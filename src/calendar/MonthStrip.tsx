@@ -20,13 +20,31 @@ interface MonthChip {
   date: Date
   year: number
   isYearStart: boolean
+  /** Chip face ("Sep") and its accessible name ("September 2026"). */
+  label: string
+  ariaLabel: string
 }
 
+// Both labels are baked in here rather than formatted in the render below:
+// the window is MONTHS_BACK + MONTHS_FORWARD + 1 chips (61 today) and each
+// needs two Intl formats, so formatting them per render meant ~122 Intl calls
+// every time this strip re-rendered — which, since `activeMonth` tracks the
+// mini-grid's swipe preview, is *during* that grid's snap animation. Profiled
+// at ~276ms of a frame that was already dropping. The strings depend only on
+// `date`, and the window is built once at mount (see the useState below), so
+// this is computed once per chip for the life of the panel.
 function buildMonths(anchor: Date): MonthChip[] {
   const chips: MonthChip[] = []
   for (let i = -MONTHS_BACK; i <= MONTHS_FORWARD; i++) {
     const date = new Date(anchor.getFullYear(), anchor.getMonth() + i, 1)
-    chips.push({ key: fmtMonth(date), date, year: date.getFullYear(), isYearStart: date.getMonth() === 0 })
+    chips.push({
+      key: fmtMonth(date),
+      date,
+      year: date.getFullYear(),
+      isYearStart: date.getMonth() === 0,
+      label: date.toLocaleDateString(undefined, { month: 'short' }),
+      ariaLabel: date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
+    })
   }
   return chips
 }
@@ -97,7 +115,7 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
               type="button"
               onClick={() => onNavigateMonth(m.date)}
               aria-current={m.key === activeKey ? 'date' : undefined}
-              aria-label={m.date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+              aria-label={m.ariaLabel}
               className={cn(
                 'shrink-0 snap-center rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                 // The current real month always reads as primary, even when
@@ -114,7 +132,7 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
                     : 'text-foreground hover:bg-muted',
               )}
             >
-              {m.date.toLocaleDateString(undefined, { month: 'short' })}
+              {m.label}
             </button>
           </div>
         )

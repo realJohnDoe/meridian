@@ -380,13 +380,19 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
             const dKey = fmtISO(d)
             const isToday = sameDay(d, today)
             const cols = colsByDay.get(dKey) ?? []
+            // Hoisted out of the hourAriaLabel closure below, which HourCells
+            // calls once per hour cell: fmtShort is an Intl date format, and
+            // leaving it inside meant 7 columns × HOURS × PANE_COUNT panes of
+            // them — profiled at ~740ms of the frame that froze a swipe. The
+            // label is per column, so it only ever needed computing here.
+            const dayLabel = fmtShort(d)
             return (
               <div key={dKey} className="relative flex-1 min-w-0">
                 <HourCells
                   date={d}
                   hour12={hour12}
                   onCreate={onCreate}
-                  hourAriaLabel={t => `Create event on ${fmtShort(d)} at ${t}`}
+                  hourAriaLabel={t => `Create event on ${dayLabel} at ${t}`}
                 />
 
                 {/* Current-time indicator, scoped to today's own column —

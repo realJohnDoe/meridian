@@ -104,6 +104,14 @@ export function TimelineScroller({
   )
 }
 
+// Merged once at module load rather than per cell: the arguments are
+// constant, and `cn` runs tailwind-merge's parser over them — which a week
+// pane was paying 7 columns × HOURS times, per mounted pane.
+const HOUR_CELL_CLASS = cn(
+  occRadius,
+  'absolute inset-x-0 bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+)
+
 interface HourCellsProps {
   /** The day a click in these cells creates into. */
   date: Date
@@ -143,7 +151,7 @@ export function HourCells({ date, hour12, onCreate, hourAriaLabel }: HourCellsPr
         <button
           key={h}
           type="button"
-          className={cn(occRadius, 'absolute inset-x-0 bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
+          className={HOUR_CELL_CLASS}
           style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
           onClick={handleHourClick(h)}
           aria-label={hourAriaLabel(formatHourBoundary(h, hour12))}
