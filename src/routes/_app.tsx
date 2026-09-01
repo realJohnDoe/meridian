@@ -8,7 +8,7 @@ import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
 import {
   useMonthPreview, useDayPreview, useWeekPreview,
-  useAgendaTopDate, requestScrollToToday, requestScrollToDate, weekStartFor,
+  useAgendaTopDate, requestScrollToToday, requestScrollToDate, weekStartFor, firstWeekStartInMonth,
   useQuickNavOpen, toggleQuickNav, closeQuickNav, MonthStrip, MiniMonth,
   useCurrentDate, setCurrentDate, weekdayKeptDate, useQuickNavSwipe,
 } from '@/calendar'
@@ -401,7 +401,16 @@ function AppMain() {
                       closeQuickNav()
                     }}
                     onBrowseMonth={d => {
-                      const iso = fmtISO(d)
+                      // `d` is the 1st of the browsed month, which routinely
+                      // isn't itself the locale's week-start weekday — landing
+                      // there literally would show (and label, via
+                      // weekDisplayStart above) whichever week contains it,
+                      // which can round backward into the *previous* month
+                      // (see firstWeekStartInMonth) and desync the topbar
+                      // label from the month strip highlighting the month
+                      // just tapped. Land on that month's first proper week
+                      // instead, so both agree.
+                      const iso = fmtISO(firstWeekStartInMonth(d, ws))
                       setCurrentDate(iso)
                       void navigate({ to: '/week/$date', params: { date: iso }, replace: true })
                     }}

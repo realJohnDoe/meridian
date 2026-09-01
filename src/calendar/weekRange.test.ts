@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { weekStartFor, weekDays, weekContains, weekNumberFor } from './weekRange'
+import { weekStartFor, weekDays, weekContains, weekNumberFor, firstWeekStartInMonth } from './weekRange'
 
 // 2026-08-12 is a Wednesday.
 const WED = new Date(2026, 7, 12)
@@ -80,6 +80,29 @@ describe('weekNumberFor', () => {
     expect(weekNumberFor(weekStartFor(new Date(2025, 11, 29), 1))).toBe(1)
     expect(weekNumberFor(weekStartFor(new Date(2025, 11, 29), 0))).toBe(1)
     expect(weekNumberFor(weekStartFor(new Date(2025, 11, 29), 6))).toBe(1)
+  })
+})
+
+describe('firstWeekStartInMonth', () => {
+  it('pushes forward to the next week start when the 1st rounds backward into the previous month', () => {
+    // Aug 1 2026 is a Saturday; a Monday-start week for it rounds back to Jul 27.
+    expect(firstWeekStartInMonth(new Date(2026, 7, 1), 1)).toEqual(new Date(2026, 7, 3))
+  })
+
+  it('is a no-op when the 1st already falls on the week-start weekday', () => {
+    // Jun 1 2026 is a Monday.
+    const june1 = new Date(2026, 5, 1)
+    expect(firstWeekStartInMonth(june1, 1)).toEqual(june1)
+  })
+
+  it('agrees across every week-start convention that the result stays in-month', () => {
+    const aug1 = new Date(2026, 7, 1)
+    for (const ws of [0, 1, 6] as const) {
+      const result = firstWeekStartInMonth(aug1, ws)
+      expect(result.getMonth()).toBe(7)
+      expect(result.getFullYear()).toBe(2026)
+      expect(weekStartFor(result, ws)).toEqual(result)
+    }
   })
 })
 
