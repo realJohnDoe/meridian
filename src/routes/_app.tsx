@@ -132,7 +132,18 @@ function AppMain() {
   // A document-level listener rather than a JSX onKeyDown on the (necessarily
   // non-interactive) panel div — jsx-a11y flags keyboard handlers on a
   // non-interactive role, and the panel itself isn't a control.
+  //
+  // Desktop's panel is a Radix Popover instead, which owns autofocus-into-
+  // Content-on-open and Escape-to-dismiss on its own — this manual version is
+  // only for the mobile inline panel below, which isn't Radix-managed (its
+  // close-focus-restore is handled separately too, see PopoverContent's own
+  // onCloseAutoFocus below). Running this same effect on desktop actively
+  // fights Radix's own FocusScope: our manual focus() moves focus outside the
+  // still-mounted, still-trapping Content, which the trap then yanks back, so
+  // by the time Content actually unmounts (after its close transition)
+  // neither attempt has stuck and focus falls through to the document body.
   useEffect(() => {
+    if (isDesktopQuickNav) return
     if (quickNavOpen) panelRef.current?.focus()
     if (!quickNavOpen) return
     const onKeyDown = (e: KeyboardEvent) => {
@@ -142,7 +153,7 @@ function AppMain() {
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [quickNavOpen])
+  }, [quickNavOpen, isDesktopQuickNav])
 
   const isDayView    = !!dayMatch
   const isWeekView   = !!weekMatch
@@ -455,7 +466,7 @@ function AppMain() {
                 non-interactive role. */}
             {!isListView && (
               <div
-                id="quickNavPanel"
+                id={isDesktopQuickNav ? undefined : 'quickNavPanel'}
                 ref={panelRef}
                 tabIndex={-1}
                 role="region"
@@ -471,8 +482,31 @@ function AppMain() {
                 </div>
               </div>
             )}
+            {/* At/above the desktop breakpoint this — not the div above,
+                permanently `inert` there — is the actual panel a keyboard/
+                screen-reader user lands in and Escape returns focus from, so
+                it (not the inline div) carries the shared "quickNavPanel" id
+                the toggle button's aria-controls and the focus-management
+                effect above key off. Radix focuses Content itself on open, no
+                help needed there — but its own default close-focus-restore
+                targets `Popover.Trigger`'s own ref, which this button isn't
+                (see `popoverAnchor`'s doc comment on PagedTopbar for why:
+                Anchor only, so the button's own onClick keeps sole ownership
+                of opening it). With no Trigger, Radix has nothing to restore
+                focus to and leaves it wherever the browser defaults to once
+                Content unmounts (the document body) — onCloseAutoFocus below
+                substitutes the toggle button as that target instead, for
+                every dismissal path (Escape, outside click), not just the
+                Escape case the mobile inline panel's own effect covers. */}
             {!isListView && (
-              <PopoverContent align="start">
+              <PopoverContent
+                id={isDesktopQuickNav ? 'quickNavPanel' : undefined}
+                align="start"
+                onCloseAutoFocus={e => {
+                  e.preventDefault()
+                  toggleButtonRef.current?.focus()
+                }}
+              >
                 {renderQuickNavPanel('buttons')}
               </PopoverContent>
             )}
