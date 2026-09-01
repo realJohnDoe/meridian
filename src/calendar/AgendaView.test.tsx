@@ -672,6 +672,16 @@ describe('AgendaView — incremental loading', () => {
     render(<AgendaView onOpen={vi.fn()} />)
     await flush()
 
+    // "Load earlier" only mounts once the viewport reaches the true top (see
+    // AgendaView's own atTop gating), and clicking it from exactly there is
+    // the scenario that used to relabel the topbar to the wrong month: the
+    // seeded window's mid-month start leans on a synthetic leading divider
+    // (assembleAgendaRows), and growing backward supersedes it with a
+    // differently-dated one — see monthDividerRow's own note on why they now
+    // carry different keys.
+    await act(async () => { scrollContainer().scrollTop = 0; await Promise.resolve() })
+    await settle()
+
     const before = calendarView.getState().agendaLoadedChunks!
     const topBefore = calendarView.getState().agendaTopDate
     const offsetBefore = scrollContainer().scrollTop

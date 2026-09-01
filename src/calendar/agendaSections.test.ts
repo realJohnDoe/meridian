@@ -158,13 +158,27 @@ function singlePassRowKeys(
   // nowhere" rule the assembly applies.
   const overdueDayKey = fmtISO(new Date(Math.max(from.getTime(), Math.min(today.getTime(), to.getTime()))))
 
+  // The run's first divider mirrors assembleAgendaRows' leading-divider
+  // special case: keyed off the opening chunk's own index (`|lead`) rather
+  // than the bare month whenever the run starts mid-month, so it can never
+  // collide with the *real* divider a later backward-grown chunk emits for
+  // that same month's true 1st — see monthDividerRow's own note.
+  const indices = range ?? testRun(anchor, ws)
+  const firstChunkIndex = indices[0]!
+  const firstDay = days[0]!
+  const isLeadingMidMonth = fmtISO(firstDay).slice(0, 7) === fmtISO(addDays(firstDay, -1)).slice(0, 7)
+
   const out: string[] = []
   let lastMonthKey = ''
   let lastWeekKey = ''
   for (const day of days) {
     const dateKey = fmtISO(day)
     const monthKey = `${day.getFullYear()}-${day.getMonth()}`
-    if (monthKey !== lastMonthKey) { lastMonthKey = monthKey; out.push(`m|${monthKey}`) }
+    if (monthKey !== lastMonthKey) {
+      lastMonthKey = monthKey
+      const isLeading = out.length === 0
+      out.push(isLeading && isLeadingMidMonth ? `m|${monthKey}|lead${firstChunkIndex}` : `m|${monthKey}`)
+    }
     const weekKey = fmtISO(weekStartFor(day, ws))
     if (weekKey !== lastWeekKey) { lastWeekKey = weekKey; out.push(`w|${weekKey}`) }
 
