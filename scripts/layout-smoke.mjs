@@ -272,6 +272,13 @@ try {
       check(scope, 'focus moves into the quick-nav panel on open', focusedInPanel)
 
       await page.keyboard.press('Escape')
+      // On desktop the panel is Radix's PopoverContent, which plays the same
+      // animate-out transition as the open above before it actually unmounts
+      // — and only unmounting runs its FocusScope's restore-focus-to-trigger
+      // effect. The mobile inline panel has no such gate (a plain CSS height
+      // transition, focus restored by _app.tsx's own Escape handler
+      // synchronously), so this wait is a no-op there.
+      await page.waitForTimeout(400) // past the 200ms close transition
       const focusedBackOnToggle = await page.evaluate(() =>
         document.activeElement === document.querySelector('[aria-controls="quickNavPanel"]'))
       check(scope, 'Escape returns focus to the quick-nav toggle button', focusedBackOnToggle)
