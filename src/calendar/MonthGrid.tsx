@@ -19,6 +19,8 @@ import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import { OccurrencePill } from './OccurrencePill'
+import { EMPTY_EXPANSION_WINDOW } from './deferredExpansionWindow'
+import { useReadyAfterMount } from './useReadyAfterMount'
 
 
 // ── CalCell ───────────────────────────────────────────────────
@@ -121,13 +123,22 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
   const showsToday = today.getFullYear() === y && today.getMonth() === m
   const now = useNow(60_000, showsToday)
 
+  // Every pane here is a fresh mount (keyed by monthKey at MonthView's own
+  // wrapping div — see useCarousel), so this is `false` for exactly the
+  // pane's first commit. While it is, the occurrence expansion below
+  // requests a cheap, reliably-empty window instead of this pane's real one,
+  // filling in on a follow-up low-priority render instead of landing in the
+  // same commit that mounts this pane. See useReadyAfterMount and DayPane's
+  // matching comment.
+  const ready = useReadyAfterMount()
+
   // useExpandWithMultiday caches by (fromMs, toMs, items structure, roots) so
   // non-structural edits (done-toggle, priority change) skip re-expansion here
   // just as they do in Agenda and Day views. Multiday events emit both a root
   // occurrence (start day) and one virtual occurrence per subsequent covered
   // day (see expandWithMultiday) — we partition those below rather than
   // switching data sources, since the shared cache already has everything we need.
-  const { from: monthFrom, to: monthTo } = dayRange(new Date(y, m, 1), new Date(y, m + 1, 0))
+  const { from: monthFrom, to: monthTo } = ready ? dayRange(new Date(y, m, 1), new Date(y, m + 1, 0)) : EMPTY_EXPANSION_WINDOW
   const allOccs = useExpandWithMultiday(items, roots, monthFrom, monthTo)
 
   // Cell grid depends only on month shape and locale week-start — independent of occurrences.

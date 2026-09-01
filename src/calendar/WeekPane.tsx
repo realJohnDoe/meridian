@@ -19,6 +19,8 @@ import { TimedBlock } from './TimedBlock'
 import { weekDays, weekContains, weekNumberFor } from './weekRange'
 import { GUTTER, COL_RIGHT_PAD, BADGE_CLASS, BADGE_H } from './timelineGeometry'
 import { TimelineScroller, HourCells, NowLine } from './timelineScaffold'
+import { EMPTY_EXPANSION_WINDOW } from './deferredExpansionWindow'
+import { useReadyAfterMount } from './useReadyAfterMount'
 
 // Fixed row height for the all-day strip's bars/pills — unlike MonthGrid's
 // rowH (measured via ResizeObserver so it can track responsive font/padding
@@ -66,7 +68,15 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
   const roots  = useStore(s => s.roots)
   const hour12 = useStore(s => s.localePrefs.hour12)
 
-  const { from: wFrom, to: wTo } = dayRange(weekStart, days[6]!)
+  // Every pane here is a fresh mount (keyed by weekStartKey at WeekView's own
+  // wrapping div — see useCarousel), so this is `false` for exactly the
+  // pane's first commit. While it is, the occurrence expansion below
+  // requests a cheap, reliably-empty window instead of this pane's real one
+  // — the expensive part for a busy week — filling in on a follow-up
+  // low-priority render instead of landing in the same commit that mounts
+  // this pane. See useReadyAfterMount and DayPane's matching comment.
+  const ready = useReadyAfterMount()
+  const { from: wFrom, to: wTo } = ready ? dayRange(weekStart, days[6]!) : EMPTY_EXPANSION_WINDOW
   const wOccs = useFilteredOccs(useExpandWithMultiday(items, roots, wFrom, wTo))
 
   // Only ticks for the pane showing today — other panes don't need a live
