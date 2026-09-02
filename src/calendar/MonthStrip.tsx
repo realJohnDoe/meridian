@@ -4,8 +4,8 @@ import { useToday } from '@/hooks'
 import { cn } from '@/lib/cn'
 
 // Deliberately not virtualized — a few dozen chips is cheap to render
-// outright, and a virtualizer would fight the browser's own scroll-snap and
-// momentum instead of riding it. The window is built once, anchored to
+// outright, and a virtualizer would fight the browser's own momentum
+// scrolling instead of riding it. The window is built once, anchored to
 // whichever month is active when the strip first mounts, and never rebuilt
 // as `activeMonth` changes afterward. Paging far enough to carry the active
 // month outside this window just means no chip reads as active; given the
@@ -118,7 +118,8 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
     else if (chipLeft < viewLeft) target = chipLeft
     if (target === undefined) return
     const max = Math.max(0, container.scrollWidth - container.clientWidth)
-    container.scrollTo({ left: Math.min(Math.max(target, 0), max), behavior: 'smooth' })
+    const left = Math.min(Math.max(target, 0), max)
+    container.scrollTo({ left, behavior: 'smooth' })
   }, [activeKey])
 
   return (
@@ -126,7 +127,7 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
       ref={containerRef}
       role="group"
       aria-label="Jump to month"
-      className="flex items-center gap-1 overflow-x-auto snap-x snap-mandatory px-3 py-2"
+      className="flex items-center gap-1 overflow-x-auto px-3 py-2"
     >
       {months.map(m => {
         const isToday = m.key === todayKey
@@ -144,7 +145,7 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
               aria-current={m.key === activeKey ? 'date' : undefined}
               aria-label={m.ariaLabel}
               className={cn(
-                'shrink-0 snap-center rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
+                'shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
                 // The current real month always reads as primary, even when
                 // it isn't the one being viewed; a viewed month that isn't
                 // today's gets a primary tint ringed in primary instead, so
