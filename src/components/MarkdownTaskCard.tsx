@@ -1,23 +1,24 @@
-import { useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { CircleFadingArrowUp } from 'lucide-react'
 import { Checkbox } from './ui/checkbox'
 import { DimmableCard } from './DimmableCard'
 import { IconButton } from './primitives/icon-button'
 import { Input } from './ui/input'
 import { cn } from '@/lib/cn'
+import { caretOffsetFromPoint } from '@/lib/caret'
 import { useScrollIntoViewAboveKeyboard } from '@/hooks'
 
 interface MarkdownTaskCardProps {
-  text:          string
-  done:          boolean
-  onToggle:      () => void
-  onPromote:     () => void
+  text:            string
+  done:            boolean
+  onToggle:        () => void
+  onPromote:       () => void
   // Inline editing — when editValue is provided the text becomes an input
-  onClickText?:  () => void
-  editValue?:    string
-  onEditChange?: (value: string) => void
-  onEditCommit?: () => void
-  onEditCancel?: () => void
+  onClickText?:    () => void
+  editValue?:      string
+  onEditChange?:   (value: string) => void
+  onEditCommit?:   () => void
+  onEditCancel?:   () => void
 }
 
 export default function MarkdownTaskCard({
@@ -26,7 +27,18 @@ export default function MarkdownTaskCard({
 }: MarkdownTaskCardProps) {
   const isEditing = editValue !== undefined
   const inputRef = useRef<HTMLInputElement>(null)
+  const caretOffsetRef = useRef<number | null>(null)
   useScrollIntoViewAboveKeyboard(isEditing, inputRef)
+
+  // Runs once per edit-session entry (not on every keystroke) so the caret
+  // lands where the user tapped, overriding the input's own autofocus
+  // placement, without fighting the user's cursor as they type afterward.
+  useLayoutEffect(() => {
+    if (!isEditing || !inputRef.current) return
+    const len = inputRef.current.value.length
+    const offset = caretOffsetRef.current == null ? len : Math.min(caretOffsetRef.current, len)
+    inputRef.current.setSelectionRange(offset, offset)
+  }, [isEditing])
 
   return (
     <DimmableCard dimmed={done} className="flex items-stretch gap-2.5 pl-2 pr-2.5 py-2">
@@ -59,7 +71,10 @@ export default function MarkdownTaskCard({
           <button
             type="button"
             className={cn('flex-1 min-w-0 text-left text-sm leading-5 font-medium truncate cursor-pointer', done ? 'line-through' : 'text-foreground')}
-            onClick={onClickText}
+            onClick={e => {
+              caretOffsetRef.current = caretOffsetFromPoint(e.clientX, e.clientY)
+              onClickText()
+            }}
           >
             {text}
           </button>
