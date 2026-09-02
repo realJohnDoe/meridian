@@ -13,7 +13,7 @@ import { Badge } from './ui/badge'
 import { DimmableCard } from './DimmableCard'
 import { SurfaceButton } from './primitives/surface-button'
 import { cn } from '@/lib/cn'
-import { occBarVariants } from './primitives/occurrence-variants'
+import { occBarVariants, VAULT_COLOR_CHIP } from './primitives/occurrence-variants'
 import TagChip from './TagChip'
 
 const EMPTY_LISTED_ON: string[] = []
@@ -119,10 +119,14 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
   // screen. Derived here rather than passed down because AgendaRow is memoized
   // and this is a global, not per-row, condition — and with a single visible
   // vault the chip would sit on every card saying nothing.
-  const sourceName = useStore(s => {
+  const sourceVault = useStore(s => {
     const visible = s.vaults.filter(v => !s.hiddenVaultIds.includes(v.id))
     if (visible.length < 2) return null
-    return visible.find(v => v.id === props.occ.metadata.vaultId)?.name ?? null
+    // Returns the vault ref itself (not a derived copy) so the selector keeps
+    // returning the same object reference across renders when nothing about
+    // the vault changed — a fresh object here would defeat useSyncExternalStore's
+    // reference-equality check and re-render in a loop.
+    return visible.find(v => v.id === props.occ.metadata.vaultId) ?? null
   })
   const barClass = occState(occ, now)
   const isPast   = barClass === 'event-past'
@@ -165,7 +169,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && (!!t || !!durationLabel))
   const hasTagsContent      = showTagsParticipants && listedOn.length > 0
-  const showMeta            = hasDateTimeContent || hasTagsContent || !!sourceName
+  const showMeta            = hasDateTimeContent || hasTagsContent || !!sourceVault
 
   return (
     <DimmableCard
@@ -221,7 +225,11 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
-            {sourceName && <Badge variant="tag">{sourceName}</Badge>}
+            {sourceVault && (
+              <Badge variant="tag" className={sourceVault.color ? VAULT_COLOR_CHIP[sourceVault.color] : undefined}>
+                {sourceVault.name}
+              </Badge>
+            )}
           </div>
         )}
       </div>

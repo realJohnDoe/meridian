@@ -18,7 +18,7 @@ import { ensureFreshAccessToken } from './githubOAuth'
 import type { OAuthTokens } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import { isWritableVault } from '@/vaultRef'
-import type { VaultRef, GitHubVaultRef, IcalVaultRef } from '@/vaultRef'
+import type { VaultRef, GitHubVaultRef, IcalVaultRef, VaultColor } from '@/vaultRef'
 import {
   getVaults, setStoreState, setVaultLayer, removeVaultLayer,
   setVaultSync, removeVaultSync, getUnreadableFiles, setUnreadableFiles,
@@ -567,6 +567,17 @@ export async function renameVault(id: string, name: string): Promise<void> {
   const trimmed = name.trim()
   if (!trimmed) return
   await updateVaultRefs(current => current.map(r => (r.id === id ? { ...r, name: trimmed } : r)))
+}
+
+/**
+ * Set (or, with `null`, clear) a registered vault's color tag.
+ *
+ * Same no-op-for-the-Tutorial-vault shape as `renameVault` above, for the
+ * same reason: `id: 'example'` is never in the persisted list this maps
+ * over, since the synthesized Tutorial vault has no ref to update.
+ */
+export async function setVaultColor(id: string, color: VaultColor | null): Promise<void> {
+  await updateVaultRefs(current => current.map(r => (r.id === id ? { ...r, color: color ?? undefined } : r)))
 }
 
 export async function addLocalVault(): Promise<void> {

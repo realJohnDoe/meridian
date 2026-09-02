@@ -5,6 +5,7 @@ import OccurrenceCard from './OccurrenceCard'
 import { setupStore, makeOcc, TEST_VAULT } from '@/test-utils'
 import { fmtShort } from '@/format'
 import { parseDateString } from '@/model'
+import { useStore } from '@/store'
 
 setupStore()
 
@@ -123,6 +124,33 @@ describe('OccurrenceCard', () => {
       const occ = makeOcc()
       render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" listedOn={['Project X']} />)
       expect(screen.getByText('Project X')).toBeInTheDocument()
+    })
+
+    it('styles the vault-source badge with the vault color when one is set', () => {
+      useStore.setState({
+        vaults: [
+          { id: TEST_VAULT, name: 'Work', kind: 'local', color: 'blue' },
+          { id: 'other-vault', name: 'Home', kind: 'local' },
+        ],
+      })
+      const occ = makeOcc()
+      render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
+      const badge = screen.getByText('Work')
+      expect(badge).toHaveClass('bg-note/15', 'border-note')
+    })
+
+    it('leaves the vault-source badge uncolored when the vault has no color', () => {
+      useStore.setState({
+        vaults: [
+          { id: TEST_VAULT, name: 'Work', kind: 'local' },
+          { id: 'other-vault', name: 'Home', kind: 'local' },
+        ],
+      })
+      const occ = makeOcc()
+      render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
+      const badge = screen.getByText('Work')
+      expect(badge).toHaveClass('bg-secondary')
+      expect(badge).not.toHaveClass('border-note')
     })
   })
 
