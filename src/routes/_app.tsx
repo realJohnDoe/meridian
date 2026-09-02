@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createFileRoute, Outlet, useNavigate, useMatch } from '@tanstack/react-router'
 import { CalendarCheck2 } from 'lucide-react'
 import { addDays, fmtTopBarMonth } from '@/format'
 import { fmtISO, fmtMonth, parseDateString, parseMonth, weekStartsOn } from '@/model'
-import { useToday, useMediaQuery } from '@/hooks'
+import { useToday, useMediaQuery, useResetOnChange } from '@/hooks'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
 import { Popover, PopoverContent } from '@/components/ui/popover'
@@ -107,6 +107,22 @@ function AppMain() {
   const currentDate   = useCurrentDate()
   const ws            = weekStartsOn(useStore(s => s.localePrefs))
   const quickNavOpen  = useQuickNavOpen()
+  // The agenda's quick-nav grid's own anchor, frozen to whatever agendaTopDate
+  // was at the moment the panel opened — NOT read live thereafter. The panel's
+  // own browse gesture drives requestScrollToDate, which moves the agenda's
+  // scroll position and therefore agendaTopDate; feeding that live value back
+  // in as anchorMonth/highlightDates re-renders MiniMonth mid-browse with a
+  // changed anchorMonth, which its own useResetOnChange reads as "the parent
+  // wants a different month" and yanks `month` back to it — the gesture's own
+  // consequence re-steering the widget that produced it. Landing off by one
+  // row (an estimate-vs-measured gap, or any future change to how the agenda
+  // seeds its scroll) is enough to trigger this, and once it does, repeated
+  // swipes can never advance past the first browsed month. useResetOnChange
+  // (render-phase, not an effect) means this updates in the same render pass
+  // `quickNavOpen` flips, so the grid still opens showing the agenda's current
+  // position — it just stops tracking it once open.
+  const [agendaQuickNavAnchor, setAgendaQuickNavAnchor] = useState(agendaTopDate)
+  useResetOnChange([quickNavOpen], () => setAgendaQuickNavAnchor(agendaTopDate))
   // Same breakpoint ResponsiveModal uses for its dialog/drawer split (md,
   // 768px) — deliberately not useSidebar's own `isMobile` (lg, 1024px),
   // which answers a different question (does the sidebar collapse behind a
@@ -314,8 +330,10 @@ function AppMain() {
     ) : !isDayView && !isWeekView && !isMonthView ? (
       <MiniMonth
         open={quickNavOpen}
-        anchorMonth={parseDateString(agendaTopDate) ?? today}
-        highlightDates={agendaTopDate ? [parseDateString(agendaTopDate) ?? today] : []}
+        // Frozen snapshot, not agendaTopDate directly — see
+        // agendaQuickNavAnchor's own doc comment above for why.
+        anchorMonth={parseDateString(agendaQuickNavAnchor) ?? today}
+        highlightDates={agendaQuickNavAnchor ? [parseDateString(agendaQuickNavAnchor) ?? today] : []}
         monthNav={monthNav}
         onSelectDay={iso => {
           requestScrollToDate(iso)
