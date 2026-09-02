@@ -1,15 +1,21 @@
-# The agenda's quick-nav swipe — implementation plan
+# The agenda's quick-nav swipe — history and open follow-up
 
-One PR remaining, and it is optional. PR 1 (stopping the agenda's own scroll
-position from steering the quick-nav grid — see `src/routes/_app.tsx`'s
-`agendaQuickNavAnchor` and `src/routes/_app.test.tsx`) and PR 2 (seeding the
+All three PRs are done: PR 1 (stopping the agenda's own scroll position from
+steering the quick-nav grid — see `src/routes/_app.tsx`'s
+`agendaQuickNavAnchor` and `src/routes/_app.test.tsx`), PR 2 (seeding the
 agenda's scroll offset instead of reconciling to it — see
-`src/calendar/AgendaView.tsx`'s scroll-to-target effect) are both done. PR 3
-is small cleanup on top of PR 2, not a fix on its own.
+`src/calendar/AgendaView.tsx`'s scroll-to-target effect), and PR 3 (the
+agenda's quick-nav browse now fires `requestScrollToDate` once per swipe, on
+commit only — see `_app.tsx`'s agenda branch of `renderQuickNavPanel`, and the
+"one browse per swipe" tests in `_app.test.tsx`). One follow-up is still
+open — see "Also worth doing: a gate, or this returns" below.
 
-**Read the "Two fixes that do not work" section before starting anything
-here.** Both are the obvious first thing to try, both were measured, and both
-make it worse.
+What remains here is the diagnosis and the traps found along the way, kept as
+reference for anyone touching this code next.
+
+**Read the "Two fixes that do not work" section before touching
+`requestScrollToDate` or the agenda's quick-nav wiring again.** Both are the
+obvious first thing to try, both were measured, and both make it worse.
 
 **Read "What PR 2 actually bought" before trusting the ms figures in "What
 is actually slow" below** — they predate PR 1, and a clean re-measurement on
@@ -110,12 +116,15 @@ Leave `requestScrollToDate` alone. The same reasoning retires the related idea
 of taking `anchorMs` out of `computeAgendaSections`' `assemblyReusable` gate:
 row assembly is not where the time goes.
 
-### ✗ Just drop the agenda's `onBrowseMonthPreview`
+### ✗ Just dropping the agenda's `onBrowseMonthPreview`, on its own, was never going to be *the* fix
 
-Measured at 645 ms busy against a 767 ms baseline, with the *worst frame
-unchanged* (370–399 ms). The commit path does the identical work; removing the
-preview relocates it rather than removing it. Worth doing (PR 3) but only as
-cleanup on top of PR 2, never as the fix.
+Measured (pre-PR-1/PR-2, at the time this was the only change on the table) at
+645 ms busy against a 767 ms baseline, with the *worst frame unchanged*
+(370–399 ms). The commit path did the identical work; removing the preview
+relocated it rather than removing it — the real fix was PR 2, not this. Landed
+anyway, afterward, as cleanup — see "PR 3, for the record" below — since
+firing `requestScrollToDate` once instead of twice is a legitimate reduction
+in work even once it stopped being load-bearing for the ms number.
 
 ---
 
@@ -171,41 +180,34 @@ belongs to PR 1.
 
 ---
 
-## PR 3 — One browse per swipe, not two (optional, small)
+## PR 3, for the record: one browse per swipe, not two
 
-`_app.tsx` passes `requestScrollToDate` as *both* `onBrowseMonth` and
-`onBrowseMonthPreview` for the agenda, on this reasoning:
+`_app.tsx` used to pass `requestScrollToDate` as *both* `onBrowseMonth` and
+`onBrowseMonthPreview` for the agenda, on the reasoning that it was "already
+cheap (no navigation)". It was not the cheapest of the three views' preview
+callbacks — day/week write one string to decoupled preview state on preview;
+the agenda's own call moved `agendaAnchor` and re-rendered the agenda's row
+list, twice per swipe (preview *and* commit), once of them squarely inside the
+snap animation.
 
-```tsx
-// Already cheap (no navigation) — same call on preview as on commit.
-onBrowseMonthPreview={d => requestScrollToDate(fmtISO(d))}
-```
+Fixed by dropping `onBrowseMonthPreview` on the agenda branch entirely.
+`MiniMonth`'s own local `browsePreview` state still keeps the panel's own
+`MonthStrip` highlight tracking the gesture live — unaffected, since that is
+local to `MiniMonth`, not `calendarView`'s `monthPreview`. **The one
+user-visible effect:** the agenda behind the panel no longer live-tracks the
+drag — it jumps once, on commit (settle), instead of previewing mid-gesture.
+If that live tracking turns out to be missed, the alternative is to keep the
+preview call but make it move only the scroll position, never `agendaAnchor`.
 
-"No navigation" is not "cheap" — it is the most expensive of the three views'
-preview callbacks. Preview fires on Embla's `select` (finger lift, animation
-starting) and commit on `settle` (animation done), so the agenda re-targets
-twice per swipe, once of them squarely inside the snap animation.
-
-Firing it once instead of twice halves the work regardless of PR 2 — it is
-cleanup worth doing on its own merits, not contingent on PR 2 having bought a
-dramatic ms number (see "What PR 2 actually bought", which it did not). Drop
-`onBrowseMonthPreview` on the agenda branch. `MiniMonth`'s own `browsePreview`
-state keeps the panel's `MonthStrip` highlight tracking the gesture without it —
-that is local state, unrelated to `calendarView`'s `monthPreview`.
-
-**This is a user-visible behaviour change** (the agenda behind the panel stops
-tracking mid-gesture and lands on commit instead), which is why it is its own
-PR rather than folded into PR 2. If that tracking is wanted, the alternative is
-to keep the preview but make it move only the scroll position, never the anchor.
-
-### Acceptance
-- `requestScrollToDate` fires **once** per swipe (spy on it, drive
-  `onPreview`/`onCommit` the way `MiniMonth.preview.test.tsx` already does).
-- Re-measure using the recipe below; busy time and `AgendaView` render count
-  should not exceed what's on `main` at the time (PR 2's own reference numbers
-  are in "What PR 2 actually bought": ~535–758 ms busy, 8–13 renders per swipe
-  on the 1 200-file vault) — there is no dramatic target to hit, just "not a
-  regression."
+Verified via `src/routes/_app.test.tsx`'s "one browse per swipe" tests
+(`requestScrollToDate` fires zero times on preview, once on commit — driven
+directly through the mocked carousel, the same way
+`MiniMonth.preview.test.tsx` drives `onPreview`/`onCommit`). Not re-measured
+in a real browser: it is a straight subtraction from an already-cheap call
+(see "What PR 2 actually bought" — the pre-PR-3 baseline already had nothing
+expensive per individual `requestScrollToDate` call), so it cannot plausibly
+regress busy time or render count, only reduce their frequency by roughly half
+on the agenda specifically.
 
 ---
 

@@ -41,6 +41,7 @@ function useMockAgendaTopDate() {
 
 interface CapturedCarouselOpts {
   unitKey: string
+  onPreview: (key: string) => void
   onCommit: (key: string) => void
 }
 let latestOpts: CapturedCarouselOpts | undefined
@@ -203,5 +204,26 @@ describe('_app — agenda quick-nav panel anchor', () => {
     // the grid was frozen at during the previous open.
     act(() => toggleQuickNav())
     expect(latestOpts!.unitKey).toBe('2026-12')
+  })
+})
+
+// PR 3 of plans/agenda-quicknav-swipe.md: the agenda branch used to pass
+// requestScrollToDate as both onBrowseMonth and onBrowseMonthPreview, firing
+// it twice per swipe (once on preview — the finger lifting, mid-animation —
+// and again on commit). Mirrors MiniMonth.preview.test.tsx's own
+// onPreview/onCommit driving pattern.
+describe('_app — agenda quick-nav panel: one browse per swipe', () => {
+  it('does not call requestScrollToDate on preview, only on commit', () => {
+    seedStore([], makeRoots('note.md'))
+    render(<AppLayout />)
+
+    act(() => toggleQuickNav())
+    expect(latestOpts!.unitKey).toBe('2026-09')
+
+    act(() => { latestOpts!.onPreview('2026-10') })
+    expect(scrollCalls).toEqual([])
+
+    act(() => { latestOpts!.onCommit('2026-10') })
+    expect(scrollCalls).toEqual(['2026-10-01'])
   })
 })

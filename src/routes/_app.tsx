@@ -340,8 +340,15 @@ function AppMain() {
           closeQuickNav()
         }}
         onBrowseMonth={d => requestScrollToDate(fmtISO(d))}
-        // Already cheap (no navigation) — same call on preview as on commit.
-        onBrowseMonthPreview={d => requestScrollToDate(fmtISO(d))}
+        // No onBrowseMonthPreview: unlike day/week's own decoupled preview
+        // state (quickNavBrowsePreview), the agenda has nothing cheap to do
+        // on preview — requestScrollToDate moves agendaAnchor and re-renders
+        // the agenda's own row list, so firing it on preview *and* commit
+        // doubles that work on every swipe for no benefit, since the panel's
+        // own highlight (MonthStrip, the highlighted day) already tracks the
+        // gesture via MiniMonth's local browsePreview state regardless. The
+        // agenda behind the panel now updates once, on commit, instead of
+        // live-tracking the drag — a deliberate, visible behaviour change.
       />
     ) : null
   )
