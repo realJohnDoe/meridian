@@ -218,15 +218,29 @@ interface Props {
   highlightDates: Date[]
   onSelectDay: (iso: string) => void
   /**
-   * Called with the 1st of the month whenever the grid's own browsed month
-   * changes — a chevron tap, a MonthStrip chip tap, or a swipe (reported as
-   * soon as its target locks in, not once it settles — see onPreview
-   * below). The caller navigates the underlying view there (without closing
-   * the panel, unlike `onSelectDay`), so browsing months here keeps the
-   * main view, its highlighted day, and this grid's own highlight all in
-   * step, without requiring an explicit day tap.
+   * Called with the 1st of the month once the grid's own browsed month
+   * *settles* — a chevron tap, a MonthStrip chip tap, or a swipe reaching
+   * commit (not preview — see onBrowseMonthPreview below). The caller
+   * navigates the underlying view there (without closing the panel, unlike
+   * `onSelectDay`), so browsing months here keeps the main view, its
+   * highlighted day, and this grid's own highlight all in step, without
+   * requiring an explicit day tap.
    */
   onBrowseMonth: (d: Date) => void
+  /**
+   * Like `onBrowseMonth`, but fired on *preview* — the swipe's target
+   * locking in, mid-gesture, well before it settles — rather than on
+   * commit. Optional: omit it for a caller with nothing cheap to do on
+   * preview (there's still `onBrowseMonth` on commit).
+   *
+   * This exists so a caller whose "browse to this month" action would
+   * otherwise be a real navigation (a route change — see day/week's own
+   * wiring in `_app.tsx`) can update cheap, decoupled preview state instead
+   * of firing that navigation on every swipe frame. A caller whose action is
+   * already cheap (agenda's `requestScrollToDate`) can just pass the same
+   * callback for both.
+   */
+  onBrowseMonthPreview?: (d: Date) => void
   /**
    * How the browsed month is paged. 'strip' (default) shows MonthStrip's
    * scrollable month-chip row below the grid — the mobile/inline panel's
@@ -255,7 +269,7 @@ interface Props {
  * (or, for a swipe still in flight, once it settles — see browsePreview).
  */
 export default function MiniMonth(props: Props) {
-  const { open, anchorMonth, highlightDates, onSelectDay, onBrowseMonth } = props
+  const { open, anchorMonth, highlightDates, onSelectDay, onBrowseMonth, onBrowseMonthPreview } = props
   const monthNav = props.monthNav ?? 'strip'
   const [month, setMonthState] = useState(anchorMonth)
   // `YYYY-MM` the swipe carousel is settling toward, set on touchend so
@@ -282,21 +296,23 @@ export default function MiniMonth(props: Props) {
     setMonthState(d)
     // Wrapped in a transition so this can't block setMonthState itself
     // landing promptly, which the carousel's own recenter depends on (see
-    // useCarousel) — onBrowseMonth is usually redundant with the transition
-    // already fired from onPreview below by the time a swipe reaches commit,
-    // but this is also the only path for a chip tap or chevron tap, neither
-    // of which goes through onPreview at all.
+    // useCarousel). This is the only path that ever calls onBrowseMonth —
+    // swipe commit, chip tap, and chevron tap all funnel through here; a
+    // live preview during the swipe goes through onBrowseMonthPreview
+    // instead (see the onPreview handler below), never this one.
     startTransition(() => onBrowseMonth(startOfMonth(d)))
   }
 
   useResetOnChange([open, fmtMonth(anchorMonth)], () => {
-    // Also gated on browsePreview being clear: onPreview above already
-    // reports a live swipe to the caller, whose navigation can echo straight
-    // back here as a new anchorMonth before the swipe has actually settled.
-    // `month` (driving this carousel's own pane recentering) must stay put
-    // until it does — see onPreview's own comment — so skip the resync
-    // while a preview is still in flight; it'll match by the time this
-    // fires again anyway, since onCommit sets `month` to the same value.
+    // Also gated on browsePreview being clear: `month` (driving this
+    // carousel's own pane recentering) must stay put for the duration of a
+    // swipe still in flight, or the recenter would fire mid-animation — see
+    // useCarousel. anchorMonth is not expected to change mid-swipe in the
+    // ordinary case (onBrowseMonthPreview below updates decoupled preview
+    // state precisely so it doesn't echo back here — see that prop's own
+    // doc comment), but this guard is cheap insurance against anchorMonth
+    // moving for some unrelated reason while browsing; it'll resync once the
+    // preview clears anyway, since onCommit sets `month` to the same value.
     if (open && browsePreview === null) setMonthState(anchorMonth)
   })
 
@@ -312,17 +328,17 @@ export default function MiniMonth(props: Props) {
     unitAt: offset => fmtMonth(new Date(month.getFullYear(), month.getMonth() + offset, 1)),
     onCommit: key => setMonth(parseMonth(key)),
     // Reports the browsed month to the caller here too (not just on commit
-    // below), so the main view it navigates — DayPane/WeekPane/Agenda,
-    // sitting behind this panel — moves as soon as the swipe's target locks
-    // in instead of only once the mini-grid's own snap animation settles.
-    // Deliberately does *not* also update `month` yet: `month` drives this
-    // carousel's own pane recentering (see useCarousel), which has to wait
-    // for the real commit below or the recenter would fire mid-animation —
-    // see the useResetOnChange guard above, which keeps anchorMonth's own
-    // echo of this navigation from doing that early either.
+    // below) via onBrowseMonthPreview — cheap, decoupled preview state, not
+    // a navigation (see that prop's own doc comment on why) — so the main
+    // view sitting behind this panel can still track the swipe as soon as
+    // its target locks in, without waiting for the mini-grid's own snap
+    // animation to settle. Deliberately does *not* also update `month` yet:
+    // `month` drives this carousel's own pane recentering (see useCarousel),
+    // which has to wait for the real commit below or the recenter would
+    // fire mid-animation.
     onPreview: key => {
       onBrowsePreview(key)
-      startTransition(() => onBrowseMonth(startOfMonth(parseMonth(key))))
+      onBrowseMonthPreview?.(startOfMonth(parseMonth(key)))
     },
     onRecentered,
   })

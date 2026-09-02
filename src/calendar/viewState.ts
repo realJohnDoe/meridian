@@ -111,6 +111,31 @@ interface CalendarViewState {
    * one view never reappears already-open on another.
    */
   quickNavOpen: boolean
+  /**
+   * `YYYY-MM-DD` the day/week route should show *instead of* its own route
+   * param, while the quick-nav mini month grid (`MiniMonth`) is being swiped
+   * — set on preview (the swipe's target locking in, mid-gesture), read by
+   * `_app.day.$date.tsx`/`_app.week.$date.tsx` in place of their `date`
+   * route param, and cleared once the real navigation (fired on commit, see
+   * `MiniMonth`'s `onBrowseMonth`) lands and the route param catches up to
+   * match it.
+   *
+   * This exists so browsing months in the quick-nav panel can still make the
+   * day/week view behind it track the gesture live, *without* paying for a
+   * real route navigation (TanStack Router matching, a full `_app` re-render)
+   * on every swipe frame — mid-drag work is exactly what routing that eagerly
+   * used to freeze. `DayPane`/`WeekPane` mounting a fresh centre pane here is
+   * cheap regardless of *why* the date prop changed (see their own `live`
+   * prop), so overriding it this way costs nothing extra once the route
+   * genuinely commits.
+   *
+   * Already the final value each route wants — the day route uses it as-is,
+   * the week route's own view-specific transform (`firstWeekStartInMonth`)
+   * is applied by whoever writes this (see `_app.tsx`'s `onBrowseMonthPreview`
+   * wiring), not by the reader, so day and week never have to agree on one
+   * shared interpretation of "the browsed date."
+   */
+  quickNavBrowsePreview: string | null
 }
 
 /** Calendar-view-local ephemeral state — scroll position, carousel previews.
@@ -129,6 +154,7 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   overdueCollapsed: false,
   currentDate: fmtISO(startOfToday()),
   quickNavOpen: false,
+  quickNavBrowsePreview: null,
 }))
 
 export function resetCalendarViewState(): void {
@@ -295,9 +321,23 @@ export function toggleQuickNav(): void {
   calendarView.setState(s => ({ quickNavOpen: !s.quickNavOpen }))
 }
 
-/** Idempotent — safe to call on every view change whether or not the panel is open. */
+/**
+ * Idempotent — safe to call on every view change whether or not the panel is
+ * open. Also clears quickNavBrowsePreview: `_app.tsx` already calls this on
+ * every `viewKind` change (not just an explicit close), which is what makes
+ * it the one safe place to guarantee a preview from the panel on the
+ * *previous* view can never leak into the next one's route file.
+ */
 export function closeQuickNav(): void {
-  calendarView.setState({ quickNavOpen: false })
+  calendarView.setState({ quickNavOpen: false, quickNavBrowsePreview: null })
+}
+
+export function useQuickNavBrowsePreview(): string | null {
+  return useZustandStore(calendarView, s => s.quickNavBrowsePreview)
+}
+
+export function setQuickNavBrowsePreview(key: string | null): void {
+  calendarView.setState({ quickNavBrowsePreview: key })
 }
 
 /**

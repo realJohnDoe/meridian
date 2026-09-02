@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO } from '@/model'
 import { useOpenEntry } from '@/hooks'
-import { setCurrentDate } from '@/calendar'
+import { setCurrentDate, useQuickNavBrowsePreview, setQuickNavBrowsePreview } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 import { newEntryRoute } from './-entryRoute'
 
@@ -16,7 +16,27 @@ function DayPage() {
   const navigate = useNavigate()
   const { date } = Route.useParams()
 
-  const dvDate = useMemo(() => new Date(date + 'T00:00:00'), [date])
+  // While the quick-nav mini month grid is being swiped, show the date it's
+  // previewing instead of this route's own param — see quickNavBrowsePreview's
+  // doc comment in viewState.ts for why (avoiding a route commit on every
+  // swipe frame) and why this alone is enough: DayView's own carousel
+  // recenters on any `date` prop change regardless of its source, and
+  // mounting a fresh centre pane here is cheap either way (see DayPane's
+  // `live` prop).
+  const quickNavPreview = useQuickNavBrowsePreview()
+  const dvDate = useMemo(
+    () => new Date((quickNavPreview ?? date) + 'T00:00:00'),
+    [date, quickNavPreview],
+  )
+
+  // Hands preview control back to the route the moment it catches up to
+  // match — comparing strings, not Dates, so this only fires once the real
+  // navigation (fired on commit, see MiniMonth's onBrowseMonth) has actually
+  // landed, never a render early. Until then dvDate above keeps tracking the
+  // preview, not this (stale) route param.
+  useEffect(() => {
+    if (quickNavPreview !== null && quickNavPreview === date) setQuickNavBrowsePreview(null)
+  }, [quickNavPreview, date])
 
   // Keeps the cross-view "current date" in sync with whichever day this route
   // is showing — mount, chevron nav, and carousel swipe-commit all go through
