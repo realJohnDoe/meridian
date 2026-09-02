@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { createFileRoute, Outlet, useNavigate, useRouter, useRouterState } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
@@ -39,14 +40,33 @@ function SettingsLayout() {
   const topbar = settingsTopbar(pathname, id => vaults.find(v => v.id === id)?.name)
   const upTo   = topbar?.backTo ?? null
 
-  // A sub-screen goes up to the list explicitly rather than through history:
-  // these screens are linkable (SyncButton points straight at a vault), so
-  // "back" there could otherwise leave Settings from a screen that has a
-  // visible parent. At the root there is no parent left, so it leaves Settings
-  // the same way the entry editor does.
+  // Whether the current sub-screen was reached by navigating forward from the
+  // settings list *within this mount* of the layout (list -> detail, pushing
+  // a history entry) as opposed to landing on it directly — a deep link
+  // (SyncButton points straight at a vault) or a page load/refresh. This ref
+  // survives across sub-route changes because the layout itself doesn't
+  // remount while staying inside `/settings/*`; it resets whenever the
+  // pathname returns to the list.
+  const cameFromListRef = useRef(false)
+  const prevPathRef      = useRef<string | null>(null)
+  useEffect(() => {
+    if (pathname === '/settings') cameFromListRef.current = false
+    else if (prevPathRef.current === '/settings') cameFromListRef.current = true
+    prevPathRef.current = pathname
+  }, [pathname])
+
+  // A sub-screen reached straight from the list pops history, same as the
+  // browser's own back button — that's what keeps the two from diverging.
+  // A sub-screen reached without the list in history (a deep link, or a
+  // fresh load) goes up to it explicitly instead: these screens are
+  // linkable, so "back" there could otherwise leave Settings from a screen
+  // that has a visible parent. At the root there is no parent left, so it
+  // leaves Settings the same way the entry editor does.
   const onBack = () => {
-    if (upTo) void navigate({ to: upTo })
-    else if (window.history.length > 1) router.history.back()
+    if (upTo) {
+      if (cameFromListRef.current) router.history.back()
+      else void navigate({ to: upTo })
+    } else if (window.history.length > 1) router.history.back()
     else void navigate({ to: '/' })
   }
 
