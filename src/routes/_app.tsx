@@ -11,7 +11,7 @@ import {
   useMonthPreview, useDayPreview, useWeekPreview,
   useAgendaTopDate, requestScrollToToday, requestScrollToDate, weekStartFor, firstWeekStartInMonth,
   useQuickNavOpen, toggleQuickNav, closeQuickNav, MonthStrip, MiniMonth,
-  useCurrentDate, setCurrentDate, weekdayKeptDate, useQuickNavSwipe,
+  useCurrentDate, setCurrentDate, weekdayKeptDate, useQuickNavSwipe, setQuickNavBrowsePreview,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
 import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
@@ -260,6 +260,12 @@ function AppMain() {
           // own commit navigations (see e.g. MonthView).
           void navigate({ to: '/day/$date', params: { date: fmtISO(d) }, replace: true })
         }}
+        // Cheap, decoupled preview instead of the navigation above —
+        // _app.day.$date.tsx reads this in place of its own route param
+        // while it's set, so the day view tracks the swipe live without a
+        // route commit on every frame. See quickNavBrowsePreview's own doc
+        // comment in viewState.ts.
+        onBrowseMonthPreview={d => setQuickNavBrowsePreview(fmtISO(d))}
       />
     ) : isWeekView && weekStartDate && weekDisplayStart ? (
       <MiniMonth
@@ -299,6 +305,11 @@ function AppMain() {
           setCurrentDate(iso)
           void navigate({ to: '/week/$date', params: { date: iso }, replace: true })
         }}
+        // Same firstWeekStartInMonth landing as the commit above, computed
+        // here rather than by the route file so day and week never have to
+        // agree on one shared interpretation of the raw browsed date — see
+        // quickNavBrowsePreview's own doc comment in viewState.ts.
+        onBrowseMonthPreview={d => setQuickNavBrowsePreview(fmtISO(firstWeekStartInMonth(d, ws)))}
       />
     ) : !isDayView && !isWeekView && !isMonthView ? (
       <MiniMonth
@@ -311,6 +322,8 @@ function AppMain() {
           closeQuickNav()
         }}
         onBrowseMonth={d => requestScrollToDate(fmtISO(d))}
+        // Already cheap (no navigation) — same call on preview as on commit.
+        onBrowseMonthPreview={d => requestScrollToDate(fmtISO(d))}
       />
     ) : null
   )

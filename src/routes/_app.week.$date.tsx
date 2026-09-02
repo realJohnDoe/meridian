@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO, weekStartsOn } from '@/model'
 import { useStore } from '@/store'
 import { useOpenEntry } from '@/hooks'
-import { setCurrentWeekKeepingWeekday } from '@/calendar'
+import { setCurrentWeekKeepingWeekday, useQuickNavBrowsePreview, setQuickNavBrowsePreview } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 import { newEntryRoute } from './-entryRoute'
 
@@ -18,7 +18,23 @@ function WeekPage() {
   const { date } = Route.useParams()
   const ws = weekStartsOn(useStore(s => s.localePrefs))
 
-  const wvDate = useMemo(() => new Date(date + 'T00:00:00'), [date])
+  // While the quick-nav mini month grid is being swiped, show the week it's
+  // previewing instead of this route's own param — see quickNavBrowsePreview's
+  // doc comment in viewState.ts (avoiding a route commit on every swipe
+  // frame) and DayPage's matching comment for why this alone is enough.
+  // Already the week-start-landed value _app.tsx's onBrowseMonthPreview
+  // computed (firstWeekStartInMonth), not the raw browsed month.
+  const quickNavPreview = useQuickNavBrowsePreview()
+  const wvDate = useMemo(
+    () => new Date((quickNavPreview ?? date) + 'T00:00:00'),
+    [date, quickNavPreview],
+  )
+
+  // Hands preview control back to the route once it catches up to match —
+  // see DayPage's matching effect for why comparing strings here is safe.
+  useEffect(() => {
+    if (quickNavPreview !== null && quickNavPreview === date) setQuickNavBrowsePreview(null)
+  }, [quickNavPreview, date])
 
   // Keeps the cross-view "current date" in sync with whichever week this
   // route is showing, preserving the weekday rather than jumping to the

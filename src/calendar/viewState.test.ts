@@ -10,6 +10,7 @@ import {
   useAgendaAnchor, useAgendaScrollTarget, useAgendaTopDate,
   requestScrollToToday, requestScrollToDate, setAgendaTopDate, markAgendaScrolled,
   setCurrentWeekKeepingWeekday,
+  useQuickNavBrowsePreview, setQuickNavBrowsePreview, toggleQuickNav, closeQuickNav,
 } from './viewState'
 
 setupStore()
@@ -32,6 +33,7 @@ describe('calendarView', () => {
       agendaAnchor: '2026-07-26',
       agendaScrollTarget: '2026-07-26',
       agendaTopDate: '2026-07-26',
+      quickNavBrowsePreview: '2026-07-01',
     })
 
     resetCalendarViewState()
@@ -42,6 +44,7 @@ describe('calendarView', () => {
     expect(calendarView.getState().monthPreview).toBeNull()
     expect(calendarView.getState().dayPreview).toBeNull()
     expect(calendarView.getState().weekPreview).toBeNull()
+    expect(calendarView.getState().quickNavBrowsePreview).toBeNull()
     // Not null: the agenda's resting default is "scroll to today" — see the
     // agendaScrollTarget doc in viewState.ts.
     expect(calendarView.getState().agendaScrollTarget).toBe(fmtISO(startOfToday()))
@@ -93,6 +96,40 @@ describe('useMonthPreview / useDayPreview', () => {
     expect(calendarView.getState().monthPreview).toBe('2026-08')
     expect(calendarView.getState().dayPreview).toBe('2026-08-01')
     expect(calendarView.getState().weekPreview).toBe('2026-08-10')
+  })
+})
+
+describe('useQuickNavBrowsePreview / closeQuickNav', () => {
+  it('starts null and reflects setQuickNavBrowsePreview writes reactively', () => {
+    const { result } = renderHook(() => useQuickNavBrowsePreview())
+    expect(result.current).toBeNull()
+
+    act(() => setQuickNavBrowsePreview('2026-08-01'))
+    expect(result.current).toBe('2026-08-01')
+
+    act(() => setQuickNavBrowsePreview(null))
+    expect(result.current).toBeNull()
+  })
+
+  // The day/week route files fall back from this to their own route param
+  // the moment it's null (see _app.day.$date.tsx/_app.week.$date.tsx) — so
+  // a preview left set past its relevance would mis-render whichever route
+  // reads it next. closeQuickNav is the one call already made on every view
+  // change (see its own doc comment), which is what makes it the safe place
+  // to guarantee that never happens, independent of MiniMonth's own
+  // mount/unmount lifecycle.
+  it('closeQuickNav clears a pending browse preview, not just quickNavOpen', () => {
+    act(() => {
+      toggleQuickNav()
+      setQuickNavBrowsePreview('2026-08-01')
+    })
+    expect(calendarView.getState().quickNavOpen).toBe(true)
+    expect(calendarView.getState().quickNavBrowsePreview).toBe('2026-08-01')
+
+    act(() => closeQuickNav())
+
+    expect(calendarView.getState().quickNavOpen).toBe(false)
+    expect(calendarView.getState().quickNavBrowsePreview).toBeNull()
   })
 })
 

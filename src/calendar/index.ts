@@ -11,6 +11,7 @@ export {
   resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useWeekPreview, useAgendaTopDate, requestScrollToToday,
   requestScrollToDate, useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay, setCurrentWeekKeepingWeekday,
   weekdayKeptDate, useQuickNavOpen, toggleQuickNav, closeQuickNav,
+  useQuickNavBrowsePreview, setQuickNavBrowsePreview,
 } from './viewState'
 export { useQuickNavSwipe } from './useQuickNavSwipe'
 export { default as MonthStrip } from './MonthStrip'
