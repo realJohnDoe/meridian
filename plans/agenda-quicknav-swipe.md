@@ -1,270 +1,348 @@
-# The agenda's quick-nav swipe is still janky — and it is not the pane cost
+# The agenda's quick-nav swipe — implementation plan
 
-`plans/calendar-swipe-cheap-panes.md` chased the mini-month swipe freeze into
-the day/week **pane DOM** (840 hour cells) and fixed it there. That work
-landed and holds: day view's swipe cost is now essentially flat in vault size.
-The agenda's is not, and it was never in scope — that plan lists "the agenda
-view's virtualizer" under *Out of scope*.
+Three PRs. Not nonfixable: PR 2 is the one that matters and it is a contained
+change to one layout effect. PR 1 exists because without it PR 2's acceptance
+test silently lies. PR 3 is small and optional.
 
-The remaining jank is a different bug on a different axis. It is not the panes,
-not `Intl`, and not occurrence expansion being slow. It is that **one quick-nav
-swipe on the agenda invalidates and rebuilds the agenda's entire data pipeline,
-twice, inside the snap animation's own frames.**
+**Read the "Two fixes that do not work" section before starting.** Both are
+the obvious first thing to try, both were measured, and both make it worse.
 
-## What was measured
+---
 
-Dev server (the large-vault generator is dev-only), Chromium 141, 412×915,
-`hasTouch`, unthrottled, generated vault via `meridian_bigvault`. Real touch
-events via CDP `Input.dispatchTouchEvent`. The measurement window is
-**touchend → +900 ms** — the snap animation, i.e. exactly the interval that has
-to stay smooth. Absolute ms carry dev-React overhead; read the columns against
-each other, not as shipped latency.
+## What is actually slow
 
-At 1 200 files, 3–4 swipes per view:
+Measured on the dev server (the large-vault generator is dev-only), Chromium
+141, 412×915, `hasTouch`, unthrottled, 1 200-file generated vault, real touch
+events via CDP. The window is **touchend → +900 ms**. Absolute ms carry
+dev-React overhead — compare columns, not against a shipped budget. Recipe at
+the bottom.
 
-| view | main-thread busy in the window | worst frame | long tasks per swipe |
+| view | busy | worst frame | long tasks/swipe |
 |---|---|---|---|
-| **agenda** | **698–767 ms** | **373–409 ms** | **3** (250–327 ms) |
+| **agenda** | **698–767 ms** | **373–409 ms** | **3** |
 | week | 392–399 ms | 159–204 ms | 2 |
 | day | 278–323 ms | 95–127 ms | 1 |
 
-Which matches the report exactly: barely noticeable on day and week, plainly
-wrong on the agenda.
+Agenda scales with vault size where day does not (day is DOM-proportional and
+PR1 of `calendar-swipe-cheap-panes.md` already fixed that axis):
 
-### It scales with the vault, which is the tell
-
-| vault | agenda busy / worst frame | day busy / worst frame |
+| vault | agenda busy / worst | day busy / worst |
 |---|---|---|
 | 300 | 555 ms / 300 ms | 205 ms / 92 ms |
 | 1 200 | 698 ms / 373 ms | 278 ms / 95 ms |
 | 3 000 | **1 389 ms / 855 ms** | 296 ms / 142 ms |
 
-Day view's swipe is DOM-proportional and roughly constant — that is PR1 working
-as designed. The agenda's is **data**-proportional: 2.5× the busy time from 300
-to 3 000 files, and a worst frame that has crossed a second. A user with a real
-vault feels this long before 3 000 files.
-
-### Call counts per single swipe (instrumented, agenda)
+The cost is **not** occurrence expansion and **not** row assembly. Instrumented
+on a grown loaded run, one swipe produces:
 
 ```
-requestScrollToDate      2      <- fired on preview AND again on commit
-computeAgendaSections    1      full miss (not the fast path)
-assembleAgendaRows       1      the whole flat row list, rebuilt
-computeExpansionCache    2      full re-expansions
+rows in the list          6 460
+goToRowIndex              ~3 400      <- the scroll crosses ~3 400 rows
+virtualizer.scrollToIndex 2           <- once on preview, once on commit
+AgendaView renders        8–11
 ```
 
-Day and week: `requestScrollToDate` **0**. None of this runs for them.
+`AgendaView.tsx`'s layout effect calls
+`virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })` across thousands
+of rows whose sizes are mostly *estimates* (`ROW_H_PLAIN` 50 vs a measured 68).
+TanStack Virtual reaches such a target iteratively — scroll, measure, correct,
+re-scroll — and each correction re-renders `AgendaView`, which carries
+`'use no memo'` for the virtualizer and therefore re-runs its whole body. The
+profile is dominated by `jsxDEV`, `addValueToProperties`, `createElement`,
+`measureElement` — React and the virtualizer, not `model/`.
 
-## The cause
+`computeAgendaScrollRestore.ts` already documents this exact cost for the mount
+path and already solves it there:
 
-`src/routes/_app.tsx`, agenda branch of `renderQuickNavPanel`:
+> Starting at 0 meant the first painted frame showed the oldest day in the
+> window, and the correction that followed cost a full unmount/remount of the
+> viewport (traced at 66 ms […]) plus a round of TanStack's rAF scroll
+> reconciliation.
 
-```tsx
-onBrowseMonth={d => requestScrollToDate(fmtISO(d))}
-// Already cheap (no navigation) — same call on preview as on commit.
-onBrowseMonthPreview={d => requestScrollToDate(fmtISO(d))}
-```
+…and it names the one case it cannot cover:
 
-That comment is the bug. "No navigation" is not the same as "cheap".
-`onBrowseMonthPreview` exists precisely so a caller can do something *cheap*
-mid-gesture instead of a route commit (see `quickNavBrowsePreview`'s doc in
-`viewState.ts`) — day and week honour that by writing one string. The agenda
-passes the most expensive callback in the file, on the strength of it not being
-a `navigate()`.
+> The case it still carries on its own is the Today button (or a sidebar jump)
+> pressed while the agenda is already mounted, where there is no new mount and
+> therefore no `initialOffset` to seed.
 
-`requestScrollToDate` (`src/calendar/viewState.ts`) is three commands in one:
+A quick-nav browse is that case, fired twice per swipe, inside the snap
+animation. **The fix is to give the already-mounted path the same seeded-offset
+treatment the mount path gets.**
+
+---
+
+## Two fixes that do not work
+
+Both were implemented and measured. Do not re-attempt them; if a future change
+seems to call for one, re-measure first.
+
+### ✗ Don't null `agendaLoadedChunks` in `requestScrollToDate`
+
+The tempting one-liner. `requestScrollToDate` currently does:
 
 ```ts
 calendarView.setState({ agendaAnchor: dateKey, agendaScrollTarget: dateKey, agendaLoadedChunks: null })
 ```
 
-Each leg detonates something, all inside the snap animation:
+Nulling the run reseeds it to three chunks and evicts cached chunks, which
+looks like pure waste. It is not: **the reseed is also what keeps the scroll
+short.** It shrinks `rows` and re-centres the run on the anchor, so
+`scrollToIndex` has a few hundred rows to cross instead of several thousand.
 
-1. **`agendaLoadedChunks: null`** — `useAgendaLoadedRun` reseeds the run to
-   three chunks around the new anchor. `chunkOccs` changes identity, and
-   `useAgendaChunks`' eviction effect *deletes every cached chunk outside the
-   new run* — including chunks the user paid for by scrolling. Swipe back and
-   they are re-expanded from scratch.
-2. **`agendaAnchor`** — `computeAgendaSections`' assembly gate includes
-   `prev.anchorMs === anchorMs`, so a moved anchor forces a full
-   `assembleAgendaRows` over the whole run. New `rows` identity then cascades
-   into `useVirtualFlip` (glide animation armed), `computeAgendaScrollRestore`,
-   and `useAnchoredAgendaScroll`.
-3. **`agendaScrollTarget`** — AgendaView's layout effect runs
-   `virtualizer.scrollToIndex()` (synchronous scroll + re-measure; `measureElement`
-   and `Virtualizer.getMeasurements` are both visible in the profile) and then
-   `markAgendaScrolled()`, **a second store write**, which re-renders `_app` and
-   AgendaView again.
+Removing it — in either the "keep the run" or the "extend the run to cover the
+anchor" form — measured, on a grown run:
 
-And because preview and commit both call it, all of that happens twice per
-swipe.
+| | busy | AgendaView renders per swipe |
+|---|---|---|
+| baseline | 1 328 ms | 8 → 11 → 11 |
+| reseed removed | **4 260 ms** | 9 → 32 → **110** |
 
-### Counterfactuals — each leg isolated (agenda, 1 200 files)
+Leave `requestScrollToDate` alone. The same reasoning retires the related idea
+of taking `anchorMs` out of `computeAgendaSections`' `assemblyReusable` gate:
+row assembly is not where the time goes.
 
-| variant | busy | worst frame | long tasks |
-|---|---|---|---|
-| baseline | 767 ms | 162–409 ms | 3 |
-| drop `agendaLoadedChunks: null` | **129 ms** | **47–53 ms** | **0** (swipes 2+) |
-| drop `agendaScrollTarget` | 245 ms | 113–373 ms | 1 |
-| drop `onBrowseMonthPreview` entirely | 645 ms | 370–399 ms | 3 |
+### ✗ Just drop the agenda's `onBrowseMonthPreview`
 
-Two things to read off this:
+Measured at 645 ms busy against a 767 ms baseline, with the *worst frame
+unchanged* (370–399 ms). The commit path does the identical work; removing the
+preview relocates it rather than removing it. Worth doing (PR 3) but only as
+cleanup on top of PR 2, never as the fix.
 
-- The chunk-run invalidation is the dominant term by a wide margin — **−83 %**
-  on its own. (It is a diagnostic, not a shipped fix: dropped unconditionally,
-  a browse far from today never loads the chunks it needs.)
-- **Removing the preview does not help.** The commit still does the same work;
-  it just lands in one larger blob at settle. The preview/commit split moves
-  cost around, it does not remove it. Anything framed as "make the preview
-  cheaper" is treating the symptom.
+---
 
-## Why it has been hard to decouple — the architectural half
+## PR 1 — Stop the agenda's own scroll position from steering the quick-nav grid
 
-Five to ten PRs of making things cheaper hit diminishing returns because
-"cheaper" is the wrong axis. Six structural reasons, roughly in order of how
-much they matter:
+**Small. Do this first.** It is a latent correctness bug today and it will
+silently corrupt PR 2's acceptance test if left in place.
 
-**1. The snap animation is main-thread JS, not a compositor animation.** Embla
-advances the pane by writing `transform` from its own rAF loop. Every
-millisecond React spends in that frame is a millisecond the transform does not
-move. So decoupling cannot mean "make the work cheaper" — it has to mean *do
-not run it in those ~350 ms at all*. Every fix that reduced work rather than
-relocating it bought a proportional, and therefore small, improvement.
+### The bug
 
-**2. Render-phase cache writes make the work non-deferrable.**
-`useAgendaLoadedRun` writes Zustand state during render; `useAgendaChunks`,
-`useExpandWithMultiday` and `useAgendaSections` write module-level caches during
-render. Each is individually justified in a comment, and each justification is
-correct (idempotent, StrictMode-safe). The aggregate is not: a pipeline that
-mutates module state during render cannot be wrapped in `startTransition` or
-`useDeferredValue`, because a transition render React discards has *already*
-mutated the caches, and a render-phase `setState` forces a synchronous
-re-render. The one escape hatch React offers for "do this, but not now" is
-structurally unavailable to the agenda.
+`src/routes/_app.tsx`, agenda branch of `renderQuickNavPanel`:
 
-**3. A cost contract that lives only in a doc comment.**
-`onBrowseMonthPreview`'s contract is "cheap, decoupled preview state". Nothing
-type-checks, tests, or lints it. The agenda's implementation violates it while
-citing it. A contract about *cost* needs a *measurement* to enforce it — see
-the gate proposed below.
-
-**4. Compound commands.** `requestScrollToDate` bundles anchor move + scroll
-request + cache invalidation. Every caller pays for all three whatever it
-wanted. A quick-nav browse wants one of them.
-
-**5. Invalidation keyed on view intent rather than on data.** Both
-`agendaAnchor` (in the sections cache gate) and `agendaLoadedChunks` treat
-*where the user is looking* as an input to a *data* cache. So a purely
-navigational gesture — which changes no occurrence, no filter, no item —
-invalidates occurrence caches. `agendaChunks.ts` already went to some trouble to
-make the chunk grid epoch-absolute *specifically so a moved anchor reuses
-chunks*; nulling the run throws that property away one layer up.
-
-**6. A feedback loop through the shared store.** swipe → `requestScrollToDate`
-→ AgendaView scrolls → `markAgendaScrolled` → `agendaTopDate` → `_app.tsx`
-re-renders → `MiniMonth`'s `anchorMonth` prop changes → **the grid currently
-being swiped re-renders mid-animation**. The gesture's own downstream effect
-comes back round and re-renders the gesture's own widget. `_app.tsx` subscribes
-to six `calendarView` slices and renders the topbar, both quick-nav panel
-sites, and the `Outlet`, so the blast radius of any of these writes is the whole
-app shell. AgendaView's necessary `'use no memo'` (for the virtualizer) means
-its full body re-runs each time.
-
-**7. Nothing in `src/` can see any of it.** jsdom has no layout engine and no
-frame budget. `MiniMonth.preview.test.tsx` pins the *order* of preview and
-commit but not their *cost*. This is why the class of bug keeps returning.
-
-## What to do
-
-In rough order of value per unit of risk.
-
-### 1. Don't reseed the loaded run when the target is already loaded
-
-The single biggest win (−83 % measured). `requestScrollToDate` should null
-`agendaLoadedChunks` only when `dateKey` falls outside the current run:
-
-```ts
-export function requestScrollToDate(dateKey: string): void {
-  const { agendaLoadedChunks: run } = calendarView.getState()
-  const target = chunkIndexFor(parseDateString(dateKey)!, ws)
-  const loaded = run !== null && target >= run.first && target <= run.last
-  calendarView.setState({
-    agendaAnchor: dateKey,
-    agendaScrollTarget: dateKey,
-    ...(loaded ? null : { agendaLoadedChunks: null }),
-  })
-}
+```tsx
+anchorMonth={parseDateString(agendaTopDate) ?? today}
+highlightDates={agendaTopDate ? [parseDateString(agendaTopDate) ?? today] : []}
 ```
 
-`ws` is the wrinkle: this is a plain setter with no hook context. Either thread
-it from the caller or keep the locale week-start in `calendarView` — decide
-before starting. Browsing one month at a time is inside the seeded ±1-chunk run
-(84 days) essentially always, so the common gesture becomes free; a distant jump
-still reseeds correctly.
+`agendaTopDate` is written by `markAgendaScrolled` and by `setAgendaTopDate` on
+every agenda scroll event. So: swipe the grid → agenda scrolls → `agendaTopDate`
+changes → `_app` re-renders → `MiniMonth`'s `anchorMonth` prop changes →
+`useResetOnChange([open, fmtMonth(anchorMonth)])` fires → `month` is yanked back.
+The gesture's own consequence re-steers the widget that produced it.
 
-### 2. Stop the anchor from invalidating row assembly
+Today it usually survives, because `scrollToIndex` lands exactly on the target
+row so `agendaTopDate` agrees with the month just browsed. It stops surviving
+the moment the landing is off by one row. Observed directly while prototyping
+PR 2: with a seeded offset the top row came back as `2026-09-30` instead of
+`2026-10-01`, `anchorMonth` reverted to September, and **three consecutive
+swipes all navigated Sep → Oct**, never reaching November. Any change to how
+the agenda lands re-triggers this.
 
-Even with #1, `anchorMs` in `computeAgendaSections`' `assemblyReusable` gate
-forces a full `assembleAgendaRows` per swipe. The anchor's only jobs there are
-seeding an empty section for the anchor day and computing `goToRowIndex`.
-Deriving `goToRowIndex` by looking the row up in the assembled list — rather
-than baking `anchor` into the cache key — makes an anchor move free whenever
-the rows themselves did not change.
+### The fix
 
-### 3. Get the scroll out of the animation frames
+Give the agenda's panel a browsed month that is not re-derived from the agenda's
+scroll position while the panel is open. Day and week already have this shape —
+they read `quickNavBrowsePreview` in place of their route param (see its doc
+comment in `viewState.ts` and `_app.day.$date.tsx`). The agenda has no route
+param to override, so the equivalent is: freeze the anchor month when the panel
+opens, and let `MiniMonth`'s own `month` state own it from there.
 
-The `agendaScrollTarget` leg is 2 of the 3 long tasks (767 → 245 ms when
-dropped). The scroll does not need to happen at `select`; it needs to happen
-once, when the gesture is done. Either fire the agenda's browse only from
-`onBrowseMonth` — while keeping *some* cheap preview so the panel's own
-highlight still tracks — or have AgendaView defer `scrollToIndex` until the
-carousel reports `onRecentered`.
+`MiniMonth` is already built for this — its doc comment says so:
 
-Note the measured trap: dropping the preview *without* doing #1 and #2 makes
-the worst frame slightly worse, because all the work relocates to settle. #3 is
-only worth doing on top of the first two.
+> Browsing is still locally tracked (`month` below) rather than driven straight
+> off `anchorMonth`, so a parent re-render mid-browse […] can't yank the grid
+> back to some earlier month
 
-### 4. Collapse the double fire
+`useResetOnChange` only guards against this *during* a swipe (`browsePreview !==
+null`). Between swipes the guard is down. The cleanest fix is for `_app.tsx` to
+stop feeding it a moving target: pass the `agendaTopDate` captured at the moment
+`quickNavOpen` flipped true, not the live value.
 
-`requestScrollToDate` runs twice per swipe with the same date. Once #1 and #2
-land the second call is nearly free, but a guard (bail when the anchor already
-equals `dateKey` and nothing else moved) removes it outright.
+Implementation is open — pick whichever is smaller:
+- a `useRef`/`useState` in `_app.tsx` latched on `quickNavOpen`'s rising edge; or
+- reuse `quickNavBrowsePreview` for the agenda too, so all three views go
+  through one mechanism (the tidier option; `closeQuickNav` already clears it).
 
-### 5. Put a gate on it, or this comes back
+`highlightDates` should follow the same value, so the highlighted day and the
+shown month cannot disagree.
 
-There is no regression test for any of this, and this is the third distinct
-root cause found for the same user-visible symptom. Two options, cheapest
-first:
+### Files
+- `src/routes/_app.tsx` (agenda branch of `renderQuickNavPanel`, ~line 315–327)
+- possibly `src/calendar/viewState.ts` if the `quickNavBrowsePreview` route is taken
+- `src/routes/-pagedTopbar.test.tsx` / a new case in `MiniMonth.test.tsx`
 
-- **A unit-level cost assertion.** Drive `MiniMonth`'s `onPreview`/`onCommit`
-  the way `MiniMonth.preview.test.tsx` already does, with a spy on
-  `computeExpansionCache` / `assembleAgendaRows`, and assert a browse inside the
-  loaded run triggers **zero** full expansions and **zero** row re-assemblies.
-  Runs in jsdom, catches the actual regression, no browser needed.
-- **A frame-budget smoke check**, alongside `scripts/layout-smoke.mjs`, using
-  the recipe below.
+### Acceptance
+- **Regression test, and it must fail before the fix:** open the agenda's
+  quick-nav panel, drive `MiniMonth`'s `onCommit` three times, assert
+  `calendarView.getState().agendaAnchor` has advanced **three** months. Force
+  the boundary condition by setting `agendaTopDate` to the last day of the
+  previous month between commits — that is the state the real scroll lands in.
+- Closing and reopening the panel still re-syncs the grid to wherever the
+  agenda now is (that is `open` in `useResetOnChange`'s deps, and it must keep
+  working).
+
+---
+
+## PR 2 — Seed the agenda's scroll offset instead of reconciling to it
+
+**The fix.** Measured on a grown run, baseline vs. prototype:
+
+| | busy | worst frame | long tasks |
+|---|---|---|---|
+| baseline | 1 328 ms | 470–659 ms | 3 |
+| seeded offset | **359 ms** | **92–201 ms** | 1–3 |
+
+### The change
+
+`src/calendar/AgendaView.tsx`, the scroll layout effect (~line 231):
+
+```ts
+useLayoutEffect(() => {
+  if (!scrollTarget || goToRowIndex < 0 || !scRef.current) return
+  virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })   // <- this
+  lastTopRef.current = scrollTarget
+  anchorAt(goToRowIndex, scrollTarget)
+  markAgendaScrolled(scrollTarget)
+}, [scrollTarget, goToRowIndex, virtualizer, anchorAt])
+```
+
+Replace the `scrollToIndex` with a direct offset write, computed by the function
+the mount path already uses:
+
+```ts
+scRef.current.scrollTop = offsetOfRow(rows, goToRowIndex, agendaScrollMeasurements)
+```
+
+`offsetOfRow` lives in `src/calendar/computeAgendaScrollRestore.ts` and is
+currently module-private — export it. It sums measured sizes where the snapshot
+has them and `estimateRow` elsewhere, which is exactly the arithmetic the
+virtualizer would otherwise arrive at iteratively. One write, one scroll event,
+no reconciliation loop.
+
+### The trap this creates, and what to do about it
+
+A summed offset is **not exact** where rows are unmeasured, so the landing row
+can be off by one. That is the off-by-one that broke navigation in the prototype
+(see PR 1). PR 1 removes the catastrophic consequence; this PR should also
+correct the landing itself:
+
+- After the seeded write, on the **next frame only**, check whether the row at
+  the top is `goToRowIndex`; if not, issue a single
+  `virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })`. Starting a few
+  pixels out, that converges immediately — the same argument
+  `computeAgendaScrollRestore`'s doc already makes for the mount path ("the seed
+  is still only an estimate on a cold start, so AgendaView keeps a corrective
+  scrollToIndex — but it now starts from a few pixels out instead of a year").
+- Do **not** make the correction unconditional or recursive; one bounded pass.
+
+`lastTopRef` / `anchorAt` / `markAgendaScrolled` keep their current order — they
+record the *intended* target, which is still correct.
+
+### Files
+- `src/calendar/AgendaView.tsx` (the one layout effect)
+- `src/calendar/computeAgendaScrollRestore.ts` (export `offsetOfRow`)
+- `src/calendar/AgendaView.test.tsx`, `src/calendar/computeAgendaScrollRestore.test.ts`
+
+### Watch out
+- **jsdom has no layout engine**, so `scrollTop` writes and `measureElement` are
+  both inert there. Existing AgendaView tests assert on `scrollToIndex` being
+  called — some will need to assert on the seeded offset instead. Do not "fix" a
+  failing test by reinstating the unconditional `scrollToIndex`.
+- `useVirtualFlip` is armed by a `rows` identity change and skipped while
+  `isScrolling`. A seeded write is a single synchronous scroll, so
+  `virtualizer.isScrolling` may read `false` where it used to read `true` —
+  check that a browse does not now trigger a full-list glide animation.
+- Do not touch `requestScrollToDate` (see "Two fixes that do not work").
+
+### Acceptance
+- Re-run the recipe below **with a grown run** (`GROW` step — scroll the agenda
+  to the end ~10 times before opening the panel). A narrow 3-chunk run hides the
+  entire bug; measuring only the fresh-mount state is how this was missed before.
+- Target: busy < 400 ms and worst frame < 250 ms at 1 200 files, against the
+  1 328 ms / 470–659 ms baseline.
+- `AgendaView` renders per swipe must not exceed the current 8–11.
+- Sanity-check the Today button and the sidebar Agenda jump by hand — they go
+  through the same effect.
+
+---
+
+## PR 3 — One browse per swipe, not two (optional, small)
+
+`_app.tsx` passes `requestScrollToDate` as *both* `onBrowseMonth` and
+`onBrowseMonthPreview` for the agenda, on this reasoning:
+
+```tsx
+// Already cheap (no navigation) — same call on preview as on commit.
+onBrowseMonthPreview={d => requestScrollToDate(fmtISO(d))}
+```
+
+"No navigation" is not "cheap" — it is the most expensive of the three views'
+preview callbacks. Preview fires on Embla's `select` (finger lift, animation
+starting) and commit on `settle` (animation done), so the agenda re-targets
+twice per swipe, once of them squarely inside the snap animation.
+
+After PR 2 each call is cheap, so this is cleanup rather than the fix. Drop
+`onBrowseMonthPreview` on the agenda branch. `MiniMonth`'s own `browsePreview`
+state keeps the panel's `MonthStrip` highlight tracking the gesture without it —
+that is local state, unrelated to `calendarView`'s `monthPreview`.
+
+**This is a user-visible behaviour change** (the agenda behind the panel stops
+tracking mid-gesture and lands on commit instead), which is why it is its own
+PR rather than folded into PR 2. If that tracking is wanted, the alternative is
+to keep the preview but make it move only the scroll position, never the anchor.
+
+### Acceptance
+- `requestScrollToDate` fires **once** per swipe (spy on it, drive
+  `onPreview`/`onCommit` the way `MiniMonth.preview.test.tsx` already does).
+- Re-measure; it should be at or below PR 2's number, never above.
+
+---
+
+## Also worth doing: a gate, or this returns
+
+This is the **third** distinct root cause found for one user-visible symptom,
+and nothing in `src/` can see any of them — jsdom has no layout engine and no
+frame budget, and `MiniMonth.preview.test.tsx` pins the *order* of
+preview/commit but not their cost.
+
+Cheapest useful gate, no browser needed: a test that drives a quick-nav browse
+and asserts a **bound on `scrollToIndex` calls and on `AgendaView` render
+count**. Both were the actual regression signal here (8–11 renders healthy, 110
+broken), both are observable in jsdom, and both are stable numbers.
+
+Add it in whichever PR lands first that makes it pass.
+
+---
 
 ## Reproducing the measurement
 
-Not committed as a script (`scripts/perf/` is already under an expiry notice —
-see `plans/vault-scaling-results.md`); the recipe is the artefact.
+Not committed as a script — `scripts/perf/` is already under an expiry notice
+(see `plans/vault-scaling-results.md`). The recipe is the artefact.
 
-1. `pnpm exec vite --port 5201 --strictPort` — the **dev** server, because
-   `meridian_bigvault` is gated on `import.meta.env.DEV`. (`vite build` sets
+1. `pnpm exec vite --port 5201 --strictPort` — the **dev** server.
+   `meridian_bigvault` is gated on `import.meta.env.DEV`, and `vite build` sets
    `DEV=false` whatever `--mode` says, so a built bundle cannot carry the
-   generator.)
+   generator.
 2. Playwright at `viewport 412×915`, `hasTouch`, `isMobile`. `addInitScript`
-   setting `meridian_bigvault` and `meridian_locale_prefs`
+   setting `meridian_bigvault` (`'1200'`) and `meridian_locale_prefs`
    (`{hour12:false, firstDayOfWeek:1}`), plus a rAF loop recording
    `[timestamp, delta]` pairs and a `longtask` PerformanceObserver.
-3. Load the view, then **wait for quiet** — no long task for 1.5 s — or vault
-   parse/expand is still running and contaminates everything.
-4. Click `[aria-controls="quickNavPanel"]`. Find the **on-screen**
-   `#quickNavPanel [data-slot="calendar"]`; the buffer panes sit at negative x
+3. Load `/meridian/`, then **wait for quiet** — no long task for 1.5 s — or the
+   vault parse/expand is still running and contaminates everything.
+4. **Grow the loaded run** before measuring: scroll the agenda's
+   `.overflow-y-auto` container to `scrollHeight` ~10 times, 450 ms apart, then
+   settle mid-list. Skipping this measures a 3-chunk run and hides the bug.
+5. Click `[aria-controls="quickNavPanel"]`. Find the **on-screen**
+   `#quickNavPanel [data-slot="calendar"]` — the buffer panes sit at negative x
    and dragging one measures nothing.
-5. Drive the drag with CDP `Input.dispatchTouchEvent` — Embla 8 listens for
+6. Drive the drag with CDP `Input.dispatchTouchEvent`. Embla 8 listens for
    `touchstart`/`touchmove`/`touchend` and `mousedown`/`mousemove`/`mouseup`,
-   **not** pointer events, so synthetic `PointerEvent`s are silently ignored
-   and the swipe appears free.
-6. Cut the frame log to `[touchend, touchend + 900 ms]`. That window — not the
-   whole gesture — is the number that corresponds to the reported jank.
+   **not** pointer events — synthetic `PointerEvent`s are silently ignored and
+   the swipe appears free.
+7. Cut the frame log to `[touchend, touchend + 900 ms]`. Take **3–4 swipes per
+   run and read swipes 2+**: the first swipe from a fresh panel is not
+   representative, and the runaway cases only appear from the second onward.
+8. Useful probes while iterating (temporary, not committed): a counter in
+   `AgendaView`'s body (renders), one at the `scrollToIndex` call, and
+   `goToRowIndex` / `rows.length` / `agendaAnchor` read at the end of the window.
+   `agendaAnchor` failing to advance across swipes is the PR 1 bug.
