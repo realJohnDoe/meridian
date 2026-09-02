@@ -6,9 +6,11 @@ real production regression (the Today button drifting to the wrong day on
 repeated presses, and the cold-start landing itself off by several rows), and
 reverted** — see "PR 2 — implemented, shipped, reverted" below, now required
 reading before anyone re-attempts a seeded-offset approach to this effect.
-PR 3 (`#913`, on hold per an explicit request, independent of PR 2's fate) is
-still open. One further follow-up is still outstanding — see "Also worth
-doing: a gate, or this returns" below.
+PR 3 is done too — the agenda's quick-nav browse now fires
+`requestScrollToDate` once per swipe, on commit only (see `_app.tsx`'s agenda
+branch of `renderQuickNavPanel`, and the "one browse per swipe" tests in
+`_app.test.tsx`). One further follow-up is still outstanding — see "Also
+worth doing: a gate, or this returns" below.
 
 What remains here is the diagnosis and the traps found along the way,
 including PR 2's own trap, kept as reference for anyone touching this code
@@ -131,10 +133,12 @@ Measured (pre-PR-1/PR-2, at the time this was the only change on the table) at
 645 ms busy against a 767 ms baseline, with the *worst frame unchanged*
 (370–399 ms). The commit path did the identical work; removing the preview
 relocated it rather than removing it — the real fix, it seemed at the time,
-was PR 2. Landed anyway, afterward, as cleanup (`#913`, on hold) — see PR 3's
-own section below — since firing `requestScrollToDate` once instead of twice
-is a legitimate reduction in work independent of whatever PR 2 did or didn't
-buy.
+was PR 2. Landed anyway, afterward, as cleanup (`#913`) — dropping the
+agenda's `onBrowseMonthPreview` entirely, firing `requestScrollToDate` once
+per swipe instead of twice — since that's a legitimate reduction in work
+independent of whatever PR 2 did or didn't buy. See `_app.tsx`'s agenda
+branch of `renderQuickNavPanel`, and the "one browse per swipe" tests in
+`_app.test.tsx`.
 
 ### ✗ Seeding `AgendaView`'s scroll-to-target effect directly, instead of `scrollToIndex`
 
@@ -293,41 +297,6 @@ PR 1's, not PR 2's — and PR 2 then cost a shipped regression on top of buying
 nothing. Not worth a second attempt without a materially different approach
 to the two bugs above, and a real vault whose window-local density is low
 enough to make the reconciliation cost worth removing in the first place.
-
----
-
-## PR 3 (`#913`, on hold) — one browse per swipe, not two
-
-`_app.tsx` used to pass `requestScrollToDate` as *both* `onBrowseMonth` and
-`onBrowseMonthPreview` for the agenda, on the reasoning that it was "already
-cheap (no navigation)". It was not the cheapest of the three views' preview
-callbacks — day/week write one string to decoupled preview state on preview;
-the agenda's own call moved `agendaAnchor` and re-rendered the agenda's row
-list, twice per swipe (preview *and* commit), once of them squarely inside
-the snap animation.
-
-Fixed (in the open, on-hold PR, independent of PR 2's fate — this touches
-`_app.tsx`, not `AgendaView.tsx`'s scroll effect) by dropping
-`onBrowseMonthPreview` on the agenda branch entirely. `MiniMonth`'s own local
-`browsePreview` state still keeps the panel's own `MonthStrip` highlight
-tracking the gesture live — unaffected, since that is local to `MiniMonth`,
-not `calendarView`'s `monthPreview`. **The one user-visible effect:** the
-agenda behind the panel no longer live-tracks the drag — it jumps once, on
-commit (settle), instead of previewing mid-gesture. If that live tracking
-turns out to be missed, the alternative is to keep the preview call but make
-it move only the scroll position, never `agendaAnchor`.
-
-Verified via `src/routes/_app.test.tsx`'s "one browse per swipe" tests
-(`requestScrollToDate` fires zero times on preview, once on commit — driven
-directly through the mocked carousel, the same way
-`MiniMonth.preview.test.tsx` drives `onPreview`/`onCommit`). Not re-measured
-in a real browser: it is a straight subtraction from an already-cheap call —
-the baseline it subtracts from (`scrollToIndex`, now that PR 2 is reverted)
-never had anything expensive attached to an individual `requestScrollToDate`
-call in the first place, so this can't plausibly regress busy time or render
-count, only reduce their frequency by roughly half on the agenda.
-
-Currently on hold per an explicit request, unrelated to PR 2's revert.
 
 ---
 
