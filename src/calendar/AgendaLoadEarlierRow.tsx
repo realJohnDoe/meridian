@@ -22,8 +22,8 @@ interface Props {
  */
 function AgendaLoadEarlierRow({ onClick }: Props) {
   return (
-    <div className="flex shrink-0 justify-center bg-background py-1.5">
-      <Button type="button" variant="outline" size="sm" onClick={onClick}>
+    <div className="flex shrink-0 justify-center bg-background py-3">
+      <Button type="button" variant="outline" onClick={onClick}>
         Load earlier
       </Button>
     </div>
