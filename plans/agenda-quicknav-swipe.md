@@ -1,8 +1,11 @@
 # The agenda's quick-nav swipe — implementation plan
 
-Three PRs. Not nonfixable: PR 2 is the one that matters and it is a contained
-change to one layout effect. PR 1 exists because without it PR 2's acceptance
-test silently lies. PR 3 is small and optional.
+Two PRs remaining. PR 1 (stopping the agenda's own scroll position from
+steering the quick-nav grid) is done — see `src/routes/_app.tsx`'s
+`agendaQuickNavAnchor` and `src/routes/_app.test.tsx`. PR 2 is the one that
+matters and it is a contained change to one layout effect; PR 1 was a
+prerequisite because without it, PR 2's acceptance test would have silently
+lied. PR 3 is small and optional.
 
 **Read the "Two fixes that do not work" section before starting.** Both are
 the obvious first thing to try, both were measured, and both make it worse.
@@ -110,79 +113,6 @@ cleanup on top of PR 2, never as the fix.
 
 ---
 
-## PR 1 — Stop the agenda's own scroll position from steering the quick-nav grid
-
-**Small. Do this first.** It is a latent correctness bug today and it will
-silently corrupt PR 2's acceptance test if left in place.
-
-### The bug
-
-`src/routes/_app.tsx`, agenda branch of `renderQuickNavPanel`:
-
-```tsx
-anchorMonth={parseDateString(agendaTopDate) ?? today}
-highlightDates={agendaTopDate ? [parseDateString(agendaTopDate) ?? today] : []}
-```
-
-`agendaTopDate` is written by `markAgendaScrolled` and by `setAgendaTopDate` on
-every agenda scroll event. So: swipe the grid → agenda scrolls → `agendaTopDate`
-changes → `_app` re-renders → `MiniMonth`'s `anchorMonth` prop changes →
-`useResetOnChange([open, fmtMonth(anchorMonth)])` fires → `month` is yanked back.
-The gesture's own consequence re-steers the widget that produced it.
-
-Today it usually survives, because `scrollToIndex` lands exactly on the target
-row so `agendaTopDate` agrees with the month just browsed. It stops surviving
-the moment the landing is off by one row. Observed directly while prototyping
-PR 2: with a seeded offset the top row came back as `2026-09-30` instead of
-`2026-10-01`, `anchorMonth` reverted to September, and **three consecutive
-swipes all navigated Sep → Oct**, never reaching November. Any change to how
-the agenda lands re-triggers this.
-
-### The fix
-
-Give the agenda's panel a browsed month that is not re-derived from the agenda's
-scroll position while the panel is open. Day and week already have this shape —
-they read `quickNavBrowsePreview` in place of their route param (see its doc
-comment in `viewState.ts` and `_app.day.$date.tsx`). The agenda has no route
-param to override, so the equivalent is: freeze the anchor month when the panel
-opens, and let `MiniMonth`'s own `month` state own it from there.
-
-`MiniMonth` is already built for this — its doc comment says so:
-
-> Browsing is still locally tracked (`month` below) rather than driven straight
-> off `anchorMonth`, so a parent re-render mid-browse […] can't yank the grid
-> back to some earlier month
-
-`useResetOnChange` only guards against this *during* a swipe (`browsePreview !==
-null`). Between swipes the guard is down. The cleanest fix is for `_app.tsx` to
-stop feeding it a moving target: pass the `agendaTopDate` captured at the moment
-`quickNavOpen` flipped true, not the live value.
-
-Implementation is open — pick whichever is smaller:
-- a `useRef`/`useState` in `_app.tsx` latched on `quickNavOpen`'s rising edge; or
-- reuse `quickNavBrowsePreview` for the agenda too, so all three views go
-  through one mechanism (the tidier option; `closeQuickNav` already clears it).
-
-`highlightDates` should follow the same value, so the highlighted day and the
-shown month cannot disagree.
-
-### Files
-- `src/routes/_app.tsx` (agenda branch of `renderQuickNavPanel`, ~line 315–327)
-- possibly `src/calendar/viewState.ts` if the `quickNavBrowsePreview` route is taken
-- `src/routes/-pagedTopbar.test.tsx` / a new case in `MiniMonth.test.tsx`
-
-### Acceptance
-- **Regression test, and it must fail before the fix:** open the agenda's
-  quick-nav panel, drive `MiniMonth`'s `onCommit` three times, assert
-  `calendarView.getState().agendaAnchor` has advanced **three** months. Force
-  the boundary condition by setting `agendaTopDate` to the last day of the
-  previous month between commits — that is the state the real scroll lands in.
-- Closing and reopening the panel still re-syncs the grid to wherever the
-  agenda now is (that is `open` in `useResetOnChange`'s deps, and it must keep
-  working).
-
----
-
 ## PR 2 — Seed the agenda's scroll offset instead of reconciling to it
 
 **The fix.** Measured on a grown run, baseline vs. prototype:
@@ -222,9 +152,10 @@ no reconciliation loop.
 ### The trap this creates, and what to do about it
 
 A summed offset is **not exact** where rows are unmeasured, so the landing row
-can be off by one. That is the off-by-one that broke navigation in the prototype
-(see PR 1). PR 1 removes the catastrophic consequence; this PR should also
-correct the landing itself:
+can be off by one. That is the off-by-one that broke navigation in the
+prototype before PR 1 landed (the feedback loop through `anchorMonth` — see
+`src/routes/_app.tsx`'s `agendaQuickNavAnchor`). PR 1 already removes the
+catastrophic consequence; this PR should also correct the landing itself:
 
 - After the seeded write, on the **next frame only**, check whether the row at
   the top is `goToRowIndex`; if not, issue a single
@@ -344,5 +275,4 @@ Not committed as a script — `scripts/perf/` is already under an expiry notice
    representative, and the runaway cases only appear from the second onward.
 8. Useful probes while iterating (temporary, not committed): a counter in
    `AgendaView`'s body (renders), one at the `scrollToIndex` call, and
-   `goToRowIndex` / `rows.length` / `agendaAnchor` read at the end of the window.
-   `agendaAnchor` failing to advance across swipes is the PR 1 bug.
+   `goToRowIndex` / `rows.length` read at the end of the window.
