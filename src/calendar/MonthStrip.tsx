@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { fmtMonth } from '@/model'
 import { useToday } from '@/hooks'
 import { cn } from '@/lib/cn'
@@ -7,11 +7,9 @@ import { cn } from '@/lib/cn'
 // outright, and a virtualizer would fight the browser's own scroll-snap and
 // momentum instead of riding it. The window is built once, anchored to
 // whichever month is active when the strip first mounts, and never rebuilt
-// or rescrolled as `activeMonth` changes afterward — matching Google
-// Calendar's own month-jump strip, which doesn't auto-scroll to follow the
-// month you're currently viewing either. Paging far enough to carry the
-// active month outside this window just means no chip reads as active;
-// given the size of the window that takes years of paging in one sitting.
+// as `activeMonth` changes afterward. Paging far enough to carry the active
+// month outside this window just means no chip reads as active; given the
+// size of the window that takes years of paging in one sitting.
 const MONTHS_BACK = 24
 const MONTHS_FORWARD = 36
 
@@ -93,6 +91,35 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
     container.scrollTo({ left, behavior: 'auto' })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately mount-only, see comment above
   }, [])
+
+  // Paging while the strip stays open (see the module comment) moves the
+  // highlight without recentering — but if that carries the active chip
+  // out of view, it needs *some* scroll or it's stranded with no visible
+  // affordance to bring it back. Matches Google Calendar's own strip:
+  // rather than recentering on every page, it scrolls just enough to land
+  // the newly active chip at the near edge — last chip when paging forward
+  // past the right edge, first chip when paging backward past the left
+  // edge. That's less movement than recentering, and it adds hysteresis: a
+  // chip that's still (barely) in view after paging isn't bumped again
+  // until it actually falls off.
+  const prevActiveKeyRef = useRef(activeKey)
+  useEffect(() => {
+    if (prevActiveKeyRef.current === activeKey) return
+    prevActiveKeyRef.current = activeKey
+    const container = containerRef.current
+    const chip = chipElsRef.current[activeKey]
+    if (!container || !chip) return
+    const viewLeft = container.scrollLeft
+    const viewRight = viewLeft + container.clientWidth
+    const chipLeft = chip.offsetLeft
+    const chipRight = chipLeft + chip.offsetWidth
+    let target: number | undefined
+    if (chipRight > viewRight) target = chipRight - container.clientWidth
+    else if (chipLeft < viewLeft) target = chipLeft
+    if (target === undefined) return
+    const max = Math.max(0, container.scrollWidth - container.clientWidth)
+    container.scrollTo({ left: Math.min(Math.max(target, 0), max), behavior: 'smooth' })
+  }, [activeKey])
 
   return (
     <div
