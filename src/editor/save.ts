@@ -3,7 +3,7 @@ import { fmtISO, applyEdit, mergeEditFields, joinFileMeta, newEntryKey, excludeO
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
-import { getSnapshot, getEntries, getItems, getUnreadableFiles, getDefaultVaultId } from '@/storeBridge'
+import { getSnapshot, getSlugSnapshot, getEntries, getItems, getDefaultVaultId } from '@/storeBridge'
 import { keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { commitNext, commitDelete } from '@/storeCommit'
@@ -234,11 +234,11 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   // a target would create an unreachable root under a vault id nothing owns.
   if (!vaultId) return null
 
-  // unreadableKeys makes newEntryKey/applyNew treat a file that failed to
-  // parse as occupied even though it has no root: without this, a new entry
-  // whose title slugifies onto that slug would look free and silently
-  // overwrite the file on write — see reportParseFailures in storage/parseReport.ts.
-  const snapshot = { ...getSnapshot(), unreadableKeys: new Set(getUnreadableFiles().keys()) }
+  // Not `getSnapshot()`: allocation has to see every slug this vault already
+  // owns, including the two kinds that are absent from `entries` — a file that
+  // failed to parse (no root, so it looks free) and one the backend has listed
+  // but this device has not pulled yet. See `getSlugSnapshot`.
+  const snapshot = getSlugSnapshot()
   const edited = editFieldsOf(fields)
   const nextData = applyEdit(
     snapshot, item, editScope,

@@ -37,6 +37,10 @@ const { cacheStore, pendingMoves, storeState, notifyFns, roundTripLossMock } = v
     items: [] as unknown[],
     roots: new Map<string, unknown>(),
     unreadableFiles: new Map<string, { path: string; message: string }>(),
+    /** vaultId → the keys that vault's last listing reported. The real store
+     *  flattens these into one cross-vault Set; keeping them split here is what
+     *  lets a test assert one vault's listing without unpicking the merge. */
+    listedKeys: new Map<string, ReadonlySet<string>>(),
     /** The registered vault refs — what `getVaults` answers. Registration is
      *  not the same thing as being mounted: `writeTarget` tells them apart. */
     vaults: [] as Array<{ id: string; name: string; kind: string }>,
@@ -183,6 +187,7 @@ vi.mock('@/storeBridge', () => ({
   }),
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
+  setVaultListedKeys: vi.fn((vaultId: string, keys: ReadonlySet<string>) => { storeState.listedKeys.set(vaultId, keys) }),
   setStoreState: vi.fn((partial: Partial<typeof storeState>) => { Object.assign(storeState, partial) }),
   getVaults: vi.fn(() => storeState.vaults),
 }))
@@ -432,6 +437,7 @@ beforeEach(() => {
   storeState.roots = new Map()
   storeState.unreadableFiles = new Map()
   storeState.vaults = []
+  storeState.listedKeys.clear()
   storeState.layers.clear()
   storeState.syncByVault.clear()
   notifyFns.notify.mockClear()
@@ -1464,6 +1470,67 @@ describe('reconcileWithBackend — the vault being unregistered mid-flight', () 
     expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('remote v2')
     // ...but the layer was not rebuilt under a vault that no longer exists.
     expect(storeState.items).toEqual([{ entryKey: K('note') }])
+  })
+})
+
+// ── Reserving the slugs of files this device has not read yet ─────────────
+//
+// The incident: an item created during the first sync of a week-stale vault
+// took a slug the remote already owned. The store is a picture of what has
+// been *pulled*, so a file added on another device that week read as a free
+// slug; the push went out as a create, the backend refused it, and what should
+// have been two unrelated notes resolved as a conflict copy — with the remote's
+// content landing under the title the user had just typed.
+//
+// `statAll` already knows the answer. It arrives on the first round trip of a
+// cycle, well before the reads that fold content into the store, so publishing
+// it is what shortens the exposure from the whole cycle to that first request.
+
+describe('reconcileWithBackend — publishing the backend listing', () => {
+  it('reserves every listed path, including ones this cycle has not pulled yet', async () => {
+    const backend = new FakeBackend()
+    backend.seed('note.md',     'remote', 'v1')
+    backend.seed('buy-milk.md', 'from the corner shop', 'v2')
+    mountBackend(backend)
+
+    const release = backend.blockNextReadFiles()
+    const reconcilePromise = reconcileWithBackend(backend, 'fake-vault')
+    await flush()
+
+    // Still mid-flight: nothing is in the store yet, but both slugs are spoken
+    // for. This is the window the incident happened in.
+    expect(storeState.items).toEqual([])
+    expect([...(storeState.listedKeys.get('fake-vault') ?? [])].sort())
+      .toEqual([K('buy-milk'), K('note')])
+
+    release()
+    await reconcilePromise
+  })
+
+  it('drops a path the backend no longer lists', async () => {
+    const backend = new FakeBackend()
+    backend.seed('gone.md', 'x', 'v1')
+    mountBackend(backend)
+
+    await reconcileWithBackend(backend, 'fake-vault')
+    expect([...(storeState.listedKeys.get('fake-vault') ?? [])]).toEqual([K('gone')])
+
+    await backend.delete('gone.md')
+    await reconcileWithBackend(backend, 'fake-vault')
+    expect([...(storeState.listedKeys.get('fake-vault') ?? [])]).toEqual([])
+  })
+
+  // Otherwise a cycle still in flight when the user removes a vault would
+  // re-reserve slugs in a vault `removeVaultLayer` has just cleared, and
+  // nothing would ever clear them again.
+  it('publishes nothing for a vault that is no longer registered', async () => {
+    const backend = new FakeBackend()
+    backend.seed('note.md', 'remote', 'v1')
+    // Never mounted (or unmounted while statAll was in flight — the backend is
+    // threaded in by the caller, so the cycle still completes either way).
+    await reconcileWithBackend(backend, 'fake-vault')
+
+    expect(storeState.listedKeys.get('fake-vault')).toBeUndefined()
   })
 })
 

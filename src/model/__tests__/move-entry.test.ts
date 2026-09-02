@@ -100,6 +100,30 @@ describe('freeEntryKey', () => {
     expect(freeEntryKey(d, HOME, 'meeting-notes')).toBe(k(HOME, 'meeting-notes-2'))
   })
 
+  // The store is a picture of what has been *pulled*. A vault that has not
+  // synced for a week has a week-old picture, so every file added elsewhere
+  // since reads as a free slug — and the new entry placed on one pushes as a
+  // create, is refused, and resolves as a conflict copy between two notes that
+  // were never versions of each other.
+  it('treats a file the backend listed but this device has not pulled as occupying its slug', () => {
+    const d = { ...snapshot(), listedKeys: new Set([k(HOME, 'meeting-notes')]) }
+    expect(freeEntryKey(d, HOME, 'meeting-notes')).toBe(k(HOME, 'meeting-notes-2'))
+  })
+
+  it('counts listed, unreadable and parsed keys as one occupied set', () => {
+    const d = {
+      ...add(snapshot(), HOME, 'meeting-notes', PLAIN_YAML),
+      unreadableKeys: new Set([k(HOME, 'meeting-notes-2')]),
+      listedKeys:     new Set([k(HOME, 'meeting-notes-3')]),
+    }
+    expect(freeEntryKey(d, HOME, 'meeting-notes')).toBe(k(HOME, 'meeting-notes-4'))
+  })
+
+  it('reserves listed keys per vault, like every other kind of occupancy', () => {
+    const d = { ...snapshot(), listedKeys: new Set([k(WORK, 'meeting-notes')]) }
+    expect(freeEntryKey(d, HOME, 'meeting-notes')).toBe(k(HOME, 'meeting-notes'))
+  })
+
   it('collides per vault, not globally — the source vault\'s copy is irrelevant', () => {
     // `meeting-notes` exists in WORK; moving it to HOME must not uniquify.
     expect(keySlug(freeEntryKey(snapshot(), HOME, 'meeting-notes'))).toBe('meeting-notes')

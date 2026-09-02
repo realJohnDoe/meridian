@@ -6,7 +6,7 @@ import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Entries, Entry, S
 import { keySlug, keyVaultId } from './fileIO'
 import type { EntryKey } from './fileIO'
 import { isWritableVault } from './vaultRef'
-import { getSnapshot, getItems, getEntries, getUnreadableFiles, getVaults, setData, replaceFavorite } from './storeBridge'
+import { getSnapshot, getSlugSnapshot, getItems, getEntries, getVaults, setData, replaceFavorite } from './storeBridge'
 import { deleteEntity } from './persistencePort'
 import { commitNext, commitMove, persistEntries } from './storeCommit'
 
@@ -138,7 +138,7 @@ export function reopenOcc(occ: Occurrence): void {
 export function moveEntryToVault(fromKey: EntryKey, toVaultId: string): EntryKey | null {
   if (keyVaultId(fromKey) === toVaultId) return null
   if (!isWritableVault(getVaults().find(v => v.id === toVaultId))) return null
-  const snapshot = { ...getSnapshot(), unreadableKeys: new Set(getUnreadableFiles().keys()) }
+  const snapshot = getSlugSnapshot()
   if (!snapshot.entries.has(fromKey)) return null
 
   const toKey = freeEntryKey(snapshot, toVaultId, keySlug(fromKey))

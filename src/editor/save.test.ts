@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { applyScope, entryFromOccurrence, saveNode } from './save'
 import { makeOcc, makeSeries, setupStore, installFakePersistence, seedStore, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { useStore } from '@/store'
-import { setUnreadableFiles } from '@/storeBridge'
+import { entryKey } from '@/fileIO'
+import { setUnreadableFiles, setVaultListedKeys } from '@/storeBridge'
 import { ENTRY_DEFAULT } from './state'
 import type { StoreItem } from '@/types'
 
@@ -122,6 +123,53 @@ describe('saveNode — reserved (unreadable) slugs', () => {
     expect(result).toBe(testKey('buy-groceries'))
     expect(useStore.getState().roots.get(testKey('buy-groceries'))?.title).toBe('Buy groceries')
     expect(persistence.writes).toEqual([testKey('buy-groceries')])
+  })
+})
+
+// The store holds what has been *pulled*, which after a week offline is not
+// the same as what the vault owns. A file created elsewhere in the meantime is
+// in the backend's listing long before its content is read — the reconcile
+// publishes that listing on its first round trip precisely so a save landing
+// during the rest of the cycle can see it.
+//
+// Without this the save took the slug, pushed as a create, was refused, and
+// resolved as a conflict copy: the user's brand-new note and an unrelated
+// remote one treated as two versions of the same file.
+describe('saveNode — slugs the backend has listed but this device has not pulled', () => {
+  setupStore()
+  const persistence = installFakePersistence()
+
+  it('places a new entry beside a listed file rather than on top of it', () => {
+    setVaultListedKeys(TEST_VAULT, new Set([testKey('buy-milk')]))
+
+    const result = saveNode(null, 'all', {
+      ...ENTRY_DEFAULT, title: 'Buy milk', body: 'two litres',
+    })
+
+    expect(result).toBe(testKey('buy-milk-2'))
+    expect(useStore.getState().roots.has(testKey('buy-milk'))).toBe(false)
+    expect(persistence.writes).toEqual([testKey('buy-milk-2')])
+  })
+
+  it('leaves the natural slug free once that listing no longer claims it', () => {
+    setVaultListedKeys(TEST_VAULT, new Set([testKey('buy-milk')]))
+    setVaultListedKeys(TEST_VAULT, new Set())
+
+    const result = saveNode(null, 'all', {
+      ...ENTRY_DEFAULT, title: 'Buy milk', body: 'two litres',
+    })
+
+    expect(result).toBe(testKey('buy-milk'))
+  })
+
+  it('reserves only the listing vault\'s slugs', () => {
+    setVaultListedKeys('other-vault', new Set([entryKey('other-vault', 'buy-milk')]))
+
+    const result = saveNode(null, 'all', {
+      ...ENTRY_DEFAULT, title: 'Buy milk', body: 'two litres',
+    })
+
+    expect(result).toBe(testKey('buy-milk'))
   })
 })
 
