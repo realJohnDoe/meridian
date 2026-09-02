@@ -195,7 +195,7 @@ describe('MonthStrip', () => {
       return <MonthStrip activeMonth={month} onNavigateMonth={vi.fn()} />
     }
 
-    it('scrolls forward just enough to land the newly active month as the last chip', () => {
+    it('scrolls forward past the last-chip target by the edge padding', () => {
       // Anchor month (Aug 2026) sits at window index 24 (MONTHS_BACK); the
       // mount effect centers it, leaving the viewport at [1222, 1522].
       const { rerender } = render(<Host month={new Date(2026, 7, 1)} />)
@@ -204,14 +204,16 @@ describe('MonthStrip', () => {
       container.scrollTo = scrollTo
 
       // 16 months forward lands at index 40 — chip spans [2240, 2296],
-      // entirely past the [1222, 1522] viewport.
+      // entirely past the [1222, 1522] viewport. Flush-edge alignment would
+      // land at 1996; the extra 12px (EDGE_PADDING) keeps the chip from
+      // reading as clipped by peeking a sliver of the next one past it.
       rerender(<Host month={new Date(2027, 11, 1)} />)
 
-      expect(scrollTo).toHaveBeenCalledWith({ left: 1996, behavior: 'smooth' })
+      expect(scrollTo).toHaveBeenCalledWith({ left: 2008, behavior: 'smooth' })
       expect(screen.getByRole('button', { name: 'December 2027' })).toHaveAttribute('aria-current', 'date')
     })
 
-    it('scrolls backward just enough to land the newly active month as the first chip', () => {
+    it('scrolls backward past the first-chip target by the edge padding', () => {
       // Whatever month mounts the strip is always the anchor, and the anchor
       // always lands at window index 24 (MONTHS_BACK) — so mounting on Dec
       // 2027 instead of Aug 2026 doesn't change the post-mount viewport:
@@ -223,9 +225,12 @@ describe('MonthStrip', () => {
 
       // April 2026 is 20 months before the Dec 2027 anchor, landing at index
       // 4 — chip spans [224, 280], entirely before the [1222, 1522] viewport.
+      // Flush-edge alignment would land at 224; the extra 12px (EDGE_PADDING)
+      // keeps the chip from reading as clipped by peeking a sliver of the
+      // previous one before it.
       rerender(<Host month={new Date(2026, 3, 1)} />)
 
-      expect(scrollTo).toHaveBeenCalledWith({ left: 224, behavior: 'smooth' })
+      expect(scrollTo).toHaveBeenCalledWith({ left: 212, behavior: 'smooth' })
       expect(screen.getByRole('button', { name: 'April 2026' })).toHaveAttribute('aria-current', 'date')
     })
   })
