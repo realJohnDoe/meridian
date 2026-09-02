@@ -13,6 +13,13 @@ import { cn } from '@/lib/cn'
 const MONTHS_BACK = 24
 const MONTHS_FORWARD = 36
 
+// Extra scroll past the strict edge-alignment target below, so the newly
+// active chip doesn't land flush against the container's clipped edge —
+// flush reads as if the chip itself were cut off. This peeks a sliver of
+// the next chip past it instead, doubling as a hint that there's more to
+// scroll in that direction.
+const EDGE_PADDING = 12
+
 interface MonthChip {
   key: string // "YYYY-MM"
   date: Date
@@ -114,8 +121,8 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
     const chipLeft = chip.offsetLeft
     const chipRight = chipLeft + chip.offsetWidth
     let target: number | undefined
-    if (chipRight > viewRight) target = chipRight - container.clientWidth
-    else if (chipLeft < viewLeft) target = chipLeft
+    if (chipRight > viewRight) target = chipRight - container.clientWidth + EDGE_PADDING
+    else if (chipLeft < viewLeft) target = chipLeft - EDGE_PADDING
     if (target === undefined) return
     const max = Math.max(0, container.scrollWidth - container.clientWidth)
     const left = Math.min(Math.max(target, 0), max)
