@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import MiniMonth from './MiniMonth'
 import { setupStore, seedStore, makeRoots, testKey } from '@/test-utils'
+import { fmtISO } from '@/model'
 import type { StoreOcc } from '@/types'
 
 setupStore()
@@ -22,7 +23,7 @@ function occ(id: string, date: string, metadata: Partial<StoreOcc['metadata']> =
 }
 
 function dayButton(container: HTMLElement, date: Date): HTMLButtonElement {
-  const el = container.querySelector<HTMLButtonElement>(`button[data-day="${date.toLocaleDateString()}"]`)
+  const el = container.querySelector<HTMLButtonElement>(`button[data-day="${fmtISO(date)}"]`)
   if (!el) throw new Error(`no day button rendered for ${date.toDateString()}`)
   return el
 }
