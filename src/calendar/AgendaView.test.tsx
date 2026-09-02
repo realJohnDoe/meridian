@@ -311,8 +311,11 @@ describe('AgendaView', () => {
     expect(overdueGroupRows()).toHaveLength(2)
     expect(screen.getByText('×2')).toBeInTheDocument()
     expect(screen.queryByText('×1')).not.toBeInTheDocument()
-    // The header counts groups, not the three occurrences behind them.
-    expect(screen.getByText('2')).toBeInTheDocument()
+    // The header counts groups, not the three occurrences behind them. Scoped
+    // to the Overdue header button: a bare getByText('2') also matches
+    // today's day-of-month badge whenever the test runs on the 2nd.
+    const overdueHeader = screen.getByText('Overdue').closest('button')!
+    expect(within(overdueHeader).getByText('2')).toBeInTheDocument()
   })
 
   it('expands the overdue section by default, mounting its rows', () => {
