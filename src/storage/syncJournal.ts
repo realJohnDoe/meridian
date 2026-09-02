@@ -44,6 +44,7 @@ export type SyncEventKind =
   | 'edit'                 // an edit was recorded in the cache (the write queue)
   | 'delete'               // a delete was staged (tombstone)
   | 'write-refused'        // a write/delete targeted a vault that is no longer registered
+  | 'write-deferred'       // …or one that is registered but not mounted yet: queued in the cache, pushed on activation
   // ── push ──────────────────────────────────────────────────────
   | 'push'                 // a CAS write went out
   | 'push-ok'              // …and was accepted

@@ -37,6 +37,9 @@ const { cacheStore, pendingMoves, storeState, notifyFns, roundTripLossMock } = v
     items: [] as unknown[],
     roots: new Map<string, unknown>(),
     unreadableFiles: new Map<string, { path: string; message: string }>(),
+    /** The registered vault refs — what `getVaults` answers. Registration is
+     *  not the same thing as being mounted: `writeTarget` tells them apart. */
+    vaults: [] as Array<{ id: string; name: string; kind: string }>,
     /** vaultId → the fields `setVaultSync` writes. */
     syncByVault: new Map<string, {
       dirtyCount: number; error: string | null; offline: boolean
@@ -181,7 +184,7 @@ vi.mock('@/storeBridge', () => ({
   getUnreadableFiles: vi.fn(() => storeState.unreadableFiles),
   setUnreadableFiles: vi.fn((files: Map<string, { path: string; message: string }>) => { storeState.unreadableFiles = files }),
   setStoreState: vi.fn((partial: Partial<typeof storeState>) => { Object.assign(storeState, partial) }),
-  getVaults: vi.fn(() => [] as { id: string; name: string }[]),
+  getVaults: vi.fn(() => storeState.vaults),
 }))
 
 vi.mock('@/storage/notifications', () => notifyFns)
@@ -428,6 +431,7 @@ beforeEach(() => {
   storeState.items = []
   storeState.roots = new Map()
   storeState.unreadableFiles = new Map()
+  storeState.vaults = []
   storeState.layers.clear()
   storeState.syncByVault.clear()
   notifyFns.notify.mockClear()
@@ -2038,6 +2042,69 @@ describe('multi-vault sync', () => {
     expect(notifyFns.warn).toHaveBeenCalledTimes(1)
     expect(notifyFns.warn.mock.calls[0]![0]).toContain('ghost-vault')
     expect(syncJournalEvents({ vaultId: 'ghost-vault' }).map(e => e.kind)).toEqual(['write-refused'])
+  })
+
+  // The incident: an item created seconds after launch, while the first sync
+  // of a week-stale vault was still running, was never saved and left no trace
+  // in the repo.
+  //
+  // `restoreVaults` opens the paint gate as soon as phase 1 has painted every
+  // vault's cached layer, and only then builds backends in phase 2 — behind an
+  // expired GitHub token's refresh POST, or a local folder's permission probe.
+  // The agenda is fully interactive for that whole window, so a save issued in
+  // it reached `getBackend` and got `undefined`. That used to be treated as
+  // "the vault is gone": the write was dropped, and because the store had
+  // already committed, the entry stayed on screen looking saved until the next
+  // reload took it away.
+  //
+  // Registration, not mounting, is what the cache actually needs — Dexie is
+  // keyed by vault id, which the EntryKey already carries.
+  describe('a save that lands before its vault has finished mounting', () => {
+    beforeEach(() => {
+      storeState.vaults = [{ id: 'late-vault', name: 'Late', kind: 'github' }]
+    })
+
+    it('is queued in the cache instead of dropped, and pushed once the vault mounts', async () => {
+      seedLayer('late-vault', [{ entryKey: 'late-vault::buy-milk' }],
+        new Map([['late-vault::buy-milk', rootFor('buy-milk', { title: 'Buy milk', tags: [], items: [] })]]))
+
+      await writeEntityToCache('late-vault::buy-milk' as EntryKey, 'two litres')
+
+      expect(cacheStore.get(vp('late-vault', 'buy-milk.md'))?.status).toBe('dirty')
+      // No toast: nothing went wrong, the push is simply waiting on the mount.
+      expect(notifyFns.warn).not.toHaveBeenCalled()
+      expect(syncJournalEvents({ vaultId: 'late-vault' }).map(e => e.kind))
+        .toEqual(['edit', 'write-deferred'])
+
+      // Phase 2 finishes. syncOnActivate's pushDirty leg is what rescues it.
+      const late = otherBackend('late-vault', 'github')
+      mountBackend(late)
+      await syncOnActivate(late)
+
+      expect(late.get('buy-milk.md')?.content).toBe('two litres')
+      expect(cacheStore.get(vp('late-vault', 'buy-milk.md'))?.status).toBe('clean')
+    })
+
+    it('stages a delete the same way', async () => {
+      await deleteFromBackend('late-vault::gone' as EntryKey)
+
+      expect(cacheStore.get(vp('late-vault', 'gone.md'))?.status).toBe('deleted')
+      expect(notifyFns.warn).not.toHaveBeenCalled()
+      expect(syncJournalEvents({ vaultId: 'late-vault' }).map(e => e.kind))
+        .toEqual(['delete', 'write-deferred'])
+    })
+
+    it('still refuses a registered vault that has no writable side at all', async () => {
+      // A subscription has no backend to ask about `readOnly` before it mounts,
+      // so the ref's kind is what answers — otherwise this would accumulate
+      // dirty rows nothing will ever push.
+      storeState.vaults = [{ id: 'feed-vault', name: 'Feed', kind: 'ical' }]
+
+      await writeEntityToCache('feed-vault::note' as EntryKey, 'content')
+
+      expect(cacheStore.get(vp('feed-vault', 'note.md'))).toBeUndefined()
+      expect(syncJournalEvents({ vaultId: 'feed-vault' }).map(e => e.kind)).toEqual(['write-refused'])
+    })
   })
 
   it('writeEntityToCache refuses a read-only vault, silently', async () => {
