@@ -47,14 +47,14 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
 
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
-// Solid bg + -foreground ink for the active segment, same formula as
-// PRIORITY_CLASS/TINT_CLASSES — colored text alone (the previous styling)
-// risks the same low-contrast failure on light themes since task/note are
-// light pastel hues.
+// Colors only the segment's icon, not its fill/text — unlike PRIORITY_CLASS's
+// bg-{color}/15 tint (occurrence-variants.ts), this reads well as-is: the
+// "on" segment is already shown by segmentedItemVariants' raised
+// bg-background pill, so the icon alone is enough of a color cue here.
 const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
-  task:  'data-[state=on]:bg-task data-[state=on]:text-task-foreground',
-  event: 'data-[state=on]:bg-event data-[state=on]:text-event-foreground',
-  note:  'data-[state=on]:bg-note data-[state=on]:text-note-foreground',
+  task:  'data-[state=on]:[&>svg]:text-task',
+  event: 'data-[state=on]:[&>svg]:text-event',
+  note:  'data-[state=on]:[&>svg]:text-note',
 }
 
 

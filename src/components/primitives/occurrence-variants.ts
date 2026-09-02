@@ -94,13 +94,16 @@ export const dvBlockVariants = cva('', {
 
 /**
  * Priority chip active-state colouring — shared between the entry editor's
- * inline priority chip and the priority selection drawer. Solid bg +
- * -foreground ink, same formula as TINT_CLASSES above (task-p1/p2/p3): a
- * light tint behind same-hue text can't clear AA on light themes, which is
- * exactly what made the yellow "Low" chip unreadable.
+ * inline priority chip and the priority selection drawer. bg-{color}/15 (a
+ * tint, not TINT_CLASSES' solid fill) plus text-chip-tint-foreground: a full
+ * solid fill reads as too dominant at this size, and the palette isn't
+ * uniformly tuned for it as a full fill + matching -foreground ink across
+ * every theme. --chip-tint-foreground is verified >=4.5:1 against every
+ * domain color's 15%-opacity tint in every theme (see its doc comment in
+ * index.css) — same formula as badge.tsx's `chip`/`link` variants.
  */
 export const PRIORITY_CLASS: Record<Priority, string> = {
-  high:   'aria-[pressed=true]:bg-priority-1 aria-[pressed=true]:border-priority-1 aria-[pressed=true]:text-priority-1-foreground',
-  medium: 'aria-[pressed=true]:bg-priority-2 aria-[pressed=true]:border-priority-2 aria-[pressed=true]:text-priority-2-foreground',
-  low:    'aria-[pressed=true]:bg-priority-3 aria-[pressed=true]:border-priority-3 aria-[pressed=true]:text-priority-3-foreground',
+  high:   'aria-[pressed=true]:bg-priority-1/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-1',
+  medium: 'aria-[pressed=true]:bg-priority-2/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-2',
+  low:    'aria-[pressed=true]:bg-priority-3/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-3',
 }
