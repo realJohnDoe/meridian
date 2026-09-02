@@ -94,10 +94,13 @@ export const dvBlockVariants = cva('', {
 
 /**
  * Priority chip active-state colouring — shared between the entry editor's
- * inline priority chip and the priority selection drawer.
+ * inline priority chip and the priority selection drawer. Solid bg +
+ * -foreground ink, same formula as TINT_CLASSES above (task-p1/p2/p3): a
+ * light tint behind same-hue text can't clear AA on light themes, which is
+ * exactly what made the yellow "Low" chip unreadable.
  */
 export const PRIORITY_CLASS: Record<Priority, string> = {
-  high:   'aria-[pressed=true]:bg-p1/15 aria-[pressed=true]:border-p1 aria-[pressed=true]:text-p1',
-  medium: 'aria-[pressed=true]:bg-p2/15 aria-[pressed=true]:border-p2 aria-[pressed=true]:text-p2',
-  low:    'aria-[pressed=true]:bg-p3/15 aria-[pressed=true]:border-p3 aria-[pressed=true]:text-p3',
+  high:   'aria-[pressed=true]:bg-priority-1 aria-[pressed=true]:border-priority-1 aria-[pressed=true]:text-priority-1-foreground',
+  medium: 'aria-[pressed=true]:bg-priority-2 aria-[pressed=true]:border-priority-2 aria-[pressed=true]:text-priority-2-foreground',
+  low:    'aria-[pressed=true]:bg-priority-3 aria-[pressed=true]:border-priority-3 aria-[pressed=true]:text-priority-3-foreground',
 }

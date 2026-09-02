@@ -9,14 +9,19 @@ const badgeVariants = cva(
       variant: {
         // Small display label — replaces .otag and .etag
         tag: 'px-1.5 py-0.5 text-2xs rounded-lg border-[var(--chip-border)] bg-secondary text-secondary-foreground',
-        // Wikilink / topic chip — always primary (indigo); underline only when interactive (applied via className)
-        link: 'px-1.5 py-0.5 text-2xs rounded-lg border-[var(--chip-border)] bg-primary/15 text-primary',
+        // Wikilink / topic chip — always primary (indigo); underline only when interactive (applied via className).
+        // Solid bg + -foreground ink, not a tint: a light tint behind same-hue text can't
+        // clear AA on either light or dark themes (see the `chip` variant below).
+        link: 'px-1.5 py-0.5 text-2xs rounded-lg border-[var(--chip-border)] bg-primary text-primary-foreground',
         // Interactive toggle chip — replaces .fchip and .pchip
-        // Active state driven by aria-pressed; priority colors via inline style override
+        // Active state driven by aria-pressed; priority colors via inline style override.
+        // Solid bg + -foreground ink (not a tint) for the same reason as
+        // dvBlockVariants (see occurrence-variants.ts): a light tint behind
+        // colored text can't clear AA on light *or* dark themes.
         chip: [
           'h-control px-2.5 text-xs rounded-full border border-border/50 bg-secondary text-secondary-foreground cursor-pointer',
-          'aria-[pressed=true]:bg-primary/20 aria-[pressed=true]:text-primary aria-[pressed=true]:border-primary',
-          'data-[state=on]:bg-primary/20 data-[state=on]:text-primary data-[state=on]:border-primary',
+          'aria-[pressed=true]:bg-primary aria-[pressed=true]:text-primary-foreground aria-[pressed=true]:border-primary',
+          'data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:border-primary',
         ],
       },
     },
