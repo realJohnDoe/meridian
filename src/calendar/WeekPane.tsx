@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { differenceInCalendarDays } from 'date-fns'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
@@ -18,9 +18,7 @@ import { computeMultidayLanes, compactRowLanes } from './computeMultidayLanes'
 import { TimedBlock } from './TimedBlock'
 import { weekDays, weekContains, weekNumberFor } from './weekRange'
 import { GUTTER, COL_RIGHT_PAD, BADGE_CLASS, BADGE_H } from './timelineGeometry'
-import { TimelineScroller, HourCells, NowLine } from './timelineScaffold'
-import { EMPTY_EXPANSION_WINDOW } from './deferredExpansionWindow'
-import { useReadyAfterMount } from './useReadyAfterMount'
+import { TimelineScroller, HourCells, HourStripes, NowLine } from './timelineScaffold'
 
 // Fixed row height for the all-day strip's bars/pills — unlike MonthGrid's
 // rowH (measured via ResizeObserver so it can track responsive font/padding
@@ -29,62 +27,28 @@ import { useReadyAfterMount } from './useReadyAfterMount'
 // trivially correct with no measurement machinery.
 const ALLDAY_ROW_H = BADGE_H // same height as the day-number badge
 
-// ── WeekPane ──────────────────────────────────────────────────
-// One pane of the week carousel — self-contained so React can key panes by
-// week-start string and preserve/discard instances independently as the
-// carousel scrolls, mirroring DayPane. Owns its own store subscriptions and
-// its own vertical scroller — see WeekView for how scroll position is
-// mirrored across panes so it carries over a swipe.
-//
-// Three occurrence classes get three different treatments:
-//   - multiday events -> spanning bars in the all-day strip (never hidden —
-//     see compactRowLanes; unlike MonthGrid there's no lane cap here, since
-//     the strip scrolls past ~4 lanes instead of boxing into a fixed cell)
-//   - untimed single-day occurrences -> single-column pills in the strip,
-//     stacked below whatever bars cover that day
-//   - timed single-day occurrences -> positioned on the hour timeline, one
-//     independently-packed column-group per day (computeColumns per day)
-interface Props {
-  weekStartKey: string // YYYY-MM-DD, already normalized to the week start
+interface LiveWeekAllDayStripProps {
+  weekStart: Date
+  days: Date[]
+  clockValue: Date
   onOpen: (occ: Occurrence, scope?: EditScope) => void
-  /** Called when the user clicks empty timeline space to start a new event at that time. */
-  onCreate?: (date: Date, time: string, duration: string) => void
-  onDayClick: (date: Date) => void
-  registerScroller: (key: string, el: HTMLDivElement | null) => void
-  onVerticalScroll: (key: string, scrollTop: number) => void
-  getInitialScrollTop: () => number
+  allDayExpanded: boolean
+  setAllDayExpanded: Dispatch<SetStateAction<boolean>>
 }
 
-export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, registerScroller, onVerticalScroll, getInitialScrollTop }: Props) {
-  const weekStart = useMemo(() => {
-    const [y = NaN, m = NaN, d = NaN] = weekStartKey.split('-').map(Number)
-    return new Date(y, m - 1, d)
-  }, [weekStartKey])
-  const days = useMemo(() => weekDays(weekStart), [weekStart])
-  const weekNum = weekNumberFor(weekStart)
-
-  const today  = useToday()
-  const items  = useStore(s => s.items)
-  const roots  = useStore(s => s.roots)
-  const hour12 = useStore(s => s.localePrefs.hour12)
-
-  // Every pane here is a fresh mount (keyed by weekStartKey at WeekView's own
-  // wrapping div — see useCarousel), so this is `false` for exactly the
-  // pane's first commit. While it is, the occurrence expansion below
-  // requests a cheap, reliably-empty window instead of this pane's real one
-  // — the expensive part for a busy week — filling in on a follow-up
-  // low-priority render instead of landing in the same commit that mounts
-  // this pane. See useReadyAfterMount and DayPane's matching comment.
-  const ready = useReadyAfterMount()
-  const { from: wFrom, to: wTo } = ready ? dayRange(weekStart, days[6]!) : EMPTY_EXPANSION_WINDOW
-  const wOccs = useFilteredOccs(useExpandWithMultiday(items, roots, wFrom, wTo))
-
-  // Only ticks for the pane showing today — other panes don't need a live
-  // clock for the current-time indicator below, and keep whatever value they
-  // mounted with for clockValue's sake. Mirrors DayPane's own guard.
-  const showsToday = weekContains(weekStart, today)
-  const now = useNow(60_000, showsToday)
-  const clockValue = showsToday ? now : today
+// The all-day/multiday strip, occurrence expansion included — only mounted
+// for a live pane (see WeekPane's `live` comment), so a skeleton pane never
+// pays for it. Unlike DayPane's strip, this one is entirely absent (not just
+// empty) when there's nothing to show, so a skeleton pane looks exactly like
+// a live pane that happens to have no all-day content this week — the one
+// case this doesn't cover, a skeleton pane for a week that *does* have
+// all-day content, briefly shows a shorter header until it goes live. See
+// plans/calendar-swipe-cheap-panes.md.
+function LiveWeekAllDayStrip({ weekStart, days, clockValue, onOpen, allDayExpanded, setAllDayExpanded }: LiveWeekAllDayStripProps) {
+  const items = useStore(s => s.items)
+  const roots = useStore(s => s.roots)
+  const { from, to } = dayRange(weekStart, days[6]!)
+  const wOccs = useFilteredOccs(useExpandWithMultiday(items, roots, from, to))
 
   // Multiday roots (deduped, earliest occurrence kept) — independent of the
   // clock, so kept out of the clockValue-dependent memo below to avoid
@@ -101,24 +65,24 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
     return [...rootsById.values()]
   }, [wOccs])
 
-  // Single-day occurrences, bucketed per day and split into timed (goes on
-  // the hour timeline, column-packed) vs untimed (goes in the all-day strip).
-  const { colsByDay, untimedByDay } = useMemo(() => {
-    const timedMap = new Map<string, Occurrence[]>()
+  // Untimed single-day occurrences, bucketed per day — these go in the
+  // all-day strip below whatever bars cover that day. Timed single-day
+  // occurrences (the hour timeline) are LiveWeekDayColumns's concern, not
+  // this component's — the two never share a hook call, only the same
+  // underlying window (cache-shared via useExpandWithMultiday).
+  const untimedByDay = useMemo(() => {
     const untimedMap = new Map<string, Occurrence[]>()
     for (const o of wOccs) {
       if ((parseDurationDays(o.metadata.duration) ?? 1) >= 2) continue
       if (!o.metadata.jsTime) continue
+      if (fmtT(o.time)) continue
       const key = fmtISO(o.metadata.jsTime)
-      const map = fmtT(o.time) ? timedMap : untimedMap
-      const arr = map.get(key)
-      if (arr) arr.push(o); else map.set(key, [o])
+      const arr = untimedMap.get(key)
+      if (arr) arr.push(o); else untimedMap.set(key, [o])
     }
-    const colsByDay = new Map<string, ReturnType<typeof computeColumns>>()
-    for (const [k, arr] of timedMap) colsByDay.set(k, computeColumns(sortOccs(arr, clockValue)))
     const untimedByDay = new Map<string, Occurrence[]>()
     for (const [k, arr] of untimedMap) untimedByDay.set(k, sortOccs(arr, clockValue))
-    return { colsByDay, untimedByDay }
+    return untimedByDay
   }, [wOccs, clockValue])
 
   // All-day strip bar layout — one row spanning the whole week (unlike
@@ -205,7 +169,7 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
     }
   }, [bars, untimedByDay, days])
 
-  const [allDayExpanded, setAllDayExpanded] = useState(false)
+  if (!hasAllDayContent) return null
 
   // Chevrons show at every viewport width here, unlike MonthGrid's bars
   // (which hide them below `sm:`). A month cell is a fixed 1/7 width no
@@ -243,8 +207,245 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
   )
 
   return (
+    // All-day / multiday strip — gutter (expand/collapse chevron,
+    // bottom-aligned so it sits right above the border into the hourly
+    // grid, matching the hour-label gutter's width) + a grid-cols-7 grid
+    // holding both the spanning bars and each day's own untimed pills. A
+    // day's pills start right after the lanes its own bars occupy (see
+    // the visiblePillsByDay/overflowPillsByDay memo above), so the two
+    // never share a cell regardless of container overflow — no
+    // absolute-positioned overlay needed (unlike MonthGrid, whose bars
+    // overlay a separately-measured cell grid). Rows at/beyond
+    // ALL_DAY_THRESHOLD are split into a second grid and folded behind
+    // the chevron in the gutter — see AllDayOverflowToggle. Each day with
+    // its own hidden items additionally gets a "+N" label in its own
+    // column (labelByDay), which also expands the strip.
+    <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
+      <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end pb-1">
+        <AllDayOverflowToggle
+          hiddenCount={hiddenCount}
+          expanded={allDayExpanded}
+          onToggle={() => setAllDayExpanded(v => !v)}
+          className="h-5 w-full p-0"
+        />
+      </div>
+      {/* pr-0.5 = COL_RIGHT_PAD, matching the gap-0.5 gap between the
+          grid's own columns, so its day columns share a right edge with
+          the header above and the hourly grid below. */}
+      <div className="flex-1 py-1 min-w-0 pr-0.5">
+        <div className="grid grid-cols-7 gap-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
+          {visibleBars.map(renderBar)}
+          {days.map((d, col) =>
+            (visiblePillsByDay.get(fmtISO(d)) ?? []).map(p => renderPill(p.o, col, p.row)),
+          )}
+          {days.map((d, col) => {
+            const key = fmtISO(d)
+            const label = labelByDay.get(key)
+            if (!label) return null
+            if (allDayExpanded) {
+              // Backfill the label's own cell with the first hidden pill
+              // instead of leaving it blank once the "+N" button
+              // disappears — keeps the day's stack contiguous instead of
+              // opening a gap where the label used to sit. A day whose
+              // overflow is bar-only (no hidden pill to promote — a
+              // spanning bar can't be squeezed into one day's column)
+              // just leaves the cell empty, same as before.
+              const first = overflowPillsByDay.get(key)?.[0]
+              return first ? renderPill(first.o, col, label.row) : null
+            }
+            return (
+              <button
+                key={`ovf-${key}`}
+                type="button"
+                onClick={() => setAllDayExpanded(true)}
+                style={{ gridColumn: col + 1, gridRow: label.row + 1 }}
+                className="text-3xs sm:text-2xs text-muted-foreground hover:text-secondary-foreground text-left px-0.5 sm:px-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              >
+                +{label.hidden}
+              </button>
+            )
+          })}
+        </div>
+
+        {hiddenCount > 0 && (
+          <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
+            <div className="grid grid-cols-7 gap-0.5 mt-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
+              {overflowBars.map(renderBar)}
+              {days.map((d, col) => {
+                const key = fmtISO(d)
+                const list = overflowPillsByDay.get(key) ?? []
+                // The label's cell above already took the first item
+                // once expanded (see the backfill above) — drop it here
+                // too and shift the rest up a row so this grid starts
+                // flush instead of repeating a leading blank row.
+                const rest = allDayExpanded && labelByDay.has(key)
+                  ? list.slice(1).map(p => ({ ...p, row: p.row - 1 }))
+                  : list
+                return rest.map(p => renderPill(p.o, col, p.row))
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface LiveWeekDayColumnsProps {
+  days: Date[]
+  clockValue: Date
+  today: Date
+  now: Date
+  onCreate?: (date: Date, time: string, duration: string) => void
+  onOpen: (occ: Occurrence, scope?: EditScope) => void
+  hour12: boolean
+}
+
+// The hour timeline's day columns, occurrence expansion included — only
+// mounted for a live pane. See WeekPane's `live` comment for why this (and
+// LiveWeekAllDayStrip above) are separate mounts from TimelineScroller rather
+// than a hook call inside WeekPane itself: TimelineScroller has to stay the
+// same instance across a live/skeleton toggle, so the occurrence-dependent
+// content around it has to live in components that mount/unmount on their own.
+function LiveWeekDayColumns({ days, clockValue, today, now, onCreate, onOpen, hour12 }: LiveWeekDayColumnsProps) {
+  const items = useStore(s => s.items)
+  const roots = useStore(s => s.roots)
+  const { from, to } = dayRange(days[0]!, days[6]!)
+  const wOccs = useFilteredOccs(useExpandWithMultiday(items, roots, from, to))
+
+  // Timed single-day occurrences, bucketed per day and column-packed — the
+  // hour timeline's concern. Untimed/multiday occurrences are
+  // LiveWeekAllDayStrip's, computed from the same (cache-shared) window.
+  const colsByDay = useMemo(() => {
+    const timedMap = new Map<string, Occurrence[]>()
+    for (const o of wOccs) {
+      if ((parseDurationDays(o.metadata.duration) ?? 1) >= 2) continue
+      if (!o.metadata.jsTime) continue
+      if (!fmtT(o.time)) continue
+      const key = fmtISO(o.metadata.jsTime)
+      const arr = timedMap.get(key)
+      if (arr) arr.push(o); else timedMap.set(key, [o])
+    }
+    const colsByDay = new Map<string, ReturnType<typeof computeColumns>>()
+    for (const [k, arr] of timedMap) colsByDay.set(k, computeColumns(sortOccs(arr, clockValue)))
+    return colsByDay
+  }, [wOccs, clockValue])
+
+  return (
+    // Day columns — each one is its own positioning context for its hour
+    // cells and event blocks, so TimedBlock's column-relative geometry needs
+    // no shared gutter-inset wrapper the way DayPane's does (there,
+    // "columns" are overlapping events within one day; here they're the days
+    // themselves). That's also why HourCells and NowLine are repeated seven
+    // times here and rendered once there.
+    <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border/60" style={{ left: GUTTER, right: COL_RIGHT_PAD }}>
+      {days.map(d => {
+        const dKey = fmtISO(d)
+        const isToday = sameDay(d, today)
+        const cols = colsByDay.get(dKey) ?? []
+        // Hoisted out of the hourAriaLabel closure below, which HourCells
+        // calls once per hour cell: fmtShort is an Intl date format, and
+        // leaving it inside meant 7 columns × HOURS × PANE_COUNT panes of
+        // them — profiled at ~740ms of the frame that froze a swipe. The
+        // label is per column, so it only ever needed computing here.
+        const dayLabel = fmtShort(d)
+        return (
+          <div key={dKey} className="relative flex-1 min-w-0">
+            <HourCells
+              date={d}
+              hour12={hour12}
+              onCreate={onCreate}
+              hourAriaLabel={t => `Create event on ${dayLabel} at ${t}`}
+            />
+
+            {/* Current-time indicator, scoped to today's own column —
+                the default full span of whatever container it sits in,
+                which here is one day column rather than DayPane's canvas. */}
+            {isToday && <NowLine now={now} />}
+
+            {/* Timed event blocks for this day */}
+            {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
+              <TimedBlock
+                key={occ.id}
+                o={occ}
+                dh={dh}
+                colIndex={colIndex}
+                totalCols={totalCols}
+                hour12={hour12}
+                onOpen={onOpen}
+                compact
+              />
+            ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── WeekPane ──────────────────────────────────────────────────
+// One pane of the week carousel — self-contained so React can key panes by
+// week-start string and preserve/discard instances independently as the
+// carousel scrolls, mirroring DayPane. Owns its own store subscriptions and
+// its own vertical scroller — see WeekView for how scroll position is
+// mirrored across panes so it carries over a swipe.
+//
+// Three occurrence classes get three different treatments:
+//   - multiday events -> spanning bars in the all-day strip (never hidden —
+//     see compactRowLanes; unlike MonthGrid there's no lane cap here, since
+//     the strip scrolls past ~4 lanes instead of boxing into a fixed cell)
+//   - untimed single-day occurrences -> single-column pills in the strip,
+//     stacked below whatever bars cover that day
+//   - timed single-day occurrences -> positioned on the hour timeline, one
+//     independently-packed column-group per day (computeColumns per day)
+interface Props {
+  weekStartKey: string // YYYY-MM-DD, already normalized to the week start
+  onOpen: (occ: Occurrence, scope?: EditScope) => void
+  /** Called when the user clicks empty timeline space to start a new event at that time. */
+  onCreate?: (date: Date, time: string, duration: string) => void
+  onDayClick: (date: Date) => void
+  registerScroller: (key: string, el: HTMLDivElement | null) => void
+  onVerticalScroll: (key: string, scrollTop: number) => void
+  getInitialScrollTop: () => number
+  /**
+   * Whether this is the carousel's centre pane. Defaults to `true` — see
+   * DayPane's matching prop for the full rationale (non-centre panes are
+   * already `inert`, so dropping their per-hour DOM and occurrence work is
+   * unobservable; the toggle is driven off this prop, not a `key`, so
+   * TimelineScroller's own instance survives it). WeekView passes
+   * `i === CENTER_PANE`.
+   */
+  live?: boolean
+}
+
+export default function WeekPane(props: Props) {
+  const { weekStartKey, onOpen, onCreate, onDayClick, registerScroller, onVerticalScroll, getInitialScrollTop } = props
+  const live = props.live ?? true
+
+  const weekStart = useMemo(() => {
+    const [y = NaN, m = NaN, d = NaN] = weekStartKey.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }, [weekStartKey])
+  const days = useMemo(() => weekDays(weekStart), [weekStart])
+  const weekNum = weekNumberFor(weekStart)
+
+  const today  = useToday()
+  const hour12 = useStore(s => s.localePrefs.hour12)
+
+  // Only ticks for the pane showing today — other panes don't need a live
+  // clock for the current-time indicator below, and keep whatever value they
+  // mounted with for clockValue's sake. Mirrors DayPane's own guard.
+  const showsToday = weekContains(weekStart, today)
+  const now = useNow(60_000, showsToday)
+  const clockValue = showsToday ? now : today
+
+  const [allDayExpanded, setAllDayExpanded] = useState(false)
+
+  return (
     <>
-      {/* Day headers — gutter (week-number badge) + 7 day columns, aligned with the grid below. */}
+      {/* Day headers — gutter (week-number badge) + 7 day columns, aligned
+          with the grid below. No occurrence dependency, so this stays
+          unconditional regardless of `live`. */}
       <div className="flex shrink-0 border-b border-input">
         <div style={{ width: GUTTER }} className="shrink-0 flex items-center justify-center">
           <span className={BADGE_CLASS} aria-label={`Week ${weekNum}`}>{weekNum}</span>
@@ -275,88 +476,15 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
         </div>
       </div>
 
-      {/* All-day / multiday strip — gutter (expand/collapse chevron,
-          bottom-aligned so it sits right above the border into the hourly
-          grid, matching the hour-label gutter's width) + a grid-cols-7 grid
-          holding both the spanning bars and each day's own untimed pills. A
-          day's pills start right after the lanes its own bars occupy (see
-          the visiblePillsByDay/overflowPillsByDay memo above), so the two
-          never share a cell regardless of container overflow — no
-          absolute-positioned overlay needed (unlike MonthGrid, whose bars
-          overlay a separately-measured cell grid). Rows at/beyond
-          ALL_DAY_THRESHOLD are split into a second grid and folded behind
-          the chevron in the gutter — see AllDayOverflowToggle. Each day with
-          its own hidden items additionally gets a "+N" label in its own
-          column (labelByDay), which also expands the strip. */}
-      {hasAllDayContent && (
-        <div className="flex border-b border-input bg-card shrink-0 shadow-md relative z-10">
-          <div style={{ width: GUTTER }} className="shrink-0 flex flex-col justify-end pb-1">
-            <AllDayOverflowToggle
-              hiddenCount={hiddenCount}
-              expanded={allDayExpanded}
-              onToggle={() => setAllDayExpanded(v => !v)}
-              className="h-5 w-full p-0"
-            />
-          </div>
-          {/* pr-0.5 = COL_RIGHT_PAD, matching the gap-0.5 gap between the
-              grid's own columns, so its day columns share a right edge with
-              the header above and the hourly grid below. */}
-          <div className="flex-1 py-1 min-w-0 pr-0.5">
-            <div className="grid grid-cols-7 gap-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
-              {visibleBars.map(renderBar)}
-              {days.map((d, col) =>
-                (visiblePillsByDay.get(fmtISO(d)) ?? []).map(p => renderPill(p.o, col, p.row)),
-              )}
-              {days.map((d, col) => {
-                const key = fmtISO(d)
-                const label = labelByDay.get(key)
-                if (!label) return null
-                if (allDayExpanded) {
-                  // Backfill the label's own cell with the first hidden pill
-                  // instead of leaving it blank once the "+N" button
-                  // disappears — keeps the day's stack contiguous instead of
-                  // opening a gap where the label used to sit. A day whose
-                  // overflow is bar-only (no hidden pill to promote — a
-                  // spanning bar can't be squeezed into one day's column)
-                  // just leaves the cell empty, same as before.
-                  const first = overflowPillsByDay.get(key)?.[0]
-                  return first ? renderPill(first.o, col, label.row) : null
-                }
-                return (
-                  <button
-                    key={`ovf-${key}`}
-                    type="button"
-                    onClick={() => setAllDayExpanded(true)}
-                    style={{ gridColumn: col + 1, gridRow: label.row + 1 }}
-                    className="text-3xs sm:text-2xs text-muted-foreground hover:text-secondary-foreground text-left px-0.5 sm:px-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-                  >
-                    +{label.hidden}
-                  </button>
-                )
-              })}
-            </div>
-
-            {hiddenCount > 0 && (
-              <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
-                <div className="grid grid-cols-7 gap-0.5 mt-0.5" style={{ gridAutoRows: ALLDAY_ROW_H }}>
-                  {overflowBars.map(renderBar)}
-                  {days.map((d, col) => {
-                    const key = fmtISO(d)
-                    const list = overflowPillsByDay.get(key) ?? []
-                    // The label's cell above already took the first item
-                    // once expanded (see the backfill above) — drop it here
-                    // too and shift the rest up a row so this grid starts
-                    // flush instead of repeating a leading blank row.
-                    const rest = allDayExpanded && labelByDay.has(key)
-                      ? list.slice(1).map(p => ({ ...p, row: p.row - 1 }))
-                      : list
-                    return rest.map(p => renderPill(p.o, col, p.row))
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {live && (
+        <LiveWeekAllDayStrip
+          weekStart={weekStart}
+          days={days}
+          clockValue={clockValue}
+          onOpen={onOpen}
+          allDayExpanded={allDayExpanded}
+          setAllDayExpanded={setAllDayExpanded}
+        />
       )}
 
       {/* Scrollable timeline — the scroller, canvas and hour labels are the
@@ -369,54 +497,21 @@ export default function WeekPane({ weekStartKey, onOpen, onCreate, onDayClick, r
         getInitialScrollTop={getInitialScrollTop}
         hour12={hour12}
       >
-        {/* Day columns — each one is its own positioning context for its
-            hour cells and event blocks, so TimedBlock's column-relative
-            geometry needs no shared gutter-inset wrapper the way DayPane's
-            does (there, "columns" are overlapping events within one day;
-            here they're the days themselves). That's also why HourCells and
-            NowLine are repeated seven times here and rendered once there. */}
-        <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border/60" style={{ left: GUTTER, right: COL_RIGHT_PAD }}>
-          {days.map(d => {
-            const dKey = fmtISO(d)
-            const isToday = sameDay(d, today)
-            const cols = colsByDay.get(dKey) ?? []
-            // Hoisted out of the hourAriaLabel closure below, which HourCells
-            // calls once per hour cell: fmtShort is an Intl date format, and
-            // leaving it inside meant 7 columns × HOURS × PANE_COUNT panes of
-            // them — profiled at ~740ms of the frame that froze a swipe. The
-            // label is per column, so it only ever needed computing here.
-            const dayLabel = fmtShort(d)
-            return (
-              <div key={dKey} className="relative flex-1 min-w-0">
-                <HourCells
-                  date={d}
-                  hour12={hour12}
-                  onCreate={onCreate}
-                  hourAriaLabel={t => `Create event on ${dayLabel} at ${t}`}
-                />
-
-                {/* Current-time indicator, scoped to today's own column —
-                    the default full span of whatever container it sits in,
-                    which here is one day column rather than DayPane's canvas. */}
-                {isToday && <NowLine now={now} />}
-
-                {/* Timed event blocks for this day */}
-                {cols.flat().map(({ occ, dh, colIndex, totalCols }) => (
-                  <TimedBlock
-                    key={occ.id}
-                    o={occ}
-                    dh={dh}
-                    colIndex={colIndex}
-                    totalCols={totalCols}
-                    hour12={hour12}
-                    onOpen={onOpen}
-                    compact
-                  />
-                ))}
-              </div>
-            )
-          })}
-        </div>
+        {live ? (
+          <LiveWeekDayColumns
+            days={days}
+            clockValue={clockValue}
+            today={today}
+            now={now}
+            onCreate={onCreate}
+            onOpen={onOpen}
+            hour12={hour12}
+          />
+        ) : (
+          <div className="absolute inset-y-0" style={{ left: GUTTER, right: COL_RIGHT_PAD }}>
+            <HourStripes />
+          </div>
+        )}
       </TimelineScroller>
     </>
   )

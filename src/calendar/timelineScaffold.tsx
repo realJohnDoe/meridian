@@ -14,6 +14,9 @@ import {
 //     Exactly one per pane, identical in both.
 //   HourCells        — one column's worth of click-to-create hour buttons.
 //     One per pane in the day view; one per day column in the week view.
+//   HourStripes      — the same striped background with none of the per-hour
+//     button DOM, for a carousel pane that isn't live (see DayPane/WeekPane's
+//     `live` prop) — one set per *pane*, not per column.
 //   NowLine          — the current-time indicator, positioned by the caller's
 //     own container.
 //
@@ -155,6 +158,37 @@ export function HourCells({ date, hour12, onCreate, hourAriaLabel }: HourCellsPr
           style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
           onClick={handleHourClick(h)}
           aria-label={hourAriaLabel(formatHourBoundary(h, hour12))}
+        />
+      ))}
+    </>
+  )
+}
+
+// A plain background stripe, not the interactive HOUR_CELL_CLASS above — no
+// cursor/focus affordances, since a skeleton pane is already `inert`.
+const HOUR_STRIPE_CLASS = cn(
+  occRadius,
+  'absolute inset-x-0 bg-muted/40',
+)
+
+/**
+ * A skeleton (non-live) pane's hour-grid background: HOURS full-width
+ * stripes, one set per *pane* rather than one per column — the DOM cost
+ * HourCells/HourStripes are the seam for (see DayPane/WeekPane's `live`
+ * prop). Renders inside the same positioned container HourCells would (the
+ * caller sets left/right insets), so a day view's stripes line up with its
+ * live hour cells exactly; a week view's single stripe set runs straight
+ * through the day columns' own inter-column gaps instead of breaking at each
+ * one, which is the one visual difference from the live grid.
+ */
+export function HourStripes() {
+  return (
+    <>
+      {Array.from({ length: HOURS }, (_, h) => h).map(h => (
+        <div
+          key={h}
+          className={HOUR_STRIPE_CLASS}
+          style={{ top: h * HP + TOP_PAD + 1, height: HP - 2 }}
         />
       ))}
     </>
