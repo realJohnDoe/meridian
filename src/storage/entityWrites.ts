@@ -17,6 +17,7 @@ import { markInFlight, clearInFlight } from '@/storage/inFlight'
 import type { StorageBackend } from './backend'
 import { keyToPath, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
+import { isWritableVault } from '@/vaultRef'
 import { getVaults } from '@/storeBridge'
 import { warn, notifyError } from './notifications'
 import { getBackend } from './backends'
@@ -25,25 +26,54 @@ import { updateSyncUI } from './sync'
 import { scheduleAutoPush } from './syncScheduler'
 
 /**
- * The backend that owns `key`'s vault, or undefined if that vault isn't
- * registered.
+ * Where one write may go — decided by the vault half of the key, which is what
+ * routes this at all: a write addressed to a vault that is not this user's is
+ * refused rather than silently applied to whichever vault happens to be at
+ * hand, which is precisely what a stale closure or a late-landing commit would
+ * have done before the key carried a vault.
  *
- * The vault half of the key is what routes this at all: a write addressed to
- * an unregistered vault is refused rather than silently applied to whichever
- * vault happens to be at hand — which is precisely what a stale closure or a
- * late-landing commit would have done before the key carried a vault.
+ * **`deferred` is not `refused`.** A vault is registered long before its
+ * backend is mounted: `restoreVaults` paints every vault's layer from the cache
+ * and opens the paint gate in phase 1, then builds backends in phase 2 — behind
+ * an OAuth refresh POST for a GitHub vault, and a permission probe for a local
+ * folder. The agenda is interactive for that whole window, so an entry created
+ * in it used to reach a `getBackend` that answered `undefined` and be thrown
+ * away with a toast claiming the vault was "no longer connected". Nothing was
+ * disconnected and nothing came back for the write: the store kept showing the
+ * entry, so the loss was invisible until the next reload.
+ *
+ * The cache does not need the backend. `recordLocalEdit`/`recordLocalDelete`
+ * are keyed by vault *id*, which the key already carries, and the mount that
+ * follows runs `syncOnActivate`, whose `pushDirty` leg exists precisely to
+ * rescue records left dirty by an earlier moment. So a registered writable
+ * vault takes the write into Dexie now and lets that push find it — the same
+ * shape as an offline edit, which is also recorded dirty against a backend that
+ * cannot currently be reached.
  */
-function backendFor(key: EntryKey): StorageBackend | undefined {
-  return getBackend(keyVaultId(key))
+type WriteTarget =
+  | { kind: 'mounted';  backend: StorageBackend }
+  | { kind: 'deferred' }
+  | { kind: 'refused' }
+
+function writeTarget(key: EntryKey): WriteTarget {
+  const vaultId = keyVaultId(key)
+  const backend = getBackend(vaultId)
+  if (backend) return { kind: 'mounted', backend }
+  // Only a *writable* kind may be written to unmounted: `readOnly` is a
+  // property of the backend, and with none built yet the ref's kind is the
+  // only thing that answers it. An iCal subscription or the Tutorial vault
+  // therefore stays refused rather than accumulating dirty rows nothing will
+  // ever push.
+  const ref = getVaults().find(v => v.id === vaultId)
+  return isWritableVault(ref) ? { kind: 'deferred' } : { kind: 'refused' }
 }
 
 /**
- * The vault for `key` was removed (or never mounted) between the store commit
- * and this write reaching the backend — e.g. deleted in Settings while an
- * editor was open on it, or a deferred commit landing after the vault
- * unmounted. Unlike `readOnly` (expected, e.g. an iCal subscription), this is
- * an anomaly: the store already shows the change as saved, so silence here
- * would let it vanish on reload with no trace.
+ * The vault for `key` is not one this app can write to at all — removed in
+ * Settings while an editor was open on it, or a deferred commit landing after
+ * it unmounted for good. Unlike `readOnly` (expected, e.g. an iCal
+ * subscription), this is an anomaly: the store already shows the change as
+ * saved, so silence here would let it vanish on reload with no trace.
  */
 function reportUnregisteredVault(key: EntryKey, path: string): void {
   const vaultId = keyVaultId(key)
@@ -64,18 +94,20 @@ function reportUnregisteredVault(key: EntryKey, path: string): void {
  * against the data it is committing.
  */
 export async function writeEntityToCache(entryKey: EntryKey, content: string): Promise<void> {
-  const path = keyToPath(entryKey)
+  const path    = keyToPath(entryKey)
+  const vaultId = keyVaultId(entryKey)
   markInFlight(entryKey)
   try {
-    const backend = backendFor(entryKey)
-    if (!backend) { reportUnregisteredVault(entryKey, path); return }
-    if (backend.readOnly) return
-    await recordLocalEdit(backend.id, path, content)
+    const target = writeTarget(entryKey)
+    if (target.kind === 'refused') { reportUnregisteredVault(entryKey, path); return }
+    if (target.kind === 'mounted' && target.backend.readOnly) return
+    await recordLocalEdit(vaultId, path, content)
     // The first link in every chain a conflict investigation has to walk: when
     // the store handed this content to the write queue, and what it was.
-    journal('edit', backend.id, path, { localHash: hashContent(content), bytes: content.length }, backend.kind)
-    updateSyncUI(backend)
-    scheduleAutoPush(backend)
+    journal('edit', vaultId, path, { localHash: hashContent(content), bytes: content.length }, target.kind === 'mounted' ? target.backend.kind : undefined)
+    if (target.kind === 'deferred') { journal('write-deferred', vaultId, path, { note: 'unmounted' }); return }
+    updateSyncUI(target.backend)
+    scheduleAutoPush(target.backend)
   } catch (e) {
     console.error('[vault] writeEntityToCache failed:', e)
     notifyError('Save failed', e)
@@ -85,16 +117,18 @@ export async function writeEntityToCache(entryKey: EntryKey, content: string): P
 }
 
 export async function deleteFromBackend(entryKey: EntryKey): Promise<void> {
-  const path = keyToPath(entryKey)
+  const path    = keyToPath(entryKey)
+  const vaultId = keyVaultId(entryKey)
   markInFlight(entryKey)
   try {
-    const backend = backendFor(entryKey)
-    if (!backend) { reportUnregisteredVault(entryKey, path); return }
-    if (backend.readOnly) return
-    await recordLocalDelete(backend.id, path)
-    journal('delete', backend.id, path, undefined, backend.kind)
-    updateSyncUI(backend)
-    scheduleAutoPush(backend)
+    const target = writeTarget(entryKey)
+    if (target.kind === 'refused') { reportUnregisteredVault(entryKey, path); return }
+    if (target.kind === 'mounted' && target.backend.readOnly) return
+    await recordLocalDelete(vaultId, path)
+    journal('delete', vaultId, path, undefined, target.kind === 'mounted' ? target.backend.kind : undefined)
+    if (target.kind === 'deferred') { journal('write-deferred', vaultId, path, { note: 'unmounted' }); return }
+    updateSyncUI(target.backend)
+    scheduleAutoPush(target.backend)
   } catch (e) {
     console.error('[vault] deleteFromBackend failed:', e)
     notifyError('Delete failed', e)
