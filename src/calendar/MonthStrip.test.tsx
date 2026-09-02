@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import MonthStrip from './MonthStrip'
 
@@ -97,10 +97,12 @@ describe('MonthStrip', () => {
     }
   })
 
-  // Google Calendar's own month-jump strip doesn't auto-scroll to follow the
-  // month you're currently viewing either — only the initial mount call
-  // (tested above) ever positions the strip.
-  it('moves the aria-current highlight, but does not scroll, when activeMonth changes after mount', () => {
+  // Doesn't recenter on every page the way the mount effect does — only
+  // nudges the strip when paging actually carries the active chip out of
+  // view (see the two tests below). With jsdom's default all-zero geometry
+  // the chip always reads as already visible, so this exercises the "still
+  // in view" branch of that check.
+  it('moves the aria-current highlight, but does not scroll, when the newly active month is still in view', () => {
     function Host({ month }: { month: Date }) {
       return <MonthStrip activeMonth={month} onNavigateMonth={vi.fn()} />
     }
@@ -117,6 +119,115 @@ describe('MonthStrip', () => {
     expect(screen.getByRole('button', { name: 'September 2026' })).toHaveAttribute('aria-current', 'date')
     expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveAttribute('aria-current')
     expect(scrollTo).not.toHaveBeenCalled()
+  })
+
+  describe('nudging the active chip back into view', () => {
+    // Gives every chip a uniform 56px slot and the strip a 300px viewport, so
+    // the geometry math in the component (which reads real offsetLeft/
+    // offsetWidth/clientWidth/scrollWidth) has non-zero numbers to work with
+    // — jsdom itself never lays anything out. scrollLeft is backed by a
+    // WeakMap and scrollTo writes through it, so the mount-time centering
+    // call actually moves the tracked viewport before each test's rerender.
+    const CHIP_W = 56
+    const CLIENT_W = 300
+    const scrollLefts = new WeakMap<Element, number>()
+    let offsetLeftDescriptor: PropertyDescriptor | undefined
+    let offsetWidthDescriptor: PropertyDescriptor | undefined
+    let clientWidthDescriptor: PropertyDescriptor | undefined
+    let scrollWidthDescriptor: PropertyDescriptor | undefined
+    let scrollLeftDescriptor: PropertyDescriptor | undefined
+    let scrollToDescriptor: PropertyDescriptor | undefined
+
+    const isGroup = (el: Element) => el.getAttribute('role') === 'group'
+    const chipIndex = (el: Element) => Array.from(document.querySelectorAll('[role="group"] button')).indexOf(el)
+
+    beforeEach(() => {
+      offsetLeftDescriptor  = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetLeft')
+      offsetWidthDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
+      clientWidthDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'clientWidth')
+      scrollWidthDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollWidth')
+      scrollLeftDescriptor  = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollLeft')
+      scrollToDescriptor    = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTo')
+
+      Object.defineProperty(HTMLElement.prototype, 'offsetLeft', {
+        configurable: true,
+        get(this: HTMLElement) { return chipIndex(this) * CHIP_W },
+      })
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+        configurable: true,
+        get(this: HTMLElement) { return this.tagName === 'BUTTON' ? CHIP_W : 0 },
+      })
+      Object.defineProperty(Element.prototype, 'clientWidth', {
+        configurable: true,
+        get(this: Element) { return isGroup(this) ? CLIENT_W : 0 },
+      })
+      Object.defineProperty(Element.prototype, 'scrollWidth', {
+        configurable: true,
+        get(this: Element) { return isGroup(this) ? this.querySelectorAll('button').length * CHIP_W : 0 },
+      })
+      Object.defineProperty(Element.prototype, 'scrollLeft', {
+        configurable: true,
+        get(this: Element) { return scrollLefts.get(this) ?? 0 },
+        set(this: Element, v: number) { scrollLefts.set(this, v) },
+      })
+      Object.defineProperty(Element.prototype, 'scrollTo', {
+        configurable: true, writable: true,
+        value(this: Element, opts?: { left?: number }) {
+          if (typeof opts?.left === 'number') this.scrollLeft = opts.left
+        },
+      })
+    })
+
+    afterEach(() => {
+      const restore = (proto: object, name: string, d: PropertyDescriptor | undefined) => {
+        if (d) Object.defineProperty(proto, name, d)
+        else delete (proto as Record<string, unknown>)[name]
+      }
+      restore(HTMLElement.prototype, 'offsetLeft', offsetLeftDescriptor)
+      restore(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor)
+      restore(Element.prototype, 'clientWidth', clientWidthDescriptor)
+      restore(Element.prototype, 'scrollWidth', scrollWidthDescriptor)
+      restore(Element.prototype, 'scrollLeft', scrollLeftDescriptor)
+      restore(Element.prototype, 'scrollTo', scrollToDescriptor)
+    })
+
+    function Host({ month }: { month: Date }) {
+      return <MonthStrip activeMonth={month} onNavigateMonth={vi.fn()} />
+    }
+
+    it('scrolls forward just enough to land the newly active month as the last chip', () => {
+      // Anchor month (Aug 2026) sits at window index 24 (MONTHS_BACK); the
+      // mount effect centers it, leaving the viewport at [1222, 1522].
+      const { rerender } = render(<Host month={new Date(2026, 7, 1)} />)
+      const container = screen.getByRole('group', { name: 'Jump to month' })
+      const scrollTo = vi.fn()
+      container.scrollTo = scrollTo
+
+      // 16 months forward lands at index 40 — chip spans [2240, 2296],
+      // entirely past the [1222, 1522] viewport.
+      rerender(<Host month={new Date(2027, 11, 1)} />)
+
+      expect(scrollTo).toHaveBeenCalledWith({ left: 1996, behavior: 'smooth' })
+      expect(screen.getByRole('button', { name: 'December 2027' })).toHaveAttribute('aria-current', 'date')
+    })
+
+    it('scrolls backward just enough to land the newly active month as the first chip', () => {
+      // Whatever month mounts the strip is always the anchor, and the anchor
+      // always lands at window index 24 (MONTHS_BACK) — so mounting on Dec
+      // 2027 instead of Aug 2026 doesn't change the post-mount viewport:
+      // centering still leaves it at [1222, 1522].
+      const { rerender } = render(<Host month={new Date(2027, 11, 1)} />)
+      const container = screen.getByRole('group', { name: 'Jump to month' })
+      const scrollTo = vi.fn()
+      container.scrollTo = scrollTo
+
+      // April 2026 is 20 months before the Dec 2027 anchor, landing at index
+      // 4 — chip spans [224, 280], entirely before the [1222, 1522] viewport.
+      rerender(<Host month={new Date(2026, 3, 1)} />)
+
+      expect(scrollTo).toHaveBeenCalledWith({ left: 224, behavior: 'smooth' })
+      expect(screen.getByRole('button', { name: 'April 2026' })).toHaveAttribute('aria-current', 'date')
+    })
   })
 
   it('keeps its window fixed at the month it mounted with — paging past the edge leaves nothing current', () => {
