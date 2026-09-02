@@ -66,7 +66,7 @@ class ChipWidget extends ReactWidget {
       ? createElement(TagChip, {
           label: this.label,
           isTopic: true,
-          className: 'underline underline-offset-2 decoration-indigo-400/60',
+          className: 'underline underline-offset-2 decoration-current/60',
         })
       // Broken link → same Badge base, recoloured destructive, underlined.
       : createElement(

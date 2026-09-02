@@ -48,7 +48,7 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
           // <button> can't contain another <button>).
           <button
             type="button"
-            className="cursor-pointer underline underline-offset-2 decoration-indigo-400/60"
+            className="cursor-pointer underline underline-offset-2 decoration-current/60"
             onClick={onNavigate}
           >
             {label}

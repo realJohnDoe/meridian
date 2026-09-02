@@ -63,10 +63,6 @@
   --color-priority-1:     var(--priority-1);
   --color-priority-2:     var(--priority-2);
   --color-priority-3:     var(--priority-3);
-  /* Backward-compat aliases used in EntryEditor priority chip Tailwind classes */
-  --color-p1:             var(--priority-1);
-  --color-p2:             var(--priority-2);
-  --color-p3:             var(--priority-3);
   /* On-accent text for solid domain-color chips — each theme picks whichever
      of its two ink colors (--ink-light/--ink-dark) contrasts best against
      that specific swatch, so swatches can stay at their vivid brand hue
