@@ -11,7 +11,7 @@ import AgendaEmptyDayRow from './AgendaEmptyDayRow'
 import AgendaRow from './AgendaRow'
 import AgendaOverdueGroupRow from './AgendaOverdueGroupRow'
 import AgendaLoadEarlierRow from './AgendaLoadEarlierRow'
-import { computeAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll } from './computeAgendaScrollRestore'
+import { computeAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll, offsetOfRow } from './computeAgendaScrollRestore'
 import { useAgendaSections, estimateRow } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useScrollabilityWarning } from './agendaScrollability'
@@ -20,6 +20,7 @@ import { useNow } from './useNow'
 import { minLoadableChunk, maxLoadableChunk } from './agendaChunks'
 import { useCalendarWeekStartsOn } from './calendarLocale'
 import {
+  calendarView,
   useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled, toggleOverdueCollapsed,
   useAgendaLoadedChunks, growAgendaLoadedChunksForward, growAgendaLoadedChunksBackward,
 } from './viewState'
@@ -227,10 +228,23 @@ export default function AgendaView({ onOpen }: Props) {
   // error between the estimated row sizes it summed and the real measured
   // ones. The case it still carries on its own is the Today button (or a
   // sidebar jump) pressed while the agenda is already mounted, where there is
-  // no new mount and therefore no initialOffset to seed.
+  // no new mount and therefore no initialOffset to seed — and, more often in
+  // practice, a quick-nav swipe committing while the agenda sits behind it.
+  //
+  // Seeds `scrollTop` directly with the same sum computeAgendaScrollRestore's
+  // mount path already uses (offsetOfRow), rather than asking the virtualizer
+  // to reach goToRowIndex via scrollToIndex. scrollToIndex on a target far
+  // from the current position reconciles iteratively — scroll, measure,
+  // correct, re-scroll — with no bound on how many corrective passes that
+  // takes; a direct write is one scroll event plus, at most, the single
+  // bounded correction below. Rendering the newly-visible rows themselves
+  // (mounting them, the virtualizer measuring their real sizes) costs the
+  // same either way — this only removes the *reconciliation* on top of it,
+  // and the dependency on TanStack's internal machinery for something this
+  // component can compute directly.
   useLayoutEffect(() => {
     if (!scrollTarget || goToRowIndex < 0 || !scRef.current) return
-    virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })
+    scRef.current.scrollTop = offsetOfRow(rows, goToRowIndex, calendarView.getState().agendaScrollMeasurements)
     lastTopRef.current = scrollTarget
     // Record the landing spot directly rather than reading it back: the
     // scroll event this just triggered hasn't been dispatched yet, so
@@ -239,7 +253,28 @@ export default function AgendaView({ onOpen }: Props) {
     // which is exactly the case the startup drift showed up in.
     anchorAt(goToRowIndex, scrollTarget)
     markAgendaScrolled(scrollTarget)
-  }, [scrollTarget, goToRowIndex, virtualizer, anchorAt])
+
+    // The seeded offset is a sum of estimates where rows haven't been
+    // measured yet, so the landing row can be off by one. One bounded
+    // corrective pass, next frame: by then the scrollTop write above has
+    // been reflected (a native scroll event, dispatched before the next
+    // paint) and the virtualizer has re-measured against it, so a single
+    // scrollToIndex call converges from a few pixels out instead of
+    // reconciling from scratch — the same argument
+    // computeAgendaScrollRestore's own doc makes for the mount path's own
+    // residual-error correction. Deliberately not recursive and not re-armed
+    // on a miss: one pass is enough once the seed is this close, and
+    // anything more risks reintroducing the iterative cost this change
+    // exists to avoid.
+    const raf = requestAnimationFrame(() => {
+      const items = virtualizer.getVirtualItems()
+      if (!items.length) return
+      const offset = virtualizer.scrollOffset ?? 0
+      const top = items.find(vi => vi.end > offset + 12) ?? items[0]!  // length checked above
+      if (top.index !== goToRowIndex) virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [scrollTarget, goToRowIndex, virtualizer, anchorAt, rows])
 
   // Only while the scroller sits at its very top does "Load earlier" belong
   // on screen — otherwise, sitting above the scroll container (see

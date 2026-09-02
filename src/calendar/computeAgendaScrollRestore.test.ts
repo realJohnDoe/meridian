@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react'
 import type { Occurrence } from '@/types'
 import type { AgendaRow } from './agendaSections'
 import { calendarView, resetCalendarViewState } from './viewState'
-import { computeAgendaScrollRestore, findAnchorIndex } from './computeAgendaScrollRestore'
+import { computeAgendaScrollRestore, findAnchorIndex, offsetOfRow } from './computeAgendaScrollRestore'
 import { testKey, TEST_VAULT } from '@/test-utils'
 
 function occ(id: string, date: string, opts: { time?: string; done?: boolean } = {}): Occurrence {
@@ -57,6 +57,34 @@ function agenda(): { rows: AgendaRow[]; goToRowIndex: number } {
 
 beforeEach(() => {
   resetCalendarViewState()
+})
+
+// offsetOfRow was module-private until AgendaView's own scroll-to-target
+// effect took a direct dependency on it (seeding scrollTop itself, instead
+// of asking the virtualizer to reach goToRowIndex via scrollToIndex's
+// iterative scroll-measure-correct — see that effect's own comment). These
+// pin the exported contract directly, independent of
+// computeAgendaScrollRestore's own wrapping.
+describe('offsetOfRow', () => {
+  it('sums estimated row sizes above the target when nothing is measured yet', () => {
+    const { rows, goToRowIndex } = agenda()
+    expect(offsetOfRow(rows, goToRowIndex, [])).toBe(104)
+  })
+
+  it('prefers a measured size over the estimate, matched by row key', () => {
+    const { rows, goToRowIndex } = agenda()
+    const snapshot = [
+      { index: 0, start: 0, end: 30, size: 30, key: rows[0]!.key, lane: 0 },
+      { index: 1, start: 30, end: 85, size: 55, key: rows[1]!.key, lane: 0 },
+    ]
+    expect(offsetOfRow(rows, goToRowIndex, snapshot)).toBe(85)
+  })
+
+  it('is 0 for the first row or an out-of-range index', () => {
+    const { rows } = agenda()
+    expect(offsetOfRow(rows, 0, [])).toBe(0)
+    expect(offsetOfRow(rows, -1, [])).toBe(0)
+  })
 })
 
 describe('computeAgendaScrollRestore', () => {
