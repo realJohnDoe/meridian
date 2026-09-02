@@ -358,11 +358,15 @@ is month view's own panel; day/week/agenda instead show `MiniMonth`.
 
 ### MiniMonth
 Day/week/agenda's quick-nav panel — `MonthStrip`'s counterpart for those three
-views: a dotted mini month grid (`@/components/ui/calendar` with a `DayButton`
-override) rather than a horizontally scrolling strip. Tapping a day navigates
-day/week view to it, or scrolls agenda to it; the grid's own caption arrows
-page its display only, never the main view.
+views: a dotted mini month grid (its own plain button grid, sharing
+`monthGridCells`' date math with `MonthGrid` rather than a `react-day-picker`
+`Calendar` — too heavy for a widget swiped continuously with several panes
+mounted at once, see the file's own header comment) rather than a
+horizontally scrolling strip. Tapping a day navigates day/week view to it, or
+scrolls agenda to it; the grid's own caption arrows page its display only,
+never the main view.
 → `calendar/MiniMonth.tsx` · `MiniMonth`
+→ `calendar/monthGridCells.ts` · `monthGridCells`
 
 ### AgendaRow (disambiguation)
 Two things in one directory, kept apart only by TypeScript's separate type and

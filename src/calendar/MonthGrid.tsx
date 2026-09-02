@@ -10,6 +10,7 @@ import { occState } from '@/occView'
 import { computeMultidayLanes, compactRowLanes, visibleLaneCount } from './computeMultidayLanes'
 import { maxVisibleFor, ROW_GAP } from './snapCarousel'
 import { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './timelineGeometry'
+import { monthGridCells } from './monthGridCells'
 
 const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
@@ -145,20 +146,11 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
   const { from: monthFrom, to: monthTo } = ready ? dayRange(new Date(y, m, 1), new Date(y, m + 1, 0)) : EMPTY_EXPANSION_WINDOW
   const allOccs = useExpandWithMultiday(items, roots, monthFrom, monthTo)
 
-  // Cell grid depends only on month shape and locale week-start — independent of occurrences.
-  const cells = (() => {
-    const rawFirst = new Date(y, m, 1).getDay()
-    const first    = (rawFirst - ws + 7) % 7
-    const dim      = new Date(y, m + 1, 0).getDate()
-    const prev     = new Date(y, m, 0).getDate()
-    const nc       = (7 - (first + dim) % 7) % 7
-
-    const out: Array<{ date: Date; other: boolean }> = []
-    for (let i = first - 1; i >= 0; i--)  out.push({ date: new Date(y, m - 1, prev - i), other: true })
-    for (let d = 1; d <= dim; d++)         out.push({ date: new Date(y, m, d),             other: false })
-    for (let d = 1; d <= nc; d++)          out.push({ date: new Date(y, m + 1, d),          other: true })
-    return out
-  })()
+  // Cell grid depends only on month shape and locale week-start — independent
+  // of occurrences. No `minWeeks`: MonthGrid's row count varies with the
+  // month (4-6), unlike MiniMonth's fixed-height quick-nav grid, which pads
+  // up to 6 (see monthGridCells's own doc comment).
+  const cells = useMemo(() => monthGridCells(y, m, ws), [y, m, ws])
 
   // Partition into single-day occurrences (bucketed per day, as occurrence rows) and
   // multiday occurrences (one root entry per event, deduped from the root +
