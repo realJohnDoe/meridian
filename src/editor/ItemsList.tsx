@@ -69,10 +69,15 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
 
   const occBySlug = useFileOccurrenceMap()
   const backlinks = useStore(s => s.backlinks)
-  const allFiles  = fileEntries(roots, vaultId ?? undefined)
-  const filtered  = pickerQuery ? rankByQuery(pickerQuery, allFiles, e => e.title) : allFiles
 
   const entries: ParsedEntry[] = items.map((raw, idx) => ({ ...parseItemEntry(raw), idx }))
+
+  // Files already linked from this entry have no business appearing in "Link
+  // file" again — a wikilink's stored ref is always the bare fileSlug (see
+  // addLink), so it compares directly against FilePickerEntry.fileSlug.
+  const linkedSlugs = new Set(entries.filter(e => e.kind === 'link').map(e => e.ref))
+  const allFiles  = fileEntries(roots, vaultId ?? undefined).filter(e => !linkedSlugs.has(e.fileSlug))
+  const filtered  = pickerQuery ? rankByQuery(pickerQuery, allFiles, e => e.title) : allFiles
 
   const sortedRows: Row[] = (() => {
     const rows: Row[] = entries.map(entry => {
@@ -109,7 +114,15 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   // file the link lives in.
   const addLink = (fileSlug: string) => {
     const stored = `[[${fileSlug}]]`
-    if (!items.includes(stored)) onChange([...items, stored])
+    if (!items.includes(stored)) {
+      onChange([...items, stored])
+      // Linking a file whose representative occurrence is done/past runs the
+      // same reopen procedure as picking it from the "Done items" group below
+      // (redoItem) — the file just arrived via a different entry point.
+      const target = vaultId ? resolveWikilink(fileSlug, roots, vaultId) : undefined
+      const occ = target ? occBySlug.get(target) : undefined
+      if (occ && isDimmed(occ)) reopenOcc(occ)
+    }
     setPickerQuery('')
     setPickerOpen(false)
   }

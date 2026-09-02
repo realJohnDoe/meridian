@@ -4,11 +4,21 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import ItemsList, { rowSortKey } from './ItemsList'
 import { parseItemEntry } from './items'
-import { setupStore, seedStore, makeOcc, makeSeries, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
+import { setupStore, seedStore, installFakePersistence, makeOcc, makeSeries, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
 import { toggleOccDone } from '@/occurrenceActions'
-import type { Occurrence, Roots } from '@/types'
+import { useStore } from '@/store'
+import type { Occurrence, Roots, StoreOcc } from '@/types'
 
 setupStore()
+const persistence = installFakePersistence()
+
+// jsdom lays nothing out, so every rect is zeros — and a zero-height anchor
+// resting on the top of the usable band reads as "scrolled out of view",
+// which makes useFloatingCombobox measure no placement and the portaled
+// list render nothing at all (see computeFloatingPlacement). One plausible
+// rect is enough to put the picker's suggestion list on screen.
+Element.prototype.getBoundingClientRect = () =>
+  ({ x: 0, y: 100, top: 100, left: 0, right: 200, bottom: 130, width: 200, height: 30, toJSON: () => ({}) })
 
 // jsdom implements no Web Animations API. FlipList reaches for it whenever a
 // row moves or enters, so a harmless stub is needed for any test that
@@ -275,5 +285,44 @@ describe('ItemsList wikilink rows', () => {
 
     expect(onToggleDone).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('linked.md') }))
     expect(collapsingRows()).toHaveLength(0)
+  })
+})
+
+describe('ItemsList link picker', () => {
+  it('excludes files already linked in items from the "Link file" list', () => {
+    const roots = makeRoots('current.md')
+    roots.set(testKey('other.md'), makeRootMeta('other.md', { title: 'Other File' }))
+    roots.set(testKey('third.md'), makeRootMeta('third.md', { title: 'Third File' }))
+
+    render(<Harness initialItems={['[[other.md]]']} roots={roots} />)
+
+    fireEvent.click(screen.getByText('Add item…'))
+
+    expect(screen.queryByText('Other File')).not.toBeInTheDocument()
+    expect(screen.getByText('Third File')).toBeInTheDocument()
+  })
+
+  it('reopens a done file when it is picked from the "Link file" list', () => {
+    const doneOcc = makeOcc({
+      id: 'occ-1', entryKey: testKey('done.md'), date: '2020-01-01',
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'done.md', participants: [], title: 'Old Task', tags: [], items: [], done: true },
+    })
+    const roots = makeRoots('current.md')
+    roots.set(testKey('done.md'), makeRootMeta('done.md', { title: 'Old Task' }))
+    seedStore([doneOcc], roots)
+
+    render(<Harness initialItems={[]} roots={roots} />)
+
+    fireEvent.click(screen.getByText('Add item…'))
+    fireEvent.click(screen.getByText('Old Task'))
+
+    // Same reopen procedure `redoItem` runs for a done row already in the
+    // list (see the "Done items" group) — a fresh undated, undone occurrence
+    // for the file, alongside the original done one.
+    const doneKeyItems = useStore.getState().items.filter(i => i.entryKey === testKey('done.md')) as StoreOcc[]
+    expect(doneKeyItems).toHaveLength(2)
+    const reopened = doneKeyItems.find(i => i.id !== 'occ-1')
+    expect(reopened?.metadata.done).toBe(false)
+    expect(persistence.writes).toContain(testKey('done.md'))
   })
 })
