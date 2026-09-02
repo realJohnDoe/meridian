@@ -7,7 +7,7 @@ import {
   ResponsiveModalActions,
 } from '@/components/primitives/responsive-modal'
 import { badgeVariants } from '@/components/ui/badge'
-import { PRIORITY_ICON_CLASS } from '@/components/primitives/occurrence-variants'
+import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
 import { cn } from '@/lib/cn'
 import { useResetOnChange } from '@/hooks'
 import type { Priority } from '@/types'
@@ -44,9 +44,9 @@ export default function PriorityDrawer({ open, value, onSelect, onClose }: Props
               type="button"
               onClick={() => setPending(p.value)}
               aria-pressed={pending === p.value}
-              className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center')}
+              className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center', PRIORITY_CLASS[p.value])}
             >
-              <Flag size={13} className={PRIORITY_ICON_CLASS[p.value]} />
+              <Flag size={13} />
               {p.label}
             </button>
           ))}

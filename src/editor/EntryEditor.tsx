@@ -8,7 +8,7 @@ import MoveVaultDialog from './dialogs/MoveVaultDialog'
 import type { PendingMove } from './dialogs/MoveVaultDialog'
 import type { DialogHandlers } from './useEntryDialogs'
 import { badgeVariants } from '@/components/ui/badge'
-import { PRIORITY_ICON_CLASS } from '@/components/primitives/occurrence-variants'
+import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { segmentedGroupVariants, segmentedItemVariants } from './segmentedGroup'
@@ -29,19 +29,17 @@ import type { PendingLinks } from './usePendingLinks'
 import { useAllParticipants } from '@/hooks'
 import { VaultChip } from '@/components'
 
-function PropChip({ icon: Icon, label, value, pressed, onClick, className, iconClassName }: {
+function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
   icon: LucideIcon
   label: string
   value?: string
   pressed: boolean
   onClick: () => void
   className?: string
-  /** Colors just the icon (e.g. the priority flag) — see PRIORITY_ICON_CLASS. */
-  iconClassName?: string
 }) {
   return (
     <button type="button" className={cn(badgeVariants({ variant: 'chip' }), className)} aria-pressed={pressed} onClick={onClick}>
-      <Icon size={13} className={iconClassName} />{label}
+      <Icon size={13} />{label}
       {value && <span className="text-2xs font-mono opacity-80 ml-px">{value}</span>}
     </button>
   )
@@ -49,9 +47,10 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className, iconC
 
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
-// Colors only the segment's icon, not its fill/text — see PRIORITY_ICON_CLASS's
-// doc comment for why a full solid fill isn't used here. The "on" segment
-// itself is already shown by segmentedItemVariants' raised bg-background pill.
+// Colors only the segment's icon, not its fill/text — unlike PRIORITY_CLASS's
+// bg-{color}/15 tint (occurrence-variants.ts), this reads well as-is: the
+// "on" segment is already shown by segmentedItemVariants' raised
+// bg-background pill, so the icon alone is enough of a color cue here.
 const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
   task:  'data-[state=on]:[&>svg]:text-task',
   event: 'data-[state=on]:[&>svg]:text-event',
@@ -303,7 +302,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
                 {tracked && (
                   <PropChip icon={Flag} label="Priority" pressed={!!priority} onClick={() => handleOpenDlg('dlgPriority')}
                     value={priority ? PRIORITY_LABELS[priority] : undefined}
-                    iconClassName={priority ? PRIORITY_ICON_CLASS[priority] : undefined} />
+                    className={priority ? PRIORITY_CLASS[priority] : undefined} />
                 )}
                 {showRepeat && (
                   <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => handleOpenRepeatDlg(itemType)}
