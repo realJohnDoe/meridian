@@ -31,6 +31,16 @@ export function serialiseInterval(n: number, unit: DurationUnit): string {
   return serialiseDuration(n, unit)
 }
 
+const FREQ_TO_DURATION_UNIT: Record<ScheduleFreq, DurationUnit> = {
+  daily: 'days', weekly: 'weeks', monthly: 'months', yearly: 'years',
+}
+
+/** The Repeat chip's value text: "every 2 weeks", "every day", "2 days after completion". */
+export function formatRepeatChip(repeat: Repeat): string {
+  if (repeat.type === 'after_completion') return `${repeat.interval} after completion`
+  return `every ${serialiseDuration(repeat.interval ?? 1, FREQ_TO_DURATION_UNIT[repeat.freq])}`
+}
+
 // ── Monthly weekday spec ──────────────────────────────────────────────────────
 
 export interface MonthlyWeekdaySpec {

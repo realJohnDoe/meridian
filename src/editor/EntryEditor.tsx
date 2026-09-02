@@ -23,7 +23,7 @@ import { cn } from '@/lib/cn'
 import type { EntryState, ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
 import { formatDurationChip, fmtDuration, fmtShort } from '@/format'
-import { fmtT, parseDateString } from '@/model'
+import { fmtT, parseDateString, formatRepeatChip } from '@/model'
 import { useStore } from '@/store'
 import type { PendingLinks } from './usePendingLinks'
 import { useAllParticipants } from '@/hooks'
@@ -302,7 +302,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
                 )}
                 {showRepeat && (
                   <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => handleOpenRepeatDlg(itemType)}
-                    value={repeat ? (repeat.type === 'after_completion' ? 'after ✓' : repeat.type) : undefined} />
+                    value={repeat ? formatRepeatChip(repeat) : undefined} />
                 )}
               </div>
             )}
