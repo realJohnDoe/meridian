@@ -93,14 +93,19 @@ export const dvBlockVariants = cva('', {
 })
 
 /**
- * Priority chip active-state colouring — shared between the entry editor's
- * inline priority chip and the priority selection drawer. Solid bg +
- * -foreground ink, same formula as TINT_CLASSES above (task-p1/p2/p3): a
- * light tint behind same-hue text can't clear AA on light themes, which is
- * exactly what made the yellow "Low" chip unreadable.
+ * Priority icon accent — shared between the entry editor's inline priority
+ * chip and the priority selection drawer. Colors only the flag icon, not the
+ * chip's fill/border/text: a full solid-color fill (like TINT_CLASSES above)
+ * reads as too dominant at this size, and the domain palette isn't tuned for
+ * it consistently across every theme the way it's tuned for a swatch used
+ * directly as icon/text color against a neutral surface (see e.g. .meridian's
+ * "tuned to sit on a 0.18-lightness surface" comment below) — several
+ * theme/swatch pairs fall well under AA as a full fill + matching ink.
+ * Selection itself is shown by the shared chip "pressed" indigo highlight
+ * (badge.tsx's `chip` variant), not by domain hue.
  */
-export const PRIORITY_CLASS: Record<Priority, string> = {
-  high:   'aria-[pressed=true]:bg-priority-1 aria-[pressed=true]:border-priority-1 aria-[pressed=true]:text-priority-1-foreground',
-  medium: 'aria-[pressed=true]:bg-priority-2 aria-[pressed=true]:border-priority-2 aria-[pressed=true]:text-priority-2-foreground',
-  low:    'aria-[pressed=true]:bg-priority-3 aria-[pressed=true]:border-priority-3 aria-[pressed=true]:text-priority-3-foreground',
+export const PRIORITY_ICON_CLASS: Record<Priority, string> = {
+  high:   'text-priority-1',
+  medium: 'text-priority-2',
+  low:    'text-priority-3',
 }
