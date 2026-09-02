@@ -93,19 +93,17 @@ export const dvBlockVariants = cva('', {
 })
 
 /**
- * Priority icon accent — shared between the entry editor's inline priority
- * chip and the priority selection drawer. Colors only the flag icon, not the
- * chip's fill/border/text: a full solid-color fill (like TINT_CLASSES above)
- * reads as too dominant at this size, and the domain palette isn't tuned for
- * it consistently across every theme the way it's tuned for a swatch used
- * directly as icon/text color against a neutral surface (see e.g. .meridian's
- * "tuned to sit on a 0.18-lightness surface" comment below) — several
- * theme/swatch pairs fall well under AA as a full fill + matching ink.
- * Selection itself is shown by the shared chip "pressed" indigo highlight
- * (badge.tsx's `chip` variant), not by domain hue.
+ * Priority chip active-state colouring — shared between the entry editor's
+ * inline priority chip and the priority selection drawer. bg-{color}/15 (a
+ * tint, not TINT_CLASSES' solid fill) plus text-chip-tint-foreground: a full
+ * solid fill reads as too dominant at this size, and the palette isn't
+ * uniformly tuned for it as a full fill + matching -foreground ink across
+ * every theme. --chip-tint-foreground is verified >=4.5:1 against every
+ * domain color's 15%-opacity tint in every theme (see its doc comment in
+ * index.css) — same formula as badge.tsx's `chip`/`link` variants.
  */
-export const PRIORITY_ICON_CLASS: Record<Priority, string> = {
-  high:   'text-priority-1',
-  medium: 'text-priority-2',
-  low:    'text-priority-3',
+export const PRIORITY_CLASS: Record<Priority, string> = {
+  high:   'aria-[pressed=true]:bg-priority-1/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-1',
+  medium: 'aria-[pressed=true]:bg-priority-2/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-2',
+  low:    'aria-[pressed=true]:bg-priority-3/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-3',
 }
