@@ -1,14 +1,20 @@
 # The agenda's quick-nav swipe — implementation plan
 
-Two PRs remaining. PR 1 (stopping the agenda's own scroll position from
-steering the quick-nav grid) is done — see `src/routes/_app.tsx`'s
-`agendaQuickNavAnchor` and `src/routes/_app.test.tsx`. PR 2 is the one that
-matters and it is a contained change to one layout effect; PR 1 was a
-prerequisite because without it, PR 2's acceptance test would have silently
-lied. PR 3 is small and optional.
+One PR remaining, and it is optional. PR 1 (stopping the agenda's own scroll
+position from steering the quick-nav grid — see `src/routes/_app.tsx`'s
+`agendaQuickNavAnchor` and `src/routes/_app.test.tsx`) and PR 2 (seeding the
+agenda's scroll offset instead of reconciling to it — see
+`src/calendar/AgendaView.tsx`'s scroll-to-target effect) are both done. PR 3
+is small cleanup on top of PR 2, not a fix on its own.
 
-**Read the "Two fixes that do not work" section before starting.** Both are
-the obvious first thing to try, both were measured, and both make it worse.
+**Read the "Two fixes that do not work" section before starting anything
+here.** Both are the obvious first thing to try, both were measured, and both
+make it worse.
+
+**Read "What PR 2 actually bought" before trusting the ms figures in "What
+is actually slow" below** — they predate PR 1, and a clean re-measurement on
+the PR-1-merged codebase does not reproduce the dramatic delta the original
+investigation attributed to PR 2's own change in isolation.
 
 ---
 
@@ -113,87 +119,55 @@ cleanup on top of PR 2, never as the fix.
 
 ---
 
-## PR 2 — Seed the agenda's scroll offset instead of reconciling to it
+## What PR 2 actually bought
 
-**The fix.** Measured on a grown run, baseline vs. prototype:
+PR 2 replaced `AgendaView.tsx`'s scroll-to-target effect's
+`virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })` with a direct
+`scRef.current.scrollTop = offsetOfRow(rows, goToRowIndex, agendaScrollMeasurements)`
+write (`offsetOfRow` exported from `computeAgendaScrollRestore.ts`), plus one
+bounded corrective `scrollToIndex` pass on the next frame if the seed landed a
+row off. Implemented as designed below, and it is unambiguously the more
+correct mechanism: one deterministic write plus at most one correction, versus
+an unbounded reconciliation loop with no guarantee on how many corrective
+passes it takes.
 
-| | busy | worst frame | long tasks |
-|---|---|---|---|
-| baseline | 1 328 ms | 470–659 ms | 3 |
-| seeded offset | **359 ms** | **92–201 ms** | 1–3 |
+**The ms figure this section originally projected (1 328 ms → 359 ms) does not
+hold up.** That number was measured in the same exploratory session that
+produced PR 1's prototype, before PR 1's fix was a separate, persisted change
+— the "baseline" it was compared against was still carrying PR 1's
+anchor-yank-back render cascade, which inflated it. Re-measured cleanly on the
+actual PR-1-merged codebase (six repeated swipes each, `GROW=10`, 1 200-file
+vault, real touch events, same recipe): baseline (`scrollToIndex`) and PR 2
+(seeded offset) come back statistically indistinguishable — both ~535–758 ms
+busy in the touchend→+900 ms window, both 8–13 `AgendaView` renders per swipe,
+with wide swipe-to-swipe variance in both (57–489 ms worst frame) that reads as
+sandbox scheduling noise rather than a structural difference. PR 2's own
+`corrections` counter reads 0 across every repeat — the seeded write already
+lands on the exact target row every time in this vault, so the corrective path
+adds no visible cost of its own.
 
-### The change
+**Why the delta is small here:** the dominant cost — confirmed by profile, not
+inference — is React rendering and the virtualizer measuring however many new
+rows a browse brings into view (`jsxDEV`, `addValueToProperties`,
+`measureElement`), which PR 2 does not touch and cannot: mounting new content
+costs what it costs regardless of how the scroll position that revealed it was
+reached. What PR 2 removes is specifically TanStack's own iterative
+scroll-measure-correct reconciliation on top of that — real, bounded-not-open-
+ended work, but on this vault's occurrence density — dense enough that even a
+freshly-reseeded 3-chunk/84-day window carries thousands of rows, confirmed by
+instrumenting `useAgendaLoadedRun`/`useAgendaChunks` directly during
+verification — it was apparently already converging in about as few corrective
+passes as PR 2's own bounded design allows, so there wasn't much reconciliation
+cost left to remove once PR 1 stopped the render cascade that was amplifying
+it. Most of the original investigation's dramatic win was PR 1's, not PR 2's.
 
-`src/calendar/AgendaView.tsx`, the scroll layout effect (~line 231):
-
-```ts
-useLayoutEffect(() => {
-  if (!scrollTarget || goToRowIndex < 0 || !scRef.current) return
-  virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })   // <- this
-  lastTopRef.current = scrollTarget
-  anchorAt(goToRowIndex, scrollTarget)
-  markAgendaScrolled(scrollTarget)
-}, [scrollTarget, goToRowIndex, virtualizer, anchorAt])
-```
-
-Replace the `scrollToIndex` with a direct offset write, computed by the function
-the mount path already uses:
-
-```ts
-scRef.current.scrollTop = offsetOfRow(rows, goToRowIndex, agendaScrollMeasurements)
-```
-
-`offsetOfRow` lives in `src/calendar/computeAgendaScrollRestore.ts` and is
-currently module-private — export it. It sums measured sizes where the snapshot
-has them and `estimateRow` elsewhere, which is exactly the arithmetic the
-virtualizer would otherwise arrive at iteratively. One write, one scroll event,
-no reconciliation loop.
-
-### The trap this creates, and what to do about it
-
-A summed offset is **not exact** where rows are unmeasured, so the landing row
-can be off by one. That is the off-by-one that broke navigation in the
-prototype before PR 1 landed (the feedback loop through `anchorMonth` — see
-`src/routes/_app.tsx`'s `agendaQuickNavAnchor`). PR 1 already removes the
-catastrophic consequence; this PR should also correct the landing itself:
-
-- After the seeded write, on the **next frame only**, check whether the row at
-  the top is `goToRowIndex`; if not, issue a single
-  `virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })`. Starting a few
-  pixels out, that converges immediately — the same argument
-  `computeAgendaScrollRestore`'s doc already makes for the mount path ("the seed
-  is still only an estimate on a cold start, so AgendaView keeps a corrective
-  scrollToIndex — but it now starts from a few pixels out instead of a year").
-- Do **not** make the correction unconditional or recursive; one bounded pass.
-
-`lastTopRef` / `anchorAt` / `markAgendaScrolled` keep their current order — they
-record the *intended* target, which is still correct.
-
-### Files
-- `src/calendar/AgendaView.tsx` (the one layout effect)
-- `src/calendar/computeAgendaScrollRestore.ts` (export `offsetOfRow`)
-- `src/calendar/AgendaView.test.tsx`, `src/calendar/computeAgendaScrollRestore.test.ts`
-
-### Watch out
-- **jsdom has no layout engine**, so `scrollTop` writes and `measureElement` are
-  both inert there. Existing AgendaView tests assert on `scrollToIndex` being
-  called — some will need to assert on the seeded offset instead. Do not "fix" a
-  failing test by reinstating the unconditional `scrollToIndex`.
-- `useVirtualFlip` is armed by a `rows` identity change and skipped while
-  `isScrolling`. A seeded write is a single synchronous scroll, so
-  `virtualizer.isScrolling` may read `false` where it used to read `true` —
-  check that a browse does not now trigger a full-list glide animation.
-- Do not touch `requestScrollToDate` (see "Two fixes that do not work").
-
-### Acceptance
-- Re-run the recipe below **with a grown run** (`GROW` step — scroll the agenda
-  to the end ~10 times before opening the panel). A narrow 3-chunk run hides the
-  entire bug; measuring only the fresh-mount state is how this was missed before.
-- Target: busy < 400 ms and worst frame < 250 ms at 1 200 files, against the
-  1 328 ms / 470–659 ms baseline.
-- `AgendaView` renders per swipe must not exceed the current 8–11.
-- Sanity-check the Today button and the sidebar Agenda jump by hand — they go
-  through the same effect.
+None of this makes PR 2 wrong — it is still a strictly simpler, more bounded
+mechanism, consistent with what `computeAgendaScrollRestore.ts` already does
+for the mount path, and it may matter more on a vault whose window-local
+density is lower (so `scrollToIndex` would otherwise need several corrective
+passes to converge) or on a slower device than this sandbox's. It just is not,
+on its own, the dramatic fix the original number implied — that credit
+belongs to PR 1.
 
 ---
 
@@ -212,7 +186,9 @@ preview callbacks. Preview fires on Embla's `select` (finger lift, animation
 starting) and commit on `settle` (animation done), so the agenda re-targets
 twice per swipe, once of them squarely inside the snap animation.
 
-After PR 2 each call is cheap, so this is cleanup rather than the fix. Drop
+Firing it once instead of twice halves the work regardless of PR 2 — it is
+cleanup worth doing on its own merits, not contingent on PR 2 having bought a
+dramatic ms number (see "What PR 2 actually bought", which it did not). Drop
 `onBrowseMonthPreview` on the agenda branch. `MiniMonth`'s own `browsePreview`
 state keeps the panel's `MonthStrip` highlight tracking the gesture without it —
 that is local state, unrelated to `calendarView`'s `monthPreview`.
@@ -225,23 +201,29 @@ to keep the preview but make it move only the scroll position, never the anchor.
 ### Acceptance
 - `requestScrollToDate` fires **once** per swipe (spy on it, drive
   `onPreview`/`onCommit` the way `MiniMonth.preview.test.tsx` already does).
-- Re-measure; it should be at or below PR 2's number, never above.
+- Re-measure using the recipe below; busy time and `AgendaView` render count
+  should not exceed what's on `main` at the time (PR 2's own reference numbers
+  are in "What PR 2 actually bought": ~535–758 ms busy, 8–13 renders per swipe
+  on the 1 200-file vault) — there is no dramatic target to hit, just "not a
+  regression."
 
 ---
 
 ## Also worth doing: a gate, or this returns
 
-This is the **third** distinct root cause found for one user-visible symptom,
-and nothing in `src/` can see any of them — jsdom has no layout engine and no
-frame budget, and `MiniMonth.preview.test.tsx` pins the *order* of
-preview/commit but not their cost.
-
-Cheapest useful gate, no browser needed: a test that drives a quick-nav browse
-and asserts a **bound on `scrollToIndex` calls and on `AgendaView` render
-count**. Both were the actual regression signal here (8–11 renders healthy, 110
-broken), both are observable in jsdom, and both are stable numbers.
-
-Add it in whichever PR lands first that makes it pass.
+This was the **third** distinct root cause found for one user-visible
+symptom, and jsdom has no layout engine and no frame budget — it cannot
+observe *cost* directly. `src/calendar/AgendaView.test.tsx` and
+`computeAgendaScrollRestore.test.ts` now cover PR 1 and PR 2's *functional*
+regressions (an arbitrary quick-nav-browsed day still lands correctly;
+`offsetOfRow`'s exported contract is pinned directly), and PR 1's own
+`_app.test.tsx` pins the render-count-explosion shape of its specific bug. No
+PR here added the *general* gate this section originally proposed — a test
+that drives a quick-nav browse and asserts a bound on `AgendaView`'s render
+count regardless of which future change might blow it up again (the 8–13
+range measured for PR 1+2 together is the number to bound against; 32+ on any
+single swipe is the shape a regression takes, per the render-count cascades
+found while investigating both PRs). Still worth adding; still not done.
 
 ---
 

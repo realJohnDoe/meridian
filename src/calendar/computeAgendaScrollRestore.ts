@@ -22,8 +22,13 @@ const TOP_ROW_EPSILON = 12
  * to reuse across a rebuild: `rows` may have grown or shrunk since the
  * snapshot was taken, but a key (`dateKey|id|instant`) still identifies the
  * same row — see occRows in agendaSections.ts.
+ *
+ * Exported for AgendaView's own scroll-to-target effect, which seeds
+ * `scrollTop` directly with this same sum rather than asking the virtualizer
+ * to reach it via `scrollToIndex`'s iterative scroll-measure-correct — see
+ * that effect's own comment on why.
  */
-function offsetOfRow(rows: AgendaRow[], goToRowIndex: number, snapshot: VirtualItem[]): number {
+export function offsetOfRow(rows: AgendaRow[], goToRowIndex: number, snapshot: VirtualItem[]): number {
   if (goToRowIndex <= 0) return 0
   const measured = snapshot.length > 0 ? new Map(snapshot.map(m => [m.key, m.size])) : null
   let offset = 0

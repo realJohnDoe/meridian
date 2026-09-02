@@ -6,7 +6,7 @@ import { setupStore, seedStore, makeOcc, makeSeries, makeRoots, testKey, TEST_VA
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import { useStore } from '@/store'
-import { calendarView, resetCalendarOnVaultChange, requestScrollToToday } from './viewState'
+import { calendarView, resetCalendarOnVaultChange, requestScrollToToday, requestScrollToDate } from './viewState'
 import { chunkIndexFor } from './agendaChunks'
 import type { Occurrence } from '@/types'
 
@@ -590,6 +590,24 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     // wide run this file's beforeEach primed it with (requestScrollToDate
     // clears agendaLoadedChunks back to null; see viewState.ts).
     expect(calendarView.getState().agendaLoadedChunks).not.toEqual(loadedBefore)
+  })
+
+  // The scenario the scroll-to-target effect's seeded-offset rewrite targets:
+  // a quick-nav browse (MiniMonth's onSelectDay/onBrowseMonth in _app.tsx,
+  // via requestScrollToDate) landing on an arbitrary day while the agenda is
+  // already mounted — not the Today button's own already-covered case above.
+  it('lands on an arbitrary quick-nav-browsed day, not just today', async () => {
+    seedStore([todayTask(), ...upcoming(), ...overdue(60)], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await settle()
+    await scrollDownBy(200)
+
+    const target = fmtISO(addDays(today, 21)) // one of upcoming()'s own dates
+    await act(async () => { requestScrollToDate(target); await Promise.resolve() })
+    await settle()
+
+    expect(calendarView.getState().agendaScrollTarget).toBeNull()
+    expect(calendarView.getState().agendaTopDate).toBe(target)
   })
 })
 
