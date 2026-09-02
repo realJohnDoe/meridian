@@ -76,6 +76,27 @@ export type VaultLayer = Entries
 
 const EMPTY_LAYER: VaultLayer = new Map()
 
+const EMPTY_KEYS: ReadonlySet<EntryKey> = new Set()
+
+/**
+ * Whether replacing `vaultId`'s slice of `prev` with `next` would change
+ * nothing — the cheap guard in front of `setVaultListedKeys`' rebuild.
+ *
+ * Counts `vaultId`'s keys in `prev` rather than filtering them out, so the
+ * whole check is one pass with no intermediate collection.
+ */
+function unchangedForVault(
+  prev: ReadonlySet<EntryKey>, vaultId: string, next: ReadonlySet<EntryKey>,
+): boolean {
+  let mine = 0
+  for (const key of prev) {
+    if (keyVaultId(key) !== vaultId) continue
+    mine++
+    if (!next.has(key)) return false
+  }
+  return mine === next.size
+}
+
 /**
  * Replace `vaultId`'s entries with `next`, leaving every other vault's entries
  * at their existing position in the map.
@@ -287,6 +308,29 @@ interface MeridianStore {
    */
   unreadableFiles: Map<EntryKey, { path: string; message: string }>
   setUnreadableFiles: (files: Map<EntryKey, { path: string; message: string }>) => void
+  /**
+   * Every key each vault's backend *listed* on its last reconcile — including
+   * files whose content has not been pulled into `entries` yet.
+   *
+   * `entries` answers "what have we read", which is not the same question as
+   * "what slugs does this vault already own", and slug allocation needs the
+   * second one. The gap between them is widest exactly when it matters most: a
+   * vault that has not synced in a week has a store painted from a week-old
+   * cache, so every file added elsewhere since looks like a free slug. A new
+   * entry allocated onto one of those pushes as a create, the backend refuses
+   * it (the path is not absent), and the divergence resolves as a conflict copy
+   * between two notes that were never versions of each other.
+   *
+   * `statAll` already answers this on every cycle and used to be discarded once
+   * `planReconcile` had read it. Keeping it costs one Set per vault and closes
+   * the window from the listing's arrival — the first round trip of a cycle —
+   * rather than from the last file being parsed.
+   *
+   * Consulted through `getSlugSnapshot` (storeBridge.ts), never read directly.
+   */
+  listedKeys: ReadonlySet<EntryKey>
+  /** Replace one vault's contribution to `listedKeys`. A no-op when unchanged. */
+  setVaultListedKeys: (vaultId: string, keys: ReadonlySet<EntryKey>) => void
 
   // ── Vaults ──────────────────────────────────────────────────────
   /** Every registered vault. Registered *is* mounted: each one syncs. */
@@ -498,6 +542,10 @@ export const useStore = create<MeridianStore>((set, get) => {
     },
 
     removeVaultLayer: (vaultId) => {
+      // Before the early return below: a vault can hold listed keys with no
+      // entries at all (its listing arrived, its content had not been pulled
+      // yet), and those must not outlive it and go on reserving slugs.
+      get().setVaultListedKeys(vaultId, EMPTY_KEYS)
       const { entries } = get()
       if (![...entries.keys()].some(key => keyVaultId(key) === vaultId)) return
       commitMerged(new Map([...entries].filter(([key]) => keyVaultId(key) !== vaultId)))
@@ -505,6 +553,19 @@ export const useStore = create<MeridianStore>((set, get) => {
 
     unreadableFiles: new Map(),
     setUnreadableFiles: (files) => set({ unreadableFiles: files }),
+
+    listedKeys: EMPTY_KEYS,
+    setVaultListedKeys: (vaultId, keys) => {
+      const prev = get().listedKeys
+      // Every cycle re-publishes the same listing for a vault nobody changed,
+      // and a fresh Set reference would notify every store subscriber for it.
+      // Comparing first is O(n) with no allocation, against an O(n) rebuild
+      // plus a render pass.
+      if (unchangedForVault(prev, vaultId, keys)) return
+      const next = new Set<EntryKey>(keys)
+      for (const key of prev) if (keyVaultId(key) !== vaultId) next.add(key)
+      set({ listedKeys: next })
+    },
 
     vaults:         [],
     defaultVaultId: readJSON<string | null>(DEFAULT_VAULT_KEY, null),

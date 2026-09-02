@@ -7,7 +7,7 @@ import { isWritableVault } from '@/vaultRef'
 import { keyVaultId, keySlug } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { moveEntryToVault } from '@/occurrenceActions'
-import { getSnapshot, getUnreadableFiles } from '@/storeBridge'
+import { getSlugSnapshot } from '@/storeBridge'
 import type { PendingMove } from './dialogs/MoveVaultDialog'
 import type { EntryState } from './state'
 
@@ -108,7 +108,7 @@ export function useVaultTarget(
     // actually see — a link typed seconds ago is otherwise still only in
     // CodeMirror, and the dialog would under-report the breakage.
     flushEditsRef.current()
-    const snapshot = { ...getSnapshot(), unreadableKeys: new Set(getUnreadableFiles().keys()) }
+    const snapshot = getSlugSnapshot()
     const toKey = freeEntryKey(snapshot, toVaultId, keySlug(savedKey))
     const { inbound, outbound } = moveLinkBreakage(snapshot, savedKey, toVaultId)
     setPendingMove({

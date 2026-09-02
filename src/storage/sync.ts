@@ -16,7 +16,7 @@ import type { EntryKey } from '@/fileIO'
 import type { Entries } from '@/types'
 import {
   getVaultLayer, setVaultLayer,
-  setVaultSync,
+  setVaultSync, setVaultListedKeys,
   getUnreadableFiles, setUnreadableFiles,
 } from '@/storeBridge'
 import type { AttentionKind } from '@/store'
@@ -399,12 +399,36 @@ function mergeChangedIntoStore(
 // stretch. Route through readAll()'s batched fetch instead in that case.
 const LARGE_RECONCILE_THRESHOLD = 50
 
+/**
+ * Publish what the backend just listed, so slug allocation can see the files
+ * this cycle has not pulled yet — see `listedKeys` in `store.ts`.
+ *
+ * Called the moment the listing lands, which is the point: it is the first
+ * round trip of a cycle, while the reads that fold the content into the store
+ * are the long tail. On a week-stale vault that is the difference between a new
+ * entry being placed correctly a second after launch and being placed against a
+ * week-old picture for the next twenty.
+ *
+ * Skipped for a vault that has since been unregistered, so a cycle still in
+ * flight cannot re-reserve slugs in a vault `removeVaultLayer` just cleared.
+ * `removeVault` unmounts and clears in two consecutive synchronous statements,
+ * so a publish either precedes both (and is cleared) or follows both (and is
+ * skipped here) — there is no order in which it survives.
+ */
+function publishListing(vaultId: string, diskTokens: Map<string, string>): void {
+  if (!getBackend(vaultId)) return
+  const keys = new Set<EntryKey>()
+  for (const path of diskTokens.keys()) keys.add(pathToKey(vaultId, path))
+  setVaultListedKeys(vaultId, keys)
+}
+
 export async function reconcileWithBackend(
   backend: StorageBackend,
   vaultId: string,
   skipPaths: Set<string> = new Set(),
 ): Promise<void> {
   const diskTokens = await backend.statAll()
+  publishListing(vaultId, diskTokens)
   // Deliberately re-read rather than reusing the snapshot activation already
   // loaded (hydrateFromCache): planReconcile branches on `status === 'clean'`
   // and on `updatedAt`, and the gap between that hydrate and this call is

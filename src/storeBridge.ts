@@ -1,4 +1,5 @@
 import type { StoreItem, Roots, Occurrence, Entries } from './types'
+import type { StoreData } from '@/model'
 import type { EntryKey } from './fileIO'
 import type { VaultRef } from './vaultRef'
 import { useStore, vaultLayer } from './store'
@@ -18,6 +19,31 @@ export const getVaults        = (): VaultRef[]     => useStore.getState().vaults
 export const getDefaultVaultId = (): string | null => useStore.getState().defaultVaultId
 export const getUnreadableFiles = (): Map<EntryKey, { path: string; message: string }> => useStore.getState().unreadableFiles
 export const setUnreadableFiles = (files: Map<EntryKey, { path: string; message: string }>) => useStore.getState().setUnreadableFiles(files)
+
+/** Publish one vault's backend listing — see `listedKeys` in `store.ts`. */
+export const setVaultListedKeys = (vaultId: string, keys: ReadonlySet<EntryKey>): void =>
+  useStore.getState().setVaultListedKeys(vaultId, keys)
+
+/**
+ * The store as **slug allocation** must see it: every key that is occupied,
+ * not merely every key that has been read.
+ *
+ * Three call sites place a file on a slug — a new entry (`saveNode`), a
+ * cross-vault move and the move it previews (`moveEntryToVault`,
+ * `useVaultTarget`) — and each used to assemble this by hand. They agreed by
+ * coincidence rather than by construction, so a fourth source of occupancy had
+ * to be remembered three times or the rarest caller silently kept the old,
+ * narrower answer. There is one definition now, and it is the one
+ * `freeEntryKey` is documented against.
+ *
+ * Deliberately not folded into `getSnapshot`: a delete or an exclusion builds a
+ * snapshot too and has no slug to allocate, so it should not pay for two Sets
+ * it will never read. That is also why `StoreData` keeps both fields optional.
+ */
+export const getSlugSnapshot = (): StoreData => {
+  const { entries, unreadableFiles, listedKeys } = useStore.getState()
+  return { entries, unreadableKeys: new Set(unreadableFiles.keys()), listedKeys }
+}
 
 // ── LAYERS ─────────────────────────────────────────────────────
 /**

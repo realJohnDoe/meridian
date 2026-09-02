@@ -28,6 +28,14 @@ export interface StoreData {
    * use for it and omit it.
    */
   unreadableKeys?: ReadonlySet<EntryKey>
+  /**
+   * Entries the backend's listing reports but whose content has not been
+   * pulled into `entries` yet — a file created on another device while this
+   * one was offline, most of all. Occupied, so not available to a new entry:
+   * see `slugTaken`/`newEntryKey`. Optional on the same terms as
+   * `unreadableKeys`.
+   */
+  listedKeys?: ReadonlySet<EntryKey>
 }
 
 // ── Entry helpers ─────────────────────────────────────────────────────────────
@@ -425,9 +433,17 @@ export interface NewEntryTarget {
   draftId?: string
 }
 
-/** True when some file already occupies `key` in this snapshot. */
-function slugTaken({ entries, unreadableKeys }: StoreData, key: EntryKey): boolean {
-  return entries.has(key) || (unreadableKeys?.has(key) ?? false)
+/**
+ * True when some file already occupies `key` in this snapshot.
+ *
+ * Three ways to be occupied, and a snapshot that omits either optional set is
+ * simply answering with less than it could — never answering "free" about
+ * something it knows is taken.
+ */
+function slugTaken({ entries, unreadableKeys, listedKeys }: StoreData, key: EntryKey): boolean {
+  return entries.has(key)
+    || (unreadableKeys?.has(key) ?? false)
+    || (listedKeys?.has(key) ?? false)
 }
 
 /**
@@ -479,7 +495,8 @@ export function draftEntryKey(entries: Entries, draftId: string | undefined): En
  * new entry would silently destroy the unrelated entry sitting on its slug.
  * `slugTaken` also consults `data.unreadableKeys`, so a file that failed to
  * parse (and so has neither a root nor an item) still holds its slug instead of
- * looking free.
+ * looking free — and `data.listedKeys`, so does one the backend has listed but
+ * this device has not pulled yet.
  *
  * Exported because callers need the resulting key to know which file to
  * persist — see `saveNode`.
@@ -498,10 +515,11 @@ export function newEntryKey(data: StoreData, vaultId: string, title: string, dra
  * needs exactly the same rule against a *different* starting slug: a move keeps
  * the entry's own slug rather than re-deriving one from its title, but must
  * still not land on top of a file the target vault already has. Sharing the
- * search means "how a free slug is found" has one definition — including its
- * consultation of `unreadableKeys` through `slugTaken`, which is what stops
- * either caller from silently overwriting a file that exists but failed to
- * parse.
+ * search means "how a free slug is found" has one definition — including
+ * everything `slugTaken` counts as occupied, which is what stops either caller
+ * from landing on a file that exists but failed to parse, or on one the backend
+ * has listed and this device has not read yet. `getSlugSnapshot`
+ * (storeBridge.ts) is the matching single definition on the caller's side.
  */
 export function freeEntryKey(data: StoreData, vaultId: string, baseSlug: string): EntryKey {
   if (!slugTaken(data, makeEntryKey(vaultId, baseSlug))) return makeEntryKey(vaultId, baseSlug)

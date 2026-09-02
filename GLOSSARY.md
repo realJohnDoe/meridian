@@ -258,6 +258,14 @@ A cached entry with local edits not yet pushed. Counted per vault for the sync
 indicator.
 → `storage/cache/files.ts` · `cacheDirtyCount`
 
+### listed keys
+Every key a vault's backend reported on its last listing, pulled or not — the
+answer to "which slugs does this vault already own", which `entries` (what has
+been *read*) only approximates. Reserved against new entries and moves.
+→ `storage/sync.ts` · `publishListing`
+→ `storeBridge.ts` · `setVaultListedKeys`, `getSlugSnapshot`
+→ `model/storeOps.ts` · `slugTaken`, `freeEntryKey`
+
 ### ConflictError
 Raised when a compare-and-swap write loses — the backend's version token no
 longer matches what the writer saw.
