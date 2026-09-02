@@ -592,6 +592,57 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     expect(calendarView.getState().agendaLoadedChunks).not.toEqual(loadedBefore)
   })
 
+  // Regression test for a real bug, not a hypothetical one: a version of the
+  // scroll-to-target effect that seeded scrollTop directly by summing against
+  // calendarView.getState().agendaScrollMeasurements shipped briefly and
+  // broke the Today button (drifting further off with every repeated press)
+  // and the cold-start landing. Root cause: agendaScrollMeasurements is
+  // written only on unmount (see useSaveAgendaScroll below), so during a live
+  // session it is stale — summing against it can land on the wrong row. See
+  // AgendaView.tsx's own comment on this effect for the second, compounding
+  // bug (a background sync racing the corrective pass) that only a
+  // real-browser repro could find; this half reproduces in jsdom by forcing
+  // the exact stale condition a live session can carry.
+  //
+  // agendaTopDate is deliberately not the assertion here: markAgendaScrolled
+  // records the *intended* target unconditionally (see its own doc comment),
+  // so it stays right even when the actual landing is wrong — this test
+  // failed to catch the real bug on a first attempt for exactly that reason.
+  // scrollContainer().scrollTop, compared against an unpoisoned reference
+  // run, is what actually observes where the agenda landed.
+  it('lands on the same offset regardless of what the store\'s scroll-measurement snapshot claims', async () => {
+    seedStore([todayTask(), ...upcoming(), ...overdue(60)], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await settle()
+
+    // The reference: an ordinary Today press with whatever the store
+    // legitimately carries (empty, from this file's beforeEach reset).
+    await act(async () => { requestScrollToToday(); await Promise.resolve() })
+    await settle()
+    const correctOffset = scrollContainer().scrollTop
+
+    // Real row keys from the settled, correct view — these genuinely
+    // identify rows this session's own row list contains — paired with sizes
+    // an order of magnitude too large. A seeded-write implementation sums
+    // measured-or-estimated sizes for every row above the target; feeding it
+    // real keys with wrong sizes corrupts that sum outright, unlike keys
+    // that don't exist at all (which merely fall back to the — in this
+    // harness, exactly accurate, see estimatedRowHeight above — estimate,
+    // silently not exercising the bug).
+    const poisoned = [...document.querySelectorAll<HTMLElement>('[data-flip-key]')]
+      .map((el, i) => ({
+        index: i, start: i * 5000, end: i * 5000 + 5000, size: 5000,
+        key: el.getAttribute('data-flip-key')!, lane: 0,
+      }))
+    calendarView.setState({ agendaScrollMeasurements: poisoned })
+
+    await scrollDownBy(1200)
+    await act(async () => { requestScrollToToday(); await Promise.resolve() })
+    await settle()
+
+    expect(scrollContainer().scrollTop).toBe(correctOffset)
+  })
+
   // The scenario the scroll-to-target effect's seeded-offset rewrite targets:
   // a quick-nav browse (MiniMonth's onSelectDay/onBrowseMonth in _app.tsx,
   // via requestScrollToDate) landing on an arbitrary day while the agenda is
