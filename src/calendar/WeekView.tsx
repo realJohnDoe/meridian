@@ -71,6 +71,7 @@ export default function WeekView({ date, onOpen, onNavigateWeek, onDayClick, onC
               registerScroller={registerScroller}
               onVerticalScroll={handleVerticalScroll}
               getInitialScrollTop={getInitialScrollTop}
+              live={i === CENTER_PANE}
             />
           </div>
         ))}

@@ -65,6 +65,7 @@ export default function DayView({ date: dvDate, onOpen, onNavigateDate, onCreate
               registerScroller={registerScroller}
               onVerticalScroll={handleVerticalScroll}
               getInitialScrollTop={getInitialScrollTop}
+              live={i === CENTER_PANE}
             />
           </div>
         ))}

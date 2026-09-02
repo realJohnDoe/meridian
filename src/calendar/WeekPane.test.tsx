@@ -14,7 +14,7 @@ function multiday(id: string, date: string, duration: string): StoreOcc {
   return { id, date, time: null, source: 'explicit', entryKey: testKey('note.md'), metadata: { participants: [], duration } }
 }
 
-function renderWeek(items: StoreOcc[]) {
+function renderWeek(items: StoreOcc[], overrides: Partial<Parameters<typeof WeekPane>[0]> = {}) {
   seedStore(items, makeRoots('note.md'))
   return render(
     <WeekPane
@@ -24,6 +24,7 @@ function renderWeek(items: StoreOcc[]) {
       registerScroller={() => {}}
       onVerticalScroll={() => {}}
       getInitialScrollTop={() => 0}
+      {...overrides}
     />,
   )
 }
@@ -63,5 +64,16 @@ describe('WeekPane continuation chevrons', () => {
   it('leaves a bar contained in the week without chevrons', () => {
     renderWeek([multiday('inside', '2026-06-09', '2 days')])
     expect(chevronOf('Note')).toBeNull()
+  })
+})
+
+// A non-centre carousel pane renders `live={false}` (see WeekPane's own
+// `live` prop comment) — it must render no occurrence pills at all, even for
+// a week that has them, since it skips occurrence expansion entirely rather
+// than just hiding what it computed.
+describe('WeekPane live={false}', () => {
+  it('renders no occurrence pills for a week that has them', () => {
+    renderWeek([multiday('wide', '2026-06-05', '5 days')], { live: false })
+    expect(screen.queryByText('Note')).not.toBeInTheDocument()
   })
 })
