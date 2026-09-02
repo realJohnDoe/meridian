@@ -1,8 +1,8 @@
 # Cheap carousel panes, then unbounded swiping
 
-Two PRs. The first makes a day/week pane cheap to mount; the second spends
-that headroom on letting a swipe burst run past the pane window. They are
-sequenced deliberately — the second is only affordable once the first lands.
+Two PRs. The first (making a day/week pane cheap to mount) has landed; what
+remains is the second, which spends that headroom on letting a swipe burst
+run past the pane window — only affordable now that the first has landed.
 
 ## Context: what was measured, and what is already fixed
 
@@ -65,81 +65,6 @@ nothing is animating).
 With those, the proposal subsumes the "per-cell elements, centre pane only"
 option discussed earlier; the CSS-gradient option becomes a fallback for the
 skeleton's own painting if step 1's numbers come up short.
-
----
-
-## PR 1 — Make a day/week pane cheap to mount
-
-**Goal:** a non-centre pane renders no per-hour DOM and no occurrence work,
-while looking the same as it does today. Centre pane behaviour is unchanged.
-
-### Files
-
-- `src/calendar/timelineScaffold.tsx` — `HourCells`, `TimelineScroller`
-- `src/calendar/DayPane.tsx`, `src/calendar/WeekPane.tsx`
-- `src/calendar/DayView.tsx`, `src/calendar/WeekView.tsx` — pass the new prop
-- `src/calendar/timelineScaffold.test.tsx` — existing count assertions
-- delete `src/calendar/deferredExpansionWindow.ts`, `src/calendar/useReadyAfterMount.ts`
-
-### Approach
-
-Add a `live: boolean` prop to `DayPane`/`WeekPane`, threaded from the views
-as `i === CENTER_PANE` (both already compute `CENTER_PANE` for `inert`, right
-beside where this goes). Default it to `true` so a pane rendered on its own —
-which is how every existing test renders them — is unchanged.
-
-When `live` is false:
-
-- **Hour cells:** render the striped background without the per-hour buttons.
-  Suggested first cut: one set of `HOURS` full-width stripe `div`s per *pane*
-  rather than per column (168 → 24 in week view), keeping `occRadius`
-  (`rounded-[4px]`) and `bg-muted/40` so the visuals are identical apart from
-  the stripes no longer being interrupted by the inter-column gaps. If the
-  measurement below still comes up short, fall back to a single
-  `repeating-linear-gradient` element per pane (24 → 1), which loses the 4px
-  corner radius — get that looked at before shipping it.
-- **Occurrences:** skip the expansion entirely and render no pills/blocks.
-  This replaces `useReadyAfterMount` + `EMPTY_EXPANSION_WINDOW`, which exist
-  only to defer this same work by a tick; delete both. (The sentinel also
-  permanently burns one of the 16 `MAX_CACHED_WINDOWS` slots — see
-  `src/calendar/expansionCaches.ts`.)
-
-Non-centre panes are already `inert`, so they are out of the a11y tree and
-non-interactive today — dropping their buttons removes nothing a user or a
-screen reader can reach.
-
-### Invariants that must not break
-
-- **`TimelineScroller` still renders for skeleton panes.** Scroll position is
-  mirrored across panes via `useTimelineScrollSync`, keyed on the scroller
-  registered by each pane. A skeleton without a scroller would start the
-  incoming pane at 7am instead of where the user was. The
-  `registerScroller`-called-once assertion in `timelineScaffold.test.tsx`
-  covers this — it is the test that caught the last botched attempt at this
-  seam.
-- **Skeleton → live is a re-render, not a remount.** Drive it from the `live`
-  prop on the existing component instance. If it is done by changing a React
-  `key`, the pane's scroller is rebuilt and its scroll position is lost.
-- The canvas height (`HOURS * HP + TOP_PAD + BOTTOM_PAD`) and the gutter hour
-  labels stay as they are, so geometry is identical in both states.
-
-### Tests
-
-- Existing: `timelineScaffold.test.tsx` renders panes directly, so its
-  `HOURS` / `HOURS * 7` button-count assertions keep passing via the `live`
-  default. Add a case asserting a `live={false}` pane renders **no**
-  `Create event` buttons but still registers exactly one scroller.
-- Add to `WeekPane.test.tsx` (or alongside): a `live={false}` pane renders no
-  occurrence pills for a week that has them.
-
-### Acceptance
-
-- Hour cells in the DOM after a mini-calendar month jump in week view drop
-  from 840 to ≤ 200.
-- Worst frame during the scripted swipe (recipe below, `HOUR12=0`) drops from
-  ~446 ms to under ~200 ms.
-- Screenshot of week view at rest is unchanged; screenshot mid-drag shows the
-  incoming pane's stripes matching the centre pane's.
 
 ---
 

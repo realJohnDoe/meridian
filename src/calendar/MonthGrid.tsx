@@ -128,8 +128,12 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
   // pane's first commit. While it is, the occurrence expansion below
   // requests a cheap, reliably-empty window instead of this pane's real one,
   // filling in on a follow-up low-priority render instead of landing in the
-  // same commit that mounts this pane. See useReadyAfterMount and DayPane's
-  // matching comment.
+  // same commit that mounts this pane. See useReadyAfterMount. DayPane/
+  // WeekPane no longer use this trick — they skip expansion for a non-centre
+  // pane outright instead of merely deferring it a tick (see their own
+  // `live` prop) — but a month pane is 42 day cells, not 168 hour-cell
+  // buttons, so it doesn't carry the DOM cost that motivated the switch; see
+  // plans/calendar-swipe-cheap-panes.md's "Out of scope".
   const ready = useReadyAfterMount()
 
   // useExpandWithMultiday caches by (fromMs, toMs, items structure, roots) so

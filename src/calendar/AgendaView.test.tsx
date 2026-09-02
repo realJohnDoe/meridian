@@ -312,8 +312,11 @@ describe('AgendaView', () => {
     expect(screen.getByText('×2')).toBeInTheDocument()
     expect(screen.queryByText('×1')).not.toBeInTheDocument()
     // The header counts groups, not the three occurrences behind them. Scoped
-    // to the Overdue header button: a bare getByText('2') also matches
-    // today's day-of-month badge whenever the test runs on the 2nd.
+    // to the "Overdue" toggle button itself (not a page-wide getByText('2')):
+    // today's own day badge elsewhere in the agenda coincidentally renders the
+    // same digit whenever the test happens to run on the 2nd of a month, which
+    // this reproduced against — a page-wide query for a bare digit collides
+    // with any day-of-month badge that happens to match the count.
     const overdueHeader = screen.getByText('Overdue').closest('button')!
     expect(within(overdueHeader).getByText('2')).toBeInTheDocument()
   })

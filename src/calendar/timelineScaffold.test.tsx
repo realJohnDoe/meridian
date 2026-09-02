@@ -103,6 +103,25 @@ describe('timeline scaffold — shared across both panes', () => {
     expect(registered).toHaveLength(1)
     expect(registered[0]!.scrollTop).toBe(sharedTop)
   })
+
+  // A non-centre carousel pane renders `live={false}` — see DayPane/WeekPane's
+  // own `live` prop comment. It must drop the per-hour button DOM (that's the
+  // whole point) while still registering exactly one scroller, the seam a
+  // previous attempt at this got wrong (see timelineScaffold.tsx's own header
+  // comment and TimelineScroller's).
+  it('drops the hour-cell buttons for a non-live pane but still registers its scroller', () => {
+    const registered: HTMLDivElement[] = []
+    renderDay({ live: false, registerScroller: (_k, el) => { if (el) registered.push(el) } })
+    expect(screen.queryAllByRole('button', { name: /^Create event at / })).toHaveLength(0)
+    expect(registered).toHaveLength(1)
+  })
+
+  it('drops the hour-cell buttons for a non-live week pane but still registers its scroller', () => {
+    const registered: HTMLDivElement[] = []
+    renderWeek({ live: false, registerScroller: (_k, el) => { if (el) registered.push(el) } })
+    expect(screen.queryAllByRole('button', { name: /^Create event on / })).toHaveLength(0)
+    expect(registered).toHaveLength(1)
+  })
 })
 
 describe('timeline scaffold — the now-line span each pane needs', () => {
