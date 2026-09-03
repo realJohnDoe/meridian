@@ -8,8 +8,8 @@
  *   - Per-key seek: firstOccurrenceFrom, OVERDUE_LOOKBACK_DAYS
  *
  * Date helpers live in ./dateUtils; duration helpers in ./duration; the
- * optional `ItemIndex`/`buildItemIndex` both functions above accept lives in
- * ./itemIndex.
+ * optional `ItemIndex`/`buildItemIndex` that expandRange, expandWithMultiday
+ * and firstOccurrenceFrom all accept lives in ./itemIndex.
  */
 
 import {
@@ -1081,6 +1081,11 @@ function* iterSeriesSlots(
  * Only safe for a predicate that may return the *first* ascending match as
  * the answer — not for an extremal-*last* query, which needs the whole
  * window materialised (see `fileOccurrence.ts`'s rule 5).
+ *
+ * `index` is an optional pre-built `ItemIndex`, same as `expandRange`'s own
+ * — pass one when a caller already built one for the same `items` (e.g.
+ * `resolveOneKey` also calls `expandRange` for its back window) so the two
+ * don't each classify `items` from scratch.
  */
 export function firstOccurrenceFrom(
   items: StoreItem[],
@@ -1088,6 +1093,7 @@ export function firstOccurrenceFrom(
   from: Date,
   horizon: Date,
   pred: (occ: OccurrenceEntry<AppMetadata>) => boolean,
+  index?: ItemIndex,
 ): OccurrenceEntry<AppMetadata> | null {
   interface SeekOcc {
     date:      string
@@ -1101,7 +1107,7 @@ export function firstOccurrenceFrom(
     metadata:  OccurrenceMetadata
   }
 
-  const { series, standalones, childrenByOwnerId } = buildItemIndex(items)
+  const { series, standalones, childrenByOwnerId } = index ?? buildItemIndex(items)
 
   function* seriesStream(s: StoreSeries): Generator<SeekOcc> {
     const children = childrenByOwnerId.get(s.id) ?? []
