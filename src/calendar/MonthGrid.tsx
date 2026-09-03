@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
 import { differenceInCalendarDays } from 'date-fns'
 import { useStore } from '@/store'
+import type { OccPainter } from '@/occView'
 import type { Occurrence } from '@/types'
 
 import { parseDurationDays, parseMonth, dayRange } from '@/model'
 import { sameDay } from '@/format'
 import { sortOccs } from './occSort'
-import { occState } from '@/occView'
 import { computeMultidayLanes, compactRowLanes, visibleLaneCount } from './computeMultidayLanes'
 import { maxVisibleFor, ROW_GAP } from './snapCarousel'
 import { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './timelineGeometry'
@@ -15,7 +15,7 @@ import { monthGridCells } from './monthGridCells'
 const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useNow } from './useNow'
-import { useToday } from '@/hooks'
+import { useToday, useOccPainter } from '@/hooks'
 import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
@@ -36,6 +36,9 @@ interface CalCellProps {
   hiddenBarCount: number
   barCoverCount: number
   onDayClick: (date: Date) => void
+  /** Passed down rather than hooked per cell — one store subscription per
+   *  pane instead of one per day (see `useOccPainter`). */
+  painter: OccPainter
 }
 
 // No memo() here — all props are read directly in the body (no unused
@@ -44,7 +47,7 @@ interface CalCellProps {
 // auto-caches occsByDay, and useToday only updates at midnight), so the
 // React Compiler's own per-prop memoization already skips this render when
 // nothing relevant changed.
-function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes, hiddenBarCount, barCoverCount, onDayClick }: CalCellProps) {
+function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes, hiddenBarCount, barCoverCount, onDayClick, painter }: CalCellProps) {
   const isToday = sameDay(date, today)
 
   const occCount = dayOccs.length + barCoverCount
@@ -78,7 +81,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
         {dayOccs.slice(0, shown).map(o => (
           <OccurrencePill
             key={`${o.entryKey}-${o.date}`}
-            state={occState(o)}
+            tone={painter.tone(o)}
             title={o.metadata.title}
             className="px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs w-full"
           />
@@ -110,6 +113,7 @@ interface Props {
 export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClick }: Props) {
   const month = useMemo(() => parseMonth(monthKey), [monthKey])
   const today = useToday()
+  const painter = useOccPainter()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
   const { filterOccs } = useCalendarFilter()
@@ -244,6 +248,7 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                     hiddenBarCount={hiddenBarCount}
                     barCoverCount={dayBars.length}
                     onDayClick={onDayClick}
+                    painter={painter}
                   />
                 )
               })}
@@ -257,7 +262,7 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                   <OccurrencePill
                     key={b.occ.id}
                     style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
-                    state={occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
+                    tone={painter.tone({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
                     title={b.occ.metadata.title}
                     continuesLeft={b.continuesLeft}
                     continuesRight={b.continuesRight}

@@ -7,20 +7,20 @@ import { fmtT, parseDateString, multidayDisplayTitle } from '@/model'
 import { fmtShort } from '@/format'
 import { useStore } from '@/store'
 import { formatDurationChip, fmtDuration } from '@/format'
-import { occState } from '@/occView'
+import { useOccPainter } from '@/hooks'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './ui/badge'
 import { DimmableCard } from './DimmableCard'
 import { SurfaceButton } from './primitives/surface-button'
 import { cn } from '@/lib/cn'
-import { occBarVariants, VAULT_COLOR_CHIP } from './primitives/occurrence-variants'
+import { occBarVariants, HUE_CHIP } from './primitives/occurrence-variants'
 import TagChip from './TagChip'
 
 const EMPTY_LISTED_ON: string[] = []
 
 interface OccurrenceCardProps {
   occ: Occurrence
-  /** Current time for wall-clock-dependent styling (occState()). Defaults to `new Date()` if omitted. */
+  /** Current time for wall-clock-dependent styling (the painter's tone). Defaults to `new Date()` if omitted. */
   now?: Date
   onOpen: () => void
   onToggleDone: () => void
@@ -115,21 +115,13 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
   const listedOn = props.listedOn ?? EMPTY_LISTED_ON
   const animate = props.animate ?? true
   const hour12   = useStore(s => s.localePrefs.hour12)
-  // Which vault a card came from, but only while more than one is actually on
-  // screen. Derived here rather than passed down because AgendaRow is memoized
-  // and this is a global, not per-row, condition — and with a single visible
-  // vault the chip would sit on every card saying nothing.
-  const sourceVault = useStore(s => {
-    const visible = s.vaults.filter(v => !s.hiddenVaultIds.includes(v.id))
-    if (visible.length < 2) return null
-    // Returns the vault ref itself (not a derived copy) so the selector keeps
-    // returning the same object reference across renders when nothing about
-    // the vault changed — a fresh object here would defeat useSyncExternalStore's
-    // reference-equality check and re-render in a loop.
-    return visible.find(v => v.id === props.occ.metadata.vaultId) ?? null
-  })
-  const barClass = occState(occ, now)
-  const isPast   = barClass === 'event-past'
+  // Coloring and the meta-row chip are two halves of one preference, so both
+  // come from the painter rather than being decided here: by type, the stripe
+  // says kind/priority and the chip names the vault; by vault, they swap.
+  const painter  = useOccPainter()
+  const tone     = painter.tone(occ, now)
+  const chip     = painter.chip(occ)
+  const isPast   = tone === 'past'
 
   // Optimistic local copy of `done` so the checkbox and its dependent styling
   // (strike-through, dim overlay) animate the instant the user clicks, rather
@@ -169,7 +161,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
 
   const hasDateTimeContent  = (showDate && !!dateBadge) || (showTime !== 'none' && (!!t || !!durationLabel))
   const hasTagsContent      = showTagsParticipants && listedOn.length > 0
-  const showMeta            = hasDateTimeContent || hasTagsContent || !!sourceVault
+  const showMeta            = hasDateTimeContent || hasTagsContent || !!chip
 
   return (
     <DimmableCard
@@ -184,7 +176,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
         onClick={onOpen}
       />
 
-      <span className={cn(occBarVariants({ state: barClass }), 'relative z-20')} />
+      <span className={cn(occBarVariants({ tone }), 'relative z-20')} />
 
       <div className={cn('relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none justify-center', dimmed && 'opacity-60')}>
         <div className="flex items-center gap-1.5">
@@ -225,9 +217,9 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
-            {sourceVault && (
-              <Badge variant="tag" className={sourceVault.color ? VAULT_COLOR_CHIP[sourceVault.color] : undefined}>
-                {sourceVault.name}
+            {chip && (
+              <Badge variant="tag" data-chip={chip.kind} className={chip.hue ? HUE_CHIP[chip.hue] : undefined}>
+                {chip.label}
               </Badge>
             )}
           </div>

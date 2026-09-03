@@ -78,6 +78,27 @@ describe('GeneralSettings — locale preferences', () => {
   })
 })
 
+describe('GeneralSettings — occurrence coloring', () => {
+  it('writes the chosen color source through to the store', () => {
+    render(<GeneralSettings />)
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Vault' }))
+    expect(useStore.getState().colorBy).toBe('vault')
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Type' }))
+    expect(useStore.getState().colorBy).toBe('type')
+  })
+
+  it('ignores a re-press that would clear the group — there is no third mode', () => {
+    useStore.setState({ colorBy: 'vault' })
+    render(<GeneralSettings />)
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Vault' }))
+
+    expect(useStore.getState().colorBy).toBe('vault')
+  })
+})
+
 describe('GeneralSettings — default vault picker', () => {
   it('is hidden when no vault can receive a new entry', () => {
     useStore.setState({

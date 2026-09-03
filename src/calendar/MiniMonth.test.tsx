@@ -48,7 +48,7 @@ describe('MiniMonth', () => {
 
   it('renders a task dot colored by its priority', () => {
     const { container } = renderMini([occ('a', '2026-08-15', { done: false, priority: 'high' })])
-    const dot = dayButton(container, new Date(2026, 7, 15)).querySelector('[data-dot="p1"]')
+    const dot = dayButton(container, new Date(2026, 7, 15)).querySelector('[data-dot="priority-1"]')
     expect(dot).not.toBeNull()
     expect(dot).toHaveClass('bg-priority-1')
   })

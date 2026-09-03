@@ -1,6 +1,7 @@
 import { useTheme } from 'next-themes'
 import { Palette } from 'lucide-react'
 import { useStore } from '@/store'
+import type { OccColorBy } from '@/occView'
 import { setDefaultVault } from '@/vaultActions'
 import { isWritableVault } from '@/vaultRef'
 import { cn } from '@/lib/cn'
@@ -11,6 +12,12 @@ import {
 } from '@/components/ui/select'
 import { SettingsSection, SettingsRow, SettingsLinkRow } from './SettingsSection'
 import { themeLabel } from './themes'
+
+/** The two occurrence color sources, in the order the toggle shows them. */
+const COLOR_SOURCES: { value: OccColorBy; label: string }[] = [
+  { value: 'type',  label: 'Type' },
+  { value: 'vault', label: 'Vault' },
+]
 
 /** Intl `getWeekInfo` values, in the order the toggle shows them. */
 const WEEK_STARTS: { value: 1 | 6 | 7; label: string }[] = [
@@ -34,6 +41,8 @@ export default function GeneralSettings() {
   const defaultVaultId = useStore(s => s.defaultVaultId)
   const localePrefs    = useStore(s => s.localePrefs)
   const setLocalePrefs = useStore(s => s.setLocalePrefs)
+  const colorBy        = useStore(s => s.colorBy)
+  const setColorBy     = useStore(s => s.setColorBy)
 
   // Where new entries go. Every registered vault is mounted and syncing, so
   // this is purely a target choice — picking one loads nothing and unloads
@@ -87,6 +96,27 @@ export default function GeneralSettings() {
             <ToggleGroupItem
               key={value}
               value={String(value)}
+              className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center')}
+            >
+              {label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </SettingsRow>
+
+      <SettingsRow
+        label="Color occurrences by"
+        description="Type colors by event/task and priority. Vault colors by the vault an entry came from — vaults with no color set stay neutral, and tasks show a priority chip instead of a vault one."
+      >
+        <ToggleGroup
+          type="single"
+          value={colorBy}
+          onValueChange={v => { if (v) setColorBy(v as OccColorBy) }}
+        >
+          {COLOR_SOURCES.map(({ value, label }) => (
+            <ToggleGroupItem
+              key={value}
+              value={value}
               className={cn(badgeVariants({ variant: 'chip' }), 'flex-1 justify-center')}
             >
               {label}

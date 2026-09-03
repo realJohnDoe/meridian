@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { occState, occKind, occIsRecur } from '@/occView'
+import { occState, occKind, occIsRecur, typeHue, makeOccPainter } from '@/occView'
 import type { Occurrence } from '@/types'
 import { testKey, TEST_VAULT } from '@/test-utils'
 
@@ -168,5 +168,86 @@ describe('occState', () => {
     // 22:00 (previous day) + 4h = 02:00 today, which is before NOW (12:00) -> past.
     // A day-truncated `now` (midnight today) would wrongly read this as future.
     expect(occState(o)).toBe('event-past')
+  })
+})
+
+
+describe('typeHue', () => {
+  it.each([
+    ['high-priority task',   { done: false, priority: 'high'   as const }, 'priority-1'],
+    ['medium-priority task', { done: false, priority: 'medium' as const }, 'priority-2'],
+    ['low-priority task',    { done: false, priority: 'low'    as const }, 'priority-3'],
+    ['task with no priority', { done: false }, 'task'],
+    // The dots' reason for existing: occState() collapses this to 'done'.
+    ['completed task keeps its priority', { done: true, priority: 'high' as const }, 'priority-1'],
+  ])('%s', (_name, meta, expected) => {
+    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'n', participants: [], title: '', tags: [], items: [], ...meta } })
+    expect(typeHue(occ)).toBe(expected)
+  })
+
+  it('is event for a dated occurrence and note for an undated one', () => {
+    expect(typeHue(makeOcc({ date: '2026-06-15' }))).toBe('event')
+    expect(typeHue(makeOcc({ date: '' }))).toBe('note')
+  })
+})
+
+describe('makeOccPainter', () => {
+  const VAULTS = [
+    { id: TEST_VAULT,   name: 'Work', color: 'blue' as const },
+    { id: 'other-vault', name: 'Home' },
+  ]
+  const task = (priority?: 'high' | 'medium' | 'low', done = false) =>
+    makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'n', participants: [], title: '', tags: [], items: [], done, priority } })
+
+  describe("colorBy: 'type'", () => {
+    const painter = makeOccPainter({ colorBy: 'type', vaults: VAULTS })
+
+    it('tones by kind and priority', () => {
+      expect(painter.tone(task('high'), NOW)).toBe('priority-1')
+      expect(painter.tone(makeOcc({ date: '2026-06-16' }), NOW)).toBe('event')
+    })
+
+    it('names the vault in the chip', () => {
+      expect(painter.chip(task())).toEqual({ kind: 'vault', label: 'Work', hue: 'note' })
+    })
+
+    it('leaves a colorless vault chip untinted', () => {
+      const occ = makeOcc({ metadata: { vaultId: 'other-vault', fileSlug: 'n', participants: [], title: '', tags: [], items: [] } })
+      expect(painter.chip(occ)).toEqual({ kind: 'vault', label: 'Home', hue: undefined })
+    })
+
+    it('drops the chip while only one vault is on screen', () => {
+      const solo = makeOccPainter({ colorBy: 'type', vaults: VAULTS, hiddenVaultIds: ['other-vault'] })
+      expect(solo.chip(task())).toBeNull()
+    })
+  })
+
+  describe("colorBy: 'vault'", () => {
+    const painter = makeOccPainter({ colorBy: 'vault', vaults: VAULTS })
+
+    it("tones by the vault's color, whatever the occurrence's type", () => {
+      expect(painter.tone(task('high'), NOW)).toBe('note')
+      expect(painter.tone(makeOcc({ date: '2026-06-16' }), NOW)).toBe('note')
+    })
+
+    it('tones a vault with no color set as neutral — never as its type', () => {
+      const occ = makeOcc({ date: '2026-06-16', metadata: { vaultId: 'other-vault', fileSlug: 'n', participants: [], title: '', tags: [], items: [] } })
+      expect(painter.tone(occ, NOW)).toBe('neutral')
+    })
+
+    it('names the priority in the chip, and shows none without one', () => {
+      expect(painter.chip(task('medium'))).toEqual({ kind: 'priority', label: 'Medium', hue: 'priority-2' })
+      expect(painter.chip(task())).toBeNull()
+      expect(painter.chip(makeOcc({ date: '2026-06-16' }))).toBeNull()
+    })
+  })
+
+  it('keeps the past/done treatments in both modes', () => {
+    const past = makeOcc({ date: '2026-06-15', time: '09:00', metadata: { vaultId: TEST_VAULT, fileSlug: 'n', participants: [], title: '', tags: [], items: [], jsTime: new Date(2026, 5, 15, 9, 0, 0) } })
+    for (const colorBy of ['type', 'vault'] as const) {
+      const painter = makeOccPainter({ colorBy, vaults: VAULTS })
+      expect(painter.tone(past, NOW)).toBe('past')
+      expect(painter.tone(task('high', true), NOW)).toBe('done')
+    }
   })
 })

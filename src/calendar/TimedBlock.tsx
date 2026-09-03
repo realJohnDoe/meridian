@@ -3,8 +3,7 @@ import { formatDurationChip, fmtDuration } from '@/format'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence } from '@/types'
-import { occState } from '@/occView'
-import { useStore } from '@/store'
+import { useOccPainter } from '@/hooks'
 import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
 import { HP, TOP_PAD, blockGeometry } from './timelineGeometry'
 
@@ -41,8 +40,8 @@ interface TimedBlockProps {
    * rather than clipping. Unset (truncate) for the day view's wider blocks. */
   compact?: boolean
 }
-// occState(o) intentionally keeps its default (true wall clock), not a
-// pane-frozen clockValue a caller might have on hand — see DayPane's
+// painter.tone(o) intentionally keeps occState's default (true wall clock),
+// not a pane-frozen clockValue a caller might have on hand — see DayPane's
 // AllDayItem for the fuller rationale (painting doesn't need the same
 // non-live-clock fallback sortOccs relies on).
 export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact }: TimedBlockProps) {
@@ -61,23 +60,19 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
         : fmtDuration(o.metadata.duration))
     : null
 
-  // Same vault-name chip OccurrenceCard shows, and the same condition: only
-  // while more than one vault is actually on screen, otherwise it would sit
-  // on every block saying nothing.
-  const sourceName = useStore(s => {
-    const visible = s.vaults.filter(v => !s.hiddenVaultIds.includes(v.id))
-    if (visible.length < 2) return null
-    return visible.find(v => v.id === o.metadata.vaultId)?.name ?? null
-  })
+  // Same chip OccurrenceCard shows, on the same terms — the vault's name while
+  // coloring by type, the priority while coloring by vault (see OccPainter).
+  const painter = useOccPainter()
+  const chip = painter.chip(o)
 
   const showBadges = dh >= EVENT_BADGE_MIN_HOURS
   const badgeWidthGate = durationLabel ? BADGE_WIDTH_GATE : TIME_ONLY_WIDTH_GATE
-  const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration, sourceName].filter(Boolean).join(', ')
+  const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration, chip?.label].filter(Boolean).join(', ')
 
   return (
     <SurfaceButton
       className={cn(
-        dvBlockVariants({ state: occState(o) }),
+        dvBlockVariants({ tone: painter.tone(o) }),
         // gap-1 both matches the title/meta spacing OccurrenceCard uses and
         // overrides the gap-2 Button's base classes apply — in this flex-col
         // that gap lands between the title and the badge row, and its 8px is
@@ -107,7 +102,7 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
         <div className={cn('flex flex-wrap gap-1', badgeWidthGate)}>
           {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
           {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
-          {sourceName && <span className={eventPillCls}>{sourceName}</span>}
+          {chip && <span className={eventPillCls}>{chip.label}</span>}
         </div>
       )}
     </SurfaceButton>

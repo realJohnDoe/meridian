@@ -1,12 +1,12 @@
 import type { CSSProperties } from 'react'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
-import type { OccState } from '@/occView'
+import type { OccTone } from '@/occView'
 import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
 import { ContinuationChevron } from './ContinuationChevron'
 
 interface OccurrencePillProps {
-  state: OccState
+  tone: OccTone
   title: string
   /** Present -> an interactive SurfaceButton. Absent -> a plain, non-interactive
    * div — for month view's chips/bars, which sit under a pointer-events-none
@@ -29,7 +29,7 @@ interface OccurrencePillProps {
 /**
  * Shared visual for every colored "pill" occurrence display in the day/week/
  * month grid views — day/week all-day items, week's multiday bars, and
- * month's day-cell chips/bars. Owns the state coloring (dvBlockVariants),
+ * month's day-cell chips/bars. Owns the tone coloring (dvBlockVariants),
  * the shared corner radius (occRadius), and the continuation-chevron +
  * title layout that used to be copy-pasted across all three views. Doesn't
  * own padding/text-size/spacing — those differ per view (see `className`).
@@ -46,7 +46,7 @@ interface OccurrencePillProps {
  * width so `truncate` still applies once the title itself is the long side.
  */
 export function OccurrencePill({
-  state, title, onClick, continuesLeft, continuesRight,
+  tone, title, onClick, continuesLeft, continuesRight,
   chevronHiddenOnMobile, style, className,
 }: OccurrencePillProps) {
   const chevronCls = chevronHiddenOnMobile ? 'hidden sm:block' : undefined
@@ -60,7 +60,7 @@ export function OccurrencePill({
   )
 
   const cls = cn(
-    dvBlockVariants({ state }),
+    dvBlockVariants({ tone }),
     occRadius,
     // gap-1 (4px between chevron and title) is also load-bearing as an
     // override: the interactive form below is a shadcn Button, whose base

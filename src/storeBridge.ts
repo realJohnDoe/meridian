@@ -99,6 +99,7 @@ export const loadGlobalPrefs = (vaultIds: string[]): void => {
   store.loadFavorites(vaultIds)
   store.loadViewFilter()
   store.loadShowTasks(vaultIds)
+  store.loadColorBy()
 }
 
 /** Load the one still-lazy per-vault pref: the participants seeded into new entries. */

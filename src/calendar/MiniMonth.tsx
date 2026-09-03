@@ -5,13 +5,15 @@ import type { StoreItem, Roots, Occurrence } from '@/types'
 import { useStore } from '@/store'
 import { fmtISO, fmtMonth, parseMonth } from '@/model'
 import { sameDay } from '@/format'
-import { useResetOnChange, useToday } from '@/hooks'
+import { useResetOnChange, useToday, useOccPainter } from '@/hooks'
 import { cn } from '@/lib/cn'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { IconButton } from '@/components/primitives/icon-button'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
-import { dayDotsFor, DOT_COLOR, type DotCategory } from './dayDots'
+import { dayDotsFor } from './dayDots'
+import type { OccHue } from '@/occView'
+import { HUE_SOLID } from '@/components/primitives/occurrence-variants'
 import { CALENDAR_FORMATTERS, useCalendarWeekStartsOn, weekdayShortNames } from './calendarLocale'
 import { monthGridCells, type MonthCell } from './monthGridCells'
 import { useCarousel } from './useCarousel'
@@ -32,7 +34,7 @@ const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 // panel's height.
 const FIXED_WEEKS = 6
 
-const EMPTY_DOTS: DotCategory[] = []
+const EMPTY_DOTS: OccHue[] = []
 
 // This grid used to be a full `Calendar` (react-day-picker) instance per
 // pane — the right tool for DatePickerDialog's actual date-input control
@@ -63,7 +65,7 @@ interface DayProps {
   other: boolean
   isToday: boolean
   highlight: boolean
-  dots: DotCategory[]
+  dots: OccHue[]
   onSelectDay: (iso: string) => void
 }
 
@@ -111,8 +113,8 @@ function MiniMonthDay({ date, other, isToday, highlight, dots, onSelectDay }: Da
       {date.getDate()}
       {dots.length > 0 && (
         <div className="flex gap-0.5" aria-hidden>
-          {dots.map(category => (
-            <span key={category} data-dot={category} className={cn('size-1.5 rounded-full', DOT_COLOR[category])} />
+          {dots.map(hue => (
+            <span key={hue} data-dot={hue} className={cn('size-1.5 rounded-full', HUE_SOLID[hue])} />
           ))}
         </div>
       )}
@@ -138,11 +140,15 @@ interface PaneProps {
  * occurrence-dot computation only reruns for its own month. */
 function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, items, roots, filterOccs, ws, monthNav, today }: PaneProps) {
   const month = useMemo(() => parseMonth(monthKey), [monthKey])
+  const painter = useOccPainter()
   const y = month.getFullYear()
   const m = month.getMonth()
 
   const allOccs = useExpandWithMultiday(items, roots, startOfMonth(month), endOfMonth(month))
-  const dotsByDay = useMemo(() => dayDotsFor(filterOccs(allOccs)), [allOccs, filterOccs])
+  const dotsByDay = useMemo(
+    () => dayDotsFor(filterOccs(allOccs), painter.hue),
+    [allOccs, filterOccs, painter],
+  )
 
   const cells = useMemo<MonthCell[]>(() => monthGridCells(y, m, ws, FIXED_WEEKS), [y, m, ws])
   const weekdayNames = weekdayShortNames(ws)

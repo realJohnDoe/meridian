@@ -8,11 +8,11 @@ export type VaultKind = 'local' | 'example' | 'github' | 'ical'
 
 /**
  * The six theme colors a vault may be tagged with, or `undefined` for no
- * color — which maps to the chip's plain, uncolored styling. Each value
- * aliases one of the app's existing domain color tokens (see
- * `VAULT_COLOR_CHIP`/`VAULT_COLOR_SWATCH` in
- * `components/primitives/occurrence-variants.ts`) rather than introducing a
- * new palette.
+ * color — which leaves the vault chip plain, and (while `colorBy` is
+ * `'vault'`) paints the vault's occurrences with the neutral hue. Each value
+ * aliases one of the app's existing domain color tokens — see `VAULT_HUE` in
+ * `occView.ts`, the one table that says which — rather than introducing a new
+ * palette.
  */
 export type VaultColor = 'indigo' | 'red' | 'orange' | 'yellow' | 'green' | 'blue'
 
