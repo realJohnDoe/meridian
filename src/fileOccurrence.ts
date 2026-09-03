@@ -2,7 +2,7 @@ import { startOfToday, addDays } from 'date-fns'
 import { expandRange, firstOccurrenceFrom, joinFileMeta, stableOccId, buildItemIndex, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { buildResolveIndex, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc, isTracked } from './types'
-import { occKind } from './occView'
+import { occKind, isArchived } from './occView'
 import { onIdle } from '@/lib/idle'
 import type { Occurrence, StoreItem, Roots, Entries } from './types'
 import type { EntryKey } from './fileIO'
@@ -30,11 +30,21 @@ interface FilePickerEntry {
  * a `[[wikilink]]` resolves only within its own vault (see `resolveWikilink`),
  * so offering another vault's entries would write a link that renders broken.
  * Search deliberately omits it and spans every registered vault.
+ *
+ * Archived entries are excluded — this is the *offering* side of archiving's
+ * rule: don't hand out an archived file as something new to link to or find.
+ * All four callers (search, the listed-on picker, the items picker, the
+ * wikilink autocomplete) want that, which is why the exclusion lives here
+ * rather than at each call site. This is deliberately the opposite of
+ * `resolveWikilink`, which must keep *resolving* an existing `[[link]]` to an
+ * archived target — offering a new pointer and honouring one already written
+ * are different questions. See GLOSSARY.md `archived`.
  */
 export function fileEntries(roots: Roots, vaultId?: string): FilePickerEntry[] {
   const entries: FilePickerEntry[] = []
   for (const [entryKey, meta] of roots) {
     if (vaultId !== undefined && meta.vaultId !== vaultId) continue
+    if (isArchived(meta)) continue
     entries.push({
       entryKey,
       fileSlug: meta.fileSlug,

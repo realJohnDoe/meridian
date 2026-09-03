@@ -273,3 +273,48 @@ describe('Root A totality — closed leaks (regression guards)', () => {
     expect(savedWithoutConvention.endsWith('\n')).toBe(true)
   })
 })
+
+// `archived` (plans/archived-entries.md PR 1) is the first FILE-LEVEL boolean
+// in the registry. `inlineFieldEmpty` treats only `undefined` as empty for a
+// boolean kind, so unlike `done` this field can be written `false` by hand and
+// must keep round-tripping as `false` — never "fixed" into a required field
+// with an empty-array-style default. These three pin the trap PR 2's
+// unarchive action depends on: it must clear the key, not write `false`.
+describe('archived field (plans/archived-entries.md PR 1)', () => {
+  it('archived: true survives an unedited round trip', () => {
+    const source = '---\ntitle: Old Project\narchived: true\n---\n'
+    assertCollapseTotality('archived-true', source)
+    assertSourceFidelity('archived-true', source)
+  })
+
+  // A hand-written `false` is a real, distinct value — not the same as the
+  // key being absent — and must round-trip exactly like any other field.
+  it('archived: false survives an unedited round trip', () => {
+    const source = '---\ntitle: Explicitly Not Archived\narchived: false\n---\n'
+    assertCollapseTotality('archived-false', source)
+    assertSourceFidelity('archived-false', source)
+    const { root } = parseToStoreItems('archived-false.md', source, TEST_VAULT)
+    expect(root.archived).toBe(false)
+  })
+
+  it('a file with no archived key still emits none', () => {
+    const source = '---\ntitle: Ordinary Note\n---\n'
+    const parsed = parseToStoreItems('ordinary.md', source, TEST_VAULT)
+    expect(parsed.root.archived).toBeUndefined()
+    expect(frontmatterOf(serialize(parsed.items, parsed.root))).not.toHaveProperty('archived')
+  })
+
+  // The trap: unarchiving must clear the key (`undefined`), never write
+  // `false` — `inlineFieldEmpty`'s boolean rule only omits `undefined`, so a
+  // written `false` would round-trip forever as "explicitly not archived"
+  // rather than reading identically to a file that never had the key.
+  it('clearing archived (unarchiving) emits no archived key, not archived: false', () => {
+    const source = '---\ntitle: Old Project\narchived: true\n---\n'
+    const parsed = parseToStoreItems('unarchive.md', source, TEST_VAULT)
+    const unarchived = serialize(parsed.items, { ...parsed.root, archived: undefined })
+    expect(frontmatterOf(unarchived)).not.toHaveProperty('archived')
+
+    const reparsed = parseToStoreItems('unarchive.md', unarchived, TEST_VAULT)
+    expect(reparsed.root.archived).toBeUndefined()
+  })
+})

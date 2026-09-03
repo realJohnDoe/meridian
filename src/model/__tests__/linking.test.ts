@@ -99,6 +99,15 @@ describe('resolveWikilink', () => {
   it('returns undefined for unknown refs', () => {
     expect(resolveWikilink('does-not-exist', roots, TEST_VAULT)).toBeUndefined()
   })
+
+  // Reachability of an already-written link must not depend on archived
+  // state — only `fileEntries` (offering a NEW link) excludes archived roots.
+  it('still resolves an archived entry — an existing link must keep working', () => {
+    const { roots: withArchived } = makeFlat([
+      { slug: 'archived-note', yaml: '---\ntitle: Archived Note\ntags: []\narchived: true\n---\n' },
+    ])
+    expect(resolveWikilink('archived-note', withArchived, TEST_VAULT)).toBe(keyOf('archived-note'))
+  })
 })
 
 // ── vault scoping ─────────────────────────────────────────────────────────────
@@ -226,6 +235,29 @@ describe('fileEntries', () => {
     for (const [, count] of Object.entries(slugCounts)) {
       expect(count).toBe(1)
     }
+  })
+
+  // The offering side of archiving's rule: don't hand out an archived file as
+  // something new to link to or find. (Resolving an EXISTING link to one is
+  // the opposite rule — see resolveWikilink's own archived test above.)
+  it('excludes an archived entry', () => {
+    const { roots: withArchived } = makeFlat([
+      { slug: 'project-alpha',  yaml: ALPHA_YAML },
+      { slug: 'archived-note',  yaml: '---\ntitle: Archived Note\ntags: []\narchived: true\n---\n' },
+    ])
+    const slugs = fileEntries(withArchived).map(e => e.fileSlug)
+    expect(slugs).toContain('project-alpha')
+    expect(slugs).not.toContain('archived-note')
+  })
+
+  // A hand-written `archived: false` is not archived — see FileMetadata's
+  // doc comment on why this must stay a presence-of-true check, never
+  // simplified to "key is present".
+  it('keeps an entry whose archived key is explicitly false', () => {
+    const { roots: explicit } = makeFlat([
+      { slug: 'not-archived', yaml: '---\ntitle: Not Archived\ntags: []\narchived: false\n---\n' },
+    ])
+    expect(fileEntries(explicit).map(e => e.fileSlug)).toContain('not-archived')
   })
 })
 

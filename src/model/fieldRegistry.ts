@@ -27,6 +27,10 @@ const INLINE_FIELDS: readonly InlineFieldSpec[] = [
   { key: 'title',        kind: 'string',      level: 'file',       required: true },
   { key: 'tags',         kind: 'stringArray', level: 'file',       required: true },
   { key: 'items',        kind: 'stringArray', level: 'file',       required: true },
+  // Not `required`: unlike title/tags/items, an absent key and an explicit
+  // `false` must read back identically as "not archived" AND still round-trip
+  // a hand-written `false` — see FileMetadata.archived's doc comment.
+  { key: 'archived',     kind: 'boolean',     level: 'file' },
   { key: 'done',         kind: 'boolean',     level: 'occurrence' },
   { key: 'participants', kind: 'stringArray', level: 'occurrence', required: true },
   { key: 'priority',     kind: 'priority',    level: 'occurrence' },

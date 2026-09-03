@@ -40,6 +40,20 @@ export interface FileMetadata {
   items: string[]
   body?: string
   /**
+   * True when the entry is archived — hidden from every calendar surface and
+   * search, but still resolvable via `[[wikilink]]`, reachable at its own
+   * route, and shown wherever it is already linked. See GLOSSARY.md
+   * `archived` for the full rule and `occView.ts`'s `isArchived` for the
+   * shared predicate over this field.
+   *
+   * `false` is a legal, hand-written value and must keep round-tripping, so
+   * this is never "fixed" to a required field with a `false` default —
+   * unarchiving clears the key (`undefined`) rather than writing `false`. See
+   * `inlineFieldEmpty` in `model/fieldRegistry.ts`, which treats only
+   * `undefined` as empty for a boolean field.
+   */
+  archived?: boolean
+  /**
    * Which vault this file came from. Runtime-only, never serialized — in the
    * same family as `fileConvention` below, and likewise absent from
    * `INLINE_FIELDS` (model/fieldRegistry.ts), so `collapseToYaml` never emits

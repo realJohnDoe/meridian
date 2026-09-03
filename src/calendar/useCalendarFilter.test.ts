@@ -131,6 +131,28 @@ describe('useFilteredOccs', () => {
 
     expect(result.current).toHaveLength(0)
   })
+
+  // Archived is unconditional — no pref gates it, unlike showTasks.
+  it('hides an archived occurrence', () => {
+    const archived = occIn(TEST_VAULT, 'a', [], { archived: true })
+    const active   = occIn(TEST_VAULT, 'b', [])
+
+    const { result } = renderHook(() => useFilteredOccs([archived, active]))
+
+    expect(result.current.map(o => o.id)).toEqual(['b'])
+  })
+
+  // hideVaults/hideParticipants both return their input by reference when
+  // nothing is hidden, which is what lets a re-render with unchanged occs
+  // skip work — hideArchived must keep that property once it's unconditionally
+  // in the chain, or every call would allocate regardless of filter state.
+  it('returns occs by reference when nothing is archived', () => {
+    const occs = [occIn(TEST_VAULT, 'a', [])]
+
+    const { result } = renderHook(() => useFilteredOccs(occs))
+
+    expect(result.current).toBe(occs)
+  })
 })
 
 describe('useParticipantFilteredOccs', () => {
@@ -162,6 +184,17 @@ describe('useParticipantFilteredOccs', () => {
     const { result } = renderHook(() => useParticipantFilteredOccs([mine, theirs]))
 
     expect(result.current.map(o => o.id)).toEqual(['a'])
+  })
+
+  // The leg this hook and filterOccs share (hideEverywhere) — pinned here so
+  // adding it to only one of the two silently misses the Backlog/Notes case.
+  it('hides an archived entry, same as the calendar', () => {
+    const archived = occIn(TEST_VAULT, 'a', [], { done: false, archived: true })
+    const active   = occIn(TEST_VAULT, 'b', [], { done: false })
+
+    const { result } = renderHook(() => useParticipantFilteredOccs([archived, active]))
+
+    expect(result.current.map(o => o.id)).toEqual(['b'])
   })
 })
 
