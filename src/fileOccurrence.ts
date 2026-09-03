@@ -1,7 +1,7 @@
 import { startOfToday, addDays } from 'date-fns'
 import { expandRange, firstOccurrenceFrom, joinFileMeta, stableOccId, buildItemIndex, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { buildResolveIndex, unwrapRef } from './wikilinks'
-import { isSeries, isStandaloneOcc } from './types'
+import { isSeries, isStandaloneOcc, isTracked } from './types'
 import { occKind } from './occView'
 import { onIdle } from '@/lib/idle'
 import type { Occurrence, StoreItem, Roots, Entries } from './types'
@@ -105,15 +105,29 @@ function resolveOneKey(
   let backWindowCache: Occurrence[] | undefined
   const backWindow = (): Occurrence[] => backWindowCache ??= expandRange(keyItems, roots, BACK, now, index) // ascending by time
 
-  // 1. Nearest upcoming event.
-  const futureEvent = firstOccurrenceFrom(keyItems, roots, now, AHEAD,
-    o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs, index)
+  // 1. Nearest upcoming event. `occKind(o) === 'event'` requires
+  // `!isTracked(o)` (metadata.done === undefined) — when every item in
+  // `keyItems` is tracked (every task series and task standalone in this
+  // file), no occurrence of it can ever be an event, so the seek is skipped
+  // outright. Skipping matters: an unmatched `firstOccurrenceFrom` predicate
+  // doesn't fail fast — it walks every occurrence up to `AHEAD` before giving
+  // up, and `AHEAD` is 3 years out, so a weekly task series would otherwise
+  // cost ~470 wasted pulls per key just to confirm what `isTracked` already
+  // knows for free.
+  const mayHaveEvent = keyItems.some(i => !isTracked(i))
+  const futureEvent = mayHaveEvent
+    ? firstOccurrenceFrom(keyItems, roots, now, AHEAD,
+        o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs, index)
+    : null
   if (futureEvent) return futureEvent
 
-  // 2. Earliest undone scheduled task.
+  // 2. Earliest undone scheduled task. Same skip as rule 1, mirrored: a key
+  // with no tracked item at all (every item an event) can never yield a task,
+  // so the forward fallback isn't worth trying either.
   const isUndoneTask = (o: Occurrence): boolean => occKind(o) === 'task' && !o.metadata.done
   const overdueTask  = backWindow().find(isUndoneTask)
-  const earliestTask = overdueTask ?? firstOccurrenceFrom(keyItems, roots, now, AHEAD, isUndoneTask, index)
+  const mayHaveTask  = keyItems.some(i => isTracked(i))
+  const earliestTask = overdueTask ?? (mayHaveTask ? firstOccurrenceFrom(keyItems, roots, now, AHEAD, isUndoneTask, index) : null)
   if (earliestTask) return earliestTask
 
   // 3. Undone unscheduled (undated) standalone task.
