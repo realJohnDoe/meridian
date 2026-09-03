@@ -1,5 +1,5 @@
 import { startOfToday, addDays } from 'date-fns'
-import { expandRange, firstOccurrenceFrom, joinFileMeta, stableOccId, OVERDUE_LOOKBACK_DAYS } from '@/model'
+import { expandRange, firstOccurrenceFrom, joinFileMeta, stableOccId, buildItemIndex, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { buildResolveIndex, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
 import { occKind } from './occView'
@@ -91,19 +91,29 @@ function resolveOneKey(
   const AHEAD = addDays(now, FORWARD_HORIZON_DAYS)
   const BACK  = addDays(now, -OVERDUE_LOOKBACK_DAYS)
 
+  // Classified once and reused by every `expandRange`/`firstOccurrenceFrom`
+  // call below — `keyItems` is small (one file's own items), but this runs
+  // per key, so skipping the re-classification each of those would otherwise
+  // do internally is worth it at 10k+ keys.
+  const index = buildItemIndex(keyItems)
+
   // Rules 2 (overdue half), 4 and 5 (past half) all read from this one fixed,
-  // cheap-to-materialise window rather than each re-expanding their own.
-  const backWindow = expandRange(keyItems, roots, BACK, now) // ascending by time
+  // cheap-to-materialise window rather than each re-expanding their own — but
+  // built lazily and memoized, since rule 1 (the common case) never touches
+  // it and materialising a window that ends up unused would waste exactly
+  // the per-key cost this function exists to avoid.
+  let backWindowCache: Occurrence[] | undefined
+  const backWindow = (): Occurrence[] => backWindowCache ??= expandRange(keyItems, roots, BACK, now, index) // ascending by time
 
   // 1. Nearest upcoming event.
   const futureEvent = firstOccurrenceFrom(keyItems, roots, now, AHEAD,
-    o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs)
+    o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs, index)
   if (futureEvent) return futureEvent
 
   // 2. Earliest undone scheduled task.
   const isUndoneTask = (o: Occurrence): boolean => occKind(o) === 'task' && !o.metadata.done
-  const overdueTask  = backWindow.find(isUndoneTask)
-  const earliestTask = overdueTask ?? firstOccurrenceFrom(keyItems, roots, now, AHEAD, isUndoneTask)
+  const overdueTask  = backWindow().find(isUndoneTask)
+  const earliestTask = overdueTask ?? firstOccurrenceFrom(keyItems, roots, now, AHEAD, isUndoneTask, index)
   if (earliestTask) return earliestTask
 
   // 3. Undone unscheduled (undated) standalone task.
@@ -113,13 +123,13 @@ function resolveOneKey(
   }
 
   // 4. Most-recent past event.
-  const pastEvent = [...backWindow].reverse().find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) < nowMs)
+  const pastEvent = [...backWindow()].reverse().find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) < nowMs)
   if (pastEvent) return pastEvent
 
   // 5. Latest done occurrence.
   const isDone     = (o: Occurrence): boolean => o.metadata.done === true
-  const pastDone   = [...backWindow].reverse().find(isDone)
-  const latestDone = pastDone ?? [...expandRange(keyItems, roots, now, AHEAD)].reverse().find(isDone)
+  const pastDone   = [...backWindow()].reverse().find(isDone)
+  const latestDone = pastDone ?? [...expandRange(keyItems, roots, now, AHEAD, index)].reverse().find(isDone)
   if (latestDone) return latestDone
 
   // 6. Fallback: standalone as-is, or a synthesized anchor for an out-of-window series.
