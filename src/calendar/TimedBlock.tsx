@@ -4,6 +4,7 @@ import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence } from '@/types'
 import { occState } from '@/occView'
+import { useStore } from '@/store'
 import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
 import { HP, TOP_PAD, blockGeometry } from './timelineGeometry'
 
@@ -60,9 +61,18 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
         : fmtDuration(o.metadata.duration))
     : null
 
+  // Same vault-name chip OccurrenceCard shows, and the same condition: only
+  // while more than one vault is actually on screen, otherwise it would sit
+  // on every block saying nothing.
+  const sourceName = useStore(s => {
+    const visible = s.vaults.filter(v => !s.hiddenVaultIds.includes(v.id))
+    if (visible.length < 2) return null
+    return visible.find(v => v.id === o.metadata.vaultId)?.name ?? null
+  })
+
   const showBadges = dh >= EVENT_BADGE_MIN_HOURS
   const badgeWidthGate = durationLabel ? BADGE_WIDTH_GATE : TIME_ONLY_WIDTH_GATE
-  const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration].filter(Boolean).join(', ')
+  const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration, sourceName].filter(Boolean).join(', ')
 
   return (
     <SurfaceButton
@@ -97,6 +107,7 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
         <div className={cn('flex flex-wrap gap-1', badgeWidthGate)}>
           {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
           {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
+          {sourceName && <span className={eventPillCls}>{sourceName}</span>}
         </div>
       )}
     </SurfaceButton>
