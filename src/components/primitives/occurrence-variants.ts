@@ -115,19 +115,21 @@ export const PRIORITY_CLASS: Record<Priority, string> = {
  * `priority-2`/`priority-3`/`task`/`note` under different names, so a vault
  * color introduces no new palette. Same bg-{color}/30 tint as `PRIORITY_CLASS`
  * above, applied to the vault-source chip shown on occurrence cards
- * (`OccurrenceCard`) when that vault has a color set — minus a colored
- * border, which doubled up on the tint and read as a ring. `border-transparent`
- * (not simply omitting a border class) is what actually drops the line: the
- * `Badge` `tag` variant's own `border-[var(--chip-border)]` still applies
- * otherwise. No color at all keeps the chip's plain `Badge` styling.
+ * (`OccurrenceCard`) when that vault has a color set. Deliberately doesn't
+ * set a border class: a colored border-{color} doubled up on the tint and
+ * read as a ring (see git history), so this leaves the `Badge` `tag`
+ * variant's own `border-[var(--chip-border)]` in place instead — the same
+ * neutral hairline every other occurrence-card chip (date/time/duration)
+ * gets, visible in light themes and transparent in dark ones. No color at
+ * all keeps the chip's plain `Badge` styling, border included.
  */
 export const VAULT_COLOR_CHIP: Record<VaultColor, string> = {
-  indigo: 'bg-event/30 text-chip-tint-foreground border-transparent',
-  red:    'bg-priority-1/30 text-chip-tint-foreground border-transparent',
-  orange: 'bg-priority-2/30 text-chip-tint-foreground border-transparent',
-  yellow: 'bg-priority-3/30 text-chip-tint-foreground border-transparent',
-  green:  'bg-task/30 text-chip-tint-foreground border-transparent',
-  blue:   'bg-note/30 text-chip-tint-foreground border-transparent',
+  indigo: 'bg-event/30 text-chip-tint-foreground',
+  red:    'bg-priority-1/30 text-chip-tint-foreground',
+  orange: 'bg-priority-2/30 text-chip-tint-foreground',
+  yellow: 'bg-priority-3/30 text-chip-tint-foreground',
+  green:  'bg-task/30 text-chip-tint-foreground',
+  blue:   'bg-note/30 text-chip-tint-foreground',
 }
 
 /** Solid swatch fill for each `VaultColor`, for the color picker in Settings. */
