@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useStore, NO_PARTICIPANT } from '@/store'
-import { occKind } from '@/occView'
+import { occKind, isArchived } from '@/occView'
 import type { Occurrence } from '@/types'
 
 export { NO_PARTICIPANT }
@@ -41,6 +41,43 @@ export function hideVaults(occs: Occurrence[], hiddenVaultIds: string[]): Occurr
 }
 
 /**
+ * Archived entries are hidden everywhere an occurrence can show up — see
+ * GLOSSARY.md `archived`. Unlike `showTasks`, this is never optional and
+ * carries no store-backed toggle: archived-ness is occurrence data, not
+ * filter state, so it needs no entry in `describeFilter` either — the
+ * agenda's section cache already invalidates on array length, and archiving
+ * a file changes it.
+ *
+ * The common case — nothing archived — returns the input by reference, same
+ * rule as `hideVaults`/`hideParticipants` above and for the same reason: with
+ * no state to short-circuit on (archived-ness lives on the occurrences
+ * themselves, not in a store field this can check up front), the `.some`
+ * scan is what keeps `filterOccs`'s "no active filter → same array back" case
+ * true even once this leg is unconditionally in the chain — see
+ * `useFilteredOccs`'s comment on why that reference stability matters.
+ */
+function hideArchived(occs: Occurrence[]): Occurrence[] {
+  return occs.some(o => isArchived(o.metadata)) ? occs.filter(o => !isArchived(o.metadata)) : occs
+}
+
+/**
+ * The legs that apply to an occurrence no matter which of the two
+ * compositions below it goes through — vaults, archived-ness, and
+ * participants. Extracted so an "applies everywhere" leg (like archived) is
+ * added in exactly one place, never independently to `filterOccs` and
+ * `useParticipantFilteredOccs` — the two used to hand-compose their own
+ * subsets of this, which is how a leg could land in one and silently miss the
+ * other. `showTasks` stays OUT of this: it is calendar-specific, not a
+ * blanket "hide everywhere" axis — see `useParticipantFilteredOccs`'s own
+ * comment for why Backlog/Notes must not inherit it.
+ */
+function hideEverywhere(
+  occs: Occurrence[], hiddenVaultIds: string[], hiddenParticipants: Record<string, string[]>,
+): Occurrence[] {
+  return hideParticipants(hideArchived(hideVaults(occs, hiddenVaultIds)), hiddenParticipants)
+}
+
+/**
  * A serializable description of the filter's *state* — equal strings mean two
  * `filterOccs` callbacks filter identically, whatever their identities.
  *
@@ -68,15 +105,18 @@ export function describeFilter(
  * The single choke point all five view call sites funnel through, so the vault
  * leg composes here ahead of the existing two:
  *
- *     filterOccs = hideVaults ∘ hideTasks ∘ hideParticipants
+ *     filterOccs = hideEverywhere ∘ hideTasks
+ *
+ * (`hideEverywhere` is itself `hideVaults ∘ hideArchived ∘ hideParticipants`.)
  *
  * ⚠️ `filterOccs`'s `useCallback` deps must stay complete: `filterKey` beside
  * it is built from the same three values, and the agenda's section caches key
  * on that string rather than on this callback's identity — so a piece of
- * filter state left out of *both* would be invisible to the cache, not merely
- * to the memo. (`overduePool.ts` still keys on the callback by reference; its
- * pass runs over a filtered item set, so a thrash there costs one cheap
- * re-expansion rather than the agenda's rows.)
+ * filter STATE left out of *both* would be invisible to the cache, not merely
+ * to the memo. Archived is not filter state (see `hideArchived`'s comment),
+ * so it needs no such entry. (`overduePool.ts` still keys on the callback by
+ * reference; its pass runs over a filtered item set, so a thrash there costs
+ * one cheap re-expansion rather than the agenda's rows.)
  */
 export function useCalendarFilter() {
   const hiddenVaultIds     = useStore(s => s.hiddenVaultIds)
@@ -84,9 +124,8 @@ export function useCalendarFilter() {
   const showTasks          = useStore(s => s.showTasks)
 
   const filterOccs = useCallback((occs: Occurrence[]) => {
-    const byVault = hideVaults(occs, hiddenVaultIds)
-    const byKind  = showTasks ? byVault : byVault.filter(o => occKind(o) !== 'task')
-    return hideParticipants(byKind, hiddenParticipants)
+    const byKind = showTasks ? occs : occs.filter(o => occKind(o) !== 'task')
+    return hideEverywhere(byKind, hiddenVaultIds, hiddenParticipants)
   }, [hiddenVaultIds, hiddenParticipants, showTasks])
 
   const filterKey = useMemo(
@@ -110,19 +149,23 @@ export function useFilteredOccs(occs: Occurrence[]): Occurrence[] {
 }
 
 /**
- * Vault + participant filtering for the undated list views (Backlog, Notes).
+ * Vault + participant (+ archived) filtering for the undated list views
+ * (Backlog, Notes).
  *
  * Deliberately does *not* apply showTasks: that toggle composes the calendar,
  * and these views have already answered the kind question by existing —
  * Backlog is tasks-only, Notes is notes-only. Honouring showTasks here would
- * blank the entire Backlog whenever tasks are hidden on the calendar. The vault
- * and people legs do apply: hiding a calendar means hiding it everywhere.
+ * blank the entire Backlog whenever tasks are hidden on the calendar. The
+ * vault, archived, and people legs do apply: hiding a calendar (or an
+ * archived entry) means hiding it everywhere — see `hideEverywhere`, the
+ * function this and `filterOccs` both funnel through so that "everywhere"
+ * leg can't be added to one and forgotten on the other.
  */
 export function useParticipantFilteredOccs(occs: Occurrence[]): Occurrence[] {
   const hiddenVaultIds     = useStore(s => s.hiddenVaultIds)
   const hiddenParticipants = useStore(s => s.hiddenParticipants)
   return useMemo(
-    () => hideParticipants(hideVaults(occs, hiddenVaultIds), hiddenParticipants),
+    () => hideEverywhere(occs, hiddenVaultIds, hiddenParticipants),
     [occs, hiddenVaultIds, hiddenParticipants],
   )
 }

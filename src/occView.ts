@@ -25,6 +25,19 @@ export function occIsRecur(occ: Occurrence): boolean {
 }
 
 /**
+ * True when the entry backing `meta` is archived — hidden from every
+ * calendar surface and search. Structural rather than typed to `Occurrence`
+ * or `FileMetadata` specifically: both shapes carry `archived` directly
+ * (`AppMetadata` includes `FileMetadata` verbatim, see `joinFileMeta`), so
+ * this serves `useCalendarFilter` (over `Occurrence.metadata`) and
+ * `fileEntries` (over a `Roots` value) alike — one predicate rather than
+ * `meta.archived` inlined at every site. See GLOSSARY.md `archived`.
+ */
+export function isArchived(meta: { archived?: boolean }): boolean {
+  return !!meta.archived
+}
+
+/**
  * `now` defaults to the wall clock for callers that don't have a live-updating
  * value on hand (sorting, one-off renders). Components that stay mounted
  * across time (e.g. OccurrenceCard in the agenda) should pass an explicit,

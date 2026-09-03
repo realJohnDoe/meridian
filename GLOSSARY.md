@@ -137,6 +137,14 @@ The source file's line-ending / trailing-newline convention, captured at parse
 time so a save doesn't rewrite every `\r` because one field changed.
 → `fileIO.ts` · `FileConvention`
 
+### archived
+A file-level flag hiding the entry from every calendar surface and search. An
+already-existing pointer to it — a `[[wikilink]]`, its own route, a listed-on
+chip — still works; only *offering* it as a new link candidate is suppressed.
+`false` is a distinct, hand-writable value, never conflated with "key absent".
+→ `types.ts` · `FileMetadata`
+→ `occView.ts` · `isArchived`
+
 ---
 
 ## Store records

@@ -57,6 +57,12 @@ export function parseWikilinks(text: string): WikilinkRef[] {
  * Resolution order (Obsidian-compatible), unchanged apart from the scoping:
  *  1. Exact fileSlug match — `[[project-alpha]]` → the slug we store in topics
  *  2. Title alias match    — `[[Project Alpha]]` → convenience for hand-typed links
+ *
+ * Deliberately resolves to an *archived* target too — this answers "what does
+ * an existing link point at", not "what would I offer as a new link" (that's
+ * `fileOccurrence.ts`'s `fileEntries`, which excludes archived entries).
+ * Reachability of an already-linked entry must not depend on its archived
+ * state.
  */
 export function resolveWikilink(ref: string, roots: Roots, vaultId: string): EntryKey | undefined {
   const lower = ref.toLowerCase()

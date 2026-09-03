@@ -1,11 +1,16 @@
 # Archived entries
 
 Plan for hiding finished entries from every browsing surface without deleting
-or moving their files. Written 2026-09-03, design settled; nothing implemented
-yet.
+or moving their files. Written 2026-09-03, design settled.
 
 Per `plans/CLAUDE.md`: delete each PR's section from this file in the PR that
-implements it, so what remains is only outstanding work.
+implements it, so what remains is only outstanding work. **PR 1 (the field and
+the hiding) has shipped** — the field, the shared `isArchived` predicate
+(`src/occView.ts`), and both filter chokepoints (`fileEntries` in
+`src/fileOccurrence.ts`; `hideEverywhere` in `src/calendar/useCalendarFilter.ts`,
+which `filterOccs` and `useParticipantFilteredOccs` both now funnel through)
+are live. Nothing can set `archived` yet — that's PR 2 — so none of it is
+reachable from the UI.
 
 ---
 
@@ -26,11 +31,11 @@ twice. The reasoning is recorded here so it isn't re-derived:
 - **A frontmatter flag won.** No move, no slug change, no link breakage, no
   sync work, no undo machinery, no new derived store state.
 
-Four PRs: the flag and the hiding (1), the actions and editor banner (2), the
-settings escape hatch (3), then the retention sweep that does most of the
-archiving in practice (4). Because archiving is mostly automatic, the manual
-entry point is deliberately tucked inside the delete dialogs rather than given
-a topbar button.
+Four PRs: the flag and the hiding (1, shipped), the actions and editor banner
+(2), the settings escape hatch (3), then the retention sweep that does most of
+the archiving in practice (4). Because archiving is mostly automatic, the
+manual entry point is deliberately tucked inside the delete dialogs rather
+than given a topbar button.
 
 ---
 
@@ -116,56 +121,6 @@ Archived-ness reaches occurrences for free: `archived` is file-level, and
 `joinFileMeta` (`src/model/expansion.ts:783`) spreads the root into every
 expanded occurrence's `AppMetadata` — the same mechanism that gives every
 occurrence its `vaultId`.
-
----
-
-## PR 1 — the field and the hiding
-
-Lands invisibly: nothing can set `archived` yet, so nothing hides. Verified by
-tests and by hand-editing a fixture.
-
-**1a. Prerequisite refactor (do this first).** Extract the always-on legs
-shared by `filterOccs` and `useParticipantFilteredOccs` into one function both
-call, so an "applies everywhere" leg can only be added in one place. Adding
-`hideArchived` to one and forgetting the other is a silent Backlog bug that
-nothing currently catches.
-
-**1b. The field.**
-- `src/types.ts` — `archived?: boolean` on `FileMetadata`.
-- `src/model/fieldRegistry.ts` — `{ key: 'archived', kind: 'boolean', level: 'file' }`
-  in `INLINE_FIELDS`. Not `required`.
-- Verified safe: `nodeIsItem` (`src/model/storeItems.ts:34`) keys on
-  `repeat`/`date`/`instances` only, so a fourth file-level key doesn't perturb
-  root-vs-item classification. `extractFileMetadata` and `fileMetaToYaml`
-  iterate `FILE_LEVEL_SPECS` generically.
-- This is the **first file-level boolean**, which is the trap below.
-
-> **Trap — `archived: false` would be written to the user's file.**
-> `inlineFieldEmpty` (`src/model/fieldRegistry.ts:96`) counts only `undefined`
-> and empty arrays as empty, so `fileMetaToYaml` (`src/model/collapse.ts:191`)
-> emits any boolean, `false` included. **Unarchive must clear the key
-> (`undefined`), never set `false`.** Do *not* "fix" `inlineFieldEmpty` for
-> booleans: a hand-written `archived: false` must still round-trip, which is
-> the Root-A totality invariant `src/model/roundTripCheck.ts` exists to guard.
-
-**1c. One shared predicate.** Two data shapes need the same question answered
-(`Occurrence` in the calendar, `FileMetadata` in `fileEntries`), and since
-`archived` rides `joinFileMeta` onto occurrences, one predicate over
-`{ archived?: boolean }` serves both. Define it once rather than inlining
-`meta.archived` at five sites.
-
-**1d. The filters.** Chokepoint A and chokepoint B, as above.
-
-**1e. `GLOSSARY.md`.** An `archived` entry naming the real symbols —
-`src/glossary.test.ts` fails otherwise, and that is the point.
-
-**Tests.**
-- Registry: `archived: true` survives an unedited round trip; a file with no
-  `archived` key still emits none; **unarchiving emits no `archived:` key**
-  (the trap above). Neighbourhood: `src/model/__tests__/round-trip-totality.test.ts`.
-- `fileEntries` excludes archived roots; `resolveWikilink` still resolves them.
-- Both calendar compositions hide archived — including a Backlog/Notes case, so
-  the 1a refactor is pinned by a test and not just by discipline.
 
 ---
 
