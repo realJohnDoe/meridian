@@ -3,14 +3,14 @@ import { startOfDay } from 'date-fns'
 import { useStore } from '@/store'
 import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
+import type { OccPainter } from '@/occView'
 import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays, dayRange } from '@/model'
 import { sameDay, addDays } from '@/format'
 import { sortOccs } from './occSort'
-import { occState } from '@/occView'
 import { OccurrencePill } from './OccurrencePill'
 import { AllDayOverflowToggle } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday } from '@/hooks'
+import { useToday, useOccPainter } from '@/hooks'
 import { useFilteredOccs } from './useCalendarFilter'
 import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
@@ -26,8 +26,8 @@ const ALL_DAY_VISIBLE_ROWS = 2
 
 // ── Sub-components ────────────────────────────────────────────
 
-// occState(o) here intentionally keeps its default (true wall clock), not the
-// pane's clockValue — clockValue freezes at `today` midnight for non-today
+// painter.tone(o) here intentionally keeps occState's default (true wall
+// clock), not the pane's clockValue — clockValue freezes at `today` midnight for non-today
 // panes (see clockValue's own comment below), which would misclassify a
 // cross-midnight timed duration in this pane's own day. sortOccs (below) has
 // no such fallback available since it runs inside a memo, so it accepts that
@@ -37,6 +37,7 @@ function renderAllDayItem(
   i: number,
   dvMidnight: Date,
   onOpen: (o: Occurrence) => void,
+  painter: OccPainter,
 ) {
   const days = parseDurationDays(o.metadata.duration) ?? 1
   const startD = parseDateString(o.date)
@@ -44,7 +45,7 @@ function renderAllDayItem(
   return (
     <OccurrencePill
       key={`${o.entryKey}-${o.date}-${i}`}
-      state={occState(o)}
+      tone={painter.tone(o)}
       title={multidayDisplayTitle(o, dvMidnight) ?? o.metadata.title}
       onClick={() => onOpen(o)}
       continuesLeft={!!startD && startD < dvMidnight}
@@ -71,6 +72,7 @@ interface AllDayStripViewProps {
 // DayPane's own `live` comment for why the split is here and not, say, a
 // loading flag on this component itself.
 function AllDayStripView({ allDay, dvDate, dvMidnight, isToday, onOpen, allDayExpanded, setAllDayExpanded }: AllDayStripViewProps) {
+  const painter = useOccPainter()
   // Unlike WeekPane's shared ALL_DAY_THRESHOLD, the day view always reserves
   // at least ALL_DAY_VISIBLE_ROWS of height for all-day content (matching
   // Google Calendar's fixed two-row day-view strip), but a bare 3rd item
@@ -109,7 +111,7 @@ function AllDayStripView({ allDay, dvDate, dvMidnight, isToday, onOpen, allDayEx
       </div>
       <div className="flex-1 min-w-0 pr-2 py-1.5">
         {/* Always-visible first N items (capped at ALL_DAY_VISIBLE_ROWS once overflowing, to make room for the label below) */}
-        {allDay.slice(0, shownAllDayCount).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen))}
+        {allDay.slice(0, shownAllDayCount).map((o, i) => renderAllDayItem(o, i, dvMidnight, onOpen, painter))}
 
         {/* Empty rows so the strip always reserves at least ALL_DAY_VISIBLE_ROWS of
             height, even with fewer (or zero) items — a bare 3rd item (not overflowing)
@@ -133,7 +135,7 @@ function AllDayStripView({ allDay, dvDate, dvMidnight, isToday, onOpen, allDayEx
           <div className={cn('dv-adoverflow', allDayExpanded && 'open')}>
             <div>
               {allDay.slice(shownAllDayCount).map((o, i) =>
-                renderAllDayItem(o, shownAllDayCount + i, dvMidnight, onOpen)
+                renderAllDayItem(o, shownAllDayCount + i, dvMidnight, onOpen, painter)
               )}
             </div>
           </div>

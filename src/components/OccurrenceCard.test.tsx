@@ -139,6 +139,50 @@ describe('OccurrenceCard', () => {
       expect(badge).toHaveClass('bg-note/30', 'border-transparent')
     })
 
+    it('replaces the vault badge with a priority one when coloring by vault', () => {
+      useStore.setState({
+        colorBy: 'vault',
+        vaults: [
+          { id: TEST_VAULT, name: 'Work', kind: 'local', color: 'blue' },
+          { id: 'other-vault', name: 'Home', kind: 'local' },
+        ],
+      })
+      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false, priority: 'high' } })
+      const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
+      expect(screen.queryByText('Work')).toBeNull()
+      const badge = screen.getByText('High')
+      expect(badge).toHaveClass('bg-priority-1/30', 'border-transparent')
+      // …and the stripe takes the vault's color, not the priority's.
+      expect(container.querySelector('.bg-note')).not.toBeNull()
+    })
+
+    it('shows no chip when coloring by vault and the task has no priority', () => {
+      useStore.setState({
+        colorBy: 'vault',
+        vaults: [
+          { id: TEST_VAULT, name: 'Work', kind: 'local', color: 'blue' },
+          { id: 'other-vault', name: 'Home', kind: 'local' },
+        ],
+      })
+      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false } })
+      const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
+      expect(container.querySelector('[data-chip]')).toBeNull()
+    })
+
+    it('paints a colorless vault neutral when coloring by vault', () => {
+      useStore.setState({
+        colorBy: 'vault',
+        vaults: [
+          { id: TEST_VAULT, name: 'Work', kind: 'local' },
+          { id: 'other-vault', name: 'Home', kind: 'local' },
+        ],
+      })
+      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false, priority: 'high' } })
+      const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
+      expect(container.querySelector('.bg-muted-foreground')).not.toBeNull()
+      expect(container.querySelector('.bg-priority-1')).toBeNull()
+    })
+
     it('leaves the vault-source badge uncolored when the vault has no color', () => {
       useStore.setState({
         vaults: [

@@ -1,10 +1,32 @@
 import { cva } from 'class-variance-authority'
 import type { Priority } from '@/types'
-import type { OccState } from '@/occView'
+import { VAULT_HUE, type OccHue, type OccTone } from '@/occView'
 import type { VaultColor } from '@/vaultRef'
 
 /**
- * Shared pattern for active tasks and notes: solid bg-{color} + text-{color}-foreground.
+ * Solid fill per hue — the palette in one place. Bars, swatches and
+ * mini-calendar dots all paint from this, so a dot always agrees with the
+ * chip of the day it sits under.
+ *
+ * `neutral` is `bg-muted-foreground`, not a new token: it is the only
+ * colorless fill every theme already guarantees reads against its surfaces
+ * (index.css treats muted-foreground-on-background at 4.58:1 as the floor to
+ * hold when retuning), and it is plainly distinct from the `bg-muted` /
+ * `bg-surface-raised` the past/done treatments use — which is the whole job,
+ * since a vault with no color set must not look finished.
+ */
+export const HUE_SOLID: Record<OccHue, string> = {
+  event:        'bg-event',
+  'priority-1': 'bg-priority-1',
+  'priority-2': 'bg-priority-2',
+  'priority-3': 'bg-priority-3',
+  task:         'bg-task',
+  note:         'bg-note',
+  neutral:      'bg-muted-foreground',
+}
+
+/**
+ * Shared pattern for active occurrences: solid bg-{color} + text-{color}-foreground.
  * Full-opacity backgrounds (rather than a light tint) plus a per-domain-color
  * foreground (each theme picks whichever of its two ink colors contrasts best
  * against that specific swatch — see index.css) is deliberate: a light tint
@@ -13,34 +35,35 @@ import type { VaultColor } from '@/vaultRef'
  * explicit hover:text so neither gets silently overridden by SurfaceButton's own
  * ghost-variant hover styles. Identical across all item-display contexts — one edit
  * here changes every view.
+ *
+ * `neutral` pairs its muted-foreground fill with `text-background` — the
+ * inverse of the pairing index.css tunes for AA in every theme, so it holds
+ * wherever that one does.
  */
 const TINT_CLASSES = {
-  'task-open': 'bg-task text-task-foreground hover:bg-task/90 hover:text-task-foreground',
-  'task-p1':   'bg-priority-1 text-priority-1-foreground hover:bg-priority-1/90 hover:text-priority-1-foreground',
-  'task-p2':   'bg-priority-2 text-priority-2-foreground hover:bg-priority-2/90 hover:text-priority-2-foreground',
-  'task-p3':   'bg-priority-3 text-priority-3-foreground hover:bg-priority-3/90 hover:text-priority-3-foreground',
-  note:        'bg-note text-note-foreground hover:bg-note/90 hover:text-note-foreground',
-}
+  event:        'bg-event text-event-foreground hover:bg-event/90 hover:text-event-foreground',
+  task:         'bg-task text-task-foreground hover:bg-task/90 hover:text-task-foreground',
+  'priority-1': 'bg-priority-1 text-priority-1-foreground hover:bg-priority-1/90 hover:text-priority-1-foreground',
+  'priority-2': 'bg-priority-2 text-priority-2-foreground hover:bg-priority-2/90 hover:text-priority-2-foreground',
+  'priority-3': 'bg-priority-3 text-priority-3-foreground hover:bg-priority-3/90 hover:text-priority-3-foreground',
+  note:         'bg-note text-note-foreground hover:bg-note/90 hover:text-note-foreground',
+  neutral:      'bg-muted-foreground text-background hover:bg-muted-foreground/90 hover:text-background',
+} satisfies Record<OccHue, string>
 
 /**
- * 4px priority bar in agenda cards (OccurrenceCard).
+ * 4px accent bar in agenda cards (OccurrenceCard).
  */
 export const occBarVariants = cva(
   'w-1 self-stretch rounded-full shrink-0 min-h-5',
   {
     variants: {
-      state: {
-        'event-future': 'bg-event',
-        'event-past':   'bg-surface-raised',
-        'task-open':    'bg-task',
-        'task-p1':      'bg-priority-1',
-        'task-p2':      'bg-priority-2',
-        'task-p3':      'bg-priority-3',
-        note:           'bg-note',
-        done:           'bg-surface-raised',
-      } satisfies Record<OccState, string>,
+      tone: {
+        ...HUE_SOLID,
+        past: 'bg-surface-raised',
+        done: 'bg-surface-raised',
+      } satisfies Record<OccTone, string>,
     },
-    defaultVariants: { state: 'done' },
+    defaultVariants: { tone: 'done' },
   },
 )
 
@@ -71,37 +94,51 @@ export const occRadius = 'rounded-[4px]'
  */
 export const dvBlockVariants = cva('', {
   variants: {
-    state: {
+    tone: {
       ...TINT_CLASSES,
-      'event-future': '',  // both appearances set per bordered in compound variants below
-      'event-past':   'bg-muted text-foreground line-through hover:bg-muted/90 hover:text-foreground',
-      done:           'bg-muted text-foreground line-through hover:bg-muted/90 hover:text-foreground',
-    } satisfies Record<OccState, string>,
+      past: 'bg-muted text-foreground line-through hover:bg-muted/90 hover:text-foreground',
+      done: 'bg-muted text-foreground line-through hover:bg-muted/90 hover:text-foreground',
+    } satisfies Record<OccTone, string>,
     bordered: {
       true:  'border-l-2',
       false: '',
     },
   },
   compoundVariants: [
-    { state: 'event-future', bordered: false, className: 'bg-event text-event-foreground hover:bg-event/90 hover:text-event-foreground' },
-    { state: 'event-future', bordered: true,  className: 'bg-event text-event-foreground hover:bg-event/90 hover:text-event-foreground' },
     // active states are already fully colored, so a same-hue border stripe would be
-    // invisible — only event-past/done (neutral bg-muted) benefit from one
-    { state: 'event-past', bordered: true, className: 'border-l-surface-raised' },
-    { state: 'done',       bordered: true, className: 'border-l-surface-raised' },
+    // invisible — only past/done (neutral bg-muted) benefit from one
+    { tone: 'past', bordered: true, className: 'border-l-surface-raised' },
+    { tone: 'done', bordered: true, className: 'border-l-surface-raised' },
   ],
-  defaultVariants: { state: 'done', bordered: false },
+  defaultVariants: { tone: 'done', bordered: false },
 })
 
 /**
+ * Chip tint per hue — bg-{color}/30 (a tint, not TINT_CLASSES' solid fill)
+ * plus text-chip-tint-foreground: a full solid fill reads as too dominant at
+ * chip size, and the palette isn't uniformly tuned for it as a full fill +
+ * matching -foreground ink across every theme. --chip-tint-foreground is
+ * verified >=4.5:1 against every domain color's 30%-opacity tint in every
+ * theme (see its doc comment in index.css) — same formula as badge.tsx's
+ * `chip`/`link` variants. `border-transparent` (not simply omitting a border
+ * class) is what actually drops the line: the `Badge` `tag` variant's own
+ * `border-[var(--chip-border)]` still applies otherwise.
+ */
+export const HUE_CHIP: Record<OccHue, string> = {
+  event:        'bg-event/30 text-chip-tint-foreground border-transparent',
+  'priority-1': 'bg-priority-1/30 text-chip-tint-foreground border-transparent',
+  'priority-2': 'bg-priority-2/30 text-chip-tint-foreground border-transparent',
+  'priority-3': 'bg-priority-3/30 text-chip-tint-foreground border-transparent',
+  task:         'bg-task/30 text-chip-tint-foreground border-transparent',
+  note:         'bg-note/30 text-chip-tint-foreground border-transparent',
+  neutral:      'bg-muted-foreground/30 text-chip-tint-foreground border-transparent',
+}
+
+/**
  * Priority chip active-state colouring — shared between the entry editor's
- * inline priority chip and the priority selection drawer. bg-{color}/30 (a
- * tint, not TINT_CLASSES' solid fill) plus text-chip-tint-foreground: a full
- * solid fill reads as too dominant at this size, and the palette isn't
- * uniformly tuned for it as a full fill + matching -foreground ink across
- * every theme. --chip-tint-foreground is verified >=4.5:1 against every
- * domain color's 30%-opacity tint in every theme (see its doc comment in
- * index.css) — same formula as badge.tsx's `chip`/`link` variants.
+ * inline priority chip and the priority selection drawer. Same tint as
+ * `HUE_CHIP`, gated on aria-pressed and with the border kept (these are
+ * pressable, and the border is what shows the pressed state's edge).
  */
 export const PRIORITY_CLASS: Record<Priority, string> = {
   high:   'aria-[pressed=true]:bg-priority-1/30 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-1',
@@ -109,33 +146,7 @@ export const PRIORITY_CLASS: Record<Priority, string> = {
   low:    'aria-[pressed=true]:bg-priority-3/30 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-3',
 }
 
-/**
- * Maps each `VaultColor` to one of the app's existing domain color tokens —
- * indigo/red/orange/yellow/green/blue are exactly `event`/`priority-1`/
- * `priority-2`/`priority-3`/`task`/`note` under different names, so a vault
- * color introduces no new palette. Same bg-{color}/30 tint as `PRIORITY_CLASS`
- * above, applied to the vault-source chip shown on occurrence cards
- * (`OccurrenceCard`) when that vault has a color set — minus a colored
- * border, which doubled up on the tint and read as a ring. `border-transparent`
- * (not simply omitting a border class) is what actually drops the line: the
- * `Badge` `tag` variant's own `border-[var(--chip-border)]` still applies
- * otherwise. No color at all keeps the chip's plain `Badge` styling.
- */
-export const VAULT_COLOR_CHIP: Record<VaultColor, string> = {
-  indigo: 'bg-event/30 text-chip-tint-foreground border-transparent',
-  red:    'bg-priority-1/30 text-chip-tint-foreground border-transparent',
-  orange: 'bg-priority-2/30 text-chip-tint-foreground border-transparent',
-  yellow: 'bg-priority-3/30 text-chip-tint-foreground border-transparent',
-  green:  'bg-task/30 text-chip-tint-foreground border-transparent',
-  blue:   'bg-note/30 text-chip-tint-foreground border-transparent',
-}
-
 /** Solid swatch fill for each `VaultColor`, for the color picker in Settings. */
-export const VAULT_COLOR_SWATCH: Record<VaultColor, string> = {
-  indigo: 'bg-event',
-  red:    'bg-priority-1',
-  orange: 'bg-priority-2',
-  yellow: 'bg-priority-3',
-  green:  'bg-task',
-  blue:   'bg-note',
-}
+export const VAULT_COLOR_SWATCH: Record<VaultColor, string> = Object.fromEntries(
+  Object.entries(VAULT_HUE).map(([color, hue]) => [color, HUE_SOLID[hue]]),
+) as Record<VaultColor, string>

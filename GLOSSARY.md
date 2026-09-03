@@ -186,16 +186,43 @@ ones joined from `roots`. Raw store items never carry this.
 → `types.ts` · `AppMetadata`, `OccurrenceMetadata`
 
 ### OccState
-The display-styling vocabulary (`task-p1`, `event-past`, `done`, …) — one
-domain word per visual variant, derived from occurrence data.
+What an occurrence *is* (`task-p1`, `event-past`, `done`, …) — one domain word
+per state, derived from occurrence data. Says nothing about which color source
+paints it; that is `OccTone`.
 → `occView.ts` · `OccState`, `occState`, `occKind`
 
-### DotCategory
-The mini-calendar's per-day dot vocabulary — `event`/`p1`/`p2`/`p3`/`task`.
-Deliberately not derived from `OccState`: `occState()` collapses every
-completed task to `'done'`, which would lose the priority a completed task's
-dot still needs.
-→ `calendar/dayDots.ts` · `DotCategory`, `dotCategory`, `dayDotsFor`
+### OccHue
+The six palette swatches an active occurrence can be painted with, plus
+`neutral` for one with no color to show. Named after the palette tokens rather
+than the domain because both color sources land here — `VaultColor`'s values
+are aliases of these same tokens (`VAULT_HUE`).
+→ `occView.ts` · `OccHue`, `typeHue`, `VAULT_HUE`, `HUE_ORDER`
+
+### OccTone
+How an occurrence is *painted*: an `OccHue`, or the `past`/`done` treatment,
+which wins over any hue in either color mode.
+→ `occView.ts` · `OccTone`
+
+### colorBy
+The device preference choosing which source picks an occurrence's color — its
+type/priority, or its vault. Set explicitly in Settings; nothing switches it
+automatically.
+→ `occView.ts` · `OccColorBy`
+→ `store.ts` · `MeridianStore`
+
+### OccPainter
+`colorBy` plus the vault list, bound into the three things a view needs per
+occurrence: its tone, its hue (dots, which outlive `done`), and its one chip —
+the vault's name when coloring by type, the priority when coloring by vault.
+Built once per view because every call site is a loop, where a hook cannot go.
+→ `occView.ts` · `OccPainter`, `makeOccPainter`, `OccChip`
+→ `hooks/useOccPainter.ts` · `useOccPainter`
+
+### day dots
+The mini-calendar's per-day color dots, one per distinct `OccHue`. Painted from
+the painter's *hue*, not its tone: `occState()` collapses every completed task
+to `'done'`, which would lose the priority a completed task's dot still needs.
+→ `calendar/dayDots.ts` · `dayDotsFor`
 
 ---
 
@@ -446,3 +473,6 @@ asserts none of these have come back.
 | `PAST_WINDOW_DAYS` / `FUTURE_WINDOW_DAYS` | split into `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` (the agenda's window, `calendar/agendaChunks.ts`) and `OVERDUE_LOOKBACK_DAYS` (the overdue pass) |
 | `WALK_PAST_DAYS` / `WALK_FUTURE_DAYS` | removed — the render walk covers exactly the chunks that were expanded (`agendaChunkRun`), so it is no longer a span of its own |
 | `requestVaultSettings` / `onVaultSettingsRequested` | removed — a vault's settings screen has a URL, so callers link to it |
+| `DotCategory` / `dotCategory` | `OccHue` (`occView.ts`), derived by `typeHue` or `OccPainter.hue` — the dots follow the `colorBy` preference now |
+| `DOT_COLOR` | `HUE_SOLID` (`components/primitives/occurrence-variants.ts`) — one solid-fill table for bars, swatches and dots |
+| `VAULT_COLOR_CHIP` | `HUE_CHIP` (keyed by `OccHue`, so priority chips and vault chips share one tint table) |

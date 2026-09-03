@@ -107,7 +107,7 @@ It is an **index, not an encyclopedia** — each entry is one sentence plus a po
 - `occurrenceActions.ts` — user-action orchestration, including its delete-undo toast; used by `editor/` and `calendar/`
 - `storeCommit.ts` + `persistencePort.ts` — persistence-port abstraction (see invariant 3 below); used by `editor/`, `storage/`, and `occurrenceActions.ts`
 - `vaultActions.ts` — used by `components/` and `routes/`
-- `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`). `occView.ts` also owns `OccState`, the display-styling vocabulary its own `occState()` derives.
+- `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`). `occView.ts` also owns the display vocabulary: `OccState` (what an occurrence is, derived by its own `occState()`) and the painting layer on top of it — `OccHue`/`OccTone`, the `colorBy` preference, and the `OccPainter` that resolves both plus the card's one chip (bound to the store by `hooks/useOccPainter.ts`).
 
 All feature directories already have `index.ts` barrels enforced by the import-boundary lint rules — do not propose adding them.
 

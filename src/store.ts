@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { StoreItem, Roots, Entries } from './types'
 import type { LocalePrefs } from '@/model'
 import type { VaultRef } from './vaultRef'
+import type { OccColorBy } from './occView'
 import { warmFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
 import { entryKey as makeEntryKey, isEntryKey, keyVaultId } from './fileIO'
 import type { EntryKey } from './fileIO'
@@ -25,6 +26,7 @@ const HIDDEN_PARTICIPANTS_KEY = 'meridian_hidden_participants'
 const HIDDEN_VAULTS_KEY       = 'meridian_hidden_vaults'
 const DEFAULT_VAULT_KEY       = 'meridian_default_vault'
 const SHOW_TASKS_KEY          = 'meridian_show_tasks_all'
+const COLOR_BY_KEY            = 'meridian_color_by'
 
 // Legacy per-vault prefixes, read once during migration and then removed.
 const LEGACY_FAVORITES_PREFIX  = 'meridian_favorites'
@@ -422,6 +424,17 @@ interface MeridianStore {
   loadShowTasks:   (vaultIds: string[]) => void
   toggleShowTasks: () => void
 
+  // ── Occurrence coloring ──────────────────────────────────────────
+  /**
+   * Which source picks an occurrence's color — its type/priority, or the
+   * vault it came from. Explicit and sticky: nothing switches it on the
+   * user's behalf (a vault gaining or losing a color changes what that vault
+   * paints with, never which mode the app is in). A view question, so global.
+   */
+  colorBy:      OccColorBy
+  loadColorBy:  () => void
+  setColorBy:   (colorBy: OccColorBy) => void
+
   // ── Locale preferences ───────────────────────────────────────────
   /** Auto-detected from browser locale; overridable by the user. Stored in localStorage (global, not vault-scoped). */
   localePrefs:    LocalePrefs
@@ -691,6 +704,16 @@ export const useStore = create<MeridianStore>((set, get) => {
       const next = !get().showTasks
       writeJSON(SHOW_TASKS_KEY, next)
       set({ showTasks: next })
+    },
+
+    colorBy: 'type',
+    loadColorBy: () => {
+      const stored = readJSON<unknown>(COLOR_BY_KEY, null)
+      set({ colorBy: stored === 'vault' ? 'vault' : 'type' })
+    },
+    setColorBy: (colorBy: OccColorBy) => {
+      writeJSON(COLOR_BY_KEY, colorBy)
+      set({ colorBy })
     },
 
     localePrefs: loadLocalePrefs(),

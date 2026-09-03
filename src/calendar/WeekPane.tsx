@@ -6,11 +6,10 @@ import type { Occurrence, EditScope } from '@/types'
 import { fmtT, fmtISO, parseDurationDays, dayRange } from '@/model'
 import { sameDay, fmtShort } from '@/format'
 import { sortOccs } from './occSort'
-import { occState } from '@/occView'
 import { OccurrencePill } from './OccurrencePill'
 import { AllDayOverflowToggle, ALL_DAY_THRESHOLD } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
-import { useToday } from '@/hooks'
+import { useToday, useOccPainter } from '@/hooks'
 import { useFilteredOccs } from './useCalendarFilter'
 import { useNow } from './useNow'
 import { computeColumns } from './computeColumns'
@@ -44,6 +43,7 @@ interface LiveWeekAllDayStripProps {
 // case this doesn't cover, a skeleton pane for a week that *does* have
 // all-day content, briefly shows a shorter header until it goes live.
 function LiveWeekAllDayStrip({ weekStart, days, clockValue, onOpen, allDayExpanded, setAllDayExpanded }: LiveWeekAllDayStripProps) {
+  const painter = useOccPainter()
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
   const { from, to } = dayRange(weekStart, days[6]!)
@@ -185,7 +185,7 @@ function LiveWeekAllDayStrip({ weekStart, days, clockValue, onOpen, allDayExpand
     <OccurrencePill
       key={b.occ.id}
       style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.row + 1 }}
-      state={occState({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
+      tone={painter.tone({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
       title={b.occ.metadata.title}
       onClick={() => onOpen(b.occ)}
       continuesLeft={b.continuesLeft}
@@ -198,7 +198,7 @@ function LiveWeekAllDayStrip({ weekStart, days, clockValue, onOpen, allDayExpand
     <OccurrencePill
       key={`${o.entryKey}-${o.date}`}
       style={{ gridColumn: col + 1, gridRow: row + 1 }}
-      state={occState(o)}
+      tone={painter.tone(o)}
       title={o.metadata.title}
       onClick={() => onOpen(o)}
       className="px-0.5 sm:px-1.5 text-3xs sm:text-xs w-full"
