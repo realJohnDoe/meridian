@@ -26,10 +26,11 @@ twice. The reasoning is recorded here so it isn't re-derived:
 - **A frontmatter flag won.** No move, no slug change, no link breakage, no
   sync work, no undo machinery, no new derived store state.
 
-The **retention sweep itself is deferred** — see *Deferred* at the bottom. This
-plan lands the flag, the hiding and the manual affordances. Archiving will
-mostly happen automatically once the sweep exists, so the manual entry point is
-deliberately tucked inside the delete dialogs rather than given a topbar button.
+Four PRs: the flag and the hiding (1), the actions and editor banner (2), the
+settings escape hatch (3), then the retention sweep that does most of the
+archiving in practice (4). Because archiving is mostly automatic, the manual
+entry point is deliberately tucked inside the delete dialogs rather than given
+a topbar button.
 
 ---
 
@@ -240,37 +241,104 @@ expected.
 
 ---
 
+## PR 4 — the retention sweep
+
+Auto-archiving on a per-vault age threshold. This is what makes the feature
+useful day to day, so it follows PR 2 rather than drifting; PRs 1–3 prove the
+filters and give the manual escape hatch first. It is the largest of the four
+and can be split at the 4b/4d seam if it gets unwieldy.
+
+**Decided:** the age signal is a **real last-modified from the backends**, and
+the condition is **age plus finished**. Age alone would archive an undone
+overdue task, which is backwards. The cheaper alternative — ageing by the
+entry's newest occurrence date, no backend work — was rejected because a
+*dateless done task* has nothing to age by (`done` is a bare boolean with no
+completion timestamp, `src/model/fieldRegistry.ts:30`), and those should
+auto-archive too. That gap is the whole reason for the plumbing in 4b.
+
+**4a. The predicate.** Pure, in `model/`, over the entry's `StoreItem[]`. A
+file is a candidate when **every** item is finished:
+
+| Item shape | Finished? |
+|---|---|
+| tracked, `done: true` | yes |
+| tracked, `done: false` | **no** — that's the backlog/overdue, dated or not |
+| untracked, past date | yes |
+| untracked, future date | no |
+| undated and untracked (a note) | **no** — neither done nor past |
+| series with `repeat.end` absent | **no** — unbounded, never all past |
+| series, `after_completion` | **no** — see below |
+| series, bounded and exhausted | yes, if every occurrence is done (tracked) or past (event) |
+
+Two traps in that table:
+
+- **"Never ends" is the *absence* of `end`.** The domain type is
+  `end?: RepeatEnd` where `RepeatEnd` is only `until | count`
+  (`src/types.ts:16`). The `RepeatEndType = 'never' | 'until' | 'count'` union
+  in `src/model/repeat.ts:123` is the **form** vocabulary for the repeat
+  dialog, not the persisted shape — don't reach for it here.
+- **`isTracked` is presence-based** (`src/types.ts:236`): `done: false` is
+  still a task. Never simplify to `!!done`.
+
+`after_completion` series are excluded deliberately rather than for lack of
+effort: `done` is what determines when the next occurrence is generated
+(`src/model/expansion.ts:108`), so "all occurrences done" isn't a fixed point —
+completing the last one creates another. Manual archiving covers them.
+
+**4b. `lastModified` on the file interface.**
+
+- `RawFile.lastModified?: number` (`src/storage/backend.ts:8`) and
+  `DexieFileRow.lastModified?: number` (`src/storage/cache/db.ts:13`).
+- **No Dexie version bump.** The field is unindexed, and `stores()` declares
+  the primary key and indexes, not the row shape — `baseContent`'s comment
+  (`src/storage/cache/db.ts:31`) is the precedent, including its rule that
+  readers treat absence on a pre-existing row as its own case rather than a
+  default. Here, absent → unknown → never archive. Fails safe.
+- **Local FS: free.** `statVersion` and `diskReadAll` already hold the `File`
+  object, so `file.lastModified` is right there (`src/storage/fs.ts:76`). Note
+  that local `version` is a **content hash** now — `mtime:size` is the legacy
+  shape being migrated off (`LEGACY_VERSION_RE`, `src/storage/fs.ts:65`) — so
+  this is a new field, not a revival of that token.
+- **GitHub: backfill once, then free.** Blobs carry no dates; per-path commit
+  dates come from aliased GraphQL `history` queries, the same batching shape as
+  `buildBlobQuery` (`src/storage/githubBackend.ts:90`). Path-filtered `history`
+  is point-expensive on GitHub's rate limiter, so its batch size needs its own
+  tuning rather than inheriting `GRAPHQL_BATCH_SIZE`. Do this on `readAll` only.
+- **Incremental sync needs no extra requests at all.** `statAll` already reports
+  which paths' version tokens changed, and a changed token *is* the
+  modification — stamp `lastModified = now` during reconcile. After a long
+  offline stretch this records pull time rather than commit time, which errs
+  recent, i.e. fails safe.
+- **Say the semantics in the doc comment.** FS mtime is "bytes written on this
+  machine"; a GitHub commit date is "committed to this branch". A fresh clone,
+  a new device, or a Dropbox/Syncthing resync resets FS mtimes to now, so
+  nothing archives for a retention period afterwards — again failing safe. A
+  squash-merge or history rewrite does the same on the GitHub side.
+- Do **not** reuse `CacheRecord.updatedAt` for this. It is when *this device's*
+  cache row was written, and the bulk reconcile stamps `updatedAt: now` on
+  every record it refreshes (`src/storage/cache/files.ts:201`), so after a
+  fresh pull every file looks edited today.
+
+**4c. The setting.** `retentionDays?: number` on `VaultRefBase`
+(`src/vaultRef.ts:29`), beside `color` — optional, so no store migration.
+A row in the vault's settings screen, hidden when `!isWritableVault(vault)`:
+`example` and `ical` have no writable side, and for a subscription the feed is
+upstream anyway.
+
+**4d. The sweep.** Runs per vault after a successful sync settles — not on a
+timer, not on render. A file is archived when it passes 4a **and** its
+`lastModified` is older than `retentionDays`. Archive through PR 2's
+`setArchived`, then one toast: `Archived N entries in <vault> · Undo`. Undo is
+real here, unlike the rejected move design — it is a flag flip on files that
+never went anywhere.
+
+**Tests.** The 4a table, case by case, including both traps. A cache row with
+no `lastModified` never archives. The sweep respects the per-vault setting and
+skips vaults where `isWritableVault` is false.
+
+---
+
 ## Deferred
-
-**The retention sweep.** Auto-archiving on an age threshold, per vault. This is
-what makes the feature useful day to day, so it should follow immediately
-rather than drift — but it needs the age signal below, and the manual half
-proves the filters first.
-
-**"Last modified" for the age signal.** Findings, so they aren't re-derived:
-
-- There is no usable last-edited timestamp today. Local-FS `version` is a
-  **content hash** (`mtime:size` is the legacy shape being migrated off —
-  `LEGACY_VERSION_RE`, `src/storage/fs.ts:65`); GitHub `version` is a **blob
-  SHA**; and `CacheRecord.updatedAt` is when *this device's* cache row was
-  written — the bulk reconcile stamps `updatedAt: now` on every record
-  (`src/storage/cache/files.ts:201`), so after a fresh pull everything looks
-  edited today.
-- Local FS mtime is free if wanted: `statVersion` already holds the `File`
-  object (`src/storage/fs.ts:76`).
-- GitHub *can* supply it, contrary to a first assessment. Per-path commit dates
-  come from aliased GraphQL `history` queries — the same batching shape as
-  `buildBlobQuery` (`src/storage/githubBackend.ts:90`). Cheaper still for the
-  retention question specifically, which needs a boolean rather than a date:
-  `GET /commits?until=<cutoff>&per_page=1` for the boundary commit, then
-  `GET /compare/{sha}...{branch}` returns every path touched since — two
-  requests, flat, whatever the repo size. Caveats: point-based GraphQL rate
-  limits mean batch size needs its own tuning, `compare` truncates on very
-  large diffs, and a squash-merge or history rewrite resets every date it
-  touches.
-- Alternative that needs no backend work: age by the entry's **newest
-  occurrence date**, already in the store. Undated notes then never age, which
-  is probably correct.
 
 **Rejected, for the record.** A `showArchived` view toggle (misses search, and
 the requirement is unconditional hiding); making archived entries read-only;
