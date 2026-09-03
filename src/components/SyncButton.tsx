@@ -134,7 +134,7 @@ export default function SyncButton() {
   // destructive color, even though it also suppresses the dirty-count badge.
   const color = worst === 'error' ? 'var(--destructive)'
     : worst === 'pending' ? 'var(--warning)'
-    : 'var(--dim)'
+    : 'var(--muted-foreground)'
 
   return (
     <Popover>
@@ -142,7 +142,7 @@ export default function SyncButton() {
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full text-dim shrink-0"
+          className="rounded-full text-muted-foreground shrink-0"
           style={{ color }}
           aria-label="Sync status"
         >

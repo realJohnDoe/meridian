@@ -26,7 +26,7 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, h
         // button is the only way out of the editor there).
         leftHasButton
         left={
-          <IconButton variant="ghost" className="text-dim" onClick={onBack} title="Back" label="Back">
+          <IconButton variant="ghost" className="text-muted-foreground" onClick={onBack} title="Back" label="Back">
             <ArrowLeft size={18} />
           </IconButton>
         }
@@ -35,7 +35,7 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, h
             <SyncButton />
             <IconButton
               variant="ghost"
-              className={isFavorited ? 'text-destructive' : 'text-dim'}
+              className={isFavorited ? 'text-destructive' : 'text-muted-foreground'}
               onClick={onToggleFavorite ?? undefined}
               disabled={!onToggleFavorite}
               title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}

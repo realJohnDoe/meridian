@@ -14,7 +14,7 @@ export default function AppErrorFallback({ error, reset }: ErrorComponentProps) 
       <AlertTriangle className="text-destructive" size={32} />
       <div className="space-y-1">
         <p className="text-base font-medium text-foreground">Something went wrong</p>
-        <p className="max-w-sm text-sm text-dim">
+        <p className="max-w-sm text-sm text-muted-foreground">
           {error instanceof Error ? error.message : 'An unexpected error occurred.'}
         </p>
       </div>
