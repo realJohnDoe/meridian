@@ -3,10 +3,9 @@ import { maxVisibleFor, PANE_COUNT } from './snapCarousel'
 
 describe('PANE_COUNT', () => {
   it('buffers enough panes for a burst of five rapid swipes with none committed yet', () => {
-    // See plans/calendar-swipe-cheap-panes.md's PR 2 acceptance bar: five
-    // rapid swipes in a row must advance five units without stalling, even
-    // in the worst case where none of them has committed (route-navigated)
-    // by the time the next one fires.
+    // Five rapid swipes in a row must advance five units without stalling,
+    // even in the worst case where none of them has committed
+    // (route-navigated) by the time the next one fires.
     const center = Math.floor(PANE_COUNT / 2)
     expect(center).toBeGreaterThanOrEqual(5)
   })

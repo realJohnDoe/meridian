@@ -47,7 +47,8 @@ the bottom.
 | day | 278–323 ms | 95–127 ms | 1 |
 
 Agenda scales with vault size where day does not (day is DOM-proportional and
-PR1 of `calendar-swipe-cheap-panes.md` already fixed that axis):
+the calendar carousel's cheap-panes work already fixed that axis — DayPane/
+WeekPane's `live` prop, only the centre pane renders interactive cells):
 
 | vault | agenda busy / worst | day busy / worst |
 |---|---|---|

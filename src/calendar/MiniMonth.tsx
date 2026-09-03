@@ -41,9 +41,8 @@ const EMPTY_DOTS: DotCategory[] = []
 // itself at once. Profiling the "still a short freeze after the day/week
 // hour-grid fix" report traced it here: react-day-picker's own per-cell
 // formatting/modifier/measurement machinery, not this app's code, was the
-// remaining cost — see plans/calendar-swipe-cheap-panes.md's history and
-// MonthGrid's own `live`-prop-free comment for why a fuller architectural
-// note lives there instead of here.
+// remaining cost — see MonthGrid's own comment on why a 42-cell month pane
+// never needed DayPane/WeekPane's live/skeleton split either.
 //
 // The replacement mirrors MonthGrid's own CalCell/`cells` pattern instead
 // (see monthGridCells.ts, extracted from MonthGrid so the two don't
@@ -82,8 +81,8 @@ function MiniMonthDay({ date, other, isToday, highlight, dots, onSelectDay }: Da
   // conveys "something's here" without a number), mirroring the same
   // uncached-toLocaleDateString-per-cell pattern CalCell uses: 42 cells here
   // (FIXED_WEEKS) is the same order of magnitude as CalCell's month pane,
-  // already established as cheap (see plans/calendar-swipe-cheap-panes.md's
-  // "Out of scope").
+  // already established as cheap (see MonthGrid's own comment on why it
+  // never needed a live/skeleton split).
   const ariaLabel = [
     date.toLocaleDateString(undefined, { month: 'long', day: 'numeric' }),
     isToday ? 'today' : '',

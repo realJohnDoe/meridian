@@ -12,17 +12,16 @@ export const ROW_GAP = 2
 // well-defined center pane). Shared by both calendar carousels via useCarousel.
 //
 // Sized at ±5 (rather than the ±2 it started at) so a burst of five rapid
-// swipes in a row — see plans/calendar-swipe-cheap-panes.md's PR 2 acceptance
-// bar — always has a pane to land on even in the worst case where none of
-// them commits (route-navigates) before the next one fires. This is PR 2's
-// "prefer the smaller change if it is enough" alternative to giving
-// useCarousel its own mid-burst-recentering pane window: raising the buffer
-// needs no change to the delicate commit/recenter timing (see useCarousel's
-// own header comment), and PR 1 already made the non-center panes cheap
-// (skeletons), so mounting more of them costs little. It does not make
-// swiping literally unbounded — a burst of six or more swipes with none of
-// them committing could still stall — but every measured/expected burst size
-// fits comfortably underneath it.
+// swipes in a row always has a pane to land on, even in the worst case where
+// none of them commits (route-navigates) before the next one fires. Chosen
+// over giving useCarousel its own mid-burst-recentering pane window: raising
+// the buffer needs no change to the delicate commit/recenter timing (see
+// useCarousel's own header comment), and the day/week carousel's live/
+// skeleton split already made the non-center panes cheap, so mounting more
+// of them costs little. It does not make swiping literally unbounded — a
+// burst of six or more swipes with none of them committing could still
+// stall — but every measured/expected burst size fits comfortably underneath
+// it.
 export const PANE_COUNT = 11
 
 /**
