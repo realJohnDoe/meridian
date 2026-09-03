@@ -9,6 +9,8 @@
  *   node scripts/perf/stress.mjs --sizes 300,1000    # a subset
  *   node scripts/perf/stress.mjs --shapes mixed,flat # both vault shapes
  *   node scripts/perf/stress.mjs --skip-ui           # pipeline + Dexie only
+ *   node scripts/perf/stress.mjs --settle-timeout-ms 60000 --settle-quiet-ms 1000
+ *                                                     # tune the scroll flow's settle wait
  *
  * Results land in scripts/perf/results/<timestamp>.json and are printed as a
  * table. Runs against the **dev server**, because the large-vault generator is
@@ -51,6 +53,13 @@ const SKIP_DEXIE = has('skip-dexie')
 // A page that is thrashing can take minutes per interaction; past this we call
 // the size unusable and move on rather than hanging the whole run.
 const FLOW_TIMEOUT_MS = Number(arg('flow-timeout', 180_000))
+// How long the scroll flow's __perf.settle() waits for cold-start background
+// work (idle warm-up, Dexie's cache write) to quiesce before starting the
+// timed loop, and the quiet stretch that counts as settled. The timeout is
+// generous on purpose — a size that never truly settles within it still
+// returns a usable (if honestly `timedOut: true`) reading rather than hanging.
+const SETTLE_QUIET_MS = Number(arg('settle-quiet-ms', 500))
+const SETTLE_TIMEOUT_MS = Number(arg('settle-timeout-ms', 45_000))
 
 // ── dev server ──────────────────────────────────────────────────────────────
 
@@ -188,35 +197,35 @@ async function measureUI(browser, spec) {
     }))
 
     // 2. Scroll the agenda hard — virtualizer + per-row render cost under load.
-    // A Long Animation Frames observer brackets the scroll loop so the frame
-    // cost measured by __perf.frames() comes back with an attribution: which
-    // script (if any) dominated each janky frame, and how much of it was
-    // style/layout vs. script execution. See finding 4 in
-    // plans/vault-scaling-results.md — this exists to tell "TanStack Virtual's
-    // measurement rebuild" apart from "React render" without a one-shot manual
-    // profile that can't be diffed across vault sizes.
-    await flow('scroll', () => page.evaluate(async () => {
+    // __perf.settle() waits out whatever cold-start background work (idle
+    // warm-up, Dexie's cache write) is still mid-flight before the timed loop
+    // starts — added after finding 4's first profile (plans/vault-scaling-
+    // results.md) showed every prior reading was dominated by exactly that,
+    // not by scrolling. __perf.loafsIn() then reads the frame's attribution
+    // from the one page-lifetime LoAF observer __perf itself keeps (see
+    // probe.mjs), windowed to just the timed loop — settling first and
+    // reading from that shared, already-running observer (rather than a
+    // second one registered here) is what stops the wait's own settled work
+    // from being replayed into the scroll's attribution via
+    // { buffered: true }.
+    await flow('scroll', () => page.evaluate(async ({ settleQuietMs, settleTimeoutMs }) => {
       const scroller = document.querySelector('[data-index]')?.closest('.overflow-y-auto')
       if (!scroller) return { skipped: 'no scroller' }
 
-      const loafEntries = []
-      let loafObserver = null
-      try {
-        loafObserver = new PerformanceObserver(list => { loafEntries.push(...list.getEntries()) })
-        loafObserver.observe({ type: 'long-animation-frame', buffered: true })
-      } catch { /* no LoAF support */ }
+      const settled = await window.__perf.settle(settleQuietMs, settleTimeoutMs)
 
+      const t0 = performance.now()
       const frameStats = await window.__perf.frames(async () => {
         for (let i = 0; i < 30; i++) {
           scroller.scrollTop += 900
           await window.__perf.raf()
         }
       })
+      const t1 = performance.now()
 
       let loaf = null
-      if (loafObserver) {
-        loafEntries.push(...loafObserver.takeRecords())
-        loafObserver.disconnect()
+      if (window.__perf.loafObserver) {
+        const loafEntries = window.__perf.loafsIn(t0, t1)
         // Attribute total blocking/style-layout time per named script, summed
         // across every LoAF entry in the scroll — the "who" behind the frame
         // cost, not just "how long". The entry has no styleAndLayoutDuration
@@ -227,8 +236,8 @@ async function measureUI(browser, spec) {
         let blockingMs = 0, styleAndLayoutMs = 0
         for (const e of loafEntries) {
           blockingMs += e.blockingDuration
-          styleAndLayoutMs += e.styleAndLayoutStart ? Math.max(0, (e.startTime + e.duration) - e.styleAndLayoutStart) : 0
-          for (const s of e.scripts ?? []) {
+          styleAndLayoutMs += e.styleAndLayoutStart ? Math.max(0, (e.start + e.dur) - e.styleAndLayoutStart) : 0
+          for (const s of e.scripts) {
             const key = `${s.invoker || s.sourceFunctionName || '(anonymous)'} @ ${s.sourceURL || 'unknown'}:${s.sourceCharPosition ?? '?'}`
             byScript.set(key, (byScript.get(key) ?? 0) + s.duration)
           }
@@ -245,8 +254,8 @@ async function measureUI(browser, spec) {
         }
       }
 
-      return { ...frameStats, loaf }
-    }))
+      return { ...frameStats, settled, loaf }
+    }, { settleQuietMs: SETTLE_QUIET_MS, settleTimeoutMs: SETTLE_TIMEOUT_MS }))
 
     r.afterFlows = await heapMB(page)
   } catch (e) {
