@@ -30,15 +30,12 @@ priority — the numbers do not move as findings get closed out.
 
 | Rank | # | Finding | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
-| 6 | 4 | Scroll cost grows with vault size although mounted rows stay constant | 7 | 2 | **Sonnet 5** for the instrumentation; re-tier once it reads |
+| 6 | 4 | Scroll cost grows with vault size although mounted rows stay constant | 7 | 2 | Instrumented and profiled; re-tier for what's next |
 
-This is Sonnet-5 work **as written**, and only as written — strip the named
-tests and the ruled-out-suspects context and it reverts to Opus 5.
-
-Finding 4 has no settled diagnosis yet, so its block is an *instrumentation*
-plan: it says what has already been ruled out, what the one matching suspect
-is, and how to attribute the frame time automatically — and it deliberately
-stops short of a fix. Do not skip to step 4 of it.
+Finding 4's instrumentation and cache-guard work is done — see its own
+section for the profile that came back and what it ruled out. Finding 2 has
+now landed too, so re-tier what remains fresh once its fix is re-measured,
+rather than reusing either row's old model recommendation.
 
 ---
 
@@ -55,13 +52,18 @@ stops short of a fix. Do not skip to step 4 of it.
   move; now 2.7×) — but not gone. Mounted rows hold at 26 for both sizes,
   confirming (again, on the new architecture) that this is not row mounting.
 - **Measurement recipe** — `node scripts/perf/stress.mjs --sizes 3000,30000`;
-  read `ui.scroll` and `ui.mountedRows`.
-- **Breadth** — `scripts/perf/stress.mjs` (step 1),
-  `src/model/expansionCache.ts` (step 2), `calendar/AgendaView.tsx` +
-  `calendar/viewState.ts` (step 4, only if step 1 confirms it).
-- **Problem** — still not diagnosed. What follows narrows it: a code read has
-  ruled several suspects out, found one small real waste, and left one suspect
-  that matches the measured signature exactly. **Do step 1 before step 3 or 4.**
+  read `ui.scroll` (now carrying a `loaf` attribution — see
+  `scripts/perf/table.mjs`'s "Long animation frames (scroll)" table) and
+  `ui.mountedRows`.
+- **Breadth** — `scripts/perf/stress.mjs`, `src/model/expansionCache.ts`
+  (both landed — see below), `calendar/AgendaView.tsx` +
+  `calendar/viewState.ts` (only if a fix is still needed once the profile
+  below is acted on).
+- **Problem** — the harness now attributes scroll frame cost via the Long
+  Animation Frames API, and `computeExpansionCache` no longer walks `items`
+  on a true no-op (both landed — see "Landed" below). The resulting profile
+  does not confirm the virtualizer theory this finding previously led with;
+  read "Profile reading" below before doing anything further here.
 
 - **Ruled out by inspection** — do not re-investigate these without evidence:
   - *Row mounting* — 26 mounted rows at both sizes, already measured.
@@ -81,90 +83,85 @@ stops short of a fix. Do not skip to step 4 of it.
     that grows with vault size. **This disconfirms the `items`/`roots` "prime
     suspect" this finding previously named.**
 
-- **The one real waste found, worth fixing regardless of the profile.**
-  AgendaView re-renders on *every* scroll event by design (its own comment at
+- **Landed.** `scripts/perf/stress.mjs`'s scroll flow now brackets its
+  30 × 900 px loop with a `PerformanceObserver` for the Long Animation Frames
+  API, reporting the top attributed scripts plus `blockingMs` and
+  `styleAndLayoutMs` totals as `ui.scroll.loaf` (`scripts/perf/table.mjs` has
+  a matching "Long animation frames (scroll)" table). Separately, AgendaView
+  re-renders on *every* scroll event by design (its own comment at
   `calendar/AgendaView.tsx:280` says so — `virtualItems` is read fresh each
-  render). That runs `computeExpansionCache` once per loaded chunk per scroll
-  event, and its fast path does an **unguarded O(items) walk** at
-  `src/model/expansionCache.ts:151` even when `items === prev.items`. The very
-  next block guards its `roots` equivalent with `if (roots !== prev.roots)`;
-  the `items` loop has no such guard. Add
-  `if (items === prev.items && roots === prev.roots) return prev` immediately
-  after the `hasSameStructure` gate at `:138`. Returning `prev` **by reference**
-  is deliberate and better than the existing `{ ...prev, items, roots }` — see
-  `sameChunks`'s comment in `calendar/useAgendaChunks.ts:23`, which exists only
-  to work around that reallocation. Expect this to be worth ~1–2 ms per scroll
-  event, not 133 ms; it is one line of pure waste, not the finding.
+  render), which ran `computeExpansionCache` once per loaded chunk per scroll
+  event; its fast path did an **unguarded O(items) walk** at
+  `src/model/expansionCache.ts:151` even when `items === prev.items`, while
+  the very next block already guarded its `roots` equivalent. It now returns
+  `prev` by reference when both are unchanged, immediately after the
+  `hasSameStructure` gate — worth ~1–2 ms per scroll event, not the finding
+  itself.
 
-- **Prime suspect: TanStack Virtual's measurement rebuild.** Rows are
-  dynamically measured — `ref={virtualizer.measureElement}` in
-  `src/components/primitives/virtual-rows.tsx:41`. The virtualizer rebuilds its
-  `measurements` array from the lowest pending measured index through `count`
-  whenever a row measures differently from its `estimateSize`, which
+- **Profile reading (mixed/3 000 and mixed/30 000,
+  `--skip-pipeline --skip-dexie`).** The captured LoAF attribution does
+  **not** confirm the virtualizer theory below — a different, larger
+  contributor dominates at both sizes:
+
+  | Attribution | mixed/3 000 | mixed/30 000 |
+  |---|---|---|
+  | `IdleRequestCallback` (`lib/idle.ts` — finding 2's `warmFileOccurrenceMap`) | 1 306 ms | 12 760 ms |
+  | `IDBRequest.onsuccess` (Dexie cache write from cold start) | 1 279 ms | 10 871 ms |
+  | React commit (`react-dom_client.js`) | 917 ms | 6 942 ms |
+  | `DIV.onscroll` (TanStack Virtual's own scroll handler) | 402 ms | 1 937 ms |
+  | style+layout recalc, summed across all LoAF entries | 8.9 ms | 19.5 ms |
+
+  - **Style/layout recalc is negligible at both sizes** — single digits to
+    ~20 ms out of a multi-second scroll. The "measurement rebuild is a
+    layout cost" half of the suspect below does not hold up.
+  - **The virtualizer's own handler (`DIV.onscroll`) is real but minor** —
+    behind three other contributors at both sizes, not the dominant cost.
+  - **`IdleRequestCallback`'s 30 000-file figure (12 760 ms) lands almost
+    exactly on finding 2's own `fileOccurrenceMap` baseline (10 448 ms).**
+    Cold start at 30 000 files takes ~24 s wall-clock, so the idle callback
+    that kicks off `warmFileOccurrenceMap` is still mid-flight when this
+    flow's scroll starts, and its main-thread time lands inside whichever
+    LoAF entries happen to overlap it — including ones inside the scroll
+    window. `IDBRequest.onsuccess` is the same cold start's Dexie write.
+    Neither is caused by scrolling — this is a **flow-order confound**: the
+    harness scrolls immediately after toggling, right after a cold load,
+    before the browser has had idle time to drain the warm-up backlog. It is
+    still a real interaction, not only a test artifact — a user who starts
+    scrolling immediately after opening a large vault would hit the same
+    overlap.
+
+  Finding 2's fix is the more promising lever to try first: it should
+  collapse the `IdleRequestCallback` contribution. It has now landed —
+  re-run this profile and read what's left before deciding whether the
+  virtualizer needs its own mitigation.
+
+- **Suspect going in, not confirmed by the profile above: TanStack Virtual's
+  measurement rebuild.** Rows are dynamically measured —
+  `ref={virtualizer.measureElement}` in
+  `src/components/primitives/virtual-rows.tsx:41`. The virtualizer rebuilds
+  its `measurements` array from the lowest pending measured index through
+  `count` whenever a row measures differently from its `estimateSize`, which
   `useVirtualFlip`'s own doc comment says "happens constantly while scrolling
-  through not-yet-measured rows". That gives cost per scroll event proportional
-  to **total row count** with **mounted rows constant** — precisely the observed
-  signature, and precisely what ruling out row *mounting* does not rule out.
-  It also explains why chunking flattened the curve without removing it: rows
-  per day still scale with vault size, so the same 30 × 900 px flow holds
-  ~34 000 rows at 30 000 files against ~3 400 at 3 000.
+  through not-yet-measured rows" — cost proportional to **total row count**
+  with **mounted rows constant**, the observed signature. But the profile
+  above attributes most of the cost elsewhere, at least until the flow-order
+  confound is removed.
 
-- **Fix — step 1 is instrumentation, not a fix.**
+- **Next steps — a fresh decision, not scoped here.** Finding 2 has landed;
+  re-run the measurement recipe above, and read `ui.scroll.loaf` again. If
+  `IdleRequestCallback`/`IDBRequest.onsuccess` collapse and a
+  `DIV.onscroll`-shaped residual remains proportional to row count, the
+  standard virtualizer mitigations are bounding `count` (the loaded run only
+  ever *grows* forward within its ±365/+90-day cap —
+  `growAgendaLoadedChunksForward`, `calendar/viewState.ts` — so a sliding
+  window that also drops chunks far behind the viewport, using
+  `useAgendaChunks`'s existing eviction machinery, is the usual answer) and
+  making each measurement cheaper (`content-visibility: auto` plus
+  `contain: layout style paint` on rows). Both are behaviour-visible on a
+  scroll-restore path that has been got wrong twice before (see
+  `computeAgendaScrollRestore`'s own notes) — re-tier before starting there.
 
-  1. **Attribute the frame time in the harness, not by hand.** The previous
-     version of this finding asked for a Chrome performance profile attached
-     manually. Don't — it is a one-shot that cannot be diffed across vault
-     sizes, and `scripts/perf/` is deleted when this file closes, so building
-     the attribution into it now is the last moment it pays for itself. Add a
-     `PerformanceObserver` for the **Long Animation Frames API**
-     (`{ type: 'long-animation-frame', buffered: true }`) around the existing
-     scroll flow in `scripts/perf/stress.mjs` — the `flow('scroll', ...)` call
-     at `:191`, whose `page.evaluate` already wraps the 30 x 900 px loop in
-     `window.__perf.frames()`. Register the observer inside that same
-     `page.evaluate` before the loop and drain it after, so the entries are
-     scoped to the scroll and come back alongside the frame stats `flow()`
-     already stores. Report the top attributions per size. LoAF is the
-     current standard for this question and the first version of it with
-     attribution: each entry carries
-     `blockingDuration`, `renderStart`, `styleAndLayoutDuration`, and a
-     `scripts[]` array with `invoker`, `sourceURL`, `sourceFunctionName` and
-     `sourceCharPosition`. Report it beside `ui.scroll` so it is comparable
-     across sizes and across runs. (INP is the wrong metric here — a continuous
-     scroll is not an INP interaction. If LoAF's attribution is too coarse,
-     escalate to a CDP `Profiler.start`/`Profiler.stop` sampling profile
-     through the session the harness already drives.)
-
-  2. **Land the `computeExpansionCache` guard above.** Independent of the
-     profile, one line, and it removes a confound from step 1's reading — do it
-     first so the profile is not attributing waste that is already known.
-
-  3. **Read the profile before writing any fix.** If `styleAndLayoutDuration`
-     dominates, it is measurement/layout and the suspect above is confirmed.
-     If `scripts[]` points into React render, it is not — and the suspects
-     ruled out above are already eliminated, so that would be a genuinely new
-     lead.
-
-  4. **Only if the virtualizer is confirmed:** the standard mitigations are
-     bounding `count` and making each measurement cheaper. `count` is the more
-     promising of the two here — the loaded run only ever *grows* forward
-     within its ±365/+90-day cap (`growAgendaLoadedChunksForward`,
-     `calendar/viewState.ts`), so a long scroll session monotonically increases
-     `rows.length`; a sliding window that also drops chunks far behind the
-     viewport is the usual answer, and `useAgendaChunks` already has the
-     eviction machinery (its commit-phase `useEffect` drops chunks outside the
-     requested run — only the run itself needs to shrink).
-     `content-visibility: auto` plus `contain: layout style paint` on rows is
-     the cheaper-measurement leg.
-     Both are behaviour-visible on a scroll-restore path that has been got
-     wrong twice before (see `computeAgendaScrollRestore`'s own notes) — do not
-     start here.
-
-- **Recommended model** — **Sonnet 5 for steps 1 and 2**, which are the whole
-  of the immediate work: a `PerformanceObserver` added to an existing harness
-  flow, and a one-line cache guard. Steps 3 and 4 are a fresh decision once
-  the profile exists, and step 4 in particular touches agenda scroll restore —
-  re-tier it then rather than now.
-- **Why it is listed anyway** — it is still a measurably bad flow at scale
-  (133 ms p50, every frame janky), and it is the last finding for which the
-  perf harness is the verification tool, so the instrumentation in step 1 is
-  the thing that has to happen before `scripts/perf/` retires.
+- **Recommended model** — the instrumentation and the cache guard are done;
+  what remains (re-reading the profile now that finding 2 has landed, and only
+  then a possible virtualizer fix on the scroll-restore path) is a fresh
+  decision — re-tier now rather than reusing this row's old model.

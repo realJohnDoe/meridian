@@ -188,15 +188,64 @@ async function measureUI(browser, spec) {
     }))
 
     // 2. Scroll the agenda hard — virtualizer + per-row render cost under load.
+    // A Long Animation Frames observer brackets the scroll loop so the frame
+    // cost measured by __perf.frames() comes back with an attribution: which
+    // script (if any) dominated each janky frame, and how much of it was
+    // style/layout vs. script execution. See finding 4 in
+    // plans/vault-scaling-results.md — this exists to tell "TanStack Virtual's
+    // measurement rebuild" apart from "React render" without a one-shot manual
+    // profile that can't be diffed across vault sizes.
     await flow('scroll', () => page.evaluate(async () => {
       const scroller = document.querySelector('[data-index]')?.closest('.overflow-y-auto')
       if (!scroller) return { skipped: 'no scroller' }
-      return window.__perf.frames(async () => {
+
+      const loafEntries = []
+      let loafObserver = null
+      try {
+        loafObserver = new PerformanceObserver(list => { loafEntries.push(...list.getEntries()) })
+        loafObserver.observe({ type: 'long-animation-frame', buffered: true })
+      } catch { /* no LoAF support */ }
+
+      const frameStats = await window.__perf.frames(async () => {
         for (let i = 0; i < 30; i++) {
           scroller.scrollTop += 900
           await window.__perf.raf()
         }
       })
+
+      let loaf = null
+      if (loafObserver) {
+        loafEntries.push(...loafObserver.takeRecords())
+        loafObserver.disconnect()
+        // Attribute total blocking/style-layout time per named script, summed
+        // across every LoAF entry in the scroll — the "who" behind the frame
+        // cost, not just "how long". The entry has no styleAndLayoutDuration
+        // field — only styleAndLayoutStart, a timestamp — so the duration is
+        // derived as the tail of the frame from that mark to its end; 0 when
+        // no style/layout work ran (styleAndLayoutStart is 0 in that case).
+        const byScript = new Map()
+        let blockingMs = 0, styleAndLayoutMs = 0
+        for (const e of loafEntries) {
+          blockingMs += e.blockingDuration
+          styleAndLayoutMs += e.styleAndLayoutStart ? Math.max(0, (e.startTime + e.duration) - e.styleAndLayoutStart) : 0
+          for (const s of e.scripts ?? []) {
+            const key = `${s.invoker || s.sourceFunctionName || '(anonymous)'} @ ${s.sourceURL || 'unknown'}:${s.sourceCharPosition ?? '?'}`
+            byScript.set(key, (byScript.get(key) ?? 0) + s.duration)
+          }
+        }
+        const topScripts = [...byScript.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([script, ms]) => ({ script, ms: +ms.toFixed(1) }))
+        loaf = {
+          frames: loafEntries.length,
+          blockingMs: +blockingMs.toFixed(1),
+          styleAndLayoutMs: +styleAndLayoutMs.toFixed(1),
+          topScripts,
+        }
+      }
+
+      return { ...frameStats, loaf }
     }))
 
     r.afterFlows = await heapMB(page)

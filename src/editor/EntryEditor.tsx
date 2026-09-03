@@ -48,7 +48,7 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
 
 const PRIORITY_LABELS: Record<string, string> = { high: 'High', medium: 'Medium', low: 'Low' }
 // Colors only the segment's icon, not its fill/text — unlike PRIORITY_CLASS's
-// bg-{color}/15 tint (occurrence-variants.ts), this reads well as-is: the
+// bg-{color}/30 tint (occurrence-variants.ts), this reads well as-is: the
 // "on" segment is already shown by segmentedItemVariants' raised
 // bg-background pill, so the icon alone is enough of a color cue here.
 const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
