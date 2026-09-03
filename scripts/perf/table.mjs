@@ -45,11 +45,14 @@ table('UI flows (ms to painted effect)', ['vault', 'vault paint', 'blocking (loa
       n(u.scroll?.p50), n(u.scroll?.p95), n(u.scroll?.janky), n(u.mountedRows)]
   }))
 
-table('Long animation frames (scroll)', ['vault', 'LoAF count', 'blocking ms', 'style+layout ms', 'top script'],
+table('Long animation frames (scroll)', ['vault', 'settle wait', 'LoAF count', 'blocking ms', 'style+layout ms', 'top script'],
   runs.map(r => {
-    const loaf = ui(r).scroll?.loaf
+    const scroll = ui(r).scroll
+    const loaf = scroll?.loaf
     const top = loaf?.topScripts?.[0]
-    return [label(r), n(loaf?.frames), n(loaf?.blockingMs), n(loaf?.styleAndLayoutMs),
+    const settled = scroll?.settled
+    const settleCell = settled ? `${settled.waitedMs} ms${settled.timedOut ? ' (timed out)' : ''}` : n(null)
+    return [label(r), settleCell, n(loaf?.frames), n(loaf?.blockingMs), n(loaf?.styleAndLayoutMs),
       top ? `${top.script} (${top.ms} ms)` : n(null)]
   }))
 
