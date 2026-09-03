@@ -86,13 +86,13 @@ export function PagedTopbar({
           the no-paging case), dragging the chevron away to the row's far
           edge instead of sitting next to the text. */}
       <span className="min-w-0 text-base text-foreground whitespace-nowrap overflow-hidden text-ellipsis">{label}</span>
-      <ChevronDown size={16} className={cn('shrink-0 text-dim transition-transform', expanded && 'rotate-180')} aria-hidden />
+      <ChevronDown size={16} className={cn('shrink-0 text-muted-foreground transition-transform', expanded && 'rotate-180')} aria-hidden />
     </button>
   )
 
   return (
     <div className="flex flex-1 items-center gap-1 overflow-hidden min-w-0">
-      {isMobile && <IconButton variant="ghost" className="text-dim" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
+      {isMobile && <IconButton variant="ghost" className="text-muted-foreground" onClick={openSidebar} title="Menu" label="Menu"><Menu size={18} /></IconButton>}
       {toggleButton
         // Only wraps when the caller has actually mounted this inside a
         // Popover (see popoverAnchor's own doc comment) — PopoverAnchor just
@@ -103,8 +103,8 @@ export function PagedTopbar({
         : labelNode}
       {showsPagingButtons && (
         <>
-          <IconButton variant="ghost" className="text-dim" label={paging.prevLabel} onClick={paging.onPrev}><ChevronLeft size={18} /></IconButton>
-          <IconButton variant="ghost" className="text-dim" label={paging.nextLabel} onClick={paging.onNext}><ChevronRight size={18} /></IconButton>
+          <IconButton variant="ghost" className="text-muted-foreground" label={paging.prevLabel} onClick={paging.onPrev}><ChevronLeft size={18} /></IconButton>
+          <IconButton variant="ghost" className="text-muted-foreground" label={paging.nextLabel} onClick={paging.onNext}><ChevronRight size={18} /></IconButton>
         </>
       )}
     </div>

@@ -82,7 +82,7 @@ function SettingsLayout() {
           leftHasButton
           left={
             <div className="flex flex-1 items-center gap-2 min-w-0">
-              <IconButton variant="ghost" className="text-dim" onClick={onBack} title="Back" label="Back">
+              <IconButton variant="ghost" className="text-muted-foreground" onClick={onBack} title="Back" label="Back">
                 <ArrowLeft size={18} />
               </IconButton>
               <TopbarLabel
