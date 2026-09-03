@@ -53,25 +53,26 @@ this row's old model recommendation.
   fixed-window baseline (33.4 → 200 ms, a 6× jump for the same 10× file-count
   move; now 2.7×) — but not gone. Mounted rows hold at 26 for both sizes,
   confirming (again, on the new architecture) that this is not row mounting.
-  **Still unchanged after every fix below**: 33.4 ms / 83.4 ms p50 (worst
-  50.1 / 116.7 ms, janky 2/30 → 29/30) at mixed/3 000 → mixed/30 000, the most
-  recent re-measurement. Landing finding 2 and its follow-ups moved the LoAF
-  attribution around substantially (see "Profile reading" below) without
-  moving this number at all.
+  **Confirmed unchanged by every fix below, and now cleanly attributed**:
+  33.3 ms / 99.9 ms p50 (worst 50.1 / 116.7–133.4 ms, janky 1/30 → 30/30) at
+  mixed/3 000 → mixed/30 000, most recently — see "Profile reading" for what
+  changed and what didn't.
 - **Measurement recipe** — `node scripts/perf/stress.mjs --sizes 3000,30000`;
-  read `ui.scroll` (now carrying a `loaf` attribution — see
-  `scripts/perf/table.mjs`'s "Long animation frames (scroll)" table) and
-  `ui.mountedRows`.
+  read `ui.scroll` (carrying a `loaf` attribution and, since the settle-wait
+  landed, a `settled` field — see `scripts/perf/table.mjs`'s "Long animation
+  frames (scroll)" table) and `ui.mountedRows`.
 - **Breadth** — `scripts/perf/stress.mjs`, `src/model/expansionCache.ts`,
   `src/fileOccurrence.ts` + `src/model/expansion.ts` (all landed — see
-  below), `calendar/AgendaView.tsx` + `calendar/viewState.ts` (only if a fix
-  is still needed once "Next steps" below is acted on).
+  below), `calendar/AgendaView.tsx` + `calendar/viewState.ts` (the confirmed
+  fix — see "Next steps").
 - **Problem** — the harness attributes scroll frame cost via the Long
-  Animation Frames API, `computeExpansionCache` no longer walks `items` on a
-  true no-op, and — found by profiling this finding, not part of the
-  original plan — `fileOccurrenceMap` itself had two real performance bugs,
-  now fixed (all landed, see "Landed" below). None of it moved the frame
-  interval this finding tracks. Read "Profile reading" below.
+  Animation Frames API and now settles cold-start background work out of the
+  measurement window before timing the scroll; `computeExpansionCache` no
+  longer walks `items` on a true no-op; and — found by profiling this
+  finding, not part of the original plan — `fileOccurrenceMap` itself had two
+  real performance bugs, also fixed (all landed, see "Landed" below). With
+  all of that in place, the profile finally confirms this finding's original
+  suspect: TanStack Virtual's measurement rebuild. See "Confirmed" below.
 
 - **Ruled out by inspection** — do not re-investigate these without evidence:
   - *Row mounting* — 26 mounted rows at both sizes, already measured.
@@ -122,80 +123,97 @@ this row's old model recommendation.
   kind, checked via `isTracked` — the same primitive `occKind` is built
   from, so this is provably correct rather than a heuristic.
 
-- **Profile reading — three passes, same recipe
+  With `fileOccurrenceMap` genuinely fixed, a fourth profile pass still
+  showed the scroll flow's own frame interval untouched, and its LoAF
+  attribution still dominated by an *unrelated* contributor: Dexie's
+  cold-start cache write. That was the harness's own fault, not the app's —
+  `scripts/perf/probe.mjs` now keeps one page-lifetime LoAF observer instead
+  of the scroll flow registering its own mid-run, plus a
+  `__perf.settle(quietMs, timeoutMs)` that waits until no LoAF entry has
+  ended in the last `quietMs` (default 500 ms, 45 s cap) before the timed
+  loop starts. The scroll flow awaits it, then reads only the entries inside
+  its own timed window via the new `__perf.loafsIn(t0, t1)` — reading from
+  the one shared, already-running observer rather than registering a second
+  one is what stops the wait's own settled work from being replayed into the
+  attribution via that observer's `{ buffered: true }`.
+
+- **Profile reading — four passes, same recipe
   (`--sizes 3000,30000 --skip-pipeline --skip-dexie`), read `ui.scroll.loaf`
-  at mixed/30 000 each time.** None of it confirms the virtualizer theory
-  below, and none of it moved the frame interval the Baseline above tracks:
+  at mixed/30 000 each time.** The first three (below) were all confounded;
+  the fourth, with the settle wait landed, is the clean read:
 
-  | Attribution | pre-finding-2 | post-finding-2 | post-both fixes above |
-  |---|---|---|---|
-  | `IdleRequestCallback` (`fileOccurrenceMap` warm-up) | 12 760 ms | 12 463 ms | **3 168 ms** |
-  | `IDBRequest.onsuccess` (Dexie cache write from cold start) | 10 871 ms | 9 958 ms | 10 836 ms |
-  | React commit (`react-dom_client.js`) | 6 942 ms | 6 881 ms | 7 040 ms |
-  | `DIV.onscroll` (TanStack Virtual's own scroll handler) | 1 937 ms | 1 614 ms | 1 644 ms |
-  | style+layout recalc, summed across all LoAF entries | 19.5 ms | 17.4 ms | 18.6 ms |
-  | scroll p50 / worst frame interval | 100.1 / 133.3 ms | 83.4 / 216.7 ms | 83.4 / 116.7 ms |
+  | Attribution | pre-finding-2 | post-finding-2 | post-fileOccurrenceMap fixes | post-settle-wait |
+  |---|---|---|---|---|
+  | `IdleRequestCallback` (`fileOccurrenceMap` warm-up) | 12 760 ms | 12 463 ms | 3 168 ms | *(not in window)* |
+  | `IDBRequest.onsuccess` (Dexie cache write from cold start) | 10 871 ms | 9 958 ms | 10 836 ms | *(not in window)* |
+  | React commit (`react-dom_client.js`, `MessagePort.onmessage`) | 6 942 ms | 6 881 ms | 7 040 ms | **709–743 ms** |
+  | `DIV.onscroll` (TanStack Virtual's own scroll handler) | 1 937 ms | 1 614 ms | 1 644 ms | **1 635–1 667 ms** |
+  | style+layout recalc, summed across all LoAF entries | 19.5 ms | 17.4 ms | 18.6 ms | 14.9–15.6 ms |
+  | scroll p50 / worst frame interval | 100.1 / 133.3 ms | 83.4 / 216.7 ms | 83.4 / 116.7 ms | 99.9 / 116.7–133.4 ms |
+  | settle wait | *(n/a)* | *(n/a)* | *(n/a)* | 0 ms (already quiet) |
 
-  - **`fileOccurrenceMap`'s fix worked exactly as measured**: the two bugs
-    above cut its own `pipeline.result.fileOccurrenceMap.cold` from
-    ~10 400–12 200 ms to **3 072 ms** at mixed/30 000 (finding 2's own
-    recipe), and `IdleRequestCallback` collapsed to match. Confirms the
-    "flow-order confound" read from the previous profile — it really was
-    `fileOccurrenceMap`'s own idle callback landing inside the scroll
-    window.
-  - **The frame interval this finding tracks did not move.** Total
-    LoAF-attributed blocking dropped ~27% (30 351 ms → 22 213 ms combining
-    all five rows), but p50/worst are statistically the same run to run —
-    fixing the single biggest contributor didn't touch the thing being
-    measured.
-  - **`IDBRequest.onsuccess` (Dexie's cold-start cache write) is now the
-    largest contributor, unchanged across all three passes.** Same
-    flow-order confound as `fileOccurrenceMap` was, different source: cold
-    start at 30 000 files takes ~24 s wall-clock and this harness flow
-    scrolls immediately after toggling, right after that cold load — so
-    whichever background task is still mid-flight (idle warm-up, Dexie
-    sync) lands inside the scroll window's LoAF entries. It is still a real
-    interaction (a user who scrolls right after opening a large vault would
-    hit the same overlap), but it means **this harness flow cannot isolate
-    steady-state scroll cost** — every profile so far is dominated by
-    whatever cold-start work hasn't finished draining, not by scrolling
-    itself.
-  - **Style/layout recalc stays negligible throughout** (single digits to
-    ~20 ms) — the "measurement rebuild is a layout cost" half of the
-    suspect below stays unconfirmed.
-  - **The virtualizer's own handler (`DIV.onscroll`) stayed flat (~1.6–1.9 s)
-    across all three passes**, including the one where the dominant
-    confound was removed. If it scaled with row count the way the theory
-    predicts, clearing 9 000+ ms of unrelated background work should have
-    made it a noticeably larger share of what's left — it didn't grow at
-    all, in absolute terms or as a share of the total. This is the
-    strongest evidence yet *against* the virtualizer theory, short of
-    proof.
+  Two runs at the settle-wait column, both mixed/30 000: `DIV.onscroll`
+  1 667 ms / 1 635 ms, `MessagePort.onmessage` 743 ms / 709 ms, p50 99.9 ms /
+  99.9 ms — stable, not a one-off. At mixed/3 000 the settled reading is
+  **0 LoAF frames, 0 ms blocking** on one run and 4 frames/17.6 ms on the
+  other — scrolling 3 000 files barely registers at all.
 
-- **Suspect going in, still not confirmed by any profile taken so far:
-  TanStack Virtual's measurement rebuild.** Rows are dynamically measured —
-  `ref={virtualizer.measureElement}` in
+  - **`fileOccurrenceMap`'s fix worked exactly as measured, and the
+    settle-wait now excludes both cold-start confounds from the window
+    entirely** — they don't taper off, they simply don't appear, because
+    `settled.waitedMs: 0` means both were already finished (their own long
+    cold-start-load and toggle-flow duration gave them enough wall-clock
+    time) by the time the scroll flow's window opens.
+  - **The frame interval itself is unchanged from every prior reading**
+    (99.9 ms p50 vs. 83.4–100.1 ms across all four passes) — confirming this
+    was never about total LoAF-attributed time, which swung by 30×, but
+    about what's *inside the measurement window*. The window is now right.
+  - **With the window right, the numbers finally add up.** `DIV.onscroll`
+    (~1.6 s) + `MessagePort.onmessage` (~0.7–0.75 s) ≈ 2.3–2.4 s of script
+    execution across 30 scroll steps ≈ 77–80 ms/step, in the same range as
+    the observed 99.9 ms p50 / 116.7–133.4 ms worst. Style+layout recalc
+    stays negligible (15–19 ms) at every size in every pass — the
+    "measurement rebuild is a layout cost" half of the theory never held,
+    but the "measurement rebuild is a *script* cost, proportional to row
+    count" half does.
+  - **The row-count signature is exact.** Mounted rows hold at 26 for both
+    sizes (unchanged), but total row count does not — mixed/3 000 has ~15.7 k
+    occurrences in the agenda window against ~163 k at mixed/30 000 (finding
+    2's own pipeline numbers). `DIV.onscroll` goes from effectively zero at
+    the smaller count to ~1.6 s at the larger one. This is precisely "cost
+    proportional to total row count with mounted rows constant" — the
+    signature the original suspect predicted and every prior, confounded
+    profile could not actually test.
+
+- **Confirmed: TanStack Virtual's measurement rebuild.** Rows are dynamically
+  measured — `ref={virtualizer.measureElement}` in
   `src/components/primitives/virtual-rows.tsx:41`. The virtualizer rebuilds
   its `measurements` array from the lowest pending measured index through
   `count` whenever a row measures differently from its `estimateSize`, which
   `useVirtualFlip`'s own doc comment says "happens constantly while scrolling
-  through not-yet-measured rows" — cost proportional to **total row count**
-  with **mounted rows constant**, the observed signature. But its own LoAF
-  attribution (`DIV.onscroll`) has stayed flat and minor through three
-  passes with very different background-work profiles, which the theory
-  doesn't predict.
+  through not-yet-measured rows". The settled profile above is direct
+  evidence, not inference: `DIV.onscroll` is the single largest attributed
+  script at mixed/30 000 once the window is right, its magnitude times 30
+  steps lands in the observed frame-interval range, and it disappears at
+  mixed/3 000 exactly where row count — not mounted rows, not files — also
+  drops by an order of magnitude.
 
-- **Next steps — a fresh decision, not scoped here.** The measurement itself
-  needs fixing before any more diagnosis is worth doing: add a settle wait
-  to `scripts/perf/stress.mjs`'s scroll flow (idle-callback backlog drained,
-  Dexie write's promise resolved) before starting the timed 30 × 900 px loop,
-  so a profile actually isolates scroll cost instead of whichever cold-start
-  background task is still mid-flight. Only once that reads cleanly is there
-  a real basis to confirm or rule out the virtualizer — and if it's ruled
-  out too, this finding may simply be "cold start's own background work
-  competes with the first scroll," which is a different finding (and a
-  different fix) than the one this file has tracked so far.
+- **Next steps — a fresh decision, not scoped here.** The standard
+  mitigations, from the original plan: bounding `count` (the loaded run only
+  ever *grows* forward within its ±365/+90-day cap —
+  `growAgendaLoadedChunksForward`, `calendar/viewState.ts` — so a sliding
+  window that also drops chunks far behind the viewport is the usual answer,
+  and `useAgendaChunks` already has the eviction machinery: its commit-phase
+  `useEffect` drops chunks outside the requested run, so only the run itself
+  needs to shrink) and making each measurement cheaper
+  (`content-visibility: auto` plus `contain: layout style paint` on rows).
+  **Both are behaviour-visible on a scroll-restore path that has been got
+  wrong twice before** (see `computeAgendaScrollRestore`'s own notes) —
+  re-tier and scope carefully before starting, this is not a mechanical
+  follow-up.
 
-- **Recommended model** — a fresh decision. The harness fix above is small
-  and mechanical (Sonnet 5 territory), but what it will reveal — and
-  therefore what's worth building — isn't knowable until it's read.
+- **Recommended model** — the diagnosis is done and settled by direct
+  measurement, which is the hard part; what's left is implementing one of
+  two well-understood mitigations against a component with a documented
+  history of getting this exact kind of change wrong. Opus 5, and design the
+  scroll-restore interaction before writing the fix.
