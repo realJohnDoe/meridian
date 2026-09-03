@@ -2,11 +2,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
-import { fmtISO } from '@/model'
+import { fmtISO, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { addDays } from '@/format'
 import { useAgendaSections } from './useAgendaSections'
 import type { AgendaRow } from './useAgendaSections'
-import { OVERDUE_LOOKBACK_DAYS } from './overduePool'
 import { calendarView } from './viewState'
 
 /** The overdue section starts expanded (viewState.ts); collapse it for the test about that. */
