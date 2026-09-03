@@ -290,6 +290,17 @@ toggle and scroll rows here are the ones to re-measure first.
 Six findings came out of this run, ranked, each with the baseline and the
 re-runnable recipe that produced it: see `plans/vault-scaling-results.md`.
 That file is a checklist — entries are removed as they are fixed and the file
-is deleted once the last one closes, per `plans/CLAUDE.md`. If it is gone,
-every finding below was closed; this report's numbers are then the *pre-fix*
-baselines and want re-measuring.
+is deleted once the last one closes, per `plans/CLAUDE.md`.
+
+Two of the six left it without being fixed. Findings **5** (`parseFiles` is a
+synchronous loop on the first-paint path) and **6** (`applyRemoteBatch` writes
+a whole vault in one transaction) were **deferred on 2026-09-03** — not
+closed. Both are real and both are still measured here; they were dropped from
+the checklist because their symptoms are visible and self-attributing at the
+sizes where they bite (a slow cold start, a hang on first connect), so they
+can be picked up if and when that happens rather than held open. Their
+baselines and recipes are the `parse` and `applyRemoteBatch` rows above.
+
+So a missing checklist means findings 1–4 were closed and 5–6 were deferred,
+not that all six were fixed. Either way this report's numbers are then the
+*pre-fix* baselines and want re-measuring.
