@@ -113,18 +113,21 @@ export const PRIORITY_CLASS: Record<Priority, string> = {
  * Maps each `VaultColor` to one of the app's existing domain color tokens —
  * indigo/red/orange/yellow/green/blue are exactly `event`/`priority-1`/
  * `priority-2`/`priority-3`/`task`/`note` under different names, so a vault
- * color introduces no new palette. Same bg-{color}/15 tint + border-{color}
- * pattern as `PRIORITY_CLASS` above, applied to the vault-source chip shown
- * on occurrence cards (`OccurrenceCard`) when that vault has a color set; no
- * color at all keeps the chip's plain `Badge` styling.
+ * color introduces no new palette. Same bg-{color}/15 tint as `PRIORITY_CLASS`
+ * above, applied to the vault-source chip shown on occurrence cards
+ * (`OccurrenceCard`) when that vault has a color set — minus a colored
+ * border, which doubled up on the tint and read as a ring. `border-transparent`
+ * (not simply omitting a border class) is what actually drops the line: the
+ * `Badge` `tag` variant's own `border-[var(--chip-border)]` still applies
+ * otherwise. No color at all keeps the chip's plain `Badge` styling.
  */
 export const VAULT_COLOR_CHIP: Record<VaultColor, string> = {
-  indigo: 'bg-event/15 text-chip-tint-foreground border-event',
-  red:    'bg-priority-1/15 text-chip-tint-foreground border-priority-1',
-  orange: 'bg-priority-2/15 text-chip-tint-foreground border-priority-2',
-  yellow: 'bg-priority-3/15 text-chip-tint-foreground border-priority-3',
-  green:  'bg-task/15 text-chip-tint-foreground border-task',
-  blue:   'bg-note/15 text-chip-tint-foreground border-note',
+  indigo: 'bg-event/15 text-chip-tint-foreground border-transparent',
+  red:    'bg-priority-1/15 text-chip-tint-foreground border-transparent',
+  orange: 'bg-priority-2/15 text-chip-tint-foreground border-transparent',
+  yellow: 'bg-priority-3/15 text-chip-tint-foreground border-transparent',
+  green:  'bg-task/15 text-chip-tint-foreground border-transparent',
+  blue:   'bg-note/15 text-chip-tint-foreground border-transparent',
 }
 
 /** Solid swatch fill for each `VaultColor`, for the color picker in Settings. */

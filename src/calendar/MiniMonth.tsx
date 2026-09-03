@@ -163,7 +163,7 @@ function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, i
           <IconButton
             variant="ghost"
             label="Go to the Previous Month"
-            className="absolute left-0 text-dim"
+            className="absolute left-0 text-muted-foreground"
             onClick={() => onMonthChange(new Date(y, m - 1, 1))}
           >
             <ChevronLeft size={18} />
@@ -171,7 +171,7 @@ function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, i
           <IconButton
             variant="ghost"
             label="Go to the Next Month"
-            className="absolute right-0 text-dim"
+            className="absolute right-0 text-muted-foreground"
             onClick={() => onMonthChange(new Date(y, m + 1, 1))}
           >
             <ChevronRight size={18} />

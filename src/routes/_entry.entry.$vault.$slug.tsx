@@ -121,7 +121,7 @@ function EntrySlugPage() {
   if (vaultLoading && !occ) return <EntrySkeleton />
   if (!occ) return (
     <div className="flex flex-col px-3.5 pt-4 lg:max-w-3xl lg:mx-auto w-full">
-      <IconButton variant="ghost" className="text-dim mb-4 self-start"
+      <IconButton variant="ghost" className="text-muted-foreground mb-4 self-start"
         label="Back to agenda"
         onClick={() => navigate({ to: '/' })}>
         <ArrowLeft size={18} />

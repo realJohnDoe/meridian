@@ -14,7 +14,7 @@ import { occRadius } from '@/components/primitives/occurrence-variants'
 // since it's month-independent). BADGE_CLASS is reused beyond the month grid,
 // by WeekPane's week/day-number badges and by DayBadge.
 export const CELL_CLASS = `flex-col items-stretch p-[3px_2px_2px] ${occRadius} bg-muted/40 transition-colors overflow-hidden min-h-0 w-full`
-export const BADGE_CLASS = 'text-xs font-medium text-dim w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
+export const BADGE_CLASS = 'text-xs font-medium text-muted-foreground w-5 h-5 flex items-center justify-center rounded-full shrink-0 mb-px'
 export const OCC_LIST_CLASS = 'flex flex-col gap-0.5 flex-1 overflow-hidden'
 // BADGE_CLASS's `h-5` as a number, for the callers that need the badge height
 // in JS pixel math rather than as a class (WeekPane's all-day row height,

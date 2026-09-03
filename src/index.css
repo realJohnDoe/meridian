@@ -81,8 +81,6 @@
      seven swatches land on the same ink at 15% over --secondary/--card/
      --background in every theme). See each theme block for its pick. */
   --color-chip-tint-foreground: var(--chip-tint-foreground);
-  /* Extra text tier — icons, unselected nav */
-  --color-dim:            var(--dim);
   /* Surface for past/done */
   --color-surface-raised: var(--surface-raised);
 
@@ -144,8 +142,11 @@
   --popover-foreground:   oklch(0.96 0.02 270);
   --accent-foreground:    oklch(0.96 0.02 270);
   --secondary-foreground: oklch(0.86 0.07 272);   /* indigo-tinted — wikilinks, time, entry body */
-  --muted-foreground:     oklch(0.54 0.04 250);   /* dim labels, placeholders, weekdays */
-  --dim:                  oklch(0.69 0.03 250);   /* icons, unselected nav — between secondary and muted */
+  /* Was oklch(0.54 0.04 250) — only 3.3-3.7:1 against --card/--background, under
+     AA's 4.5:1 for the body text this renders (settings row descriptions,
+     placeholders). Lightened to clear 4.5:1 against the tightest surface
+     (--secondary/--muted/--accent); same hue/chroma. */
+  --muted-foreground:     oklch(0.65 0.04 250);   /* dim labels, placeholders, weekdays, icons, unselected nav */
 
   /* Brand */
   --primary:            oklch(0.68 0.22 278);   /* indigo — balanced for text on dark surfaces and filled button bg */
@@ -294,8 +295,7 @@
   --popover-foreground:   oklch(0.36  0.045 270);
   --accent-foreground:    oklch(0.36  0.045 270);
   --secondary-foreground: oklch(0.46  0.055 272);   /* indigo-tinted — wikilinks, time, entry body */
-  --muted-foreground:     oklch(0.525 0.038 250);   /* dim labels, placeholders, weekdays */
-  --dim:                  oklch(0.60  0.032 250);   /* icons, unselected nav */
+  --muted-foreground:     oklch(0.525 0.038 250);   /* dim labels, placeholders, weekdays, icons, unselected nav */
 
   /* Brand — same 278 indigo, darkened to carry light ink as a filled button */
   --primary:            oklch(0.52 0.20 278);
@@ -389,8 +389,11 @@
   --popover-foreground:   #c0caf5;
   --accent-foreground:    #c0caf5;
   --secondary-foreground: #a9b1d6;
-  --muted-foreground:     #565f89;
-  --dim:                  #737aa2;
+  /* Tokyo Night's own comment/dark3 value was only 2.2-4.1:1 against
+     --card/--secondary, under AA's 4.5:1 for the body/label/icon text it
+     renders as. Lightened to clear 4.5:1+ against the tightest surface,
+     same hue. */
+  --muted-foreground:     #8792bf;
 
   /* Brand — Tokyo Night magenta/pink as primary */
   --primary:            #bb9af7;
@@ -463,9 +466,14 @@
   --card-foreground:      #575279;
   --popover-foreground:   #575279;
   --accent-foreground:    #575279;
-  --secondary-foreground: #797593;
-  --muted-foreground:     #9893a5;
-  --dim:                  #b9b3c4;
+  /* Rosé Pine's own subtle/muted/highlight-low values were only 1.7-4.2:1
+     against --background/--card/--secondary, under AA's 4.5:1 for the
+     body/label/icon text they render as (secondary-foreground is Entry body
+     text). Each darkened just enough to clear 4.5:1+ against the tightest
+     surface, same hue. --sidebar-foreground mirrors --secondary-foreground
+     below, so it moves too. */
+  --secondary-foreground: #605c79;
+  --muted-foreground:     #6c6778;
 
   /* Brand — iris (purple) */
   --primary:            #907aa9;
@@ -515,7 +523,7 @@
 
   /* Sidebar */
   --sidebar:                    #faf4ed;
-  --sidebar-foreground:         #797593;
+  --sidebar-foreground:         #605c79;
   --sidebar-primary:            #907aa9;
   --sidebar-primary-foreground: #fffaf3;
   --sidebar-accent:             #fffaf3;
@@ -545,14 +553,21 @@
   --muted:      #f5f0e4;
   --accent:     #f5f0e4;
 
-  /* Text */
-  --foreground:           #586e75;
-  --card-foreground:      #586e75;
-  --popover-foreground:   #586e75;
-  --accent-foreground:    #586e75;
-  --secondary-foreground: #657b83;
-  --muted-foreground:     #839496;
-  --dim:                  #93a1a1;
+  /* Text — Solarized's own base01/base00/base0/base1 read fine as syntax-
+     highlighting accents but fall short as UI body text: --foreground was
+     only 4.4:1 against --background, and every dimmer tier below it fell
+     as low as 2.2:1 against --card/--secondary — well under AA's 4.5:1 for
+     the row labels, entry body (secondary-foreground) and settings/icon
+     text (muted-foreground) they render as. Each darkened just enough to
+     clear its floor against the tightest surface, same hue.
+     --sidebar-foreground/--sidebar-accent-foreground mirror
+     --secondary-foreground/--foreground below, so they move too. */
+  --foreground:           #445960;
+  --card-foreground:      #445960;
+  --popover-foreground:   #445960;
+  --accent-foreground:    #445960;
+  --secondary-foreground: #4c6169;
+  --muted-foreground:     #5b6b6d;
 
   /* Brand — violet */
   --primary:            #6c71c4;
@@ -602,11 +617,11 @@
 
   /* Sidebar */
   --sidebar:                    #fdf6e3;
-  --sidebar-foreground:         #657b83;
+  --sidebar-foreground:         #4c6169;
   --sidebar-primary:            #6c71c4;
   --sidebar-primary-foreground: #fdf6e3;
   --sidebar-accent:             #f5f0e4;
-  --sidebar-accent-foreground:  #586e75;
+  --sidebar-accent-foreground:  #445960;
   --sidebar-border: color-mix(in oklab, #839496, transparent 75%);
   --sidebar-ring:               #6c71c4;
 
@@ -635,14 +650,22 @@
   --muted:      #0d4552;
   --accent:     #0d4552;
 
-  /* Text — base1 (content) down to base01 (comments) */
-  --foreground:           #93a1a1;
-  --card-foreground:      #93a1a1;
-  --popover-foreground:   #93a1a1;
-  --accent-foreground:    #93a1a1;
-  --secondary-foreground: #839496;
-  --muted-foreground:     #586e75;
-  --dim:                  #657b83;
+  /* Text — base1 (content) down to base01 (comments). Solarized's own
+     values read fine as syntax-highlighting accents but fall short as UI
+     body text: --foreground was only 3.95:1 against --secondary/--accent
+     (the hover/selected-row surface), and every dimmer tier below it fell
+     as low as 1.96:1 against --secondary — well under AA's 4.5:1 for the
+     row labels, entry body (secondary-foreground) and settings/icon text
+     (muted-foreground) they render as. Each lightened just enough to
+     clear its floor against the tightest surface, same hue.
+     --sidebar-foreground/--sidebar-accent-foreground mirror
+     --secondary-foreground/--foreground below, so they move too. */
+  --foreground:           #b8c7c7;
+  --card-foreground:      #b8c7c7;
+  --popover-foreground:   #b8c7c7;
+  --accent-foreground:    #b8c7c7;
+  --secondary-foreground: #aabcbe;
+  --muted-foreground:     #96aeb5;
 
   /* Brand — violet, same hue as .solarized-light */
   --primary:            #6c71c4;
@@ -689,11 +712,11 @@
 
   /* Sidebar */
   --sidebar:                    #073642;
-  --sidebar-foreground:         #839496;
+  --sidebar-foreground:         #aabcbe;
   --sidebar-primary:            #6c71c4;
   --sidebar-primary-foreground: #fdf6e3;
   --sidebar-accent:             #0d4552;
-  --sidebar-accent-foreground:  #93a1a1;
+  --sidebar-accent-foreground:  #b8c7c7;
   --sidebar-border: color-mix(in oklab, #586e75, transparent 70%);
   --sidebar-ring:               #6c71c4;
 
@@ -721,8 +744,11 @@
   --popover-foreground:   #f8f8f2;
   --accent-foreground:    #f8f8f2;
   --secondary-foreground: #cdd6f4;
-  --muted-foreground:     #6272a4;
-  --dim:                  #8b95bb;
+  /* Dracula's own comment/selection-fg value was only 2.4-4.8:1 against
+     --card/--secondary, under AA's 4.5:1 for the body/label/icon text it
+     renders as. Lightened to clear 4.5:1+ against the tightest surface,
+     same hue. */
+  --muted-foreground:     #91a3d8;
 
   /* Brand — Dracula purple as primary */
   --primary:            #bd93f9;
@@ -801,9 +827,13 @@
   --card-foreground:      #4c4f69;
   --popover-foreground:   #4c4f69;
   --accent-foreground:    #4c4f69;
-  --secondary-foreground: #5c5f77;   /* subtext1 */
-  --muted-foreground:     #6c6f85;   /* subtext0 — placeholder, labels */
-  --dim:                  #8c8fa1;   /* overlay1 — icons, unselected nav */
+  /* Catppuccin's own subtext1/subtext0 values only clear 2.6-5.1:1 against
+     --background/--card/--secondary here, well under AA's 4.5:1 for the
+     body/label/icon text they render as. Each darkened just enough to clear
+     4.5:1+ against the tightest surface, same hue. --sidebar-foreground
+     mirrors --secondary-foreground below, so it moves too. */
+  --secondary-foreground: #5a5d75;   /* subtext1 */
+  --muted-foreground:     #65687e;   /* subtext0 — placeholder, labels, icons, unselected nav */
 
   /* Brand — mauve */
   --primary:            #8839ef;
@@ -856,7 +886,7 @@
 
   /* Sidebar */
   --sidebar:                    #eff1f5;
-  --sidebar-foreground:         #5c5f77;
+  --sidebar-foreground:         #5a5d75;
   --sidebar-primary:            #8839ef;
   --sidebar-primary-foreground: #eff1f5;
   --sidebar-accent:             #f5f6f9;
@@ -897,8 +927,10 @@
   --popover-foreground:   #cdd6f4;
   --accent-foreground:    #cdd6f4;
   --secondary-foreground: #bac2de;   /* subtext1 */
-  --muted-foreground:     #6c7086;   /* overlay0 */
-  --dim:                  #7f849c;   /* overlay1 — between subtext1 and overlay0 */
+  /* overlay0 was only 2.6-4.8:1 against --card/--secondary, under AA's
+     4.5:1 for the body/label/icon text it renders as. Lightened to clear
+     4.5:1+ against the tightest surface, same hue. */
+  --muted-foreground:     #959ab1;   /* overlay0 — placeholder, labels, icons, unselected nav */
 
   /* Brand — mauve */
   --primary:            #cba6f7;
@@ -978,7 +1010,7 @@
 
 /* ── SEARCH BAR — brand identity widget ─────────────────────────────────────────────────────── */
 /* .search-bar-wrap kept: :focus-within selector + multi-layer shadow can't be Tailwind utilities */
-.search-bar-wrap{flex:none;display:flex;align-items:center;gap:8px;background:var(--search-bar-bg);border:1px solid color-mix(in oklab,var(--dim),transparent 82%);border-radius:26px;padding:0 6px 0 14px;height:52px;box-shadow:var(--shadow-float);pointer-events:all;transition:box-shadow .2s,border-color .2s}
+.search-bar-wrap{flex:none;display:flex;align-items:center;gap:8px;background:var(--search-bar-bg);border:1px solid color-mix(in oklab,var(--muted-foreground),transparent 82%);border-radius:26px;padding:0 6px 0 14px;height:52px;box-shadow:var(--shadow-float);pointer-events:all;transition:box-shadow .2s,border-color .2s}
 .search-bar-wrap:focus-within{border-color:color-mix(in oklab,var(--primary),transparent 65%);box-shadow:var(--shadow-float-focus)}
 /* Inside the mobile overlay the input sits against a solid bg — drop the glow that bleeds into results */
 .mobile-search-overlay .search-bar-wrap,.mobile-search-overlay .search-bar-wrap:focus-within{box-shadow:none}

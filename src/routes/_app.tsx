@@ -473,7 +473,7 @@ function AppMain() {
                     <ViewFilterButton />
                     <SyncButton />
                     {!isListView && (
-                      <IconButton variant="ghost" className="text-dim" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
+                      <IconButton variant="ghost" className="text-muted-foreground" onClick={handleToday} title="Today" label="Today"><CalendarCheck2 size={18} /></IconButton>
                     )}
                   </div>
                 }

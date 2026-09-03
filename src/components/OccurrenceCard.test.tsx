@@ -136,7 +136,7 @@ describe('OccurrenceCard', () => {
       const occ = makeOcc()
       render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       const badge = screen.getByText('Work')
-      expect(badge).toHaveClass('bg-note/15', 'border-note')
+      expect(badge).toHaveClass('bg-note/15', 'border-transparent')
     })
 
     it('leaves the vault-source badge uncolored when the vault has no color', () => {
@@ -150,7 +150,7 @@ describe('OccurrenceCard', () => {
       render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       const badge = screen.getByText('Work')
       expect(badge).toHaveClass('bg-secondary')
-      expect(badge).not.toHaveClass('border-note')
+      expect(badge).not.toHaveClass('border-transparent')
     })
   })
 

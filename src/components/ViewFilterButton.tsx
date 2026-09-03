@@ -144,7 +144,7 @@ export default function ViewFilterButton() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative rounded-full shrink-0 text-dim"
+          className="relative rounded-full shrink-0 text-muted-foreground"
           aria-label={active ? 'Filters active. Change calendar and people filter' : 'Filter calendars and people'}
         >
           <Users size={18} className="shrink-0" />
