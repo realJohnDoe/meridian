@@ -136,6 +136,8 @@ export function computeExpansionCache(
   const toMs = to.getTime()
 
   if (prev && prev.fromMs === fromMs && prev.toMs === toMs && hasSameStructure(prev.items, items)) {
+    if (items === prev.items && roots === prev.roots) return prev
+
     // Only non-structural metadata changed — find altered items/files and overlay.
     // `roots` identity is deliberately NOT part of the fast-path gate above: a
     // title/tags/body edit on one file allocates a brand-new `roots` map (see
