@@ -26,3 +26,10 @@ results file as part of that same PR.
 The goal is that anyone reading a results or plan file sees only
 still-outstanding work — never a mix of done and not-done that requires
 cross-referencing git history to tell apart.
+
+## Sizing PRs when writing a plan
+
+When a plan (not a survey's findings) lays out the PRs that will implement
+it, split the work into PRs that are as large as possible without becoming
+mega-PRs, and write each one with enough context that Sonnet 5 can carry
+out the implementation from that PR's description alone.

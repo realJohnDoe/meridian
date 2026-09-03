@@ -1,5 +1,11 @@
 # Agent guidelines for Meridian
 
+## Implementation decisions
+
+When an implementation decision isn't covered by this doc or explicitly
+discussed with the user, default to industry standards rather than
+inventing a bespoke approach.
+
 ## Package manager
 
 This project uses **pnpm**. Always use `pnpm` — never `npm` or `yarn`.
