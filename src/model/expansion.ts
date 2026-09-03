@@ -5,6 +5,7 @@
  *   - Predicates:   hasRepeat, treeHasOccurrences
  *   - Multiday:     multidayDisplayTitle
  *   - Main-app API: expandRange, expandWithMultiday, joinFileMeta, stableOccId
+ *   - Per-key seek: firstOccurrenceFrom, OVERDUE_LOOKBACK_DAYS
  *
  * Date helpers live in ./dateUtils; duration helpers in ./duration; the
  * optional `ItemIndex`/`buildItemIndex` both functions above accept lives in
@@ -16,7 +17,7 @@ import {
   addDays, addWeeks, addMonths, addYears, addHours, addMinutes, startOfDay, endOfDay,
   differenceInCalendarDays,
 } from 'date-fns'
-import type { Repeat, StoreItem, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
+import type { Repeat, StoreItem, StoreSeries, StoreOcc, OccurrenceMetadata, AppMetadata, Roots, OccurrenceEntry } from '@/types'
 import { scalarToString } from './fieldRegistry'
 import type { EffectiveNode } from './inheritance'
 import { fmtISO, fmtT, parseDateString, parseDateTime } from './dateUtils'
@@ -210,15 +211,23 @@ function cachedCountBound(
   return bound
 }
 
-function generateScheduledDates(
+/**
+ * Lazy, ascending date walk for a `schedule` repeat rule — one `yield` per
+ * date passing the same `from`/`to` predicate `generateScheduledDates` used
+ * to filter its materialised array with. `generateScheduledDates` is now a
+ * one-line `[...iterScheduledDates(...)]` wrapper kept for callers (`expandNode`)
+ * that still want the whole window; `firstOccurrenceFrom`'s per-key seek is
+ * what pulls from this directly, so it can stop after the first match instead
+ * of paying for the rest of the window.
+ */
+function* iterScheduledDates(
   anchor: Date,
   anchorTimeStr: string | null,
   sched: Extract<Repeat, { type: 'schedule' }>,
   from: Date,
   to: Date,
-): Date[] {
+): Generator<Date> {
   const { freq, byweekday, bymonthday, bymonth, bysetpos, interval = 1, end } = sched
-  const results: Date[] = []
   // `end.time` only ever accompanies `end.date` — it names an instant within
   // that day, not a bound on its own.
   const untilDate = end?.type === 'until' && end.date ? toDate(end.date) : null
@@ -494,25 +503,42 @@ function generateScheduledDates(
   let iter = 0
   while (cursor <= walkBound && iter++ < PERIOD_WALK_LIMIT) {
     for (const d of periodDates(cursor)) {
-      if (d <= dateBound) results.push(d)
+      if (d <= dateBound && d >= from && d <= to) yield d
     }
     const next = nextBase(cursor)
     if (next <= cursor) break  // interval <= 0: the cursor would never advance
     cursor = next
   }
-  return results.filter(d => d >= from && d <= to)
 }
 
-function expandNode<M>(
-  node: ExpandNode<M>,
+/** Materialised form of `iterScheduledDates`, for callers (`expandNode`) that want the whole window. */
+function generateScheduledDates(
+  anchor: Date,
+  anchorTimeStr: string | null,
+  sched: Extract<Repeat, { type: 'schedule' }>,
   from: Date,
   to: Date,
-): ExpandedOcc<M>[] {
-  const occurrences: ExpandedOcc<M>[] = []
-  const anchor = nodeDateTime(node)
-  if (!anchor) return occurrences
+): Date[] {
+  return [...iterScheduledDates(anchor, anchorTimeStr, sched, from, to)]
+}
 
-  const instanceOverrides = (node.instances ?? []).map(child => {
+/** One override child, indexed for `findOverridesAt`'s coincidence test. */
+interface InstanceOverride<M> {
+  ms:        number
+  hasTime:   boolean
+  matchDate: Date | null
+  child:     ExpandNode<M>
+  eff:       ExpandNode<M>
+}
+
+/**
+ * Index a node's override children for `findOverridesAt`/`emitSlotOccs`.
+ * A child with neither its own time nor date (relying entirely on the
+ * parent's anchor) is dropped — nothing distinguishes it from the anchor
+ * slot it inherits, so it has no instant of its own to be found by.
+ */
+function buildInstanceOverrides<M>(node: ExpandNode<M>): InstanceOverride<M>[] {
+  return (node.instances ?? []).map(child => {
     const t = nodeDateTime(child)
     if (!t && !child.date) return null
     const hasTime = !!child.time
@@ -525,42 +551,64 @@ function expandNode<M>(
       eff: mergeNode(node, child),
     }
   }).filter((o): o is NonNullable<typeof o> => o !== null)
+}
 
-  // All override children that land on `jsDate`. Returns every match — not just
-  // the first — so multiple explicit instances on the same day each surface as
-  // their own occurrence instead of one silently shadowing the others.
-  function findOverrides(jsDate: Date) {
-    return instanceOverrides.filter(o => {
-      if (!o.hasTime) {
-        const od = o.matchDate
-        return !!od && sameCalendarDay(od, jsDate)
-      }
-      return sameMinute(o.ms, jsDate)
-    })
-  }
-
-  function makeOcc(eff: ExpandNode<M>, jsDate: Date, baseNode: ExpandNode<M>, instOverride: { child: ExpandNode<M> } | null, source: 'generated' | 'explicit'): ExpandedOcc<M> | null {
-    if (eff.excluded) return null
-    const occTimeStr = eff.time ?? baseNode.time ?? node.time
-    const occDate = (instOverride?.child.date && instOverride.child.date !== node.date)
-      ? instOverride.child.date
-      : (jsDateToSpec(jsDate).date ?? '')
-    return { date: occDate, time: occTimeStr, jsTime: jsDate, source, done: eff.done, overrideId: instOverride?.child.id, metadata: eff.metadata }
-  }
-
-  // Emit either the plain slot (no override) or one occurrence per override
-  // child sitting on `jsDate`. Shared by the anchor and every generated date.
-  function emitSlot(jsDate: Date, source: 'generated' | 'explicit') {
-    const ovs = findOverrides(jsDate)
-    if (ovs.length === 0) {
-      const occ = makeOcc(node, jsDate, node, null, source)
-      if (occ) occurrences.push(occ)
-      return
+/**
+ * All override children that land on `jsDate`. Returns every match — not just
+ * the first — so multiple explicit instances on the same day each surface as
+ * their own occurrence instead of one silently shadowing the others.
+ */
+function findOverridesAt<M>(overrides: InstanceOverride<M>[], jsDate: Date): InstanceOverride<M>[] {
+  return overrides.filter(o => {
+    if (!o.hasTime) {
+      const od = o.matchDate
+      return !!od && sameCalendarDay(od, jsDate)
     }
-    for (const ov of ovs) {
-      const occ = makeOcc(ov.eff, jsDate, node, ov, source)
-      if (occ) occurrences.push(occ)
-    }
+    return sameMinute(o.ms, jsDate)
+  })
+}
+
+function makeOcc<M>(node: ExpandNode<M>, eff: ExpandNode<M>, jsDate: Date, instOverride: InstanceOverride<M> | null, source: 'generated' | 'explicit'): ExpandedOcc<M> | null {
+  if (eff.excluded) return null
+  const occTimeStr = eff.time ?? node.time
+  const occDate = (instOverride?.child.date && instOverride.child.date !== node.date)
+    ? instOverride.child.date
+    : (jsDateToSpec(jsDate).date ?? '')
+  return { date: occDate, time: occTimeStr, jsTime: jsDate, source, done: eff.done, overrideId: instOverride?.child.id, metadata: eff.metadata }
+}
+
+/**
+ * Emit either the plain slot (no override) or one occurrence per override
+ * child sitting on `jsDate`. Shared by `expandNode` (anchor + every generated
+ * date) and `iterSeriesSlots`'s lazy per-key walk, so a slot resolves the same
+ * way regardless of which one reached it.
+ */
+function emitSlotOccs<M>(node: ExpandNode<M>, overrides: InstanceOverride<M>[], jsDate: Date, source: 'generated' | 'explicit'): ExpandedOcc<M>[] {
+  const ovs = findOverridesAt(overrides, jsDate)
+  if (ovs.length === 0) {
+    const occ = makeOcc(node, node, jsDate, null, source)
+    return occ ? [occ] : []
+  }
+  const out: ExpandedOcc<M>[] = []
+  for (const ov of ovs) {
+    const occ = makeOcc(node, ov.eff, jsDate, ov, source)
+    if (occ) out.push(occ)
+  }
+  return out
+}
+
+function expandNode<M>(
+  node: ExpandNode<M>,
+  from: Date,
+  to: Date,
+): ExpandedOcc<M>[] {
+  const occurrences: ExpandedOcc<M>[] = []
+  const anchor = nodeDateTime(node)
+  if (!anchor) return occurrences
+
+  const instanceOverrides = buildInstanceOverrides(node)
+  const emitSlot = (jsDate: Date, source: 'generated' | 'explicit') => {
+    occurrences.push(...emitSlotOccs(node, instanceOverrides, jsDate, source))
   }
 
   if (node.repeat?.type !== 'after_completion') {
@@ -640,7 +688,7 @@ function expandNode<M>(
       ? addInterval(lastDone.jsTime, String(repeat.interval || '1 day'))
       : null
 
-    /** Date-only records match the whole day, timed ones the minute — cf. findOverrides. */
+    /** Date-only records match the whole day, timed ones the minute — cf. findOverridesAt. */
     function onNextSlot(t: Date, timed: boolean): boolean {
       if (!nextJsTime) return false
       return timed ? sameMinute(t, nextJsTime) : sameCalendarDay(t, nextJsTime)
@@ -892,5 +940,246 @@ export function expandWithMultiday(
     })
 
   return dedupeAndSort([...occs, ...extraMultiday])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PER-KEY SEEK  (bounded, ascending — the alternative to expand-then-filter)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * How far back the overdue pass expands, and — since `fileOccurrence.ts`'s
+ * per-key resolution binds its own backward reach to the same number — the
+ * app's one definition of "how far back does overdue reach". Lives here
+ * rather than in `calendar/` (its only reader until now) because `model/`
+ * may not import outward (invariant 1) and a root-level file may not deep-
+ * import a feature module either; `calendar/overduePool.ts` imports it from
+ * here instead of declaring its own.
+ */
+export const OVERDUE_LOOKBACK_DAYS = 365
+
+/**
+ * Ascending, lazy per-series occurrence stream, used by `firstOccurrenceFrom`'s
+ * per-key seek. Reuses `buildInstanceOverrides`/`emitSlotOccs` so a slot
+ * carrying an override child resolves identically to `expandRange`'s own
+ * handling of it — including a slot that lands on more than one override.
+ *
+ * `after_completion` (and any non-`schedule` shape) is bounded by its own
+ * instances rather than an open-ended rule, so materialising it via
+ * `expandNode` in one shot is cheap — the laziness this function exists for
+ * only matters for `schedule`, whose date walk can otherwise run for years.
+ * `expandNode`'s own doc notes it does not always emit in time order (nested
+ * child series are appended last); that hazard never triggers for a node built
+ * from one file's own items, since those children are always plain `StoreOcc`
+ * and never carry their own `repeat` — sorted anyway, since it is free at
+ * this size.
+ *
+ * For `schedule`, off-anchor override instants are precomputed (small — an
+ * `instances:` list is a handful of entries) and merged against the lazy
+ * `iterScheduledDates` walk by ascending instant, coalescing a generated date
+ * and an override that land on the same slot into one `emitSlotOccs` call —
+ * exactly the coincidence `findOverridesAt` already tests for, reused here
+ * rather than re-derived so the two can never disagree about what "the same
+ * slot" means.
+ */
+function* iterSeriesSlots(
+  node: ExpandNode<OccurrenceMetadata>,
+  from: Date,
+  horizon: Date,
+): Generator<ExpandedOcc<OccurrenceMetadata>> {
+  const anchor = nodeDateTime(node)
+  if (!anchor) return
+
+  if (node.repeat?.type !== 'schedule') {
+    yield* [...expandNode(node, from, horizon)].sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
+    return
+  }
+
+  const overrides = buildInstanceOverrides(node)
+  const consumed = new Set<InstanceOverride<OccurrenceMetadata>>()
+
+  const overrideInstants = overrides
+    .map(o => ({ o, instant: o.hasTime ? new Date(o.ms) : o.matchDate }))
+    .filter((x): x is { o: InstanceOverride<OccurrenceMetadata>; instant: Date } =>
+      x.instant !== null && x.instant >= from && x.instant <= horizon)
+    .sort((a, b) => a.instant.getTime() - b.instant.getTime())
+  let ovIdx = 0
+
+  const genIter = iterScheduledDates(anchor, node.time, node.repeat, from, horizon)
+  let anchorPending = anchor >= from && anchor <= horizon
+  function pullGenerated(): Date | null {
+    if (anchorPending) { anchorPending = false; return anchor }
+    const r = genIter.next()
+    return r.done ? null : r.value
+  }
+
+  function emitGenerated(jsDate: Date): ExpandedOcc<OccurrenceMetadata>[] {
+    const matching = findOverridesAt(overrides, jsDate).filter(o => !consumed.has(o))
+    if (matching.length === 0) {
+      const occ = makeOcc(node, node, jsDate, null, 'generated')
+      return occ ? [occ] : []
+    }
+    const out: ExpandedOcc<OccurrenceMetadata>[] = []
+    for (const ov of matching) {
+      consumed.add(ov)
+      const occ = makeOcc(node, ov.eff, jsDate, ov, 'generated')
+      if (occ) out.push(occ)
+    }
+    return out
+  }
+
+  // Mirrors expandNode's own off-grid instance loop (an override whose own
+  // date/time doesn't land on any generated slot), but per-override rather
+  // than checked against a materialised `generatedMs` set.
+  function emitOffGrid(ov: InstanceOverride<OccurrenceMetadata>): ExpandedOcc<OccurrenceMetadata>[] {
+    if (consumed.has(ov)) return []
+    consumed.add(ov)
+    if (ov.eff.excluded) return []
+    const jsDate = ov.hasTime ? new Date(ov.ms) : ov.matchDate!
+    const spec = jsDateToSpec(jsDate)
+    return [{
+      date:       ov.child.date || (spec.date ?? ''),
+      time:       ov.eff.time,
+      jsTime:     jsDate,
+      source:     'explicit',
+      overrideId: ov.child.id,
+      metadata:   ov.eff.metadata,
+    }]
+  }
+
+  let genPeek = pullGenerated()
+  while (genPeek !== null || ovIdx < overrideInstants.length) {
+    const ovEntry = ovIdx < overrideInstants.length ? overrideInstants[ovIdx]! : null
+    // Defer to the generated slot whenever it coincides with the pending
+    // override, whatever the two instants' raw ms happen to be (a date-only
+    // override on a timed series sorts earlier than the slot it overrides) —
+    // emitGenerated's own findOverridesAt call is what actually resolves it.
+    const coincides = genPeek !== null && ovEntry !== null && findOverridesAt([ovEntry.o], genPeek).length > 0
+    if (genPeek !== null && (ovEntry === null || coincides || genPeek.getTime() < ovEntry.instant.getTime())) {
+      yield* emitGenerated(genPeek)
+      genPeek = pullGenerated()
+    } else {
+      yield* emitOffGrid(ovEntry!.o)
+      ovIdx++
+    }
+  }
+}
+
+/**
+ * Bounded seek: the first occurrence among `items` (one file's own items)
+ * satisfying `pred`, walking ascending from `from` and giving up at `horizon`.
+ *
+ * Built for `fileOccurrence.ts`'s per-key resolution, which used to expand
+ * the whole `[from, horizon]` window per key just to pick one representative
+ * (vault-scaling survey, finding #2). Each item gets its own lazily-pulled
+ * ascending stream — a series via `iterSeriesSlots`, a standalone as a
+ * single-element one — merged by `jsTime` and pulled one value at a time, so
+ * a series with thousands of occurrences in the window costs only as many
+ * pulls as it takes `pred` to match (typically one or two). `items.length` is
+ * small (one file's own occurrences), so the linear scan for the next-lowest
+ * stream on each pull is cheap.
+ *
+ * Only safe for a predicate that may return the *first* ascending match as
+ * the answer — not for an extremal-*last* query, which needs the whole
+ * window materialised (see `fileOccurrence.ts`'s rule 5).
+ */
+export function firstOccurrenceFrom(
+  items: StoreItem[],
+  roots: Roots,
+  from: Date,
+  horizon: Date,
+  pred: (occ: OccurrenceEntry<AppMetadata>) => boolean,
+): OccurrenceEntry<AppMetadata> | null {
+  interface SeekOcc {
+    date:      string
+    time:      string | null
+    jsTime:    Date
+    source:    'generated' | 'explicit'
+    entryKey:  EntryKey
+    id:        string
+    ownerId?:  string
+    excluded?: boolean
+    metadata:  OccurrenceMetadata
+  }
+
+  const { series, standalones, childrenByOwnerId } = buildItemIndex(items)
+
+  function* seriesStream(s: StoreSeries): Generator<SeekOcc> {
+    const children = childrenByOwnerId.get(s.id) ?? []
+    const node: ExpandNode<OccurrenceMetadata> = {
+      date:     s.date,
+      time:     s.time,
+      repeat:   s.repeat,
+      done:     s.metadata.done,
+      metadata: s.metadata,
+      instances: children.map(c => ({
+        date: c.date, time: c.time ?? null, excluded: c.excluded, done: c.metadata.done, id: c.id, metadata: c.metadata,
+      })),
+    }
+    const childById = new Map(children.map(c => [c.id, c]))
+    for (const occ of iterSeriesSlots(node, from, horizon)) {
+      const override = occ.overrideId ? childById.get(occ.overrideId) : undefined
+      const occMeta: OccurrenceMetadata = override ? { ...s.metadata, ...override.metadata } : s.metadata
+      yield {
+        date:     occ.date,
+        time:     occ.time,
+        jsTime:   occ.jsTime,
+        source:   occ.source,
+        entryKey: s.entryKey,
+        id:       override ? override.id : stableOccId(`${s.id}|${occ.date}|${occ.time ?? ''}`),
+        ownerId:  s.id,
+        metadata: occMeta,
+      }
+    }
+  }
+
+  function* standaloneStream(occ: StoreOcc): Generator<SeekOcc> {
+    const jsTime = nodeDateTime({ date: occ.date, time: occ.time }) ?? parseDateString(occ.date)
+    if (!jsTime || jsTime < from || jsTime > horizon) return
+    yield {
+      date: occ.date, time: occ.time, jsTime, source: occ.source,
+      entryKey: occ.entryKey, id: occ.id, excluded: occ.excluded, metadata: occ.metadata,
+    }
+  }
+
+  interface Cursor { gen: Generator<SeekOcc>; peek: IteratorResult<SeekOcc> }
+
+  // `IteratorResult<T>.value` is `T | TReturn` (TReturn defaults to `any` for
+  // a bare `Generator<T>`), so accessing `.peek.value` straight off a `Cursor`
+  // resolves to `any` unless it's narrowed against that exact `.peek.done`
+  // check in the same expression — this is the one place that happens.
+  function peeked(c: Cursor): SeekOcc | null {
+    return c.peek.done ? null : c.peek.value
+  }
+
+  const cursors: Cursor[] = [...series.map(seriesStream), ...standalones.map(standaloneStream)]
+    .map(gen => ({ gen, peek: gen.next() }))
+
+  for (;;) {
+    let minIdx = -1
+    let minVal: SeekOcc | null = null
+    for (let i = 0; i < cursors.length; i++) {
+      const val = peeked(cursors[i]!)
+      if (val !== null && (minVal === null || val.jsTime.getTime() < minVal.jsTime.getTime())) {
+        minIdx = i
+        minVal = val
+      }
+    }
+    if (minIdx === -1 || minVal === null) return null
+
+    const cursor = cursors[minIdx]!
+    cursor.peek = cursor.gen.next()
+
+    const occ: OccurrenceEntry<AppMetadata> = {
+      date:     minVal.date,
+      time:     minVal.time,
+      source:   minVal.source,
+      entryKey: minVal.entryKey,
+      id:       minVal.id,
+      ownerId:  minVal.ownerId,
+      excluded: minVal.excluded,
+      metadata: { ...joinFileMeta(minVal.entryKey, minVal.metadata, roots), jsTime: minVal.jsTime },
+    }
+    if (pred(occ)) return occ
+  }
 }
 

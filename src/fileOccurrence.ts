@@ -1,5 +1,5 @@
-import { startOfToday } from 'date-fns'
-import { expandRange, joinFileMeta, stableOccId } from '@/model'
+import { startOfToday, addDays } from 'date-fns'
+import { expandRange, firstOccurrenceFrom, joinFileMeta, stableOccId, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { buildResolveIndex, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc } from './types'
 import { occKind } from './occView'
@@ -49,40 +49,61 @@ export function fileEntries(roots: Roots, vaultId?: string): FilePickerEntry[] {
 
 // ── fileOccurrenceMap ──────────────────────────────────────────────────────────
 
-const _3YR_MS = 365 * 3 * 86_400_000
+/**
+ * Forward reach of rules 1, 2 and 5 below — unchanged in magnitude from the
+ * old ±3yr window (see the vault-scaling results' "series whose only
+ * occurrences fall beyond the forward horizon" behaviour note). It no longer
+ * costs materialising the window: rules 1 and 2's forward half seek lazily
+ * via `firstOccurrenceFrom` and bail at the first match, and rule 5's forward
+ * half is only ever reached for the rare fully-completed file.
+ */
+const FORWARD_HORIZON_DAYS = 365 * 3
 
 /**
  * Per-key resolution primitive used by `updateFileOccurrenceMap`.
  *
  * Fill order (first match wins — future events, open tasks, past events, done tasks):
- *  1. Nearest upcoming event (dated, no `done` field, in the ±3yr window).
- *  2. Earliest undone scheduled (dated) task in the ±3yr window (overdue tasks
- *     sort before future ones, since "earliest" just means smallest date).
+ *  1. Nearest upcoming event (dated, no `done` field), sought forward from `now`.
+ *  2. Earliest undone scheduled (dated) task — checked first in the fixed
+ *     `OVERDUE_LOOKBACK_DAYS` back window (its first ascending match there is
+ *     the oldest, i.e. the extremal answer), then sought forward from `now`
+ *     when the back window has none (safe: forward is monotonically later
+ *     than `now`, so the nearest forward match is also the earliest one).
  *  3. Undone unscheduled (undated) standalone task.
- *  4. Most-recent past event.
- *  5. Latest done occurrence in the ±3yr window (past or future).
- *  6. Fallback for keys with nothing in the window: the first standalone item
- *     as-is, or — for a series entirely outside the window — a synthetic
- *     occurrence built from the series' own anchor date (RepeatPattern isn't
- *     itself an Occurrence, so expandRange can't hand us one).
+ *  4. Most-recent past event, within the back window.
+ *  5. Latest done occurrence (past or future). The past half reuses the same
+ *     back window; the future half is reached only when rules 1-4 all missed
+ *     (the file's entire content is completed) and materialises the forward
+ *     window rather than seeking it, because "latest" is extremal-*last* —
+ *     not something a first-ascending-match seek can answer.
+ *  6. Fallback for keys with nothing found: the first standalone item as-is,
+ *     or — for a series entirely outside the window — a synthetic occurrence
+ *     built from the series' own anchor date (RepeatPattern isn't itself an
+ *     Occurrence, so expandRange can't hand us one).
  */
 function resolveOneKey(
   entryKey: EntryKey,
   keyItems: StoreItem[],
   roots: Roots,
   now: Date,
-  AHEAD: Date,
-  BACK: Date,
 ): Occurrence | null {
-  const nowMs    = now.getTime()
-  const inWindow = expandRange(keyItems, roots, BACK, AHEAD) // ascending by time
+  const nowMs = now.getTime()
+  const AHEAD = addDays(now, FORWARD_HORIZON_DAYS)
+  const BACK  = addDays(now, -OVERDUE_LOOKBACK_DAYS)
+
+  // Rules 2 (overdue half), 4 and 5 (past half) all read from this one fixed,
+  // cheap-to-materialise window rather than each re-expanding their own.
+  const backWindow = expandRange(keyItems, roots, BACK, now) // ascending by time
 
   // 1. Nearest upcoming event.
-  const futureEvent = inWindow.find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs)
+  const futureEvent = firstOccurrenceFrom(keyItems, roots, now, AHEAD,
+    o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) >= nowMs)
   if (futureEvent) return futureEvent
 
   // 2. Earliest undone scheduled task.
-  const earliestTask = inWindow.find(o => occKind(o) === 'task' && !o.metadata.done)
+  const isUndoneTask = (o: Occurrence): boolean => occKind(o) === 'task' && !o.metadata.done
+  const overdueTask  = backWindow.find(isUndoneTask)
+  const earliestTask = overdueTask ?? firstOccurrenceFrom(keyItems, roots, now, AHEAD, isUndoneTask)
   if (earliestTask) return earliestTask
 
   // 3. Undone unscheduled (undated) standalone task.
@@ -92,11 +113,13 @@ function resolveOneKey(
   }
 
   // 4. Most-recent past event.
-  const pastEvent = [...inWindow].reverse().find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) < nowMs)
+  const pastEvent = [...backWindow].reverse().find(o => occKind(o) === 'event' && (o.metadata.jsTime?.getTime() ?? 0) < nowMs)
   if (pastEvent) return pastEvent
 
   // 5. Latest done occurrence.
-  const latestDone = [...inWindow].reverse().find(o => o.metadata.done === true)
+  const isDone     = (o: Occurrence): boolean => o.metadata.done === true
+  const pastDone   = [...backWindow].reverse().find(isDone)
+  const latestDone = pastDone ?? [...expandRange(keyItems, roots, now, AHEAD)].reverse().find(isDone)
   if (latestDone) return latestDone
 
   // 6. Fallback: standalone as-is, or a synthesized anchor for an out-of-window series.
@@ -140,9 +163,7 @@ export function updateFileOccurrenceMap(
   entries:     Entries,
   roots:       Roots,
 ): Map<EntryKey, Occurrence> {
-  const now   = startOfToday()
-  const AHEAD = new Date(now.getTime() + _3YR_MS)
-  const BACK  = new Date(now.getTime() - _3YR_MS)
+  const now = startOfToday()
 
   const map = new Map<EntryKey, Occurrence>()
   for (const [key, entry] of entries) {
@@ -151,7 +172,7 @@ export function updateFileOccurrenceMap(
       if (cached !== undefined) { map.set(key, cached); continue }
     }
 
-    const occ = resolveOneKey(key, entry.items, roots, now, AHEAD, BACK)
+    const occ = resolveOneKey(key, entry.items, roots, now)
     if (occ) map.set(key, occ)
   }
 

@@ -1,22 +1,10 @@
 import type { StoreItem, Roots, Occurrence } from '@/types'
 import { isSeries, isTracked } from '@/types'
 import { addDays } from '@/format'
-import { dayRange, expandWithMultiday } from '@/model'
+import { dayRange, expandWithMultiday, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { occKind } from '@/occView'
 import { sortOccs } from './occSort'
 import type { FilterOccs } from './agendaSections'
-
-/**
- * How far back the overdue pass expands.
- *
- * Deliberately its own constant, not the agenda's window: overdue tasks can be
- * arbitrarily old (this is why the agenda window was widened from 7 to 365 days
- * in the first place), whereas the agenda itself is a near-term view whose span
- * is about to start moving with the user's scrolling. The two used to be the
- * same number meaning three different things — see agendaSections.ts's
- * WALK_PAST_DAYS/WALK_FUTURE_DAYS for the other two.
- */
-export const OVERDUE_LOOKBACK_DAYS = 365
 
 /** A past-dated, undone task occurrence — the agenda's definition of overdue. */
 const isOverdue = (o: Occurrence): boolean => occKind(o) === 'task' && !o.metadata.done

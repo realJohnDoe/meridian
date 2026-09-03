@@ -34,8 +34,8 @@ export const CHUNK_DAYS = 28
  * ahead than a season belongs in month view rather than in an endlessly
  * scrolling list. It reaches further back because a scrolled-past day is
  * cheaper to keep than to explain, *not* because overdue work lives there —
- * that is overduePool.ts's OVERDUE_LOOKBACK_DAYS, which is a separate number
- * with a separate reason to change.
+ * that is `@/model`'s OVERDUE_LOOKBACK_DAYS (read by overduePool.ts), which is
+ * a separate number with a separate reason to change.
  *
  * There used to be a third pair, WALK_PAST_DAYS/WALK_FUTURE_DAYS, for the
  * day-by-day render walk, plus a test asserting the expansion covered it — a
