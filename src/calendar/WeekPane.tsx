@@ -42,8 +42,7 @@ interface LiveWeekAllDayStripProps {
 // empty) when there's nothing to show, so a skeleton pane looks exactly like
 // a live pane that happens to have no all-day content this week — the one
 // case this doesn't cover, a skeleton pane for a week that *does* have
-// all-day content, briefly shows a shorter header until it goes live. See
-// plans/calendar-swipe-cheap-panes.md.
+// all-day content, briefly shows a shorter header until it goes live.
 function LiveWeekAllDayStrip({ weekStart, days, clockValue, onOpen, allDayExpanded, setAllDayExpanded }: LiveWeekAllDayStripProps) {
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
