@@ -158,6 +158,17 @@ describe('computeExpansionCache', () => {
     expect(second.allOccs.find(o => o.id === 'b')?.metadata.title).toBe('Note B')
   })
 
+  it('returns prev by reference, skipping the overlay walk entirely, when items and roots are both unchanged', () => {
+    const a = occ({ id: 'a', entryKey: keyOf('note-a.md'), date: '2026-06-01' })
+    const items = [a]
+    const roots = rootsOf([['note-a.md', { title: 'Title', tags: [], items: [] }]])
+
+    const first = computeExpansionCache(null, items, roots, from, to)
+    const second = computeExpansionCache(first, items, roots, from, to)
+
+    expect(second).toBe(first)
+  })
+
   it('returns the same allOccs reference when neither items nor roots entries changed', () => {
     const a = occ({ id: 'a', entryKey: keyOf('note-a.md'), date: '2026-06-01' })
     const items = [a]

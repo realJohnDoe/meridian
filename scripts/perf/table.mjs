@@ -45,6 +45,14 @@ table('UI flows (ms to painted effect)', ['vault', 'vault paint', 'blocking (loa
       n(u.scroll?.p50), n(u.scroll?.p95), n(u.scroll?.janky), n(u.mountedRows)]
   }))
 
+table('Long animation frames (scroll)', ['vault', 'LoAF count', 'blocking ms', 'style+layout ms', 'top script'],
+  runs.map(r => {
+    const loaf = ui(r).scroll?.loaf
+    const top = loaf?.topScripts?.[0]
+    return [label(r), n(loaf?.frames), n(loaf?.blockingMs), n(loaf?.styleAndLayoutMs),
+      top ? `${top.script} (${top.ms} ms)` : n(null)]
+  }))
+
 table('Memory (MB of JS heap) and Dexie', ['vault', 'heap after load', 'heap after flows', 'DOM nodes', 'dexie write', 'dexie readAll', 'dirty scan', 'IDB usage', 'quota'],
   runs.map(r => [label(r), n(ui(r).afterLoad?.heapUsedMB), n(ui(r).afterFlows?.heapUsedMB), n(ui(r).afterLoad?.nodes),
     n(dx(r).writeMs), n(dx(r).readAllMs), n(dx(r).dirtyScanMs), n(dx(r).usageMB), n(dx(r).quotaMB)]))
