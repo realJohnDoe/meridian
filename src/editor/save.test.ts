@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
-import { applyScope, entryFromOccurrence, saveNode } from './save'
+import { describe, it, expect, vi } from 'vitest'
+import { applyScope, entryFromOccurrence, saveNode, deleteNode, archiveEntry } from './save'
+import type { SeriesSheetConfig } from './save'
 import { makeOcc, makeSeries, setupStore, installFakePersistence, seedStore, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { useStore } from '@/store'
 import { entryKey } from '@/fileIO'
@@ -266,5 +267,80 @@ describe('saveNode — writes only the fields the editor changed', () => {
     saveNode(occ, 'single', { ...base, priority: 'high' }, { base })
 
     expect(storedBody()).toBe('some text')
+  })
+})
+
+// plans/archived-entries.md PR 2 — archiving via the editor and its delete
+// dialogs. The store op itself (setArchived) is pinned in
+// model/__tests__/setArchived.test.ts; these cover the write path
+// (persisted content, not just store state) and deleteNode's wiring.
+describe('archiveEntry', () => {
+  setupStore()
+  const persistence = installFakePersistence()
+
+  it('archiving writes archived: true to the file', () => {
+    const occ = makeOcc({ entryKey: testKey('solo'), metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', participants: [], title: 'Solo note', tags: [], items: [] } })
+    seedStore([occ], makeRoots('solo', { title: 'Solo note' }))
+
+    archiveEntry(testKey('solo'), true)
+
+    expect(useStore.getState().roots.get(testKey('solo'))?.archived).toBe(true)
+    expect(persistence.contentByKey.get(testKey('solo'))).toContain('archived: true')
+  })
+
+  // The trap PR 1 pinned at the registry level (round-trip-totality.test.ts):
+  // clearing must never round-trip as a written `archived: false`.
+  it('unarchiving writes no archived key at all', () => {
+    const occ = makeOcc({ entryKey: testKey('solo'), metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', participants: [], title: 'Solo note', tags: [], items: [], archived: true } })
+    seedStore([occ], makeRoots('solo', { title: 'Solo note', archived: true }))
+
+    archiveEntry(testKey('solo'), false)
+
+    expect(useStore.getState().roots.get(testKey('solo'))?.archived).toBeUndefined()
+    expect(persistence.contentByKey.get(testKey('solo'))).not.toContain('archived')
+  })
+})
+
+describe('deleteNode — archiving instead of deleting', () => {
+  setupStore()
+  installFakePersistence()
+
+  it('single-entry path (no siblings, not recurring): archives without navigating away', () => {
+    const occ = makeOcc({ entryKey: testKey('solo'), id: 'solo-1', metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', participants: [], title: 'Solo note', tags: [], items: [] } })
+    seedStore([occ], makeRoots('solo', { title: 'Solo note' }))
+
+    const navigateBack = vi.fn()
+    let captured: { title: string; onConfirm: () => void; onArchive: () => void } | undefined
+    deleteNode(occ, navigateBack, undefined, undefined, (title, onConfirm, onArchive) => {
+      captured = { title, onConfirm, onArchive }
+    })
+
+    expect(captured?.title).toBe('Solo note')
+    captured!.onArchive()
+
+    expect(useStore.getState().roots.get(testKey('solo'))?.archived).toBe(true)
+    // Unlike a real delete (doDelete), archiving leaves the entry — and the
+    // editor showing it — right where it was.
+    expect(navigateBack).not.toHaveBeenCalled()
+    expect(useStore.getState().items.some(i => i.id === 'solo-1')).toBe(true)
+  })
+
+  it('multi-item file path: the series sheet\'s archive option archives the WHOLE file, not one occurrence', () => {
+    const occA = makeOcc({ entryKey: testKey('multi'), id: 'multi-a', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', participants: [], title: 'Task A', tags: [], items: [], done: false } })
+    const occB = makeOcc({ entryKey: testKey('multi'), id: 'multi-b', date: '2026-06-16', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', participants: [], title: 'Task A', tags: [], items: [], done: false } })
+    seedStore([occA, occB], makeRoots('multi', { title: 'Task A' }))
+
+    let config: SeriesSheetConfig | undefined
+    deleteNode(occA, vi.fn(), c => { config = c }, vi.fn())
+
+    // It's the multi-item (sibling) branch, not a lone standalone — confirms
+    // the fixture actually reaches onShowSeries rather than onConfirmSingle.
+    expect(config).toBeDefined()
+    expect(config!.onArchive).toBeDefined()
+    config!.onArchive!()
+
+    expect(useStore.getState().roots.get(testKey('multi'))?.archived).toBe(true)
+    // Both occurrences are still there — archiving is not a delete of any kind.
+    expect(useStore.getState().items.map(i => i.id).sort()).toEqual(['multi-a', 'multi-b'])
   })
 })

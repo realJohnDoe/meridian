@@ -123,6 +123,10 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
   // directly in move-entry.test.ts instead; the items keep their ids, so their
   // bags are checked by the property exactly as for any other operation.
   moveEntryKey: d => storeOps.moveEntryKey(d, [...rootsIn(d).keys()][0]!, entryKey('other-vault', 'moved')),
+  // Rebuilds the root by spreading it and touching only `archived` — the
+  // property test's own way of confirming that spread is real and not, say,
+  // a field-by-field reconstruction that happens to list `extra` today.
+  setArchived: d => storeOps.setArchived(d, [...rootsIn(d).keys()][0]!, true),
 }
 
 /**

@@ -73,7 +73,7 @@ describe('useEntryDialogs', () => {
 
   it('setSeriesSheetConfig / handleDeleteClose drive the delete + series-sheet state', () => {
     const { result } = setup()
-    act(() => result.current.setPendingDelete({ title: 'Note', onConfirm: () => {} }))
+    act(() => result.current.setPendingDelete({ title: 'Note', onConfirm: () => {}, onArchive: () => {} }))
     expect(result.current.dialogHandlers.pendingDelete?.title).toBe('Note')
 
     act(() => result.current.dialogHandlers.onDeleteClose())

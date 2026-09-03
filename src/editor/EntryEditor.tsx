@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { EditorView } from '@codemirror/view'
-import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Info } from 'lucide-react'
+import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Info, Archive } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import type { SeriesContext } from '@/model'
 import { PRIORITY_LABELS } from '@/occView'
@@ -106,6 +106,8 @@ export interface EntryEditorHooks {
   handleScopeChange: (scope: EditScope) => void
   handleTypeChange: (t: ItemType) => void
   handleDoneToggle: () => void
+  /** Clears `archived` on this entry — the archived banner's Unarchive button. */
+  handleUnarchive: () => void
   /** Null when the caller has nowhere to navigate a wikilink to (the debug page's scratch entry isn't part of a real vault). */
   handleOpenWikilink: ((ref: string) => void) | null
   handleToggleDoneBacklink: (occ: Occurrence) => void
@@ -130,7 +132,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
     pendingLinks, handleCreateList, dialogHandlers,
     setEntry, handleSave, handleOpenDlg, handleOpenRepeatDlg, handlePromoteTask,
     scheduleAutoSave, saveMeta, handleScopeChange, handleTypeChange, handleDoneToggle,
-    handleOpenWikilink, handleToggleDoneBacklink, titleMissing, focusTitleTick,
+    handleUnarchive, handleOpenWikilink, handleToggleDoneBacklink, titleMissing, focusTitleTick,
   } = hooks
   // ListedOnRow/EntryBody/ItemsList props are `?:`, not `| null` — coalesce once here.
   const openWikilink = handleOpenWikilink ?? undefined
@@ -180,9 +182,30 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
 
   const showScopeRow = isRecurring || hasSched
 
+  // Archived state lives on the file root, not the occurrence — reading it
+  // this way (rather than occ.metadata.archived) is what keeps this correct
+  // even for a generated occurrence with no override of its own, and while
+  // `effectiveKey` is still undefined for a brand-new, never-saved entry
+  // (which can't be archived yet either).
+  const archived = !!(effectiveKey && roots.get(effectiveKey)?.archived)
+
   return (
     <section className="flex-1 min-h-0 flex flex-col">
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-3xl lg:mx-auto">
+
+        {archived && (
+          <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 mb-3 text-xs text-warning">
+            <Archive size={14} className="shrink-0" />
+            <span className="flex-1">Archived — hidden from the calendar and search.</span>
+            <button
+              type="button"
+              className={cn(badgeVariants({ variant: 'chip' }), 'shrink-0 text-warning')}
+              onClick={handleUnarchive}
+            >
+              Unarchive
+            </button>
+          </div>
+        )}
 
         {readOnlyVault && (
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 mb-3 text-xs text-muted-foreground">
