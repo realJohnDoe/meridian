@@ -74,11 +74,11 @@
   --color-priority-2-foreground: var(--priority-2-foreground);
   --color-priority-3-foreground: var(--priority-3-foreground);
   /* Ink for any low-opacity color-tinted chip (priority chip, type toggle,
-     wikilink/topic chips, the shared "pressed" chip tint) — bg-{color}/15
-     barely moves a surface's own lightness, so which ink wins depends on
-     the theme's own dark/light character, not on which hue is tinted in;
+     wikilink/topic chips, the shared "pressed" chip tint) — bg-{color}/30
+     still doesn't flip a surface's own lightness, so which ink wins depends
+     on the theme's own dark/light character, not on which hue is tinted in;
      every domain color within a theme picks the same one (verified: all
-     seven swatches land on the same ink at 15% over --secondary/--card/
+     seven swatches land on the same ink at 30% over --secondary/--card/
      --background in every theme). See each theme block for its pick. */
   --color-chip-tint-foreground: var(--chip-tint-foreground);
   /* Surface for past/done */
@@ -184,8 +184,8 @@
   --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground above. Verified 6.2–9.9:1 across every
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground above. Verified 6.9–12.0:1 across every
      domain color here. */
   --chip-tint-foreground: var(--ink-light);
 
@@ -339,8 +339,8 @@
   --priority-2-foreground: var(--ink-dark);
   --priority-3-foreground: var(--ink-dark);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground in the @theme block. Verified 4.9–17.6:1
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground in the @theme block. Verified 9.9–15.6:1
      across every domain color here. */
   --chip-tint-foreground: var(--ink-dark);
 
@@ -430,8 +430,8 @@
   --priority-2-foreground: var(--ink-dark);
   --priority-3-foreground: var(--ink-dark);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground in the @theme block. Verified 5.9–9.1:1. */
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground in the @theme block. Verified 6.8–10.0:1. */
   --chip-tint-foreground: var(--ink-light);
 
   /* Sidebar */
@@ -517,8 +517,8 @@
   --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground in the @theme block. Verified 12.9–14.9:1. */
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground in the @theme block. Verified 9.2–13.5:1. */
   --chip-tint-foreground: var(--ink-dark);
 
   /* Sidebar */
@@ -611,8 +611,8 @@
   --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-light);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground in the @theme block. Verified 15.3–17.5:1. */
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground in the @theme block. Verified 11.3–14.5:1. */
   --chip-tint-foreground: var(--ink-dark);
 
   /* Sidebar */
@@ -706,8 +706,8 @@
   --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-light);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground in the @theme block. Verified 7.2–10.4:1. */
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground in the @theme block. Verified 6.7–11.7:1. */
   --chip-tint-foreground: var(--ink-light);
 
   /* Sidebar */
@@ -789,8 +789,8 @@
   --priority-2-foreground: var(--ink-dark);
   --priority-3-foreground: var(--ink-dark);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground in the @theme block. Verified 4.8–8.8:1. */
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground in the @theme block. Verified 4.9–10.6:1. */
   --chip-tint-foreground: var(--ink-light);
 
   /* Sidebar */
@@ -880,8 +880,8 @@
   --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground in the @theme block. Verified 13.6–16.6:1. */
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground in the @theme block. Verified 9.3–15.4:1. */
   --chip-tint-foreground: var(--ink-dark);
 
   /* Sidebar */
@@ -970,8 +970,8 @@
   --priority-2-foreground: var(--ink-dark);
   --priority-3-foreground: var(--ink-dark);
 
-  /* Ink for any bg-{color}/15 tinted chip — see the shared comment on
-     --color-chip-tint-foreground in the @theme block. Verified 5.3–7.8:1. */
+  /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
+     --color-chip-tint-foreground in the @theme block. Verified 4.9–8.6:1. */
   --chip-tint-foreground: var(--ink-light);
 
   /* Sidebar */
