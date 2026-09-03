@@ -51,8 +51,9 @@ export function fileEntries(roots: Roots, vaultId?: string): FilePickerEntry[] {
 
 /**
  * Forward reach of rules 1, 2 and 5 below — unchanged in magnitude from the
- * old ±3yr window (see the vault-scaling results' "series whose only
- * occurrences fall beyond the forward horizon" behaviour note). It no longer
+ * old ±3yr window; a series whose only occurrences fall beyond it still lands
+ * on rule 6's synthetic anchor, pinned by its own test in
+ * `model/__tests__/linking.test.ts`. It no longer
  * costs materialising the window: rules 1 and 2's forward half seek lazily
  * via `firstOccurrenceFrom` and bail at the first match, and rule 5's forward
  * half is only ever reached for the rare fully-completed file.

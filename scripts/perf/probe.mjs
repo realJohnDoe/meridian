@@ -70,7 +70,7 @@ window.__perf = (() => {
    * timeoutMs total elapses — whichever comes first. LoAF, not longtask, is
    * the signal: it's what actually captured the cold-start confounds (idle
    * warm-up, Dexie's cache write) a scroll-flow profile ran into (finding 4,
-   * plans/vault-scaling-results.md) as attributed entries, including bursts
+   * plans/surveys/vault-scaling.md) as attributed entries, including bursts
    * of individually-short callbacks that never cross the longtask
    * threshold. Meant to run right before a flow that wants to measure
    * steady-state cost rather than whatever cold-start work is still

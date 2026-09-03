@@ -8,10 +8,11 @@ runs out._
 
 This is a finished measurement report, like `storage-backend.md` — not a
 runnable survey template, and not a to-do list. The **findings it produced**
-live in `plans/vault-scaling-results.md`, which is a checklist and gets
-deleted as they are fixed; what stays here is the method, the curves, and the
-two structural answers, which remain true of the architecture until someone
-changes it.
+lived in `plans/vault-scaling-results.md`, a checklist that was deleted as
+they closed out; now that it is gone, "Where the findings went" at the end of
+this file records what happened to each of the six. What stays here otherwise
+is the method, the curves, and the two structural answers, which remain true
+of the architecture until someone changes it.
 
 **Keeping this current.** Fixing any finding invalidates specific rows, not
 the report: re-run the harness (see the end) and replace the affected numbers,
@@ -210,8 +211,8 @@ have opposite answers.
 environment. Reads are fast and stay file-linear: `cacheLoadAll` is 489 ms for
 30 000 rows and the `dirty` scan 909 ms. Dexie is not the problem at any size
 tested. Its one weak spot is the **write**: `applyRemoteBatch` takes 21.3 s for
-30 000 rows in a single transaction — finding #6 in
-`plans/vault-scaling-results.md`.
+30 000 rows in a single transaction — finding #6, deferred rather than fixed
+(see "Where the findings went").
 
 **The JS heap is the real ceiling, and it is not holding vault content.**
 Per-stage heap, taken after a forced GC (`--js-flags=--expose-gc`), as a delta
@@ -267,40 +268,225 @@ node scripts/perf/stress.mjs --shapes mixed,flat --sizes 300,1000,3000,10000,300
 node scripts/perf/table.mjs scripts/perf/results/<file>.json
 ```
 
-This reproduces every column except the four noted above. The harness retires
-when the last finding closes — see `plans/vault-scaling-results.md`.
+This reproduces every column except the four noted above.
+
+**The harness stays, even though the checklist is gone.** Its retirement was
+scoped to close with the last finding, on the assumption every finding would
+be fixed; three were deferred instead (#4, #5, #6 below), and the "pick it up
+if the symptom shows" plan for each of them *is* a `stress.mjs` invocation.
+Deleting `scripts/perf/` would strand all three. Nothing in CI runs it, so it
+can still rot — treat a re-run that fails to launch as expected maintenance,
+not as a reason to distrust the numbers above. Its build-tooling footprint
+stays where it is: the `scripts/perf/results/` line in `.gitignore`, plus the
+two `knip.json` allowances documented in `scripts/perf/README.md`.
 
 `scripts/perf/README.md` documents the phases, the dev-server caveats, and two
 timing traps that cost a day each (a garbage-collected `MutationObserver`, and
 `keyboard.type` outrunning the search debounce).
 
-## Note on the planned infinite-scroll change
+## The infinite-scroll change has landed
 
-A move to a standard infinite-scroll agenda is planned. It does not change any
-measurement here — the curves describe the architecture as measured on
-2026-08-28 — but it does change which findings are separately actionable, and
-three properties of the current code constrain how it can be built (the
-exact-window gate on the expansion cache, the section cache's positional
-alignment, and the overdue header's exact count). Those are written up in
-`plans/vault-scaling-results.md`. Once that change lands, the cold-start,
-toggle and scroll rows here are the ones to re-measure first.
+Every number above predates it. The agenda no longer expands its whole
+±455-day window before first paint: it loads in chunks and grows the loaded
+run forward as the user scrolls (`useAgendaChunks`,
+`growAgendaLoadedChunksForward` in `calendar/viewState.ts`). That was
+finding #1's fix; finding #2's landed shortly after it.
+
+The curves above still describe the architecture as measured on 2026-08-28
+against `54ab5cb`, which is what makes them a usable *baseline* — but they are
+now pre-fix for the three rows those two fixes touch. **Only the scroll row
+has been re-measured against both** (see finding #4 below, which is where the
+newer numbers live). `coldStart.vaultPaintMs` was re-measured after #1 alone
+and had not moved — 13 521 ms at mixed/30 000, because the bottleneck had
+shifted to #2's warm-up — and `toggle` has not been re-measured at all, so the
+13 s paint / 7.3 s toggle there are upper bounds of unknown tightness. Both come out of the same `stress.mjs` run as the scroll
+figures, so one command produces all three:
+
+```bash
+node scripts/perf/stress.mjs --sizes 3000,10000,30000 --skip-pipeline --skip-dexie
+```
+
+That re-measurement is also the gate on finding #4's deferral — see below.
 
 ## Where the findings went
 
 Six findings came out of this run, ranked, each with the baseline and the
-re-runnable recipe that produced it: see `plans/vault-scaling-results.md`.
-That file is a checklist — entries are removed as they are fixed and the file
-is deleted once the last one closes, per `plans/CLAUDE.md`.
+re-runnable recipe that produced it. They lived in
+`plans/vault-scaling-results.md`, a checklist per `plans/CLAUDE.md`;
+**that file was deleted on 2026-09-03** when the last of them left it, so this
+section is now the only record of what happened to each.
 
-Two of the six left it without being fixed. Findings **5** (`parseFiles` is a
-synchronous loop on the first-paint path) and **6** (`applyRemoteBatch` writes
-a whole vault in one transaction) were **deferred on 2026-09-03** — not
-closed. Both are real and both are still measured here; they were dropped from
-the checklist because their symptoms are visible and self-attributing at the
-sizes where they bite (a slow cold start, a hang on first connect), so they
-can be picked up if and when that happens rather than held open. Their
-baselines and recipes are the `parse` and `applyRemoteBatch` rows above.
+| # | Finding | Outcome |
+|---|---|---|
+| 1 | The agenda expands its whole ±455-day window before first paint | **Fixed** — incremental chunk loading, see "The infinite-scroll change has landed" |
+| 2 | `fileOccurrenceMap` expands ±3 years to pick one occurrence per file | **Fixed** — `firstOccurrenceFrom`'s lazy per-key seek, plus two follow-ups found while profiling #4 |
+| 3 | `computeExpansionCache` re-allocates the whole occurrence array on every metadata edit | **Fixed** — the structural-reuse fast path and metadata overlay in `model/expansionCache.ts` |
+| 4 | Scroll cost grows with vault size although mounted rows stay constant | **Deferred 2026-09-03, diagnosis complete** — see below |
+| 5 | `parseFiles` is a synchronous loop on the first-paint path | **Deferred 2026-09-03** |
+| 6 | `applyRemoteBatch` writes 30 000 rows in one transaction (21 s) | **Deferred 2026-09-03** |
 
-So a missing checklist means findings 1–4 were closed and 5–6 were deferred,
-not that all six were fixed. Either way this report's numbers are then the
-*pre-fix* baselines and want re-measuring.
+**Deferred is not closed, and not invalid.** All three deferrals apply the same
+criterion: the symptom is visible and self-attributing at the sizes where it
+bites — a slow cold start (#5), a hang on first connect (#6), visible scroll
+jank (#4) — so each can be picked up if and when that happens rather than held
+open indefinitely. Every baseline above is the pre-fix measurement, and the
+recipes are `stress.mjs` invocations, which is why the harness outlives the
+checklist (see "Re-running"). #5 and #6 want the `parse` and `applyRemoteBatch`
+rows; #4 has its own numbers below.
+
+### Finding #4 — deferred with the diagnosis complete
+
+Kept in full because the expensive half is done. Four profile passes, two
+harness confounds and two incidental `fileOccurrenceMap` bugs stand between
+the original suspicion and the confirmed cause below; what remains is
+implementation, against a component with a history of being got wrong. Anyone
+picking this up should not need to re-derive any of it.
+
+**Symptom.** Scroll frame cost grows with vault size while mounted rows hold
+at 26. Latest baseline, at `--sizes 3000,30000`: p50 frame interval while
+scrolling 30 × 900 px is **33.3 ms at mixed/3 000 and 99.9 ms at mixed/30 000**
+(worst 50.1 / 116.7–133.4 ms; janky frames 1/30 → 30/30). Two runs agreed to
+0.1 ms at p50, so this is stable rather than a one-off. At mixed/3 000 the
+settled reading is **0 LoAF frames and 0 ms blocking** on one run and
+4 frames / 17.6 ms on the other — scrolling 3 000 files barely registers.
+For scale, the original pre-incremental-loading baseline was 33.4 → 200 ms, a
+6× jump for the same 10× file-count move; it is now 2.7×, smaller in absolute
+terms and a flatter curve, but not gone.
+
+**Recipe.**
+
+```bash
+node scripts/perf/stress.mjs --sizes 3000,30000 --skip-pipeline --skip-dexie
+```
+
+Read `ui.scroll` (which carries a `loaf` attribution and a `settled` field —
+`scripts/perf/table.mjs` renders both under "Long animation frames (scroll)")
+and `ui.mountedRows`.
+
+**Confirmed cause: TanStack Virtual's measurement rebuild.** Rows are
+dynamically measured (`ref={virtualizer.measureElement}`,
+`src/components/primitives/virtual-rows.tsx:41`). The virtualizer rebuilds its
+`measurements` array from the lowest pending measured index through `count`
+whenever a row measures differently from its `estimateSize` — which
+`useVirtualFlip`'s own doc comment says "happens constantly while scrolling
+through not-yet-measured rows". `count` is `rows.length`
+(`calendar/AgendaView.tsx:106`), i.e. the *loaded run*, not the vault.
+
+The evidence is direct measurement, not inference. In the settled profile at
+mixed/30 000, `DIV.onscroll` (the virtualizer's own scroll handler) is the
+single largest attributed script at ~1.6 s across 30 steps, with React commit
+(`MessagePort.onmessage`) adding ~0.7 s; together ~77–80 ms/step against an
+observed 99.9 ms p50. It effectively vanishes at mixed/3 000, where row count —
+not mounted rows, not file count — drops by an order of magnitude.
+Style and layout recalc stayed negligible (15–19 ms summed across all LoAF
+entries) at every size in every pass, so the "measurement rebuild is a layout
+cost" half of the original theory never held; the "it is a *script* cost
+proportional to row count" half does.
+
+That per-row constant is the useful number: ~1.6 s over 30 steps at ~163 k
+loaded rows is roughly **0.33 µs/row/scroll-event in dev**, which puts a
+fully-loaded mixed/3 000 run (~18 k rows) near 6 ms/event and mixed/10 000
+(~65 k) near 21 ms. Dev-React overhead is perhaps 2×, per "What was measured".
+
+**Why deferred.** Not because it is small — 99.9 ms p50 with 30/30 janky
+frames is ~10 fps. Because the arithmetic above puts the first size where
+scroll *alone* breaks a frame budget at ~30 000 files at the default mix, and
+at that size "Where it stops being usable" already has 13 s to paint and 7.3 s
+to toggle a checkbox. Smooth scrolling in an app that takes seconds to tick a
+task is not a user-visible win, and the structural cause of the rest (eager
+full-window expansion) is not a finding anyone can pick up any more.
+
+**The gate on that reasoning**, and the first thing to re-check before
+accepting it: those paint and toggle figures are the 2026-08-28 baselines, and
+findings #1 and #2 have landed since. `vaultPaintMs` was re-measured once
+after #1 alone (13 521 ms at mixed/30 000 — unchanged, because the bottleneck
+had moved to #2's warm-up) but neither it nor `toggle` has been measured since
+#2 was fixed. The recipe above produces `ui.coldStart` and `ui.toggle` in the
+same run. **If toggle at mixed/10 000 is now a few hundred ms rather than
+seconds, scroll becomes the first flow to break and this finding should be
+re-tiered upward immediately.**
+
+**Ruled out by inspection — do not re-investigate without new evidence.**
+
+- *Row mounting* — 26 mounted rows at both sizes, measured.
+- *`computeOverduePool`* (`calendar/overduePool.ts:128`) — identity-cached on
+  `items`/`roots`/`todayMs`/`filterOccs`, and `filterOccs` is a `useCallback`
+  over three store values that do not change while scrolling. Hits its cache.
+- *`hasSameStructure`* (`model/expansionCache.ts:82`) — opens with
+  `if (a === b) return true`, so it is O(1) during scroll.
+- *`useAgendaChunks`'s run memo* — works; it compares each chunk's `allOccs`
+  rather than the `ExpansionCache` wrapper, deliberately, because the wrapper
+  is reallocated even on a no-op.
+- *Store-write fan-out from `setAgendaTopDate`* — it does reach `_app.tsx`,
+  `Sidebar` and `SearchBar`, but only on a **day-boundary crossing**, and
+  crossings get *rarer* as the vault grows (~408 agenda rows per day at
+  mixed/30 000 against ~40 at mixed/3 000, so 900 px crosses a boundary
+  constantly at 3 000 and almost never at 30 000). It cannot produce a cost
+  that grows with vault size. This disconfirmed the `items`/`roots` "prime
+  suspect" the finding originally named.
+
+**Already landed, and not to be redone.** Four things shipped while
+diagnosing this, all still in the tree:
+
+1. `stress.mjs`'s scroll flow brackets its loop with a Long Animation Frames
+   observer, reporting top attributed scripts plus `blockingMs` and
+   `styleAndLayoutMs` as `ui.scroll.loaf`.
+2. `computeExpansionCache` returns `prev` by reference when `items` and
+   `roots` are both unchanged (`model/expansionCache.ts:139`), immediately
+   after the `hasSameStructure` gate. Its fast path previously did an
+   unguarded O(items) walk even on a true no-op, while the very next block
+   already guarded its `roots` equivalent — and AgendaView re-renders on every
+   scroll event by design (its comment at `calendar/AgendaView.tsx:280`), so
+   that walk ran once per loaded chunk per scroll event.
+3. Two real `fileOccurrenceMap` bugs, found by profiling this finding rather
+   than from the original plan: `resolveOneKey` computed its 365-day back
+   window eagerly even when rule 1 resolved first and never touched it, and
+   `expandRange`/`firstOccurrenceFrom` each built their own `ItemIndex` over
+   the same `keyItems`. Both fixed. The larger of the two was
+   `firstOccurrenceFrom`'s contract: an unmatched predicate walks every
+   occurrence to its 3-year horizon before giving up, and rule 1's predicate
+   (`occKind(o) === 'event'`) can never match a task-only series, so every
+   weekly task series — ~7.5% of files at the `mixed` shape — paid ~470 wasted
+   pulls. Both seeks now skip outright when `keyItems` structurally cannot
+   produce a matching kind, checked via `isTracked`, the same primitive
+   `occKind` is built from.
+4. `probe.mjs` keeps one page-lifetime LoAF observer and exposes
+   `__perf.settle(quietMs, timeoutMs)` (default 500 ms quiet, 45 s cap) plus
+   `__perf.loafsIn(t0, t1)`. The scroll flow settles cold-start background
+   work out of the way, then reads only entries inside its own timed window.
+   Reading from the one already-running observer, rather than registering a
+   second one mid-run, is what stops the wait's own work being replayed into
+   the attribution via `{ buffered: true }`.
+
+Items 1 and 4 are why the numbers above are trustworthy and the three earlier
+profile passes were not: those passes were dominated by an
+`IdleRequestCallback` (`fileOccurrenceMap`'s warm-up, 12.8 s) and an
+`IDBRequest.onsuccess` (Dexie's cold-start cache write, 10.9 s) that were
+never part of scrolling at all. With the window right, both are simply absent
+(`settled.waitedMs: 0` — each had already finished) and total attributed time
+fell ~30× while **the frame interval itself did not move** across all four
+passes (83.4–100.1 ms p50). That is the tell that this was never about total
+LoAF time.
+
+**What is actually left.** Two standard mitigations, either of which needs
+designing before it is written:
+
+- **Bound `count`.** The loaded run only ever grows forward within its
+  ±365/+90-day cap (`growAgendaLoadedChunksForward`, `calendar/viewState.ts`),
+  so a sliding window that also drops chunks far behind the viewport is the
+  usual answer. `useAgendaChunks` already has the eviction machinery — its
+  commit-phase `useEffect` drops chunks outside the requested run — so only
+  the run itself needs to shrink.
+- **Make each measurement cheaper**, via `content-visibility: auto` plus
+  `contain: layout style paint` on rows.
+
+**Both are behaviour-visible on a scroll-restore path that has been got wrong
+twice before** (see `computeAgendaScrollRestore`'s own notes). Scope carefully;
+this is not a mechanical follow-up. Worth pricing first, though: `estimateRow`
+(`calendar/agendaSections.ts:94`) is already exact per row kind, so the
+mismatch that triggers the rebuild at all is probably just title wrapping to a
+second line. If that is confirmed, a wrap-aware estimate would be far cheaper
+than either mitigation and touches neither `count` nor scroll restore.
+
+If this is picked up, budget Opus 5 and design the scroll-restore interaction
+before writing the fix.
