@@ -199,8 +199,9 @@ async function measureUI(browser, spec) {
     // 2. Scroll the agenda hard — virtualizer + per-row render cost under load.
     // __perf.settle() waits out whatever cold-start background work (idle
     // warm-up, Dexie's cache write) is still mid-flight before the timed loop
-    // starts — added after finding 4's first profile (plans/vault-scaling-
-    // results.md) showed every prior reading was dominated by exactly that,
+    // starts — added after finding 4's first profile (finding #4 in
+    // plans/surveys/vault-scaling.md) showed every prior reading was
+    // dominated by exactly that,
     // not by scrolling. __perf.loafsIn() then reads the frame's attribution
     // from the one page-lifetime LoAF observer __perf itself keeps (see
     // probe.mjs), windowed to just the timed loop — settling first and

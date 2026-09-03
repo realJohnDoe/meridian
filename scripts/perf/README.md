@@ -57,12 +57,16 @@ Three UI flows, deliberately: cold start, toggling a task, and scrolling the
 agenda. The view switches, search, opening an entry and the CodeMirror
 keystroke measurement were removed — the reasoning is on `measureUI` in
 `stress.mjs`. The `pipeline` and `dexie` phases are untouched and are what
-verify five of the six findings in `plans/vault-scaling-results.md`.
+verify five of the six findings recorded in `plans/surveys/vault-scaling.md`.
 
-**This directory has an expiry.** It exists to verify those findings by
-re-measurement; nothing in CI runs it, so once the last finding closes it
-would rot unnoticed. `plans/vault-scaling-results.md` says to delete it in the
-same PR that deletes that file.
+**This directory outlived its expiry, deliberately.** It existed to verify
+those findings by re-measurement and was scoped to be deleted with the last
+one, on the assumption every finding would be fixed. Three were **deferred**
+instead (#4, #5, #6 — see "Where the findings went" in the report), and the
+plan for picking each of them up later *is* a `stress.mjs` invocation, so
+deleting this directory would strand all three. Nothing in CI runs it, so it
+can still rot unnoticed: if a re-run fails to launch, treat that as expected
+maintenance on an unexercised harness rather than as a signal about the app.
 
 ## Two things `knip.json` carries for this directory
 

@@ -615,7 +615,7 @@ instances:
     expect([...map1.entries()]).toStrictEqual([...map2.entries()])
   })
 
-  // ── bounded-window edge cases (vault-scaling results, finding #2) ──────────
+  // ── bounded-window edge cases (vault-scaling finding #2) ──────────────────
 
   it('a series whose only occurrences fall beyond the forward horizon still lands on rule 6\'s synthetic anchor', () => {
     const farFuture = fmtISO(addYears(new Date(), 5))
