@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest'
+import { addDays, addYears, subMonths } from 'date-fns'
 import { parseToStoreItems } from '@/model/storeItems'
 import { resolveWikilink, buildResolveIndex, unwrapRef } from '@/wikilinks'
 import { fileEntries, buildBacklinkIndex, updateFileOccurrenceMap, fileOccurrenceMap } from '@/fileOccurrence'
 import { toggleDone } from '@/model/storeOps'
 import type { StoreItem, Roots, Occurrence, Entries, Entry } from '@/types'
 import type { StoreData } from '@/model'
+import { firstOccurrenceFrom, expandRange, fmtISO } from '@/model'
 import type { EntryKey } from '@/fileIO'
 import { entryKey } from '@/fileIO'
 import { TEST_VAULT, keyOf, itemsOf, rootsIn } from './helpers'
@@ -307,6 +309,111 @@ describe('buildBacklinkIndex', () => {
   })
 })
 
+// ── firstOccurrenceFrom ───────────────────────────────────────────────────────
+//
+// The bounded seek `fileOccurrence.ts` uses instead of expand-then-filter
+// (vault-scaling survey, finding #2). `FROM`/`HORIZON` are fixed rather than
+// relative to "today", so these tests don't drift with the calendar.
+
+const SEEK_FROM    = new Date('2026-01-01T00:00:00')
+const SEEK_HORIZON = new Date('2027-01-01T00:00:00')
+
+describe('firstOccurrenceFrom', () => {
+  const WEEKLY_YAML = `---
+title: Weekly Meeting
+date: "2025-06-02"
+time: "09:00"
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday: [mo]
+---
+`
+  it('agrees with expandRange + find for an unconditional predicate', () => {
+    const { items, roots } = makeFlat([{ slug: 'weekly', yaml: WEEKLY_YAML }])
+    const got  = firstOccurrenceFrom(items, roots, SEEK_FROM, SEEK_HORIZON, () => true)
+    const want = expandRange(items, roots, SEEK_FROM, SEEK_HORIZON)[0] ?? null
+    expect(got?.date).toBe(want?.date)
+    expect(got?.id).toBe(want?.id)
+  })
+
+  it('returns null when nothing in [from, horizon] matches', () => {
+    const { items, roots } = makeFlat([{ slug: 'weekly', yaml: WEEKLY_YAML }])
+    expect(firstOccurrenceFrom(items, roots, SEEK_FROM, SEEK_HORIZON, o => o.metadata.priority === 'high')).toBeNull()
+  })
+
+  it('honours an override that excludes the nearest slot, skipping to the next one', () => {
+    const yaml = `---
+title: Weekly Meeting
+date: "2025-06-02"
+time: "09:00"
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday: [mo]
+instances:
+  - date: "2026-01-05"
+    excluded: true
+---
+`
+    const { items, roots } = makeFlat([{ slug: 'weekly', yaml }])
+    const got = firstOccurrenceFrom(items, roots, SEEK_FROM, SEEK_HORIZON, () => true)
+    expect(got?.date).toBe('2026-01-12')
+  })
+
+  it('honours an override that changes fields on a generated slot, matching expandRange', () => {
+    const yaml = `---
+title: Weekly Meeting
+date: "2025-06-02"
+time: "09:00"
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday: [mo]
+instances:
+  - date: "2026-01-05"
+    priority: high
+---
+`
+    const { items, roots } = makeFlat([{ slug: 'weekly', yaml }])
+    const got  = firstOccurrenceFrom(items, roots, SEEK_FROM, SEEK_HORIZON, () => true)
+    const want = expandRange(items, roots, SEEK_FROM, SEEK_HORIZON)[0]
+    expect(got?.date).toBe('2026-01-05')
+    expect(got?.metadata.priority).toBe('high')
+    expect(got?.id).toBe(want?.id)
+  })
+
+  it('finds an off-grid override (a moved-in occurrence) ahead of the next generated slot', () => {
+    const yaml = `---
+title: Weekly Meeting
+date: "2025-06-02"
+time: "09:00"
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday: [mo]
+instances:
+  - date: "2026-01-03"
+    priority: high
+---
+`
+    const { items, roots } = makeFlat([{ slug: 'weekly', yaml }])
+    const got = firstOccurrenceFrom(items, roots, SEEK_FROM, SEEK_HORIZON, () => true)
+    expect(got?.date).toBe('2026-01-03')
+    expect(got?.metadata.priority).toBe('high')
+  })
+
+  it('treats a standalone item as a single-element stream, merged with series by jsTime', () => {
+    const { items, roots } = makeFlat([
+      { slug: 'weekly',  yaml: WEEKLY_YAML },
+      { slug: 'earlier', yaml: '---\ntitle: Earlier Note\ndate: "2026-01-02"\n---\n' },
+    ])
+    const got = firstOccurrenceFrom(items, roots, SEEK_FROM, SEEK_HORIZON, () => true)
+    expect(got?.entryKey).toBe(keyOf('earlier'))
+    expect(got?.date).toBe('2026-01-02')
+  })
+})
+
 // ── representative occurrence resolution ─────────────────────────────────────
 //
 // buildFom is a full-rebuild helper used as the oracle for updateFileOccurrenceMap
@@ -506,6 +613,67 @@ instances:
     const map1 = buildFom(data.entries, rootsIn(data))
     const map2 = buildFom(data.entries, rootsIn(data))
     expect([...map1.entries()]).toStrictEqual([...map2.entries()])
+  })
+
+  // ── bounded-window edge cases (vault-scaling results, finding #2) ──────────
+
+  it('a series whose only occurrences fall beyond the forward horizon still lands on rule 6\'s synthetic anchor', () => {
+    const farFuture = fmtISO(addYears(new Date(), 5))
+    const yaml = `---
+title: Distant Future Meeting
+date: "${farFuture}"
+repeat:
+  type: schedule
+  freq: yearly
+---
+`
+    const data = makeStore([{ slug: 'distant-future', yaml }])
+    const map = buildFom(data.entries, rootsIn(data))
+    const occ = map.get(keyOf('distant-future'))
+    expect(occ).toBeDefined()
+    expect(occ!.date).toBe(farFuture)
+    expect(occ!.source).toBe('explicit') // rule 6's synthesized anchor, not a real expansion
+  })
+
+  it('(behaviour change) a file with several events older than OVERDUE_LOOKBACK_DAYS falls to rule 6, returning the first item rather than the most recent', () => {
+    // Both dates sit outside the new 365-day back window but would have been
+    // inside the old ±3yr one — the differential zone this rewrite creates.
+    // The older one is listed first, so rule 6 (first standalone as-is) and
+    // the old rule 4 (most recent past event) disagree on which one wins.
+    const older = fmtISO(addDays(new Date(), -800))
+    const newer = fmtISO(addDays(new Date(), -400))
+    const yaml = `---
+title: Old Events
+instances:
+  - date: "${older}"
+  - date: "${newer}"
+---
+`
+    const data = makeStore([{ slug: 'old-events', yaml }])
+    const map = buildFom(data.entries, rootsIn(data))
+    const occ = map.get(keyOf('old-events'))
+    expect(occ).toBeDefined()
+    expect(occ!.date).toBe(older)
+  })
+
+  it('rule 2 finds an undone task 11 months overdue via the fixed back window', () => {
+    // Within OVERDUE_LOOKBACK_DAYS (365 days), so the back window must catch
+    // it — the case a forward-only seek from `now` would get wrong, since an
+    // overdue task lies in the past relative to `now`.
+    const elevenMonthsAgo = fmtISO(subMonths(new Date(), 11))
+    const yaml = `---
+title: Very Overdue Task
+instances:
+  - date: "${elevenMonthsAgo}"
+    done: false
+---
+`
+    const data = makeStore([{ slug: 'very-overdue', yaml }])
+    const map = buildFom(data.entries, rootsIn(data))
+    const occ = map.get(keyOf('very-overdue'))
+    expect(occ).toBeDefined()
+    expect(occ!.date).toBe(elevenMonthsAgo)
+    expect(occ!.metadata.done).toBe(false)
   })
 })
 

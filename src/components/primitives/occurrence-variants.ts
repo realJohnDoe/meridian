@@ -120,18 +120,22 @@ export const dvBlockVariants = cva('', {
  * matching -foreground ink across every theme. --chip-tint-foreground is
  * verified >=4.5:1 against every domain color's 30%-opacity tint in every
  * theme (see its doc comment in index.css) — same formula as badge.tsx's
- * `chip`/`link` variants. `border-transparent` (not simply omitting a border
- * class) is what actually drops the line: the `Badge` `tag` variant's own
- * `border-[var(--chip-border)]` still applies otherwise.
+ * `chip`/`link` variants. Deliberately doesn't set a border class: a colored
+ * border-{color} doubled up on the tint and read as a ring (see git history),
+ * so this leaves the `Badge` `tag` variant's own `border-[var(--chip-border)]`
+ * in place instead — the same neutral hairline every other occurrence-card
+ * chip (date/time/duration) gets, visible in light themes and transparent in
+ * dark ones. An uncolored chip keeps the plain `Badge` styling, border
+ * included.
  */
 export const HUE_CHIP: Record<OccHue, string> = {
-  event:        'bg-event/30 text-chip-tint-foreground border-transparent',
-  'priority-1': 'bg-priority-1/30 text-chip-tint-foreground border-transparent',
-  'priority-2': 'bg-priority-2/30 text-chip-tint-foreground border-transparent',
-  'priority-3': 'bg-priority-3/30 text-chip-tint-foreground border-transparent',
-  task:         'bg-task/30 text-chip-tint-foreground border-transparent',
-  note:         'bg-note/30 text-chip-tint-foreground border-transparent',
-  neutral:      'bg-muted-foreground/30 text-chip-tint-foreground border-transparent',
+  event:        'bg-event/30 text-chip-tint-foreground',
+  'priority-1': 'bg-priority-1/30 text-chip-tint-foreground',
+  'priority-2': 'bg-priority-2/30 text-chip-tint-foreground',
+  'priority-3': 'bg-priority-3/30 text-chip-tint-foreground',
+  task:         'bg-task/30 text-chip-tint-foreground',
+  note:         'bg-note/30 text-chip-tint-foreground',
+  neutral:      'bg-muted-foreground/30 text-chip-tint-foreground',
 }
 
 /**
