@@ -1,6 +1,7 @@
 import { cva } from 'class-variance-authority'
 import type { Priority } from '@/types'
 import type { OccState } from '@/occView'
+import type { VaultColor } from '@/vaultRef'
 
 /**
  * Shared pattern for active tasks and notes: solid bg-{color} + text-{color}-foreground.
@@ -106,4 +107,32 @@ export const PRIORITY_CLASS: Record<Priority, string> = {
   high:   'aria-[pressed=true]:bg-priority-1/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-1',
   medium: 'aria-[pressed=true]:bg-priority-2/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-2',
   low:    'aria-[pressed=true]:bg-priority-3/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-3',
+}
+
+/**
+ * Maps each `VaultColor` to one of the app's existing domain color tokens —
+ * indigo/red/orange/yellow/green/blue are exactly `event`/`priority-1`/
+ * `priority-2`/`priority-3`/`task`/`note` under different names, so a vault
+ * color introduces no new palette. Same bg-{color}/15 tint + border-{color}
+ * pattern as `PRIORITY_CLASS` above, applied to the vault-source chip shown
+ * on occurrence cards (`OccurrenceCard`) when that vault has a color set; no
+ * color at all keeps the chip's plain `Badge` styling.
+ */
+export const VAULT_COLOR_CHIP: Record<VaultColor, string> = {
+  indigo: 'bg-event/15 text-chip-tint-foreground border-event',
+  red:    'bg-priority-1/15 text-chip-tint-foreground border-priority-1',
+  orange: 'bg-priority-2/15 text-chip-tint-foreground border-priority-2',
+  yellow: 'bg-priority-3/15 text-chip-tint-foreground border-priority-3',
+  green:  'bg-task/15 text-chip-tint-foreground border-task',
+  blue:   'bg-note/15 text-chip-tint-foreground border-note',
+}
+
+/** Solid swatch fill for each `VaultColor`, for the color picker in Settings. */
+export const VAULT_COLOR_SWATCH: Record<VaultColor, string> = {
+  indigo: 'bg-event',
+  red:    'bg-priority-1',
+  orange: 'bg-priority-2',
+  yellow: 'bg-priority-3',
+  green:  'bg-task',
+  blue:   'bg-note',
 }

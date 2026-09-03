@@ -17,11 +17,14 @@ import { readVaultStringArray } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
 import {
-  syncToBackend, removeVault, renameVault, cacheDirtyCount, startGitHubSignIn,
+  syncToBackend, removeVault, renameVault, setVaultColor, cacheDirtyCount, startGitHubSignIn,
   GITHUB_APP_INSTALL_URL, exportVaultIcs,
 } from '@/vaultActions'
 import { ParticipantsRow } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
+import { VAULT_COLORS } from '@/vaultRef'
+import { VAULT_COLOR_SWATCH } from '@/components/primitives/occurrence-variants'
+import { cn } from '@/lib/cn'
 import { SettingsSection, SettingsRow } from './SettingsSection'
 import { vaultSummary } from './vaultSummary'
 
@@ -105,6 +108,43 @@ export function VaultSettings({ vault }: Props) {
             description="Renaming doesn’t change this vault’s URL — bookmarks and links keep working."
           >
             <Input value={name} onChange={e => { setName(e.target.value) }} onBlur={handleNameBlur} />
+          </SettingsRow>
+        )}
+
+        {vault.kind !== 'example' && (
+          <SettingsRow
+            label="Color"
+            description="Shown on this vault's chip on occurrence cards."
+          >
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                aria-pressed={!vault.color}
+                aria-label="No color"
+                onClick={() => void setVaultColor(vault.id, null)}
+                className={cn(
+                  'flex size-7 items-center justify-center rounded-full border-2',
+                  !vault.color ? 'border-primary' : 'border-transparent',
+                )}
+              >
+                <span className="size-4.5 rounded-full border-2 border-dashed border-muted-foreground/50" />
+              </button>
+              {VAULT_COLORS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={vault.color === value}
+                  aria-label={label}
+                  onClick={() => void setVaultColor(vault.id, value)}
+                  className={cn(
+                    'flex size-7 items-center justify-center rounded-full border-2',
+                    vault.color === value ? 'border-primary' : 'border-transparent',
+                  )}
+                >
+                  <span className={cn('size-4.5 rounded-full', VAULT_COLOR_SWATCH[value])} />
+                </button>
+              ))}
+            </div>
           </SettingsRow>
         )}
 

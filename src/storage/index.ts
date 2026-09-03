@@ -10,7 +10,8 @@ setEntityPersistence({
 
 export {
   restoreVaults, setDefaultVault, reconnectVault,
-  addLocalVault, addGitHubVaultOAuth, reauthGitHubVault, addIcalVault, addExampleVault, removeVault, renameVault, onVaultChanged,
+  addLocalVault, addGitHubVaultOAuth, reauthGitHubVault, addIcalVault, addExampleVault, removeVault, renameVault,
+  setVaultColor, onVaultChanged,
 } from './vaultRegistry'
 
 export { previewIcalFeed } from './icalBackend'

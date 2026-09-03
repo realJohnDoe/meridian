@@ -4,7 +4,18 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useStore, emptySyncStatus } from '@/store'
 import { setupStore } from '@/test-utils'
 import type { VaultRef } from '@/vaultRef'
+import { setVaultColor } from '@/vaultActions'
+import type * as VaultActions from '@/vaultActions'
 import { VaultSettings } from './VaultSettings'
+
+// Only setVaultColor is faked — everything else (exportVaultIcs et al.) stays
+// real, since the export test below exercises it for real. Faking just this
+// one export sidesteps a real Dexie/IndexedDB write, which jsdom has no
+// backing store for.
+vi.mock('@/vaultActions', async (importOriginal) => ({
+  ...(await importOriginal<typeof VaultActions>()),
+  setVaultColor: vi.fn(),
+}))
 
 setupStore()
 
@@ -35,6 +46,39 @@ describe('VaultSettings — export', () => {
 
     const [a] = click.mock.instances as [HTMLAnchorElement]
     expect(a.download).toBe('Work-Life- 2026.ics')
+  })
+})
+
+describe('VaultSettings — color', () => {
+  afterEach(() => { vi.mocked(setVaultColor).mockClear() })
+
+  it('marks "No color" pressed when the vault has none set', () => {
+    render(<VaultSettings vault={GITHUB_VAULT} />)
+    expect(screen.getByRole('button', { name: 'No color' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Blue' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('marks the matching swatch pressed when the vault has a color set', () => {
+    render(<VaultSettings vault={{ ...GITHUB_VAULT, color: 'blue' }} />)
+    expect(screen.getByRole('button', { name: 'Blue' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'No color' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('sets the color when a swatch is clicked', () => {
+    render(<VaultSettings vault={GITHUB_VAULT} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Red' }))
+    expect(setVaultColor).toHaveBeenCalledWith(GITHUB_VAULT.id, 'red')
+  })
+
+  it('clears the color when "No color" is clicked', () => {
+    render(<VaultSettings vault={{ ...GITHUB_VAULT, color: 'red' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'No color' }))
+    expect(setVaultColor).toHaveBeenCalledWith(GITHUB_VAULT.id, null)
+  })
+
+  it('hides the color picker for the Tutorial vault', () => {
+    render(<VaultSettings vault={{ id: 'example', name: 'Tutorial', kind: 'example' }} />)
+    expect(screen.queryByRole('button', { name: 'No color' })).not.toBeInTheDocument()
   })
 })
 

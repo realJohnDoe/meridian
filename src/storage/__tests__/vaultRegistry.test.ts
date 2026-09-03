@@ -262,7 +262,7 @@ vi.mock('@/storage/parseReport', () => ({
 // Imports of the module under test (and its non-mocked collaborators — the
 // trivial in-memory backend registry) must come after the vi.mock calls.
 import {
-  restoreVaults, reconnectVault, setDefaultVault, removeVault, renameVault, addExampleVault,
+  restoreVaults, reconnectVault, setDefaultVault, removeVault, renameVault, setVaultColor, addExampleVault,
   addLocalVault, addGitHubVaultOAuth, onVaultChanged, newVaultId,
 } from '@/storage/vaultRegistry'
 import { getBackend, getMountedVaultIds, unmountAllBackends } from '@/storage/backends'
@@ -1015,6 +1015,48 @@ describe('renameVault', () => {
     await renameVault('nope', 'Whatever')
 
     expect((metaStore.get('vaults') as VaultRef[])).toHaveLength(1)
+  })
+})
+
+// ── setVaultColor ────────────────────────────────────────────────────────
+
+describe('setVaultColor', () => {
+  it('sets the color, leaving the rest of the ref untouched', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    await restoreVaults()
+
+    await setVaultColor(LOCAL_REF.id, 'blue')
+
+    const persisted = (metaStore.get('vaults') as VaultRef[]).find(r => r.id === LOCAL_REF.id)
+    expect(persisted).toEqual({ ...LOCAL_REF, color: 'blue' })
+    expect(storeState.vaults.find(v => v.id === LOCAL_REF.id)?.color).toBe('blue')
+  })
+
+  it('clears the color when passed null', async () => {
+    metaStore.set('vaults', [{ ...LOCAL_REF, color: 'red' }])
+    await restoreVaults()
+
+    await setVaultColor(LOCAL_REF.id, null)
+
+    const persisted = (metaStore.get('vaults') as VaultRef[]).find(r => r.id === LOCAL_REF.id)
+    expect(persisted?.color).toBeUndefined()
+  })
+
+  it('is a no-op for the synthesized Tutorial vault, which is never in the persisted list', async () => {
+    await restoreVaults()
+
+    await setVaultColor('example', 'green')
+
+    expect(storeState.vaults.find(v => v.id === 'example')?.color).toBeUndefined()
+  })
+
+  it('is a no-op for an id not present in the registry', async () => {
+    metaStore.set('vaults', [LOCAL_REF])
+    await restoreVaults()
+
+    await setVaultColor('nope', 'orange')
+
+    expect((metaStore.get('vaults') as VaultRef[]).find(r => r.id === LOCAL_REF.id)?.color).toBeUndefined()
   })
 })
 
