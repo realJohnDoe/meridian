@@ -265,10 +265,10 @@ file is a candidate when **every** item is finished:
 | tracked, `done: false` | **no** — that's the backlog/overdue, dated or not |
 | untracked, past date | yes |
 | untracked, future date | no |
-| undated and untracked (a note) | **no** — neither done nor past |
-| series with `repeat.end` absent | **no** — unbounded, never all past |
-| series, `after_completion` | **no** — see below |
-| series, bounded and exhausted | yes, if every occurrence is done (tracked) or past (event) |
+| undated and untracked (a note) | **no** — neither done nor past; deliberately left for later |
+| `schedule` series with `repeat.end` absent | **no** — unbounded, never all past |
+| `schedule` series, bounded and exhausted | yes, if every occurrence is done (tracked) or past (event) |
+| `after_completion` series | yes, when it has **no open occurrence left** — see below |
 
 Two traps in that table:
 
@@ -280,10 +280,32 @@ Two traps in that table:
 - **`isTracked` is presence-based** (`src/types.ts:236`): `done: false` is
   still a task. Never simplify to `!!done`.
 
-`after_completion` series are excluded deliberately rather than for lack of
-effort: `done` is what determines when the next occurrence is generated
-(`src/model/expansion.ts:108`), so "all occurrences done" isn't a fixed point —
-completing the last one creates another. Manual archiving covers them.
+**`after_completion` needs its own rule, and the codebase already has the
+concept.** "All occurrences done" is not a fixed point for these: `done` is
+what generates the next occurrence (`src/model/expansion.ts:108`), so
+completing the last one just makes another. What *does* end the chain is
+having no **open** occurrence — none that is simultaneously undone and
+non-excluded — which happens when the last one is cancelled rather than
+completed.
+
+`deletionEndsAfterCompletionSeries` (`src/model/storeOps.ts:841`) already
+encodes exactly this notion of open, as the *hypothetical* "would deleting
+this occurrence end the series?", and its warning copy in
+`src/editor/save.ts:309` states the semantics in the user's own words. The
+sweep needs the current-state sibling: *does this series have an open
+occurrence right now?* — the same `!excluded && !metadata.done` test over the
+items the series owns, minus that function's `io.id !== occ.id` clause, which
+exists only because it is asking about a deletion that hasn't happened.
+
+Extract that shared "open occurrence" test so the two can't drift apart; it is
+the one place where cancelling and completing must keep meaning different
+things.
+
+No expansion pass is needed for this branch. `after_completion` "is bounded by
+its own instances rather than an open-ended rule"
+(`src/model/expansion.ts:966`), so its occurrences are already materialised in
+`StoreItem[]` — the predicate reads them directly. Only bounded `schedule`
+series need a date walk.
 
 **4b. `lastModified` on the file interface.**
 
@@ -332,9 +354,12 @@ timer, not on render. A file is archived when it passes 4a **and** its
 real here, unlike the rejected move design — it is a flag flip on files that
 never went anywhere.
 
-**Tests.** The 4a table, case by case, including both traps. A cache row with
-no `lastModified` never archives. The sweep respects the per-vault setting and
-skips vaults where `isWritableVault` is false.
+**Tests.** The 4a table, case by case, including both traps and both
+`after_completion` directions: a series whose last occurrence was **cancelled**
+archives, one whose last occurrence was **completed** does not (it has just
+generated another). A cache row with no `lastModified` never archives. The
+sweep respects the per-vault setting and skips vaults where `isWritableVault`
+is false.
 
 ---
 
