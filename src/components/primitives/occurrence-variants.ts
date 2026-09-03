@@ -95,25 +95,25 @@ export const dvBlockVariants = cva('', {
 
 /**
  * Priority chip active-state colouring — shared between the entry editor's
- * inline priority chip and the priority selection drawer. bg-{color}/15 (a
+ * inline priority chip and the priority selection drawer. bg-{color}/30 (a
  * tint, not TINT_CLASSES' solid fill) plus text-chip-tint-foreground: a full
  * solid fill reads as too dominant at this size, and the palette isn't
  * uniformly tuned for it as a full fill + matching -foreground ink across
  * every theme. --chip-tint-foreground is verified >=4.5:1 against every
- * domain color's 15%-opacity tint in every theme (see its doc comment in
+ * domain color's 30%-opacity tint in every theme (see its doc comment in
  * index.css) — same formula as badge.tsx's `chip`/`link` variants.
  */
 export const PRIORITY_CLASS: Record<Priority, string> = {
-  high:   'aria-[pressed=true]:bg-priority-1/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-1',
-  medium: 'aria-[pressed=true]:bg-priority-2/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-2',
-  low:    'aria-[pressed=true]:bg-priority-3/15 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-3',
+  high:   'aria-[pressed=true]:bg-priority-1/30 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-1',
+  medium: 'aria-[pressed=true]:bg-priority-2/30 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-2',
+  low:    'aria-[pressed=true]:bg-priority-3/30 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-3',
 }
 
 /**
  * Maps each `VaultColor` to one of the app's existing domain color tokens —
  * indigo/red/orange/yellow/green/blue are exactly `event`/`priority-1`/
  * `priority-2`/`priority-3`/`task`/`note` under different names, so a vault
- * color introduces no new palette. Same bg-{color}/15 tint as `PRIORITY_CLASS`
+ * color introduces no new palette. Same bg-{color}/30 tint as `PRIORITY_CLASS`
  * above, applied to the vault-source chip shown on occurrence cards
  * (`OccurrenceCard`) when that vault has a color set — minus a colored
  * border, which doubled up on the tint and read as a ring. `border-transparent`
@@ -122,12 +122,12 @@ export const PRIORITY_CLASS: Record<Priority, string> = {
  * otherwise. No color at all keeps the chip's plain `Badge` styling.
  */
 export const VAULT_COLOR_CHIP: Record<VaultColor, string> = {
-  indigo: 'bg-event/15 text-chip-tint-foreground border-transparent',
-  red:    'bg-priority-1/15 text-chip-tint-foreground border-transparent',
-  orange: 'bg-priority-2/15 text-chip-tint-foreground border-transparent',
-  yellow: 'bg-priority-3/15 text-chip-tint-foreground border-transparent',
-  green:  'bg-task/15 text-chip-tint-foreground border-transparent',
-  blue:   'bg-note/15 text-chip-tint-foreground border-transparent',
+  indigo: 'bg-event/30 text-chip-tint-foreground border-transparent',
+  red:    'bg-priority-1/30 text-chip-tint-foreground border-transparent',
+  orange: 'bg-priority-2/30 text-chip-tint-foreground border-transparent',
+  yellow: 'bg-priority-3/30 text-chip-tint-foreground border-transparent',
+  green:  'bg-task/30 text-chip-tint-foreground border-transparent',
+  blue:   'bg-note/30 text-chip-tint-foreground border-transparent',
 }
 
 /** Solid swatch fill for each `VaultColor`, for the color picker in Settings. */
