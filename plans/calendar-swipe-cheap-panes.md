@@ -1,8 +1,16 @@
 # Cheap carousel panes, then unbounded swiping
 
-Two PRs. The first (making a day/week pane cheap to mount) has landed; what
-remains is the second, which spends that headroom on letting a swipe burst
-run past the pane window — only affordable now that the first has landed.
+Two PRs, both landed. The first made a day/week pane cheap to mount. The
+second spent that headroom on letting a swipe burst run past the pane
+window, by raising `PANE_COUNT` (see the constant's own comment in
+`snapCarousel.ts`) rather than giving `useCarousel` its own mid-burst
+pane-recentering state: the latter would need to force Embla's scroll
+position back to center while a snap animation is still in flight, which
+needs frame-capture verification on a real touch device that wasn't
+available when this was implemented. `PANE_COUNT` is a buffer, not
+literally unbounded — a burst larger than it (with none of its swipes
+committing in between) can still stall — so revisit the mid-burst design if
+that turns out to matter in practice.
 
 ## Context: what was measured, and what is already fixed
 
@@ -38,7 +46,7 @@ and it is independent of clock format, locale and vault size.
 
 The same number is why you cannot swipe more than two panes quickly:
 `PANE_COUNT` is 5 (centre ± 2) and cannot be raised while a pane costs this
-much — see PR 2.
+much.
 
 ## The idea, and the two corrections it needs
 
@@ -65,68 +73,6 @@ nothing is animating).
 With those, the proposal subsumes the "per-cell elements, centre pane only"
 option discussed earlier; the CSS-gradient option becomes a fallback for the
 skeleton's own painting if step 1's numbers come up short.
-
----
-
-## PR 2 — Let a swipe burst run past the pane window
-
-**Goal:** rapid repeated swipes keep going instead of stopping at ±2 panes.
-
-### Why it is blocked today
-
-`src/calendar/useCarousel.ts` advances its pane window only at *commit*, and
-commit fires on Embla's `settle` (or `COMMIT_FALLBACK_MS`, 500 ms). During a
-continuous burst `settle` never fires, so the window never recenters, so the
-user runs out of panes at the edge of `PANE_COUNT`. Committing is also a
-route navigation (`onCommit` → `navigate`), i.e. a whole-app re-render — too
-heavy to run per swipe in a burst.
-
-### Approach
-
-Split "which panes exist" from "what the URL says":
-
-- Give `useCarousel` its own centre-unit state, advanced on Embla's `select`
-  (fires the moment a target locks in, mid-animation). The pane window
-  follows this immediately, so the buffer refills during a burst and the
-  gesture never runs out of slides.
-- Keep the **route** commit where it is — on `settle` / the fallback timer —
-  so the router still sees one navigation per gesture, not one per swipe.
-  The route remains the source of truth for a cold load and for everything
-  outside the carousel; it is just allowed to lag the gesture.
-- The existing recenter seam (`reInit` + `scrollTo(center, true)` in a layout
-  effect) currently relies on "the committed pane was already centred at
-  commit time", which stops being true once the window advances
-  mid-animation. Advancing the window must therefore keep the *currently
-  animating* pane at its current visual position — i.e. shift keys and
-  scroll position together so nothing moves on screen. This is the delicate
-  part of the PR and deserves its own test.
-
-With panes cheap (PR 1), `PANE_COUNT` can also simply be raised — try 9 —
-which widens the burst headroom on its own and is worth measuring *before*
-attempting the state split, in case it is enough in practice. Prefer the
-smaller change if it is.
-
-Embla's own `loop: true` is the other way to get genuinely unbounded
-swiping, but it repositions slide DOM itself and would fight the keyed-pane
-reconciliation the views depend on. Not recommended without a spike.
-
-### Files
-
-- `src/calendar/useCarousel.ts` (the whole of it), `src/calendar/snapCarousel.ts`
-  (`PANE_COUNT`)
-- `src/calendar/DayView.tsx`, `WeekView.tsx`, `MonthView.tsx` — consumers
-- `src/calendar/MiniMonth.tsx` — has its own local `PANE_COUNT = 3` and the
-  same `useCarousel`; check the change holds there too
-- `src/calendar/useCarousel`-adjacent tests, `MiniMonth.preview.test.tsx`
-  (drives `onPreview`/`onCommit` directly and pins their relative order)
-
-### Acceptance
-
-- Five rapid swipes in a row advance five units, with no stall at ±2.
-- The route still receives one navigation per gesture, not one per swipe
-  (assert on a mocked `navigate` in a unit test).
-- No visible jump when the window advances mid-animation — verify by frame
-  capture, not by reasoning.
 
 ---
 
@@ -160,5 +106,6 @@ busy 1318 ms, 840 hour cells.
 - `MonthGrid` — a month pane is 42 day cells, not 168 buttons; it does not
   carry this cost and should be left alone in both PRs.
 - The agenda view's virtualizer, which already windows its own rows.
-- Reworking the route-as-source-of-truth design beyond the narrow split
-  described in PR 2.
+- Reworking the route-as-source-of-truth design — the route stays the pane
+  window's only source of truth; PR 2 widened the buffer instead of giving
+  the carousel its own competing recentering state.
