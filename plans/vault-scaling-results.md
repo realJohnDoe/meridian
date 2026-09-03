@@ -31,14 +31,12 @@ priority — the numbers do not move as findings get closed out.
 | Rank | # | Finding | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|
 | 2 | 2 | `fileOccurrenceMap` expands ±3 years to pick one occurrence per file | 8 | 2 | **Sonnet 5** (window narrowing); Opus 5 for the lazy variant |
-| 3 | 6 | `applyRemoteBatch` writes 30 000 rows in one transaction (21 s) | 6 | 1 | **Sonnet 5** |
-| 4 | 5 | `parseFiles` is a synchronous loop on the first-paint path | 5 | 2 | **Sonnet 5** |
 | 6 | 4 | Scroll cost grows with vault size although mounted rows stay constant | 7 | 2 | Unverified; needs a fresh profile — see below |
 
-Three of the four are Sonnet-5 work as written — each carries a **Task
-context** block naming the constant to change, the invariant that must
-survive, and the tests that guard it. Strip those blocks and most revert to
-Opus 5.
+Finding 2 is Sonnet-5 work as written — it carries a **Task context** block
+naming the constant to change, the invariant that must survive, and the tests
+that guard it. Strip that block and it reverts to Opus 5. Finding 4 has no
+such block because it has no diagnosis yet: profile first.
 
 ---
 
@@ -141,106 +139,3 @@ Opus 5.
 - **Why it is listed anyway** — it is still a measurably bad flow at scale
   (133 ms p50, every frame janky), and ruling out the virtualizer a second
   time — on the architecture that actually ships — is itself worth doing.
-
----
-
-### 5. `parseFiles` is a synchronous loop on the first-paint path
-
-- **Flows** — cold start, and every reconcile that touches many files.
-- **Category** — `critical-path-work`
-- **Impact** — 5
-- **Baseline** — 23.5 ms at 300 files, 155.8 ms at 3 000, 609.5 ms at 10 000,
-  1 987 ms at 30 000, 5 061 ms at 100 000. Essentially identical in both shapes
-  (1 467 ms at flat/30 000), confirming it as the one large *file*-linear cost.
-- **Measurement recipe** —
-  `node scripts/perf/stress.mjs --shapes mixed,flat --sizes 3000,30000 --skip-ui --skip-dexie`;
-  read `pipeline.result.parse.median`.
-- **Breadth** — `src/storage/parseReport.ts`, `src/storage/vaultRegistry.ts`.
-- **Evidence** — `src/storage/parseReport.ts`:
-  ```ts
-  for (const { path, content } of files) {
-    try {
-      const result = parseToStoreItems(path, content, vaultId)
-      entries.set(result.key, result)
-  ```
-- **Problem** — the round-trip *audit* was already moved off this loop into
-  `runInIdleBatches`, but the parse itself still runs as one unbroken loop
-  before `setVaultLayer`, so nothing paints for its whole duration.
-- **Fix** — parse in idle batches like the audit already does, writing the
-  layer incrementally (or once, after the first batch, then again at the end)
-  so the agenda paints against a partial vault and fills in. Expected effect:
-  removes ~2 s from `vaultPaintMs` at 30 000 files.
-- **Recommended model** — **Sonnet 5**, given the context block below and the
-  constraint that only the parse is batched.
-- **Hazard that sets the tier** — a partially-populated layer is visible to
-  wikilink resolution and to `applyNew`'s collision check; batching must not
-  let a save happen against a half-loaded vault. That stays true only if the
-  layer write remains a single atomic `setVaultLayer` — which is the one rule
-  the context below turns on.
-- **Task context** — `parseFiles` (`src/storage/parseReport.ts:52`) returns
-  `{ entries, failures, auditRoundTrip }` to three call sites in
-  `src/storage/vaultRegistry.ts`: `hydrateFromCache` (~line 214),
-  `mountExampleVault` (~line 236), and the reconcile path. The batching helper
-  it should use is already imported in the same file — `runInIdleBatches` from
-  `@/lib/idle`, which `auditRoundTrip` uses a few lines above. **Simplest
-  correct shape:** make `parseFiles` async, accumulate into the same `entries`
-  Map across idle batches, and call `setVaultLayer` once when all batches
-  finish — that keeps the layer atomic and still frees the main thread between
-  batches, which is what the ~2 s is. Only pursue painting a partial vault if
-  the atomic version does not move `vaultPaintMs` enough; that variant needs
-  the wikilink/collision question answered first and is not Sonnet work.
-  Tests: `src/storage/__tests__/vaultRegistry.test.ts`,
-  `src/model/__tests__/round-trip-totality.test.ts`,
-  `src/model/__tests__/entry-without-occurrences.test.ts`. Note the callers
-  are already `async`, so making the parse async does not ripple outward.
-
----
-
-### 6. `applyRemoteBatch` writes a whole vault in one transaction
-
-- **Flows** — first connect of a real (local-FS or GitHub) vault; large syncs.
-- **Category** — `data-and-persistence`
-- **Impact** — 6
-- **Baseline** — `applyRemoteBatch` for 30 000 rows: 21 313 ms (mixed) /
-  15 863 ms (flat). By contrast `cacheLoadAll` for the same rows is 489 ms and
-  the dirty scan 909 ms — the write is ~40× the read. 10 000 rows: 2 948 ms.
-  3 000 rows: 417 ms. Growth is markedly super-linear between 10 k and 30 k.
-- **Measurement recipe** —
-  `node scripts/perf/stress.mjs --sizes 3000,10000,30000 --skip-ui --skip-pipeline`;
-  read `dexie.result.writeMs` against `readAllMs`.
-- **Breadth** — `src/storage/cache/files.ts`.
-- **Evidence** — `src/storage/cache/files.ts`:
-  ```ts
-  await d.transaction('rw', d.files, async () => {
-    const keys = records.map(r => vp(vaultId, r.path))
-    const existingRecords = await d.files.bulkGet(keys)
-  ```
-  — one `bulkGet` of every key plus one `bulkPut` of every row, in a single
-  transaction, over a table carrying four indexes.
-- **Problem** — connecting a large vault blocks on a 21-second IndexedDB
-  transaction with no progress and no yield point. `readAll`'s `onProgress`
-  already reports the fetch; the write that follows it is silent.
-- **Fix** — chunk into batches of ~1 000 records, each its own transaction, and
-  report progress per chunk through the existing `vaultLoadProgress` channel.
-  Expected effect: the same total work becomes interruptible and observable;
-  based on the sub-linear per-row cost at 3 000 (0.14 ms/row) versus 30 000
-  (0.71 ms/row), chunking should also cut the total by roughly half.
-- **Recommended model** — **Sonnet 5**, given the context block below. The
-  hazard is a silent correctness one rather than a build failure: dropping the
-  dirty-check or losing `written` across chunks would overwrite a user's
-  in-progress edit with remote content, which `cache.test.ts` and
-  `sync-collision.test.ts` are the guards for.
-- **Task context** — the `bulkGet` exists to skip rows that are locally dirty,
-  and `written` (the returned paths) is what the caller merges into the store,
-  so chunking must accumulate `written` across chunks and keep the
-  dirty-check-then-put pair inside each chunk's transaction — never hoist the
-  `bulkGet` out and share one snapshot across chunks, since a concurrent local
-  edit between chunks is exactly what the per-transaction read prevents.
-  The progress channel already exists: `vaultLoadProgress` on the store, set
-  from `registerAndMount` (`src/storage/vaultRegistry.ts:375`) and read by
-  `src/routes/auth.callback.tsx:63`, so reporting per chunk needs no new
-  plumbing — the same `{ loaded, total }` shape works. Tests:
-  `src/storage/__tests__/cache.test.ts`,
-  `src/storage/__tests__/sync-collision.test.ts`,
-  `src/storage/__tests__/sync.test.ts`,
-  `src/storage/__tests__/vaultRegistry.test.ts`.
