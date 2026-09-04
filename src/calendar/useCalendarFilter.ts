@@ -6,6 +6,21 @@ import type { Occurrence } from '@/types'
 export { NO_PARTICIPANT }
 
 /**
+ * The view's occurrence filter, as the pure builders below it see it.
+ *
+ * Declared here, with the hook that produces the live one, rather than in
+ * either of the two modules that consume it: `computeAgendaSections` and
+ * `computeOverduePool` both take a `FilterOccs` as a parameter instead of
+ * reading the store themselves, which is what keeps them pure and testable
+ * (their tests pass `occs => occs`). Whichever of the two had owned the type,
+ * the other would have had to import it back across a boundary they already
+ * cross the other way — `agendaSections.ts` takes `OverdueGroup` from
+ * `overduePool.ts` — and a pair of modules naming each other's types is a
+ * cycle like any other (invariant 4 counts type edges).
+ */
+export type FilterOccs = (occs: Occurrence[]) => Occurrence[]
+
+/**
  * The "who" axis, per vault.
  *
  * `hidden` is keyed by vault id because two vaults can each have a "Bob" who is
@@ -123,7 +138,7 @@ export function useCalendarFilter() {
   const hiddenParticipants = useStore(s => s.hiddenParticipants)
   const showTasks          = useStore(s => s.showTasks)
 
-  const filterOccs = useCallback((occs: Occurrence[]) => {
+  const filterOccs = useCallback<FilterOccs>(occs => {
     const byKind = showTasks ? occs : occs.filter(o => occKind(o) !== 'task')
     return hideEverywhere(byKind, hiddenVaultIds, hiddenParticipants)
   }, [hiddenVaultIds, hiddenParticipants, showTasks])

@@ -190,8 +190,10 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
    differently would also make the rule one keystroke wide — deleting `type`
    from an import would turn a tolerated loop into a real one with nothing to
    catch it. So the checked graph counts type edges (`tsPreCompilationDeps`),
-   and a shared type gets the same fix as shared code: move it below both
-   sides. See `calendar/occFilter.ts`, which exists for exactly that.
+   and a shared type gets the same fix as shared code: put it where neither
+   consumer has to import the other. Usually that is the module that *produces*
+   values of it — `FilterOccs` sits in `calendar/useCalendarFilter.ts`, which
+   builds the live filter, not in either of the two builders that take one.
 
    A cycle is a **placement bug**, not something inherent to feature-sliced
    React. Every one this codebase has had turned out to be a file sitting in

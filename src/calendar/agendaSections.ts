@@ -5,7 +5,7 @@ import { CHUNK_DAYS, chunkIndexFor, chunkRange } from './agendaChunks'
 import { weekStartFor, weekNumberFor } from './weekRange'
 import { sortOccs } from './occSort'
 import type { OverdueGroup } from './overduePool'
-import type { FilterOccs } from './occFilter'
+import type { FilterOccs } from './useCalendarFilter'
 
 // Size estimates for the virtualizer. Real sizes are measured after render
 // (measureElement); accurate estimates just keep the scrollbar/scrollToIndex

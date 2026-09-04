@@ -4,7 +4,7 @@ import { addDays } from '@/format'
 import { dayRange, expandWithMultiday, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { occKind } from '@/occView'
 import { sortOccs } from './occSort'
-import type { FilterOccs } from './occFilter'
+import type { FilterOccs } from './useCalendarFilter'
 
 /** A past-dated, undone task occurrence — the agenda's definition of overdue. */
 const isOverdue = (o: Occurrence): boolean => occKind(o) === 'task' && !o.metadata.done
