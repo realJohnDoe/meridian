@@ -37,7 +37,7 @@ export default function DeleteDialog({ open, title, onConfirm, onClose, onArchiv
             Delete &ldquo;{title}&rdquo;? This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
+        <AlertDialogFooter className="gap-2 sm:gap-0">
           <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
           {onArchive && (
             <AlertDialogAction
