@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import type * as ReactRouter from '@tanstack/react-router'
 import { useStore, emptySyncStatus } from '@/store'
 import { setupStore, installFakePersistence, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
@@ -165,6 +165,45 @@ describe('VaultSettings — auto-archive', () => {
   it('hides the row for an iCal subscription (not writable)', () => {
     render(<VaultSettings vault={{ id: 'cal', name: 'Calendar', kind: 'ical', ical: { url: 'https://example.com/feed.ics' } }} />)
     expect(screen.queryByPlaceholderText('Off')).not.toBeInTheDocument()
+  })
+})
+
+describe('VaultSettings — invite', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+
+  it('links to the GitHub collaborator-access page for the vault\'s repo', () => {
+    render(<VaultSettings vault={GITHUB_VAULT} />)
+
+    const link = screen.getByRole('link', { name: /Add collaborator on GitHub/ })
+    expect(link).toHaveAttribute('href', 'https://github.com/acme/notes/settings/access')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(link).toHaveAttribute('rel', 'noreferrer')
+  })
+
+  it('copies an invite message naming the repo, with no install step, and confirms it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const writeText = vi.fn((_text: string) => Promise.resolve())
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+
+    render(<VaultSettings vault={GITHUB_VAULT} />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Copy invite message/ })); await Promise.resolve() })
+
+    expect(writeText).toHaveBeenCalledTimes(1)
+    const [message] = writeText.mock.calls[0]!
+    expect(message).toContain('acme/notes')
+    expect(message).toContain('https://realjohndoe.github.io/meridian/')
+    // No GitHub App install step — a collaborator's sign-in is their whole setup.
+    expect(message).not.toMatch(/install/i)
+    expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()
+
+    act(() => { vi.advanceTimersByTime(2000) })
+    expect(screen.getByRole('button', { name: /Copy invite message/ })).toBeInTheDocument()
+  })
+
+  it('hides the row for a non-GitHub vault', () => {
+    render(<VaultSettings vault={{ id: 'local', name: 'Notes', kind: 'local' }} />)
+    expect(screen.queryByRole('button', { name: /Copy invite message/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Add collaborator on GitHub/ })).not.toBeInTheDocument()
   })
 })
 

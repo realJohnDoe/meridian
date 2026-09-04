@@ -26,7 +26,7 @@ export { cacheDirtyCount } from './cache/files'
 
 export {
   startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos,
-  OAuthCallbackError, GITHUB_APP_INSTALL_URL,
+  OAuthCallbackError, GITHUB_APP_INSTALL_URL, APP_URL,
 } from './githubOAuth'
 export type { OAuthTokens, InstalledRepo } from './githubOAuth'
 
