@@ -423,15 +423,16 @@ items:
   - "[[install-as-an-app]]"
 ---
 
-This example vault is **read-only** — edits and new entries won't be saved here.
+This Tutorial vault is **read-only** — edits and new entries won't be saved here.
 
 To use Meridian for real:
 
-1. Open the **menu** (☰, top-left) and tap **Manage vaults**.
-2. **Add local folder** — pick a folder; Meridian reads and writes plain \`.md\` files
-   there, with no lock-in (Chrome / Edge desktop only).
-3. Or **Add GitHub repo** — sync your notes to a repository; works on any device,
-   including iOS.
+1. Open the **menu** (☰, top-left), tap **Settings**, then **Vaults**.
+2. Tap **Add vault**, then **GitHub repository** — sync your notes to a repository;
+   works on any device, including iOS.
+3. Or **Local folder** — pick a folder; Meridian reads and writes plain \`.md\` files
+   there, with no lock-in (Chrome or Edge, desktop or Android; not available in
+   Safari or Firefox).
 
 Once you've selected a writable vault, everything works: create entries, tick tasks done,
 set up recurring events, and link files with wikilinks.

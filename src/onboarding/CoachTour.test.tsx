@@ -17,13 +17,13 @@ const REAL_VAULT: VaultRef = { id: 'v1', name: 'Real', kind: 'local' }
 
 /**
  * `useResetOnChange` only fires on a change from the previously rendered
- * value, never on mount — so the tour needs `hasRealVault` to actually flip
- * from true to false after mount to auto-start. Mounts with a real vault
+ * value, never on mount — so the tour needs one of its deps to actually
+ * change after mount to auto-start. Mounts already loaded, with a real vault
  * registered, then drops it, mirroring the "last vault removed" transition
  * the hook is built to catch.
  */
 function mountAndDropVault() {
-  useStore.setState({ vaults: [REAL_VAULT] })
+  useStore.setState({ vaultLoading: false, vaults: [REAL_VAULT] })
   const setSidebarOpen = vi.fn()
   const navigateHome = vi.fn()
   render(<CoachTour setSidebarOpen={setSidebarOpen} navigateHome={navigateHome} />)
@@ -57,6 +57,19 @@ describe('CoachTour', () => {
     expect(screen.getByText('1 / 4')).toBeInTheDocument()
     await waitFor(() => { expect(setSidebarOpen).toHaveBeenCalledWith(false) })
     expect(navigateHome).toHaveBeenCalled()
+  })
+
+  it('auto-starts once the vault restore settles with no vault having ever been present', () => {
+    // Mirrors a brand-new visit: nothing to restore, so `vaultLoading` is the
+    // only thing that changes after mount — `hasRealVault` is `false` both
+    // before and after. Without gating on `vaultLoading`, this case (finding
+    // #4) would never show the tour at all.
+    render(<CoachTour setSidebarOpen={vi.fn()} navigateHome={vi.fn()} />)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    act(() => { useStore.setState({ vaultLoading: false }) })
+
+    expect(screen.getByRole('dialog', { name: /Welcome to Meridian/ })).toBeInTheDocument()
   })
 
   it('advances through steps with Next and back up with Back, disabling Back on the first step', () => {

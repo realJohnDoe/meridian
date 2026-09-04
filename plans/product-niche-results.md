@@ -165,7 +165,6 @@ and #5 because they are cheap and wide, not because they matter more.
 | 1 | #1 | No visual proof of the phone claim | declared-vs-served (inverted) | communication | 7 | 3 | Haiku 4.5 | 21 |
 | 2 | #2 | "Example vault" / "Tutorial vault" and the folder/vault/repo fracture | declared-vs-served | communication | 4 | 5 | Haiku 4.5 | 20 |
 | 3 | #3 | iCal, backlog, favorites, themes, multi-vault shipped and unclaimed — blog says the opposite | declared-vs-revealed | both | 7 | 4 | Sonnet 5 | 14 |
-| 4 | #4 | The first-run coach tour never runs | declared-vs-served | communication | 8 | 3 | Sonnet 5 | 12 |
 | 5 | #5 | "Usable by someone who won't configure a vault" is not a promise the product can cash | declared-vs-served | fit + communication | 8 | 5 | Opus 5, plan mode, multi-PR | 8 |
 
 **Sequencing note.** #5 is a positioning decision and #2 picks the surviving
@@ -314,62 +313,6 @@ written twice. #4 is independent (source only) and can go first or in parallel.
   iCal bullet to "What it does"; append a dated note to the blog post; decide
   separately (section 6) whether backlog/favorites/themes/multi-vault join the
   feature list or stay deliberately unlisted.
-
----
-
-### #4 — The coach tour never runs, so the app never says what it is
-
-- **Gap:** `declared-vs-served`
-- **Question:** communication
-- **Category:** `recognition` `adoption-gate` `niche-definition`
-- **Who it costs us:** **every** first-time visitor to the app. This is the one
-  place in the finding list where the share is knowable and total: the auto-start
-  path is unreachable for anyone who has never connected a vault, which is the
-  definition of a first-time visitor.
-- **Impact:** 8
-- **Evidence:**
-  - `src/onboarding/CoachTour.tsx:82` — `  // Auto-start once, before any real vault exists (never again after Skip/Done)`
-  - The hook it relies on cannot do that. `src/hooks/useResetOnChange.ts`
-    initialises `prevDeps` to the *current* deps, so `changed` is `false` on the
-    first render and `sync` never runs on mount. `hasRealVault` starts `false`
-    for a new visitor and stays `false`, so it never flips and the guard is
-    unreachable.
-  - The test suite documents the defect instead of catching it.
-    `src/onboarding/CoachTour.test.tsx:20` — ` * value, never on mount — so the tour needs \`hasRealVault\` to actually flip`
-    — and `mountAndDropVault()` mounts *with* a real vault and then removes it, a
-    sequence a first-time visitor never performs. All tour tests pass green.
-  - Confirmed empirically this run: a clean browser profile at
-    `http://localhost:5199/meridian/`, 6s wait — `[role="dialog"]` count `0`,
-    `localStorage['meridian.tourDone']` `null`, no tour text in `document.body.innerText`.
-  - What is therefore never said: `src/onboarding/CoachTour.tsx:47` —
-    `Meridian keeps your notes, events, and tasks as plain Markdown files in a folder you own.`
-    That is the **only** statement of the niche anywhere inside the app. The
-    first screen otherwise shows an agenda list with no reference to Markdown,
-    files, folders or ownership (verified by screenshot, both widths).
-  - `README.md:61` instructs the user to `click through the onboarding tour.`
-- **Breadth:** 3 surfaces (`CoachTour.tsx` production path, `CoachTour.test.tsx`
-  which encodes the wrong precondition, `README.md:61` which promises it).
-- **Recommended model:** **Sonnet 5.** The bug is located and the fix is small,
-  but it is a state-machine change with two easy ways to fail silently.
-  - *Task context:* the fix is to make auto-start evaluate on mount, not only on
-    a `hasRealVault` transition — e.g. seed `useResetOnChange`'s `prevDeps` with
-    a sentinel in this call site, or replace the call here with a mount-time
-    check. **Do not change `useResetOnChange` itself**: its "never on mount"
-    behaviour is the documented React-docs pattern (`useResetOnChange.ts:3-9`)
-    and it has other callers. **Trap 1:** the store loads asynchronously, so
-    `vaults` is briefly empty even for a user who *does* have a real vault —
-    gate on the store having loaded, or a returning user gets the tour again.
-    **Trap 2:** `isTourDone()` returns `true` when `localStorage` throws
-    (`tourState.ts:4`), which is the intended fail-closed behaviour — keep it.
-    **Update `mountAndDropVault()` in `CoachTour.test.tsx:25-33`** and add a test
-    that mounts with *no* vault ever present and asserts the dialog appears;
-    that is the case with no coverage today. The four existing behaviour tests
-    (advance/back, Done, Escape, Skip) should keep passing unchanged.
-- **Problem:** the app's first screen communicates an interface and never a
-  niche, so a visitor who arrives without reading the README cannot tell this is
-  a Markdown-files product at all.
-- **Fix:** make the tour auto-start on first mount when no real vault exists, and
-  add the missing first-visit test.
 
 ---
 

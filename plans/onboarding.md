@@ -55,46 +55,6 @@ repository on GitHub" link uses `?name=meridian-vault`.
 
 ---
 
-## PR 3 — Make the app's own instructions true
-
-**Model: Sonnet 5** for part 1 (a state-machine change with two named
-silent-failure modes); **Haiku 4.5** for part 2 if the surviving vault term is
-given in the task, since it is then a copy rewrite against labels listed below.
-Splittable into two PRs on that line if you'd rather.
-
-Two things a new user reads that are currently wrong, both cheap.
-
-**1. The first-run tour never runs** (finding #4 — full diagnosis and traps in
-`plans/product-niche-results.md`). Short version: `useResetOnChange`
-(`src/hooks/useResetOnChange.ts`) seeds `prevDeps` with the current deps, so it
-never fires on mount; `hasRealVault` (`CoachTour.tsx:27`) starts `false` for a
-newcomer and never flips, leaving the guard at `CoachTour.tsx:83-87` unreachable.
-Fix at the call site — **do not change `useResetOnChange`**, it has other callers
-and its mount behaviour is the documented React-docs pattern. Gate on the store
-having loaded (`vaultLoading`, as `auth.callback.tsx:19-26` does) so a returning
-user doesn't get the tour again during the async restore. Update
-`mountAndDropVault()` (`CoachTour.test.tsx:25-33`) and add the missing case:
-mounts with no vault ever present, asserts the dialog appears.
-
-**2. "Make it yours" names three buttons that don't exist.**
-`src/storage/devFixtures/tutorialVault.ts:421+` tells the user to tap
-**"Manage vaults"**, then **"Add local folder"** or **"Add GitHub repo"**. I
-grepped all three across `src/**/*.tsx`: none exist. The real path is
-Settings → **"Vaults"** → **"Add vault"** → **"GitHub repository"** /
-**"Local folder"** (`VaultList.tsx`, `AddVaultWizard.tsx:16-41`). Same entry
-also says local folders are *"(Chrome / Edge desktop only)"* while
-`AddVaultWizard.tsx:27` says "desktop or Android" — it is turning away Android
-users who could use it. Rewrite the steps against the real labels, and put
-GitHub first since it is the only path that works on iOS.
-
-While here: `tutorialVault.ts:426` says *"This example vault"* — the UI calls it
-the **Tutorial vault** (`AddVaultWizard.tsx:40`). That is finding #2's rename;
-fix it here only if #2 has already settled the surviving term, otherwise leave
-it and let #2 do all sites at once. **Check `GLOSSARY.md` before renaming** —
-`src/glossary.test.ts` fails the build on a stale term.
-
----
-
 ## PR 4 — An invite path for the shared-repo story
 
 **Model: Sonnet 5.** One `SettingsRow`, one link, one copyable message.
