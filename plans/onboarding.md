@@ -63,88 +63,57 @@ failure point remains, and it bites after the flow otherwise succeeds:
 
 **An empty repo reads as a sync conflict.** A first-timer who creates a repo
 without ticking "Add a README" gets a repo with no commits.
-`githubBackend.ts:153` calls `GET /repos/{owner}/{repo}/git/trees/{tree_sha}`;
+`githubBackend.ts:196` calls `GET /repos/{owner}/{repo}/git/trees/{tree_sha}`;
 GitHub answers **409** on an empty repo; `failureKind.ts:57` maps 409 →
-`conflict`; `githubBackend.ts:184` calls `mapGitHubError(e)` **without a
+`conflict`; `githubBackend.ts:225` calls `mapGitHubError(e)` **without a
 path**, so the user gets a `ConflictError` reading
 `Conflict on unknown: backend version diverged since last sync.`
-The mapping is verified from source; the 409 itself was not exercised against
-a live empty repo — do that first in PR 2.
+Only the *read* is affected — see the API-family table in PR 2.
 
 ---
 
 ## PR 2 — An empty repository is a normal state, not a conflict
 
-**Model: Sonnet 5 for the code — but it cannot start until someone answers the
-one question at the end of this section**, which needs a GitHub token and a
-throwaway repo, so it is not a model-tier question at all. The likely answer
-makes this a small PR; the unlikely one makes it a different, larger one.
+**Model: Sonnet 5. Not blocked on anything.**
 
-The same throwaway repo answers a second, smaller thing worth having: connect it
-and record the **exact error text** the user currently sees. The 409 →
-`ConflictError` mapping is verified from source, but the observed string is what
-the fix has to replace, and it belongs in the PR description.
+**The design: accept the empty repo, and push into it when the user creates
+their first item.** Exactly as you would by hand — the first push creates the
+commit and `main` along with it.
 
-Then, in `githubBackend.ts:153-186`: catch **409 specifically in `statAll`** and
-return an empty `Map` rather than throwing. An empty repo has no files, which is
-exactly what an empty tree listing means — the current failure is a category
-error, not a missing feature. Everything downstream (`parseToStoreItems` →
-expansion → agenda) already handles a vault with no files, since that is what a
-freshly-created local folder looks like.
+Only the **read** is broken, and the reason is which API family it uses:
+
+| Path | Endpoint | On a zero-commit repo |
+|---|---|---|
+| `statAll` (`githubBackend.ts:194-225`) | `GET /repos/{owner}/{repo}/git/trees/{tree_sha}` — **Git Data API** | **409** `Git Repository is empty` |
+| `write` (`githubBackend.ts:358-378`) | `PUT /repos/{owner}/{repo}/contents/{path}` — **Contents API** | fine; creates the first commit and the branch |
+
+The Git Data API needs a commit to exist before it can answer anything, which is
+what every "Git Repository is empty" report is about. The Contents API doesn't —
+it is the normal way to bootstrap a repo over HTTP, and it is the one Meridian
+writes through. So the asymmetry is the whole bug: connecting fails, pushing
+would have been fine.
+
+### The fix
+
+In `statAll`'s catch (`githubBackend.ts:225`): catch **409** and return an empty
+`Map` rather than throwing. An empty repo has no files, which is exactly what an
+empty tree listing means. Everything downstream (`parseToStoreItems` → expansion
+→ agenda) already handles a vault with no files, since that is what a
+freshly-connected local folder looks like. The user gets an empty agenda,
+creates an entry, and `write()` pushes it — first commit, `main` created, done.
 
 **Do not** widen `failureKind.ts:57` to treat 409 as non-conflict globally — 409
 is a real SHA-mismatch conflict on the write paths, and the comment at
 `githubApi.ts:58-64` explains why the status and GitHub's own message are kept
-on the error. Scope the change to `statAll`'s catch, matching on GitHub's
+on the error. Scope it to `statAll`'s catch, matching on GitHub's
 `Git Repository is empty` message rather than the bare status if the live check
 shows the status alone is ambiguous.
 
-**The one open question, and why it decides the size of this PR.**
-
-Connecting an empty repo touches GitHub twice, and the fix above only covers
-the first:
-
-1. **The read.** `statAll` asks for the tree of branch `main`. On a repo with
-   no commits that ref does not exist, so GitHub 409s. That is the fix above.
-2. **The first write.** `write()` (`githubBackend.ts:276-296`) uses
-   `PUT /repos/{owner}/{repo}/contents/{path}` with `branch: this._cfg.branch`
-   — i.e. `main`, which still doesn't exist at that moment, because the
-   repo *still* has no commits. Fixing the read gets the user connected; it
-   does nothing about this.
-
-So the question is exactly one thing:
-
-> **Does `PUT /repos/{owner}/{repo}/contents/{path}` with `branch: "main"`
-> succeed on a repository with zero commits, creating the initial commit and
-> the branch?**
-
-- **If yes** → the `statAll` catch is the entire PR. Sonnet 5, as scoped above.
-- **If no** → Meridian has to create an initial commit itself before the first
-  write can land. That is a different piece of work — what to commit, what
-  happens when two devices connect the same empty repo at once, how it
-  interacts with `syncJournal` — and it should be its own PR at Opus tier
-  rather than being absorbed into this one. **Stop and re-plan if the answer
-  is no.**
-
-**Expectation, stated as an expectation:** probably yes. The Contents API is the
-usual way to bootstrap an empty repo, and it is a different endpoint family from
-the Git Data API (blobs/trees/commits/refs), which definitely does 409 on an
-empty repo and is what most "409 Git Repository is empty" reports are about.
-Meridian uses the Contents API, not the Git Data API, so it is on the side of
-that split more likely to work. This could not be confirmed from a primary
-source in the session that wrote this plan — `docs.github.com` was unreachable —
-so it stays a question rather than an assumption.
-
-**How to answer it** (~30 seconds, no code): create a throwaway repo with *no*
-README, then
-
-```
-curl -X PUT -H "Authorization: Bearer $TOKEN" \
-  https://api.github.com/repos/<you>/<throwaway>/contents/test.md \
-  -d '{"message":"test","content":"aGk=","branch":"main"}'
-```
-
-A 201 means yes. Record the answer here, then implement.
+While you have a throwaway empty repo connected, record the **exact error text**
+a user sees today — the 409 → `ConflictError` mapping is verified from source,
+but the observed string is what this PR replaces and it belongs in the PR
+description. If the first write should somehow also fail, say so in the PR and
+stop rather than growing it; nothing in the code suggests it will.
 
 ---
 
@@ -221,8 +190,8 @@ then needs `GITHUB_APP_INSTALL_URL` added and `README.md:7` qualified.
 ### The PR
 
 A new `SettingsRow` in the existing **Source** `SettingsSection`
-(`VaultSettings.tsx:142`), directly under the `Repository` row at
-`VaultSettings.tsx:202-210`, gated the same way on `vault.kind === 'github'`:
+(`VaultSettings.tsx:151`), directly under the `Repository` row at
+`VaultSettings.tsx:211-220`, gated the same way on `vault.kind === 'github'`:
 
 - A link to `https://github.com/{owner}/{repo}/settings/access` — the page where
   a collaborator is added. `vault.github.owner`/`.repo` are already in scope.
