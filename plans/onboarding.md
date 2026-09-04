@@ -100,6 +100,9 @@ And one that bites after the flow appears to succeed:
 
 ## PR 1 — Make the GitHub connect path survivable without a repo
 
+**Model: Sonnet 5.** Every site is named below, the traps are located, and a
+wrong guess breaks a test rather than failing quietly.
+
 The core of finding #5. All in `src/routes/auth.callback.tsx` and
 `src/settings/AddVaultWizard.tsx`; no storage or model changes.
 
@@ -129,12 +132,17 @@ repo. Add one line above them saying the App has to be installed on a repo for
 it to appear in the list, which is the fact that makes an empty list make sense.
 
 **3. Fold `no-installations` into the picker.** It is the zero-length case of the
-same screen and currently a separate dead end (`:166-177`). Once the picker
-carries both links, render it with an empty list and a different lead line
-rather than a distinct phase — that removes the "come back and sign in again"
-instruction for anyone who now has a link to click in place. Keep the
-`no-installations` *phase* if it simplifies the diff; the requirement is that the
-screen offers the two links, not that the union is literal.
+same screen and currently a separate dead end (`:166-177`). Concretely: delete
+the `no-installations` phase from the `Phase` union (`:41`) and its render block
+(`:166-177`), and make both call sites set `{ kind: 'picking', tokens, repos }`
+unconditionally — `tokens` is already in scope at `:89` and `:117`. The picker
+then branches on `repos.length === 0` for its lead line only ("Meridian isn't
+installed on any repository yet" vs "Choose a repository"), and both links are
+present either way. That removes the "come back and sign in again" instruction
+entirely, since there is now something to click in place.
+
+Leave `reconnect-repo-missing` (`:179-190`) alone — it is a genuinely different
+state with an owner/repo in its message, and it is not on the new-user path.
 
 **4. Tell the user what's coming, before the redirect.** In
 `AddVaultWizard.tsx:234-237`, replace *"Choose which repository to connect after
@@ -171,6 +179,11 @@ picker.
 
 ## PR 2 — An empty repository is a normal state, not a conflict
 
+**Model: Sonnet 5 for the code — but it cannot start until a human runs the
+check below**, which needs a real GitHub account and so is not a model-tier
+question at all. See the split-out risk at the end of this section: one possible
+outcome is a bigger, separate PR.
+
 **First, confirm the premise** (~5 minutes, needs a real GitHub account): make
 an empty repo with no README, install the App on it, connect it, and record the
 exact error. The 409 → `ConflictError` mapping is verified from source, but the
@@ -190,15 +203,29 @@ on the error. Scope the change to `statAll`'s catch, matching on GitHub's
 `Git Repository is empty` message rather than the bare status if the live check
 shows the status alone is ambiguous.
 
-Worth pairing with a first-write check: an empty repo has **no default branch**
-until its first commit, even though `fetchInstalledRepos` (`githubOAuth.ts:396`)
-reports `default_branch` as `main`. Confirm during the live check whether the
-first write succeeds against a branch that doesn't exist yet; if it doesn't,
-that is part of this PR, not a follow-up.
+**The risk this PR is hiding, stated so it doesn't ambush the implementer.** An
+empty repo has **no default branch** until its first commit, even though
+`fetchInstalledRepos` (`githubOAuth.ts:396`) reports `default_branch` as `main`.
+So the live check has two questions, not one:
+
+1. *Does `statAll` 409?* → if yes, the fix above is the whole PR. Sonnet 5.
+2. *Does the first write then succeed against a branch that doesn't exist yet?*
+   → if **yes**, done. If **no**, stop and re-plan: creating an initial commit
+   and a ref on the user's behalf is a different piece of work with its own
+   failure modes (what to commit, what happens when two devices both try it,
+   how it interacts with `syncJournal`), and it should be its own PR at Opus
+   tier rather than being absorbed into this one.
+
+Record the answer to both here when the check is run, before writing any code.
 
 ---
 
 ## PR 3 — Make the app's own instructions true
+
+**Model: Sonnet 5** for part 1 (a state-machine change with two named
+silent-failure modes); **Haiku 4.5** for part 2 if the surviving vault term is
+given in the task, since it is then a copy rewrite against labels listed below.
+Splittable into two PRs on that line if you'd rather.
 
 Two things a new user reads that are currently wrong, both cheap.
 
@@ -235,28 +262,65 @@ it and let #2 do all sites at once. **Check `GLOSSARY.md` before renaming** —
 
 ## PR 4 — An invite path for the shared-repo story
 
+**Model: Sonnet 5, once the experiment below has been run and its answer written
+into this section.** Both outcomes are pre-specified, so settling the experiment
+is a one-line edit here, not a re-plan. Until then it is not implementable by
+anyone — the plan deliberately doesn't know what the invitee has to do.
+
 The decision above keeps multi-user in the pitch, and right now **all** of it
 happens outside the product: to share a vault, the second person has to be added
-as a repo collaborator on github.com, and (unverified — see below) may need the
-App installed for their own account too. There is no invite affordance anywhere
-in `src/`.
+as a repo collaborator on github.com. There is no invite affordance anywhere in
+`src/`.
 
-**Settle this first, and the shape of the PR follows.** `fetchInstalledRepos`
-(`githubOAuth.ts:384-399`) calls `GET /user/installations`. Whether that surfaces
-the *owner's* installation to a plain repo collaborator decides everything:
+### The experiment (needs two GitHub accounts and one repo; ~10 minutes)
 
-- **If it does** — the invitee's path is "be added as a collaborator, sign in,
-  pick the repo", and this PR is a share sheet on the vault settings screen: a
-  link to the repo's `…/settings/access` page, plus copy-able instructions to
-  send. Small.
-- **If it doesn't** — every invitee must install the App themselves, and the
-  invite has to carry `GITHUB_APP_INSTALL_URL` with an explanation. Still small,
-  but the copy is materially different and the claim in `README.md:7` needs
-  qualifying.
+Account A owns a repo and has the Meridian App installed on it. Add account B as
+a plain repo collaborator, **without** B installing the App. Sign in as B.
 
-Needs two real GitHub accounts and one repo to answer; it cannot be settled from
-this repository. Don't write the copy before it is answered — this is the field
-where a confident guess is worst.
+**Does B's repo list include A's repo?** `fetchInstalledRepos`
+(`githubOAuth.ts:384-399`) calls `GET /user/installations` and then
+`GET /user/installations/{id}/repositories`, so the question is whether A's
+installation appears in B's installations list at all.
+
+> **Answer: _(unrun)_** — write **A** or **B** here, then implement that branch.
+
+### Branch A — B sees the repo without installing anything
+
+The invitee's path is "get added as a collaborator, sign in, pick the repo". The
+PR is a share affordance on the vault settings screen:
+
+- A new `SettingsRow` in the existing **Source** `SettingsSection`
+  (`VaultSettings.tsx:142`), directly under the `Repository` row at
+  `VaultSettings.tsx:202-210`, gated the same way on `vault.kind === 'github'`.
+- Its control is a link to
+  `https://github.com/{owner}/{repo}/settings/access` — the page where a
+  collaborator is added. `vault.github.owner`/`.repo` are already in scope there.
+- Plus a copy-to-clipboard button yielding a short message the owner can send:
+  what Meridian is, the app URL, and "you'll be able to open the shared
+  calendar once you sign in with GitHub". No App install step in the text.
+
+`target="_blank" rel="noreferrer"` per PR 1's out-link rule. `README.md:7` needs
+no qualification under this branch.
+
+### Branch B — B must install the App on the repo themselves
+
+Same row and same placement, but the copyable message must also carry
+`GITHUB_APP_INSTALL_URL` (`githubOAuth.ts:7`, already imported into
+`VaultSettings.tsx:23`) and say plainly that the invitee installs Meridian on
+the *same* repo before signing in.
+
+Under this branch **`README.md:7` overstates the current product** — "Point
+Meridian at a repo and everyone you share it with reads and writes the same
+repo — no vault to configure, no plugins" is true of the vault but not of the
+install step. Qualify that sentence in the same PR; it is the sentence this
+whole plan exists to make honest, so shipping the invite path while leaving it
+unqualified would be the worst of both.
+
+### Either way
+
+Don't invent the answer. This is the field where a confident guess is worst —
+Branch A's copy actively tells the invitee *not* to do the thing Branch B
+requires, so guessing wrong produces instructions that don't work.
 
 ---
 
