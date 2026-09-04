@@ -6,7 +6,10 @@ import { journal } from './syncJournal'
 const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
 export const GITHUB_APP_INSTALL_URL = 'https://github.com/apps/realjohndoe-meridian/installations/new'
 
-const REDIRECT_URI = 'https://realjohndoe.github.io/meridian/auth/callback'
+/** The deployed app's URL — also where an invite message sends a collaborator. */
+export const APP_URL = 'https://realjohndoe.github.io/meridian/'
+
+const REDIRECT_URI = `${APP_URL}auth/callback`
 
 const VERIFIER_KEY = 'meridian_oauth_verifier'
 const STATE_KEY = 'meridian_oauth_state'

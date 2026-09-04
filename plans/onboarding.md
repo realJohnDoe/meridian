@@ -55,55 +55,6 @@ repository on GitHub" link uses `?name=meridian-vault`.
 
 ---
 
-## PR 4 — An invite path for the shared-repo story
-
-**Model: Sonnet 5.** One `SettingsRow`, one link, one copyable message.
-
-The decision above keeps multi-user in the pitch, and right now **all** of it
-happens outside the product: to share a vault, the second person has to be added
-as a repo collaborator on github.com. There is no invite affordance anywhere in
-`src/`.
-
-### What the invitee actually has to do
-
-**Install is per repo, not per person; each additional person only has to
-authorize.** Settled by the app owner, and it matches how user-to-server tokens
-are specified to work: a user access token's reach is the *intersection* of what
-the installation can see and what the user can see. So once A has installed
-Meridian on `A/vault`, a collaborator B who signs in gets `A/vault` back from
-`GET /user/installations` → `GET /user/installations/{id}/repositories`
-(`githubOAuth.ts:384-399`) without installing anything — B's OAuth consent at
-sign-in is the whole of B's setup.
-
-Two conditions this rests on, both satisfied by construction: A's installation
-must actually cover that repo (it does — it is the repo A connected), and B must
-have repo access on GitHub (that is what being added as a collaborator means).
-
-This is asserted from the app's own configuration plus the documented token
-semantics, **not** from a two-account test. The first real shared vault
-confirms it for free; if B ever lands on an empty repo list after being added as
-a collaborator, this is the assumption that broke, and the invite copy below
-then needs `GITHUB_APP_INSTALL_URL` added and `README.md:7` qualified.
-
-### The PR
-
-A new `SettingsRow` in the existing **Source** `SettingsSection`
-(`VaultSettings.tsx:151`), directly under the `Repository` row at
-`VaultSettings.tsx:211-220`, gated the same way on `vault.kind === 'github'`:
-
-- A link to `https://github.com/{owner}/{repo}/settings/access` — the page where
-  a collaborator is added. `vault.github.owner`/`.repo` are already in scope.
-- A copy-to-clipboard button yielding a short message the owner can send: what
-  Meridian is, the app URL, and that the recipient signs in with GitHub and
-  picks the repo. **No install step in that text** — per the above, they don't
-  need one, and telling them to install would send them somewhere confusing.
-
-`target="_blank" rel="noreferrer"` per PR 1's out-link rule. `README.md:7` needs
-no qualification: "everyone you share it with reads and writes the same repo —
-no vault to configure, no plugins" is accurate under this model.
-
----
-
 ## Deferred
 
 **One-hop install → sign-in.** GitHub Apps can be configured to request user
