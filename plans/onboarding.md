@@ -100,6 +100,9 @@ And one that bites after the flow appears to succeed:
 
 ## PR 1 — Make the GitHub connect path survivable without a repo
 
+**Model: Sonnet 5.** Every site is named below, the traps are located, and a
+wrong guess breaks a test rather than failing quietly.
+
 The core of finding #5. All in `src/routes/auth.callback.tsx` and
 `src/settings/AddVaultWizard.tsx`; no storage or model changes.
 
@@ -129,12 +132,17 @@ repo. Add one line above them saying the App has to be installed on a repo for
 it to appear in the list, which is the fact that makes an empty list make sense.
 
 **3. Fold `no-installations` into the picker.** It is the zero-length case of the
-same screen and currently a separate dead end (`:166-177`). Once the picker
-carries both links, render it with an empty list and a different lead line
-rather than a distinct phase — that removes the "come back and sign in again"
-instruction for anyone who now has a link to click in place. Keep the
-`no-installations` *phase* if it simplifies the diff; the requirement is that the
-screen offers the two links, not that the union is literal.
+same screen and currently a separate dead end (`:166-177`). Concretely: delete
+the `no-installations` phase from the `Phase` union (`:41`) and its render block
+(`:166-177`), and make both call sites set `{ kind: 'picking', tokens, repos }`
+unconditionally — `tokens` is already in scope at `:89` and `:117`. The picker
+then branches on `repos.length === 0` for its lead line only ("Meridian isn't
+installed on any repository yet" vs "Choose a repository"), and both links are
+present either way. That removes the "come back and sign in again" instruction
+entirely, since there is now something to click in place.
+
+Leave `reconnect-repo-missing` (`:179-190`) alone — it is a genuinely different
+state with an owner/repo in its message, and it is not on the new-user path.
 
 **4. Tell the user what's coming, before the redirect.** In
 `AddVaultWizard.tsx:234-237`, replace *"Choose which repository to connect after
@@ -171,10 +179,15 @@ picker.
 
 ## PR 2 — An empty repository is a normal state, not a conflict
 
-**First, confirm the premise** (~5 minutes, needs a real GitHub account): make
-an empty repo with no README, install the App on it, connect it, and record the
-exact error. The 409 → `ConflictError` mapping is verified from source, but the
-observed message is what the fix has to replace.
+**Model: Sonnet 5 for the code — but it cannot start until someone answers the
+one question at the end of this section**, which needs a GitHub token and a
+throwaway repo, so it is not a model-tier question at all. The likely answer
+makes this a small PR; the unlikely one makes it a different, larger one.
+
+The same throwaway repo answers a second, smaller thing worth having: connect it
+and record the **exact error text** the user currently sees. The 409 →
+`ConflictError` mapping is verified from source, but the observed string is what
+the fix has to replace, and it belongs in the PR description.
 
 Then, in `githubBackend.ts:153-186`: catch **409 specifically in `statAll`** and
 return an empty `Map` rather than throwing. An empty repo has no files, which is
@@ -190,15 +203,61 @@ on the error. Scope the change to `statAll`'s catch, matching on GitHub's
 `Git Repository is empty` message rather than the bare status if the live check
 shows the status alone is ambiguous.
 
-Worth pairing with a first-write check: an empty repo has **no default branch**
-until its first commit, even though `fetchInstalledRepos` (`githubOAuth.ts:396`)
-reports `default_branch` as `main`. Confirm during the live check whether the
-first write succeeds against a branch that doesn't exist yet; if it doesn't,
-that is part of this PR, not a follow-up.
+**The one open question, and why it decides the size of this PR.**
+
+Connecting an empty repo touches GitHub twice, and the fix above only covers
+the first:
+
+1. **The read.** `statAll` asks for the tree of branch `main`. On a repo with
+   no commits that ref does not exist, so GitHub 409s. That is the fix above.
+2. **The first write.** `write()` (`githubBackend.ts:276-296`) uses
+   `PUT /repos/{owner}/{repo}/contents/{path}` with `branch: this._cfg.branch`
+   — i.e. `main`, which still doesn't exist at that moment, because the
+   repo *still* has no commits. Fixing the read gets the user connected; it
+   does nothing about this.
+
+So the question is exactly one thing:
+
+> **Does `PUT /repos/{owner}/{repo}/contents/{path}` with `branch: "main"`
+> succeed on a repository with zero commits, creating the initial commit and
+> the branch?**
+
+- **If yes** → the `statAll` catch is the entire PR. Sonnet 5, as scoped above.
+- **If no** → Meridian has to create an initial commit itself before the first
+  write can land. That is a different piece of work — what to commit, what
+  happens when two devices connect the same empty repo at once, how it
+  interacts with `syncJournal` — and it should be its own PR at Opus tier
+  rather than being absorbed into this one. **Stop and re-plan if the answer
+  is no.**
+
+**Expectation, stated as an expectation:** probably yes. The Contents API is the
+usual way to bootstrap an empty repo, and it is a different endpoint family from
+the Git Data API (blobs/trees/commits/refs), which definitely does 409 on an
+empty repo and is what most "409 Git Repository is empty" reports are about.
+Meridian uses the Contents API, not the Git Data API, so it is on the side of
+that split more likely to work. This could not be confirmed from a primary
+source in the session that wrote this plan — `docs.github.com` was unreachable —
+so it stays a question rather than an assumption.
+
+**How to answer it** (~30 seconds, no code): create a throwaway repo with *no*
+README, then
+
+```
+curl -X PUT -H "Authorization: Bearer $TOKEN" \
+  https://api.github.com/repos/<you>/<throwaway>/contents/test.md \
+  -d '{"message":"test","content":"aGk=","branch":"main"}'
+```
+
+A 201 means yes. Record the answer here, then implement.
 
 ---
 
 ## PR 3 — Make the app's own instructions true
+
+**Model: Sonnet 5** for part 1 (a state-machine change with two named
+silent-failure modes); **Haiku 4.5** for part 2 if the surviving vault term is
+given in the task, since it is then a copy rewrite against labels listed below.
+Splittable into two PRs on that line if you'd rather.
 
 Two things a new user reads that are currently wrong, both cheap.
 
@@ -235,28 +294,50 @@ it and let #2 do all sites at once. **Check `GLOSSARY.md` before renaming** —
 
 ## PR 4 — An invite path for the shared-repo story
 
+**Model: Sonnet 5.** One `SettingsRow`, one link, one copyable message.
+
 The decision above keeps multi-user in the pitch, and right now **all** of it
 happens outside the product: to share a vault, the second person has to be added
-as a repo collaborator on github.com, and (unverified — see below) may need the
-App installed for their own account too. There is no invite affordance anywhere
-in `src/`.
+as a repo collaborator on github.com. There is no invite affordance anywhere in
+`src/`.
 
-**Settle this first, and the shape of the PR follows.** `fetchInstalledRepos`
-(`githubOAuth.ts:384-399`) calls `GET /user/installations`. Whether that surfaces
-the *owner's* installation to a plain repo collaborator decides everything:
+### What the invitee actually has to do
 
-- **If it does** — the invitee's path is "be added as a collaborator, sign in,
-  pick the repo", and this PR is a share sheet on the vault settings screen: a
-  link to the repo's `…/settings/access` page, plus copy-able instructions to
-  send. Small.
-- **If it doesn't** — every invitee must install the App themselves, and the
-  invite has to carry `GITHUB_APP_INSTALL_URL` with an explanation. Still small,
-  but the copy is materially different and the claim in `README.md:7` needs
-  qualifying.
+**Install is per repo, not per person; each additional person only has to
+authorize.** Settled by the app owner, and it matches how user-to-server tokens
+are specified to work: a user access token's reach is the *intersection* of what
+the installation can see and what the user can see. So once A has installed
+Meridian on `A/vault`, a collaborator B who signs in gets `A/vault` back from
+`GET /user/installations` → `GET /user/installations/{id}/repositories`
+(`githubOAuth.ts:384-399`) without installing anything — B's OAuth consent at
+sign-in is the whole of B's setup.
 
-Needs two real GitHub accounts and one repo to answer; it cannot be settled from
-this repository. Don't write the copy before it is answered — this is the field
-where a confident guess is worst.
+Two conditions this rests on, both satisfied by construction: A's installation
+must actually cover that repo (it does — it is the repo A connected), and B must
+have repo access on GitHub (that is what being added as a collaborator means).
+
+This is asserted from the app's own configuration plus the documented token
+semantics, **not** from a two-account test. The first real shared vault
+confirms it for free; if B ever lands on an empty repo list after being added as
+a collaborator, this is the assumption that broke, and the invite copy below
+then needs `GITHUB_APP_INSTALL_URL` added and `README.md:7` qualified.
+
+### The PR
+
+A new `SettingsRow` in the existing **Source** `SettingsSection`
+(`VaultSettings.tsx:142`), directly under the `Repository` row at
+`VaultSettings.tsx:202-210`, gated the same way on `vault.kind === 'github'`:
+
+- A link to `https://github.com/{owner}/{repo}/settings/access` — the page where
+  a collaborator is added. `vault.github.owner`/`.repo` are already in scope.
+- A copy-to-clipboard button yielding a short message the owner can send: what
+  Meridian is, the app URL, and that the recipient signs in with GitHub and
+  picks the repo. **No install step in that text** — per the above, they don't
+  need one, and telling them to install would send them somewhere confusing.
+
+`target="_blank" rel="noreferrer"` per PR 1's out-link rule. `README.md:7` needs
+no qualification: "everyone you share it with reads and writes the same repo —
+no vault to configure, no plugins" is accurate under this model.
 
 ---
 
