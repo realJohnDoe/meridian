@@ -122,7 +122,10 @@ reconnect of a known vault should still go straight through without asking.
 **2. Give the picker somewhere to go.** Under the repo list at `:192-207`, add:
 
 - **"Create a new repository on GitHub"** → `https://github.com/new` (see the
-  prefill note above), and
+  prefill note above). **Say "tick *Add a README*" next to this link** — a repo
+  created without one has no commits, which is the state PR 2 is about; telling
+  the user to tick it means the guided path never produces one, at the cost of a
+  single clause of copy.
 - **"Add another repository…"** → `GITHUB_APP_INSTALL_URL`
   (`githubOAuth.ts:7`, already imported at `:5`).
 
@@ -179,68 +182,51 @@ picker.
 
 ## PR 2 — An empty repository is a normal state, not a conflict
 
-**Model: Sonnet 5 for the code — but it cannot start until someone answers the
-one question at the end of this section**, which needs a GitHub token and a
-throwaway repo, so it is not a model-tier question at all. The likely answer
-makes this a small PR; the unlikely one makes it a different, larger one.
+**Model: Sonnet 5. Not blocked on anything.**
 
-The same throwaway repo answers a second, smaller thing worth having: connect it
-and record the **exact error text** the user currently sees. The 409 →
-`ConflictError` mapping is verified from source, but the observed string is what
-the fix has to replace, and it belongs in the PR description.
+**The design is settled: accept the empty repo, and push into it when the user
+creates their first item.** That is the whole intent, and nothing below is a
+fork in it.
 
-Then, in `githubBackend.ts:153-186`: catch **409 specifically in `statAll`** and
+In `githubBackend.ts:153-186`: catch **409 specifically in `statAll`** and
 return an empty `Map` rather than throwing. An empty repo has no files, which is
 exactly what an empty tree listing means — the current failure is a category
 error, not a missing feature. Everything downstream (`parseToStoreItems` →
 expansion → agenda) already handles a vault with no files, since that is what a
-freshly-created local folder looks like.
+freshly-created local folder looks like. The user then gets an empty agenda,
+creates an entry, and `write()` pushes it.
 
 **Do not** widen `failureKind.ts:57` to treat 409 as non-conflict globally — 409
 is a real SHA-mismatch conflict on the write paths, and the comment at
 `githubApi.ts:58-64` explains why the status and GitHub's own message are kept
 on the error. Scope the change to `statAll`'s catch, matching on GitHub's
 `Git Repository is empty` message rather than the bare status if the live check
-shows the status alone is ambiguous.
+below shows the status alone is ambiguous.
 
-**The one open question, and why it decides the size of this PR.**
+While you have a throwaway empty repo connected, record the **exact error text**
+a user sees today — the 409 → `ConflictError` mapping is verified from source,
+but the observed string is what this PR replaces, and it belongs in the PR
+description.
 
-Connecting an empty repo touches GitHub twice, and the fix above only covers
-the first:
+### One factual unknown, which is not a blocker
 
-1. **The read.** `statAll` asks for the tree of branch `main`. On a repo with
-   no commits that ref does not exist, so GitHub 409s. That is the fix above.
-2. **The first write.** `write()` (`githubBackend.ts:276-296`) uses
-   `PUT /repos/{owner}/{repo}/contents/{path}` with `branch: this._cfg.branch`
-   — i.e. `main`, which still doesn't exist at that moment, because the
-   repo *still* has no commits. Fixing the read gets the user connected; it
-   does nothing about this.
+`write()` (`githubBackend.ts:276-296`) does
+`PUT /repos/{owner}/{repo}/contents/{path}` with `branch: this._cfg.branch` —
+i.e. `main`, which on a zero-commit repo does not exist as a ref yet. So:
 
-So the question is exactly one thing:
+> Does `PUT /contents` with `branch: "main"` succeed on a repo with no commits,
+> creating the initial commit and the branch?
 
-> **Does `PUT /repos/{owner}/{repo}/contents/{path}` with `branch: "main"`
-> succeed on a repository with zero commits, creating the initial commit and
-> the branch?**
+**Expected: yes.** The Contents API is a different endpoint family from the Git
+Data API (blobs/trees/commits/refs); the Git Data one definitely 409s on an
+empty repo and is what nearly every "Git Repository is empty" report is about.
+Meridian uses the Contents API. This could not be confirmed from a primary
+source when this plan was written — `docs.github.com` was unreachable — so it
+is written as an expectation.
 
-- **If yes** → the `statAll` catch is the entire PR. Sonnet 5, as scoped above.
-- **If no** → Meridian has to create an initial commit itself before the first
-  write can land. That is a different piece of work — what to commit, what
-  happens when two devices connect the same empty repo at once, how it
-  interacts with `syncJournal` — and it should be its own PR at Opus tier
-  rather than being absorbed into this one. **Stop and re-plan if the answer
-  is no.**
-
-**Expectation, stated as an expectation:** probably yes. The Contents API is the
-usual way to bootstrap an empty repo, and it is a different endpoint family from
-the Git Data API (blobs/trees/commits/refs), which definitely does 409 on an
-empty repo and is what most "409 Git Repository is empty" reports are about.
-Meridian uses the Contents API, not the Git Data API, so it is on the side of
-that split more likely to work. This could not be confirmed from a primary
-source in the session that wrote this plan — `docs.github.com` was unreachable —
-so it stays a question rather than an assumption.
-
-**How to answer it** (~30 seconds, no code): create a throwaway repo with *no*
-README, then
+**It does not gate this PR.** The `statAll` fix is correct either way, and
+answering the question needs nothing more than the curl below once someone has a
+token to hand:
 
 ```
 curl -X PUT -H "Authorization: Bearer $TOKEN" \
@@ -248,7 +234,15 @@ curl -X PUT -H "Authorization: Bearer $TOKEN" \
   -d '{"message":"test","content":"aGk=","branch":"main"}'
 ```
 
-A 201 means yes. Record the answer here, then implement.
+**If it turns out to be no,** the graceful fallback is already in PR 1 rather
+than here: the "Create a new repository on GitHub" link should tell the user to
+tick **"Add a README"**, which puts a first commit in the repo and means the
+zero-commit state never arises on the guided path at all. Only someone who made
+a bare repo elsewhere would still hit it, and *then* it is worth deciding
+whether Meridian should create an initial commit itself — a separate, larger
+piece of work (what to commit, two devices racing on the same empty repo, how it
+interacts with `syncJournal`) that should be its own PR and is explicitly **not**
+in scope here.
 
 ---
 
