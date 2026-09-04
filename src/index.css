@@ -156,11 +156,6 @@
   --ink-dark:  var(--background);
   --ink-light: oklch(1 0 0);
 
-  /* Destructive */
-  --destructive: oklch(0.72 0.20 15);   /* rose */
-  --warning:     oklch(0.86 0.16 74);   /* amber */
-  --warning-foreground: var(--ink-dark);
-
   /* Borders */
   --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);   /* slate at ~8% */
   --input:  color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);   /* slate at ~15% */
@@ -265,6 +260,22 @@
   --search-bottom-inset: max(16px, env(safe-area-inset-bottom, 0px));
 }
 
+/* Destructive / warning — aliased to priority-1/priority-3 so the
+   Delete/Archive dialog buttons (and every other destructive/warning
+   usage) match the same reds/yellows used for task priority, rather than
+   an independently-tuned rose/amber pair that can drift from them. Every
+   theme selector is listed explicitly, not just :root, because
+   AppearanceSettings previews each theme by applying its class to a
+   nested swatch element rather than to <html> — a var(--priority-1)
+   reference declared only on :root would resolve against whichever
+   theme is active on <html>, not the theme the swatch is previewing. */
+:root, .meridian, .meridian-light, .tokyo-night, .rose-pine-dawn,
+.solarized-light, .solarized-dark, .dracula, .catppuccin-latte, .catppuccin-mocha {
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
+  --warning-foreground: var(--ink-dark);
+}
+
 /* ── MERIDIAN LIGHT THEME ───────────────────────────────────────── */
 /* The light half of the brand pair — same indigo identity as .meridian
    (surfaces on hue 252, primary/event on 278), inverted onto a cool paper
@@ -308,11 +319,6 @@
      .rose-pine-dawn and .catppuccin-latte make for the same reason. */
   --ink-light: oklch(0.99 0.004 252);
   --ink-dark:  oklch(0.17 0.030 270);
-
-  /* Destructive / warning — darkened to read on light surfaces */
-  --destructive: oklch(0.55 0.20 15);
-  --warning:     oklch(0.62 0.14 74);
-  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, oklch(0.525 0.038 250), transparent 78%);
@@ -404,11 +410,6 @@
   --ink-dark:  #1a1b2e;
   --ink-light: #ffffff;
 
-  /* Destructive / warning */
-  --destructive: #f7768e;
-  --warning:     #e0af68;
-  --warning-foreground: var(--ink-dark);
-
   /* Borders */
   --border: color-mix(in oklab, #565f89, transparent 80%);
   --input:  color-mix(in oklab, #565f89, transparent 70%);
@@ -486,11 +487,6 @@
      yellow, well under AA; the dark-variant base clears ~7.5:1. */
   --ink-light: #fffaf3;
   --ink-dark:  #191724;
-
-  /* Destructive / warning */
-  --destructive: #b4637a;
-  --warning:     #ea9d34;
-  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #9893a5, transparent 78%);
@@ -580,11 +576,6 @@
      black clears 4.5:1+ on all six swatches, so it replaces that slate here. */
   --ink-light: #fdf6e3;
   --ink-dark:  #000000;
-
-  /* Destructive / warning */
-  --destructive: #dc322f;
-  --warning:     #b58900;
-  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #839496, transparent 78%);
@@ -679,11 +670,6 @@
   --ink-light: #fdf6e3;
   --ink-dark:  #002b36;
 
-  /* Destructive / warning */
-  --destructive: #dc322f;
-  --warning:     #b58900;
-  --warning-foreground: var(--ink-dark);
-
   /* Borders */
   --border: color-mix(in oklab, #586e75, transparent 80%);
   --input:  color-mix(in oklab, #586e75, transparent 70%);
@@ -763,11 +749,6 @@
   --ink-dark:  #191a21;
   --ink-light: #ffffff;
 
-  /* Destructive / warning */
-  --destructive: #ff5555;
-  --warning:     #f1fa8c;
-  --warning-foreground: var(--ink-dark);
-
   /* Borders */
   --border: color-mix(in oklab, #6272a4, transparent 80%);
   --input:  color-mix(in oklab, #6272a4, transparent 70%);
@@ -846,11 +827,6 @@
      yellow, well under AA; Mocha's crust clears ~7.2:1. */
   --ink-light: #eff1f5;
   --ink-dark:  #11111b;
-
-  /* Destructive / warning */
-  --destructive: #d20f39;   /* red */
-  --warning:     #df8e1d;   /* yellow */
-  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #9ca0b0, transparent 78%);
@@ -942,11 +918,6 @@
      .catppuccin-latte borrows Mocha's crust for its own ink-dark. */
   --ink-dark:  #11111b;
   --ink-light: #eff1f5;
-
-  /* Destructive / warning */
-  --destructive: #f38ba8;
-  --warning:     #f9e2af;
-  --warning-foreground: var(--ink-dark);
 
   /* Borders */
   --border: color-mix(in oklab, #6c7086, transparent 80%);
