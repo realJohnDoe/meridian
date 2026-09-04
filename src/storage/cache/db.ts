@@ -30,6 +30,16 @@ export interface DexieFileRow {
    * the primary key and indexes, not the row's shape.
    */
   baseContent?: string
+  /**
+   * The retention sweep's age signal — see `RawFile.lastModified`, whose
+   * value this carries forward into the cache. Same no-version-bump shape as
+   * `baseContent` above, and the same rule for absence: a row written before
+   * this field existed, or one the backend never supplied a value for, reads
+   * back `undefined` — never defaulted to `updatedAt` (that is when *this
+   * device's* cache row was written, not the file; see `CacheRecord`'s doc
+   * comment) or to `0`. Absent means unknown, and unknown never archives.
+   */
+  lastModified?: number
 }
 
 /**

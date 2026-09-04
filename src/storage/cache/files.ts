@@ -42,13 +42,15 @@ export interface CacheRecord {
    * `DexieFileRow.baseContent`.
    */
   baseContent?: string
+  /** The retention sweep's age signal — see `DexieFileRow.lastModified`. */
+  lastModified?: number
 }
 
 function toCacheRecord(r: DexieFileRow): CacheRecord {
   return {
     vaultPath: r.vaultPath, vaultId: r.vaultId, path: r.path, content: r.content,
     status: toStatus(r.dirty), updatedAt: r.updatedAt, version: r.version,
-    baseContent: r.baseContent,
+    baseContent: r.baseContent, lastModified: r.lastModified,
   }
 }
 
@@ -186,7 +188,7 @@ export async function markMerged(
  */
 export async function applyRemoteBatch(
   vaultId: string,
-  records: Array<{ path: string; content: string; version?: string }>,
+  records: Array<{ path: string; content: string; version?: string; lastModified?: number }>,
 ): Promise<string[]> {
   const d = await cacheInit()
   const now = Date.now()

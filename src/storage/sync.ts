@@ -25,6 +25,7 @@ import { getBackend } from './backends'
 import { journal, hashContent, syncJournalDump } from './syncJournal'
 import { parseFiles, reportParseFailures } from './parseReport'
 import { syncStateFor, noteSyncSuccess, noteSyncFailure } from './syncState'
+import { sweepRetention } from './retentionSweep'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
@@ -453,15 +454,21 @@ export async function reconcileWithBackend(
   if (changed.length > 0) {
     let freshFiles: RawFile[]
     if (changed.length > LARGE_RECONCILE_THRESHOLD) {
+      // readAll() already backfills `lastModified` per file (FS mtime, or
+      // GitHub's batched commit-date lookup) — real values, kept as-is.
       const changedSet = new Set(changed)
       freshFiles = (await backend.readAll()).filter(f => changedSet.has(f.path))
     } else {
-      freshFiles = await backend.readFiles(changed)
+      // readFiles() never sets `lastModified` (see its doc comment on
+      // RawFile) — an incremental pull's changed token IS the modification
+      // (plans/archived-entries.md 4b), so stamp it here rather than paying
+      // for a per-file history lookup on every ordinary sync.
+      freshFiles = (await backend.readFiles(changed)).map(f => ({ ...f, lastModified: Date.now() }))
     }
     written = new Set(await applyRemoteBatch(vaultId, freshFiles))
     for (const f of freshFiles) {
       if (!written.has(f.path)) continue
-      cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, status: 'clean', updatedAt: Date.now(), version: f.version })
+      cacheMap.set(f.path, { vaultPath: `${vaultId}::${f.path}`, vaultId, path: f.path, content: f.content, status: 'clean', updatedAt: Date.now(), version: f.version, lastModified: f.lastModified })
       // A pull is the other way a record's base version changes, so it belongs
       // in the same journal as the pushes — a conflict caused by a reconcile
       // stamping an older token over a fresher one is otherwise invisible.
@@ -818,7 +825,13 @@ export async function runSync(
     await settlePendingMoves(released)
     setVaultSync(vaultId, { error: null, offline: false, lastSyncedAt: Date.now(), needsAttention: null })
     noteSyncSuccess(syncState)
-    if (pulled) syncState.lastPullAt = Date.now()
+    if (pulled) {
+      syncState.lastPullAt = Date.now()
+      // Runs after a pull specifically — see retentionSweep.ts's doc comment
+      // and plans/archived-entries.md 4d. Never rejects (its own errors are
+      // caught below), so it can't take a successful cycle down with it.
+      void sweepRetention(vaultId).catch((e: unknown) => console.error(`[vault] retention sweep failed for ${vaultId}:`, e))
+    }
     updateSyncUI(backend)
   } catch (e) {
     console.error(`[vault] sync failed for ${vaultId}:`, e)

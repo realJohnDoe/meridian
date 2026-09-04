@@ -58,6 +58,17 @@ const GRAPHQL_BATCH_SIZE = 50
 const GRAPHQL_CONCURRENCY = 10
 /** readAll() routes through readFiles() below this size — GraphQL batching only pays off in bulk. */
 const GRAPHQL_MIN_FILES = READ_FILES_CONCURRENCY
+/**
+ * Paths per commit-date GraphQL batch (plans/archived-entries.md 4b's
+ * `lastModified` backfill). Deliberately its own, smaller constant rather
+ * than reusing `GRAPHQL_BATCH_SIZE`: that number was measured against
+ * `buildBlobQuery`, which reads a blob straight off the tree, while
+ * `history(path: ...)` walks a per-path commit log — real work on GitHub's
+ * side, not a lookup — so it is heavier per aliased field at the same batch
+ * size. Chosen conservatively pending a measurement against a real large
+ * repo, the way `GRAPHQL_BATCH_SIZE`'s 50 was.
+ */
+const HISTORY_BATCH_SIZE = 20
 
 function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = []
@@ -94,6 +105,36 @@ function buildBlobQuery(branch: string, paths: string[]): string {
   return `query($owner: String!, $name: String!) {
     repository(owner: $owner, name: $name) {
       ${fields}
+    }
+  }`
+}
+
+type HistoryQueryResult = {
+  repository: {
+    ref: { target: Record<string, { nodes: { committedDate: string }[] } | null> | null } | null
+  }
+}
+
+/**
+ * Builds a GraphQL query that fetches each path's most recent commit date in
+ * one request, one `history` field per path aliased as f0, f1, … — same
+ * aliasing shape as `buildBlobQuery`, but every alias shares one `ref`/
+ * `target` lookup (the branch is constant across the batch; only `path`
+ * varies) rather than each carrying its own `object(expression: ...)`.
+ */
+function buildHistoryQuery(branch: string, paths: string[]): string {
+  const fields = paths
+    .map((path, i) => `f${i}: history(first: 1, path: "${escapeGraphQLString(path)}") { nodes { committedDate } }`)
+    .join('\n')
+  return `query($owner: String!, $name: String!) {
+    repository(owner: $owner, name: $name) {
+      ref(qualifiedName: "refs/heads/${escapeGraphQLString(branch)}") {
+        target {
+          ... on Commit {
+            ${fields}
+          }
+        }
+      }
     }
   }`
 }
@@ -235,8 +276,10 @@ export class GitHubBackend implements StorageBackend {
     const total  = paths.length
     if (total === 0) return []
     // Small vaults: a single GraphQL batch wouldn't beat readFiles' own request
-    // count by enough to justify the extra code path.
-    if (total < GRAPHQL_MIN_FILES) return this.readFiles(paths)
+    // count by enough to justify the extra code path. Still backfilled below —
+    // readFiles() itself never sets lastModified (see its RawFile doc comment),
+    // but readAll() always does, small vault or not.
+    if (total < GRAPHQL_MIN_FILES) return this.backfillLastModified(await this.readFiles(paths))
 
     const files: RawFile[] = []
     const fallbackPaths: string[] = []
@@ -270,7 +313,46 @@ export class GitHubBackend implements StorageBackend {
       files.push(...await this.readFiles(fallbackPaths))
     }
 
-    return files
+    return this.backfillLastModified(files)
+  }
+
+  /**
+   * Attach each file's most recent commit date as `lastModified` — the
+   * retention sweep's age signal (plans/archived-entries.md 4b). Blobs carry
+   * no dates of their own, so this is a second pass of batched, aliased
+   * GraphQL queries (see `buildHistoryQuery`) after the content is already in
+   * hand — done here, once, on `readAll()` only: an incremental pull
+   * (`readFiles()`) has no call to this at all, and stamps the current time
+   * instead (see `reconcileWithBackend`) rather than paying for a
+   * history lookup on every ordinary sync.
+   *
+   * Soft-fails: a lookup that errors (or a path with no history — shouldn't
+   * happen, but `nodes` can come back empty) leaves that file's
+   * `lastModified` unset rather than failing the whole read. The content is
+   * what matters; the age signal degrades to "unknown", which the sweep
+   * already treats as "never archive" — fails safe, same as everywhere else
+   * in 4b.
+   */
+  private async backfillLastModified(files: RawFile[]): Promise<RawFile[]> {
+    if (files.length === 0) return files
+    const dates = new Map<string, number>()
+    try {
+      await mapWithConcurrency(chunk(files.map(f => f.path), HISTORY_BATCH_SIZE), GRAPHQL_CONCURRENCY, async batch => {
+        const data = await this._octokit.graphql<HistoryQueryResult>(
+          buildHistoryQuery(this._cfg.branch, batch),
+          { owner: this._cfg.owner, name: this._cfg.repo },
+        )
+        const target = data.repository.ref?.target
+        batch.forEach((path, i) => {
+          const committedDate = target?.[`f${i}`]?.nodes[0]?.committedDate
+          if (committedDate) dates.set(path, new Date(committedDate).getTime())
+        })
+      })
+    } catch (e) {
+      console.warn('[github] could not backfill lastModified:', e)
+      return files
+    }
+    return files.map(f => ({ ...f, lastModified: dates.get(f.path) }))
   }
 
   async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {

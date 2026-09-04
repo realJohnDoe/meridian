@@ -834,6 +834,32 @@ export function toggleDone(data: StoreData, occ: Occurrence): StoreData {
 // ── Exclude / delete ──────────────────────────────────────────────────────────
 
 /**
+ * Whether `seriesId`'s after_completion series has an occurrence that is
+ * neither excluded nor done — i.e. still pending completion.
+ *
+ * Shared by `deletionEndsAfterCompletionSeries` below (the *hypothetical* "if
+ * `excludeId` were deleted, would one remain?") and `retention.ts`'s
+ * `isAfterCompletionFinished` (the *current* "is one pending right now?",
+ * with no exclusion) — extracted so "open" can't drift apart between the two.
+ *
+ * `false` is not by itself "the series is finished": a `done` occurrence
+ * isn't open either, but completing it is what generates the next one
+ * (`expansion.ts`), so a just-completed series still has work coming — see
+ * `isAfterCompletionFinished`'s doc comment for how it tells the two apart.
+ */
+export function hasOpenAfterCompletionOccurrence(
+  items: StoreItem[], seriesId: string, excludeId?: string,
+): boolean {
+  return items.some(i => {
+    if (isSeries(i)) return false
+    const io = i
+    if (io.ownerId !== seriesId) return false
+    if (excludeId !== undefined && io.id === excludeId) return false
+    return !io.excluded && !io.metadata.done
+  })
+}
+
+/**
  * True when deleting `occ` would end its after_completion series: `occ` is
  * the series' one open (undone, non-excluded) occurrence, and once it's gone
  * there is nothing left that could trigger the next occurrence's generation.
@@ -842,11 +868,7 @@ export function deletionEndsAfterCompletionSeries(items: StoreItem[], occ: Occur
   const series = findSeries(items, occ)
   if (!series || series.repeat.type !== 'after_completion') return false
   if (occ.metadata.done) return false
-  return !items.some(i => {
-    if (isSeries(i)) return false
-    const io = i
-    return io.ownerId === series.id && io.id !== occ.id && !io.excluded && !io.metadata.done
-  })
+  return !hasOpenAfterCompletionOccurrence(items, series.id, occ.id)
 }
 
 /**

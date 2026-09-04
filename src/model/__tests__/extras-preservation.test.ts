@@ -138,6 +138,7 @@ const EXEMPT: Record<string, string> = {
   findSeries: 'pure lookup — returns an existing object untouched',
   seriesContext: 'read-only derivation — returns booleans plus an existing repeat spec',
   deletionEndsAfterCompletionSeries: 'predicate — returns a boolean',
+  hasOpenAfterCompletionOccurrence: 'predicate — returns a boolean',
   occFromAppMeta: 'metadata constructor, covered by its own test below',
   newEntryKey: 'pure key allocation — returns a string, never touches metadata',
   draftEntryKey: 'pure lookup — returns an existing entry\'s key, never touches metadata',

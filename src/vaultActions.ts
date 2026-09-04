@@ -1,6 +1,6 @@
 export {
   addLocalVault, addGitHubVaultOAuth, reauthGitHubVault, addIcalVault, addExampleVault, removeVault, renameVault,
-  setVaultColor, setDefaultVault, reconnectVault, isFolderPickerSupported,
+  setVaultColor, setVaultRetentionDays, setDefaultVault, reconnectVault, isFolderPickerSupported,
 } from '@/storage'
 export { previewIcalFeed } from '@/storage'
 export type { VaultRef } from '@/storage'
