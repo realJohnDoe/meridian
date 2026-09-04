@@ -165,12 +165,15 @@ and #5 because they are cheap and wide, not because they matter more.
 | 1 | #1 | No visual proof of the phone claim | declared-vs-served (inverted) | communication | 7 | 3 | Haiku 4.5 | 21 |
 | 2 | #2 | "Example vault" / "Tutorial vault" and the folder/vault/repo fracture | declared-vs-served | communication | 4 | 5 | Haiku 4.5 | 20 |
 | 3 | #3 | iCal, backlog, favorites, themes, multi-vault shipped and unclaimed — blog says the opposite | declared-vs-revealed | both | 7 | 4 | Sonnet 5 | 14 |
-| 5 | #5 | "Usable by someone who won't configure a vault" is not a promise the product can cash | declared-vs-served | fit + communication | 8 | 5 | Opus 5, plan mode, multi-PR | 8 |
+| 5 | #5 | "Usable by someone who won't configure a vault" — the setup half is fixed, the word isn't | declared-vs-served | communication | 5 | 4 | Haiku 4.5 | 20 |
 
-**Sequencing note.** #5 is a positioning decision and #2 picks the surviving
-term; both touch `README.md` and the settings/onboarding copy. Land #5's decision
-first, then #2's rename, then #1 and #3's README edits — otherwise the copy gets
-written twice. #4 is independent (source only) and can go first or in parallel.
+**Sequencing note.** #5's decision (keep the promise, build the sharing path
+rather than soften the claim) has been made and its harder half shipped —
+`plans/onboarding.md`'s PR 4 landed the invite path, 2026-09-04
+(realJohnDoe/meridian#959). What's left of #5 is the same vocabulary problem
+#2 already tracks, so #2 is unblocked and should land next, then #1 and #3's
+README edits — otherwise the copy gets written twice. #4 is independent
+(source only) and can go first or in parallel.
 
 ---
 
@@ -316,61 +319,62 @@ written twice. #4 is independent (source only) and can go first or in parallel.
 
 ---
 
-### #5 — "Usable by someone who won't configure a vault" is not a promise the product can cash
+### #5 — "Usable by someone who won't configure a vault" — the setup half is fixed, the word isn't
 
 - **Gap:** `declared-vs-served`
-- **Question:** fit + communication
-- **Category:** `audience-selection` `adoption-gate` `differentiation`
+- **Question:** communication (was fit + communication — the fit question, "is a
+  shared repo a viable calendar for a non-technical second person," is answered:
+  the invite path now does what the README says. What's left is a naming
+  inconsistency, not a fit gap.)
+- **Category:** `recognition` (was also `audience-selection` `adoption-gate` — the
+  hard adoption gate, a required GitHub App install, is gone for this audience)
 - **Who it costs us:** the non-technical person a current user tries to share a
-  calendar with — the exact person README:7 recruits. **Share: unknown**, and it
-  belongs in the bet list rather than an estimate; see bet 5 in section 5. What
-  is knowable: the claim sits in the first comparison table, at line 24, above
-  the fold.
-- **Impact:** 8
+  calendar with — the exact person README:7 recruits. They can now actually do
+  what the README says (sign in, pick the repo); what still costs them is
+  meeting the word "vault" along the way, not a technical wall.
+- **Impact:** 5 *(was 8 — downgraded now that evidence point 2, the hard block, is resolved)*
 - **Evidence:**
   - `README.md:24` — `| Usable by someone who won't configure a vault | ✅ | ❌ | ✅ |`
   - `README.md:7` recruits that person explicitly: `**And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins. Tag people on entries, filter the calendar down to one person.`
-  - The served path contradicts it three ways:
-    1. **The word.** 33 user-visible `vault` strings in `src/`; the settings
-       screen is a vault list; the wizard is `AddVaultWizard`; and
+  - The served path contradicted it three ways; one is now fixed:
+    1. **The word.** Still open. 33 user-visible `vault` strings in `src/`; the
+       settings screen is a vault list; the wizard is `AddVaultWizard`; and
        `src/onboarding/CoachTour.tsx:73` tells the user to `manage vaults in Settings`.
-    2. **The setup.** `src/routes/auth.callback.tsx:170` —
-       `        description="You're signed in, but the app isn't installed on any repository yet. Install it, then come back and sign in again."`
-       — a round trip out to GitHub to install a third-party App
-       (`githubOAuth.ts:7`), then a **second** sign-in. `README.md:63` describes
-       this as `click "Connect GitHub repo", **Sign in with GitHub**, and pick the repository to use — no token to create by hand.`
-    3. **The alternative.** The only non-GitHub writable backend needs Chrome or
-       Edge (`AddVaultWizard.tsx:27`), which the README concedes at lines 51 and 64.
+       This is the same underlying problem finding #2 already tracks — closing
+       #2's rename closes this too, no separate fix needed.
+    2. ~~**The setup.** `src/routes/auth.callback.tsx:170` — a round trip out to
+       GitHub to install a third-party App, then a second sign-in.~~ **Resolved
+       2026-09-04:** `plans/onboarding.md` PR 4 (merged as
+       realJohnDoe/meridian#959) shipped an in-app invite path for exactly the
+       audience this finding is about — a collaborator adds an "Invite someone"
+       row (`src/settings/VaultSettings.tsx`) that links to the repo's
+       collaborator-access page and copies a message telling the recipient to
+       sign in with GitHub and pick the repo, with no install step, because per
+       the app owner's confirmation (see "Unverified, flagged" above) a
+       collaborator never needs one. `README.md:7`'s claim now holds for this
+       path. (The *owner's* own first-time setup still goes through the
+       App-install round trip at `auth.callback.tsx:170` — untouched, but that
+       was never who this finding is about.)
+    3. **The alternative.** Still open, and minor: the only non-GitHub writable
+       backend needs Chrome or Edge (`AddVaultWizard.tsx:27`) — a real
+       limitation, but a disclosed one (the README concedes it at lines 51 and
+       64), so it is not the same kind of broken promise as points 1 and 2 were.
   - Counter-evidence worth weighing before changing anything: the visual identity
     genuinely does recruit that person (see the blind visual read — it looks like
     a consumer app), and the read-only Tutorial vault genuinely is a zero-setup
     front door. The claim is not fantasy; it is ahead of the setup path.
-- **Breadth:** 5 surfaces (`README.md` lines 7/24/63, `AddVaultWizard.tsx`,
-  `auth.callback.tsx`, `CoachTour.tsx:73`, the settings vault screens).
-- **Recommended model:** **Opus 5, in plan mode, spanning multiple PRs** — and
-  the task context does **not** bring this down a tier, because what is expensive
-  here is a decision, not missing information. Whether the beachhead is the
-  Markdown-vault keeper or the person they share a calendar with determines
-  whether the right move is to delete the claim or to build the setup path that
-  earns it. That is the user's call, and section 6 states it as such.
-  - *The hazard that sets the tier:* the tempting fix — deleting the row and
-    softening line 7 — is a silent positioning loss. It removes the product's
-    only differentiator against Obsidian + TaskNotes that is about *other
-    people* rather than about the author, and the code has been investing in
-    exactly that (participants, per-vault colours, ICS export, multi-vault). A
-    confident copy edit here would position the product *away* from where it is
-    demonstrably heading.
-  - Options the plan should lay out, not choose between: (a) keep the promise and
-    close the gap — a share/invite path that does not require the recipient to
-    understand repos; (b) keep the promise but scope it honestly — "usable by
-    someone who won't configure a vault" becomes "…once you've set it up for
-    them"; (c) drop the audience and commit to the technical niche, in which case
-    the theme menu (below) becomes an asset to surface rather than a curiosity.
-- **Problem:** a person is recruited by an above-the-fold promise and then meets
-  a GitHub App install and a vocabulary the promise said they would not have to
-  learn.
-- **Fix:** decide the beachhead first (section 6), then either build the sharing
-  path or requalify the claim — do not simply delete the row.
+- **Breadth:** 4 surfaces *(was 5 — `auth.callback.tsx` dropped, resolved)*:
+  `README.md` lines 7/24, `AddVaultWizard.tsx`, `CoachTour.tsx:73`, the settings
+  vault screens.
+- **Recommended model:** **Haiku 4.5** *(was Opus 5, plan mode, multi-PR)* — the
+  expensive part was the beachhead decision and the sharing-path build; both are
+  done. What remains is the copy-level rename finding #2 already scopes.
+- **Problem:** a person invited to a shared vault no longer meets a GitHub App
+  install, but still meets the word "vault" the moment they add the shared
+  repo — the promise is functionally true now and terminologically inconsistent.
+- **Fix:** none beyond finding #2's rename. Once #2 lands, re-check that the
+  invite path's own screens (Settings → Vaults → Add vault) don't still say
+  "vault" to the person README:7 told they wouldn't have to learn that word.
 
 ---
 
@@ -406,8 +410,11 @@ DM Sans at `:245`, plus gradients and a multi-layer `--shadow-float` at `:230`.
 names as its context. That is a defensible deliberate divergence — it is how the
 product looks better on a phone than Obsidian does — but it is currently an
 accident of two audiences rather than a stated point of view, and the one signal
-aimed at the declared niche is buried. Depends on #5's decision; do not act on it
-before that.
+aimed at the declared niche is buried. **#5's decision has landed** (keep the
+promise, build the sharing path rather than drop the audience — see finding
+#5), which was the branch under which this item's own "commit to the
+technical niche" framing would have applied. It didn't; this item stays as
+recorded, not acted on.
 
 ---
 
