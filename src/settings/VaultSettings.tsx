@@ -406,7 +406,7 @@ export function VaultSettings({ vault }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           {dirtyCount > 0 && (
-            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+            <div className="flex items-start gap-2 rounded-lg bg-warning px-3 py-2 text-xs text-warning-foreground">
               <TriangleAlert size={14} className="mt-0.5 shrink-0" />
               <span>
                 {dirtyCount} unsynced {dirtyCount === 1 ? 'change has' : 'changes have'} not been backed up and will be lost.

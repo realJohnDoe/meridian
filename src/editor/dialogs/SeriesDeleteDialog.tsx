@@ -78,7 +78,7 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
         </RadioGroup>
 
         {selectedWarning && (
-          <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+          <div className="flex items-start gap-2 rounded-lg bg-warning px-3 py-2 text-xs text-warning-foreground">
             <TriangleAlert size={14} className="shrink-0 mt-0.5" />
             <span>{selectedWarning}</span>
           </div>

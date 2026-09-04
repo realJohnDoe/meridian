@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { EditorView } from '@codemirror/view'
-import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Info, Archive } from 'lucide-react'
+import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Info, Archive, ArchiveRestore } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import type { SeriesContext } from '@/model'
 import { PRIORITY_LABELS } from '@/occView'
@@ -194,16 +194,18 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-3xl lg:mx-auto">
 
         {archived && (
-          <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 mb-3 text-xs text-warning">
+          <div className="flex items-center gap-2 rounded-lg bg-warning px-3 py-2 mb-3 text-xs text-warning-foreground">
             <Archive size={14} className="shrink-0" />
             <span className="flex-1">Archived — hidden from the calendar and search.</span>
-            <button
-              type="button"
-              className={cn(badgeVariants({ variant: 'chip' }), 'shrink-0 text-warning')}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0 gap-1.5"
               onClick={handleUnarchive}
             >
+              <ArchiveRestore className="size-3.5 stroke-[1.7]" />
               Unarchive
-            </button>
+            </Button>
           </div>
         )}
 
