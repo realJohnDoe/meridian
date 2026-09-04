@@ -2,8 +2,7 @@
 
 Plan for closing finding #5 of `plans/product-niche-results.md` — the README
 promises Meridian is "usable by someone who won't configure a vault", and the
-setup path can't currently cash that. Written 2026-09-04; nothing implemented
-yet.
+setup path can't currently cash that. Written 2026-09-04.
 
 Per `plans/CLAUDE.md`: delete each PR's section from this file in the PR that
 implements it, so what remains is only outstanding work.
@@ -50,122 +49,27 @@ That workaround costs more than it buys here:
 **Instead:** link out to GitHub's own new-repo page and make the round trip
 legible. A link costs nothing and asks for no new permission.
 
-> Unverified, worth two minutes before PR 1: whether `https://github.com/new`
-> still honours `?name=` and `?description=` query params to prefill the form.
-> If it does, prefill `name=meridian-vault`. If not, plain-link it — the rest of
-> the PR is unaffected.
+Verified live (2026-09-04): `https://github.com/new` still honours `?name=` to
+prefill the form across the sign-in redirect, so the picker's "Create a new
+repository on GitHub" link uses `?name=meridian-vault`.
 
 ---
 
-## The current flow, and where it breaks
+## What's still broken
 
-```
-Settings → Vaults → Add vault → "GitHub repository"
-  → [wizard GitHub step]  AddVaultWizard.tsx:228-241
-      one button, "Sign in with GitHub". Says nothing about needing a repo,
-      nothing about the App having to be installed.
-  → github.com/login/oauth/authorize          githubOAuth.ts:55-62
-  → /auth/callback                            auth.callback.tsx
-      0 repos → 'no-installations' dead end   :166-177
-      1 repo  → auto-connects, no picker      :90
-      2+      → picker                        :192-207
-```
+The GitHub connect path itself (wizard copy, the repo picker, the
+`no-installations` dead end) was fixed in the PR that implemented it. One
+failure point remains, and it bites after the flow otherwise succeeds:
 
-Four distinct failure points, in the order a newcomer meets them:
-
-1. **The wizard step promises nothing and warns of nothing** (`:228-241`). A
-   user with no repo learns that only after a full OAuth round trip.
-2. **The picker is skipped at exactly one repo** (`:90`, and again at `:118` in
-   the `reconnect` fallback). Someone with one repo installed who wants to
-   connect a *different* one is auto-connected to the wrong one with no way
-   back except Settings.
-3. **The picker has no way to add a repo** (`:192-207`) — bare
-   `{owner}/{repo}` buttons, no install link, no create link.
-4. **`no-installations` says "come back and sign in again"** (`:170`) — a second
-   full OAuth round trip after installing.
-
-And one that bites after the flow appears to succeed:
-
-5. **An empty repo reads as a sync conflict.** A first-timer who creates a repo
-   without ticking "Add a README" gets a repo with no commits.
-   `githubBackend.ts:153` calls `GET /repos/{owner}/{repo}/git/trees/{tree_sha}`;
-   GitHub answers **409** on an empty repo; `failureKind.ts:57` maps 409 →
-   `conflict`; `githubBackend.ts:184` calls `mapGitHubError(e)` **without a
-   path**, so the user gets a `ConflictError` reading
-   `Conflict on unknown: backend version diverged since last sync.`
-   The mapping is verified from source; the 409 itself was not exercised against
-   a live empty repo — do that first in PR 2.
-
----
-
-## PR 1 — Make the GitHub connect path survivable without a repo
-
-The core of finding #5. All in `src/routes/auth.callback.tsx` and
-`src/settings/AddVaultWizard.tsx`; no storage or model changes.
-
-**1. Always show the picker.** Delete the `repos.length === 1` auto-connect at
-`auth.callback.tsx:90` *and* the duplicate at `:118` in `reconnect`'s
-vault-missing fallback — both branches must change or the two paths diverge.
-`repos.length === 0` keeps its own phase. The picker becomes the single
-destination for every non-reconnect sign-in.
-
-This is also the previously-listed `next-steps.md` item **"fix flow for adding a
-second vault"**: with one repo installed, signing in to add a second vault
-auto-reconnects the first and never offers a choice. Same one-line cause.
-
-Note the `reconnect` success path at `:130-132` is **not** affected — a genuine
-reconnect of a known vault should still go straight through without asking.
-
-**2. Give the picker somewhere to go.** Under the repo list at `:192-207`, add:
-
-- **"Create a new repository on GitHub"** → `https://github.com/new` (see the
-  prefill note above), and
-- **"Add another repository…"** → `GITHUB_APP_INSTALL_URL`
-  (`githubOAuth.ts:7`, already imported at `:5`).
-
-Both are plain `<a>` elements, `target="_blank" rel="noreferrer"`, styled as
-secondary to the repo buttons — the common case is still picking an existing
-repo. Add one line above them saying the App has to be installed on a repo for
-it to appear in the list, which is the fact that makes an empty list make sense.
-
-**3. Fold `no-installations` into the picker.** It is the zero-length case of the
-same screen and currently a separate dead end (`:166-177`). Once the picker
-carries both links, render it with an empty list and a different lead line
-rather than a distinct phase — that removes the "come back and sign in again"
-instruction for anyone who now has a link to click in place. Keep the
-`no-installations` *phase* if it simplifies the diff; the requirement is that the
-screen offers the two links, not that the union is literal.
-
-**4. Tell the user what's coming, before the redirect.** In
-`AddVaultWizard.tsx:234-237`, replace *"Choose which repository to connect after
-signing in."* with copy that names the two prerequisites — a repository, and
-Meridian installed on it — and links to `GITHUB_APP_INSTALL_URL`. This is the
-one place a user can still back out cheaply.
-
-**Traps.**
-- `startGitHubSignIn` stores its PKCE verifier in **`sessionStorage`**
-  (`githubOAuth.ts:46-52`) and the comment there is load-bearing: *"survives the
-  redirect to github.com and back (same tab), but not a new tab — the flow must
-  stay in one tab"*. Two consequences, in opposite directions. The **sign-in
-  redirect must stay same-tab** — it is `window.location.href` at
-  `githubOAuth.ts:62`; do not "improve" it into a popup or a new tab, or the
-  verifier is unreachable when the callback lands. The **out-links must open in
-  a new tab** (`target="_blank" rel="noreferrer"`), so a user who goes off to
-  create a repo or install the App doesn't lose the screen they were on. Note
-  the wizard's link is clicked before any verifier exists, so nothing is lost
-  there beyond wizard state — it is the picker's links, after the exchange, and
-  the sign-in redirect itself where the one-tab rule actually bites.
-- `auth.callback.tsx:56-59` explains why `Route.useSearch()` carries an explicit
-  annotation — CI lints before `routeTree.gen.ts` is regenerated. Don't "tidy"
-  that away.
-- The route is under the **document-flow** shell, not `_app` (see the Route
-  shells table in `CLAUDE.md`) — leave it there; it has no virtualizer.
-
-**Tests.** `src/routes/-entryTopbar.test.tsx` and `settings.test.tsx` are the
-nearest precedents for route-level tests. Cover: one installed repo now renders
-the picker rather than auto-connecting (the regression this PR is fixing);
-zero repos renders both links; the reconnect success path still bypasses the
-picker.
+**An empty repo reads as a sync conflict.** A first-timer who creates a repo
+without ticking "Add a README" gets a repo with no commits.
+`githubBackend.ts:153` calls `GET /repos/{owner}/{repo}/git/trees/{tree_sha}`;
+GitHub answers **409** on an empty repo; `failureKind.ts:57` maps 409 →
+`conflict`; `githubBackend.ts:184` calls `mapGitHubError(e)` **without a
+path**, so the user gets a `ConflictError` reading
+`Conflict on unknown: backend version diverged since last sync.`
+The mapping is verified from source; the 409 itself was not exercised against
+a live empty repo — do that first in PR 2.
 
 ---
 
@@ -264,11 +168,12 @@ where a confident guess is worst.
 
 **One-hop install → sign-in.** GitHub Apps can be configured to request user
 authorization (OAuth) during installation, so `installations/new` redirects
-straight to the callback with a `code` — collapsing the two round trips that
-`auth.callback.tsx:170` currently spells out. Deferred because it starts with a
-toggle in the App's own settings page that only the repo owner can flip, not
-with code, and because PR 1 removes most of the pain without it. The callback
-would then need to handle arriving with an `installation_id` alongside `code`.
+straight to the callback with a `code` — collapsing the "install, then come
+back and sign in separately" round trip into one. Deferred because it starts
+with a toggle in the App's own settings page that only the repo owner can
+flip, not with code, and because the picker's out-links already remove most
+of the pain without it. The callback would then need to handle arriving with
+an `installation_id` alongside `code`.
 
 **A desktop layout worth the name.** Out of scope here, noted so it isn't lost:
 at 1440px the app is the phone layout widened, with ~300px of dead gutter. That

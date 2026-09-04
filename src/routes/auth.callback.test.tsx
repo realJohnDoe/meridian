@@ -115,16 +115,25 @@ describe('auth.callback — exchanging', () => {
 })
 
 describe('auth.callback — repository fan-out', () => {
-  it('connects immediately and goes home when exactly one repo is installed', async () => {
+  // Regression coverage: a single installed repo used to auto-connect
+  // without asking, which was also the bug behind "adding a second vault
+  // silently reconnects the first". The picker is now the single
+  // destination for every non-reconnect sign-in, whatever the repo count.
+  it('offers the picker rather than auto-connecting when exactly one repo is installed', async () => {
     completeGitHubSignIn.mockResolvedValue(TOKENS)
     fetchInstalledRepos.mockResolvedValue([repo('notes')])
     render(<AuthCallbackPage />)
 
-    await waitFor(() => expect(addGitHubVaultOAuth).toHaveBeenCalledTimes(1))
-    expect(addGitHubVaultOAuth).toHaveBeenCalledWith({
+    expect(await screen.findByText('Choose a repository')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'acme/notes' })).toBeInTheDocument()
+    expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'acme/notes' }))
+
+    await waitFor(() => expect(addGitHubVaultOAuth).toHaveBeenCalledWith({
       owner: 'acme', repo: 'notes', branch: 'main',
       accessToken: 'at', refreshToken: 'rt', expiresAt: 1_800_000,
-    })
+    }))
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith({ to: '/' }))
   })
 
@@ -152,17 +161,46 @@ describe('auth.callback — repository fan-out', () => {
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith({ to: '/' }))
   })
 
-  // Signed in but the GitHub App isn't installed anywhere — a dead end unless
-  // the user is sent to the install page, so this must not read as an error.
-  it('sends the user to the install page when no repos are installed', async () => {
+  // Signed in but the GitHub App isn't installed anywhere — this is the
+  // zero-length case of the same picker screen, not a distinct dead end, so
+  // it must offer both out-links rather than send the user away to sign in
+  // again later.
+  it('renders the picker with both out-links and no repos when none are installed', async () => {
     completeGitHubSignIn.mockResolvedValue(TOKENS)
     fetchInstalledRepos.mockResolvedValue([])
     render(<AuthCallbackPage />)
 
-    expect(await screen.findByText('Install Meridian on a repository')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Install on GitHub' }))
+    expect(await screen.findByText('Choose a repository')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Create a new repository on GitHub' }))
+      .toHaveAttribute('href', 'https://github.com/new?name=meridian-vault')
+    expect(screen.getByRole('link', { name: 'Add another repository…' }))
       .toHaveAttribute('href', 'https://github.com/apps/test-app/installations/new')
     expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
+  })
+
+  it('also offers both out-links alongside a non-empty repo list', async () => {
+    completeGitHubSignIn.mockResolvedValue(TOKENS)
+    fetchInstalledRepos.mockResolvedValue([repo('notes')])
+    render(<AuthCallbackPage />)
+
+    expect(await screen.findByRole('link', { name: 'Create a new repository on GitHub' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Add another repository…' })).toBeInTheDocument()
+  })
+
+  // The PKCE verifier for a fresh sign-in lives in sessionStorage and does not
+  // survive a new tab, but by this point in the flow the exchange is already
+  // done — these out-links must open in a new tab so a user who goes off to
+  // create a repo or install the App doesn't lose this screen.
+  it('opens both out-links in a new tab', async () => {
+    completeGitHubSignIn.mockResolvedValue(TOKENS)
+    fetchInstalledRepos.mockResolvedValue([])
+    render(<AuthCallbackPage />)
+
+    for (const name of ['Create a new repository on GitHub', 'Add another repository…']) {
+      const link = await screen.findByRole('link', { name })
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noreferrer')
+    }
   })
 
   it('fetches the repo list with the freshly exchanged access token', async () => {
@@ -182,6 +220,8 @@ describe('auth.callback — connecting', () => {
     useStore.setState({ vaultLoadProgress: { loaded: 12, total: 40 } })
     render(<AuthCallbackPage />)
 
+    fireEvent.click(await screen.findByRole('button', { name: 'acme/notes' }))
+
     expect(await screen.findByText('Connecting…')).toBeInTheDocument()
     expect(await screen.findByText('Loaded 12 of 40 files')).toBeInTheDocument()
   })
@@ -191,6 +231,8 @@ describe('auth.callback — connecting', () => {
     fetchInstalledRepos.mockResolvedValue([repo('notes')])
     addGitHubVaultOAuth.mockReturnValue(pending())
     render(<AuthCallbackPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'acme/notes' }))
 
     expect(await screen.findByText('Connecting…')).toBeInTheDocument()
     expect(screen.queryByText(/Loaded/)).not.toBeInTheDocument()
@@ -292,12 +334,17 @@ describe('auth.callback — reconnect', () => {
     expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
   })
 
-  it('falls through to the normal add flow when the vault is no longer registered', async () => {
+  it('falls through to the picker, not an auto-connect, when the vault is no longer registered', async () => {
     completeGitHubSignIn.mockResolvedValue({ ...TOKENS, reconnectVaultId: 'gone' })
     fetchInstalledRepos.mockResolvedValue([repo('notes')])
     useStore.setState({ vaultLoading: false, vaults: [] })
 
     render(<AuthCallbackPage />)
+
+    expect(await screen.findByRole('button', { name: 'acme/notes' })).toBeInTheDocument()
+    expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'acme/notes' }))
 
     await waitFor(() => expect(addGitHubVaultOAuth).toHaveBeenCalledTimes(1))
     expect(reauthGitHubVault).not.toHaveBeenCalled()
@@ -332,6 +379,9 @@ describe('auth.callback — reconnect', () => {
     useStore.setState({ vaultLoading: true, vaults: [] })
 
     render(<AuthCallbackPage />)
+
+    expect(await screen.findByRole('button', { name: 'acme/notes' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'acme/notes' }))
 
     await waitFor(() => expect(addGitHubVaultOAuth).toHaveBeenCalledTimes(1))
     expect(reauthGitHubVault).not.toHaveBeenCalled()
