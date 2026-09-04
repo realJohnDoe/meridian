@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type * as ReactRouter from '@tanstack/react-router'
 import { useStore, emptySyncStatus } from '@/store'
 import { setupStore, installFakePersistence, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { entryKey } from '@/fileIO'
+import type { Roots } from '@/types'
 import type { VaultRef } from '@/vaultRef'
 import { setVaultColor } from '@/vaultActions'
 import type * as VaultActions from '@/vaultActions'
@@ -17,6 +19,33 @@ vi.mock('@/vaultActions', async (importOriginal) => ({
   ...(await importOriginal<typeof VaultActions>()),
   setVaultColor: vi.fn(),
 }))
+
+// The archived list's rows are real `Link`s (see keyRoute), which need a
+// live router context `Link` itself can't get from a plain RTL render —
+// jsdom throws deep inside useLinkProps without one. Stubbed to a plain
+// anchor that reconstructs keyRoute's actual href from its known shape
+// (`to: '/entry/$vault/$slug', params: { vault, slug }`), so the archived
+// tests below can assert on where the link really points, not just that
+// something renders.
+vi.mock('@tanstack/react-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactRouter>()
+  return {
+    ...actual,
+    Link: ({ children, className, to, params }: {
+      children: React.ReactNode
+      className?: string
+      to?: string
+      params?: { vault?: string; slug?: string }
+    }) => (
+      <a
+        className={className}
+        href={to === '/entry/$vault/$slug' && params ? `/entry/${params.vault}/${params.slug}` : String(to)}
+      >
+        {children}
+      </a>
+    ),
+  }
+})
 
 setupStore()
 
@@ -146,18 +175,29 @@ describe('VaultSettings — archived', () => {
     seedStore([occ], makeRoots(slug, { title, archived: true }))
   }
 
+  // seedStore replaces the whole store on each call, so seeding several
+  // entries at once (for the collapse-threshold tests below) needs its own
+  // helper rather than calling seedArchived in a loop.
+  function seedArchivedMany(entries: Array<{ slug: string; title: string }>) {
+    const occs = entries.map(({ slug, title }) =>
+      makeOcc({ entryKey: testKey(slug), metadata: { vaultId: TEST_VAULT, fileSlug: slug, participants: [], title, tags: [], items: [] } }))
+    const roots: Roots = new Map(entries.map(({ slug, title }) =>
+      [testKey(slug), { title, tags: [], items: [], vaultId: TEST_VAULT, fileSlug: slug, archived: true }]))
+    seedStore(occs, roots)
+  }
+
   it('shows a friendly empty state when nothing is archived', () => {
     render(<VaultSettings vault={LOCAL_VAULT} />)
     expect(screen.getByText(/show up here/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /unarchive/i })).not.toBeInTheDocument()
   })
 
-  it('lists archived entries by title, with a count', () => {
+  it('lists archived entries as links to the entry, with a count', () => {
     seedArchived('old-task', 'Old Task')
 
     render(<VaultSettings vault={LOCAL_VAULT} />)
 
-    expect(screen.getByText('Old Task')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Old Task' })).toHaveAttribute('href', `/entry/${TEST_VAULT}/old-task`)
     expect(screen.getByText(/1 entry is hidden/i)).toBeInTheDocument()
   })
 
@@ -180,5 +220,28 @@ describe('VaultSettings — archived', () => {
     render(<VaultSettings vault={LOCAL_VAULT} />)
 
     expect(screen.queryByText('Stray')).not.toBeInTheDocument()
+  })
+
+  it('shows the list directly, with no disclosure, at the collapse threshold', () => {
+    seedArchivedMany([1, 2, 3, 4, 5].map(n => ({ slug: `task-${n}`, title: `Task ${n}` })))
+
+    render(<VaultSettings vault={LOCAL_VAULT} />)
+
+    expect(screen.queryByRole('button', { name: /show.*archived/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link')).toHaveLength(5)
+  })
+
+  it('hides the list behind a disclosure once it passes the threshold, and reveals it on click', () => {
+    seedArchivedMany([1, 2, 3, 4, 5, 6].map(n => ({ slug: `task-${n}`, title: `Task ${n}` })))
+
+    render(<VaultSettings vault={LOCAL_VAULT} />)
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    const trigger = screen.getByRole('button', { name: 'Show 6 archived entries' })
+
+    fireEvent.click(trigger)
+
+    expect(screen.getAllByRole('link')).toHaveLength(6)
+    expect(screen.getByRole('button', { name: 'Hide archived entries' })).toBeInTheDocument()
   })
 })

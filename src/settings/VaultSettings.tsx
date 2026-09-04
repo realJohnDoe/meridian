@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Trash2, TriangleAlert, AlertCircle, Download, RefreshCw, ArchiveRestore } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Trash2, TriangleAlert, AlertCircle, Download, RefreshCw, ArchiveRestore, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -12,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { readVaultStringArray } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
@@ -21,6 +23,7 @@ import {
   GITHUB_APP_INSTALL_URL, exportVaultIcs,
 } from '@/vaultActions'
 import { ParticipantsRow, archiveEntry } from '@/editor'
+import { keyRoute } from '@/entryRoute'
 import type { VaultRef } from '@/vaultActions'
 import { VAULT_COLORS } from '@/vaultRef'
 import { VAULT_COLOR_SWATCH } from '@/components/primitives/occurrence-variants'
@@ -28,6 +31,34 @@ import { cn } from '@/lib/cn'
 import { SettingsSection, SettingsRow } from './SettingsSection'
 import { vaultSummary } from './vaultSummary'
 import { archivedEntriesFor } from './archivedEntries'
+import type { ArchivedEntry } from './archivedEntries'
+
+/** Above this many archived entries, the list hides behind a disclosure — see `ArchivedRows`. */
+const ARCHIVE_COLLAPSE_THRESHOLD = 5
+
+/** One archived entry's row: a link to it, plus its own Unarchive action. */
+function ArchivedRows({ archived }: { archived: ArchivedEntry[] }) {
+  return (
+    <ul className="flex flex-col gap-1.5">
+      {archived.map(({ key, title }) => (
+        <li key={key} className="flex items-center justify-between gap-2">
+          <Link {...keyRoute(key)} className="min-w-0 flex-1 truncate text-sm text-foreground hover:underline">
+            {title}
+          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 gap-1.5"
+            onClick={() => archiveEntry(key, false)}
+          >
+            <ArchiveRestore className="size-3.5 stroke-[1.7]" />
+            Unarchive
+          </Button>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 interface Props {
   vault: VaultRef
@@ -47,10 +78,11 @@ function sanitizeFilename(name: string): string {
  * bottom sheet.
  */
 export function VaultSettings({ vault }: Props) {
-  const [syncing,     setSyncing]     = useState(false)
-  const [name,        setName]        = useState(vault.name)
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [dirtyCount,  setDirtyCount]  = useState(0)
+  const [syncing,      setSyncing]      = useState(false)
+  const [name,         setName]         = useState(vault.name)
+  const [confirmOpen,  setConfirmOpen]  = useState(false)
+  const [archivedOpen, setArchivedOpen] = useState(false)
+  const [dirtyCount,   setDirtyCount]   = useState(0)
   const [participants, setParticipants] = useState<string[]>(
     () => readVaultStringArray('meridian_default_participants', vault.id),
   )
@@ -295,22 +327,24 @@ export function VaultSettings({ vault }: Props) {
           }
         >
           {archived.length > 0 && (
-            <ul className="flex flex-col gap-1.5">
-              {archived.map(({ key, title }) => (
-                <li key={key} className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{title}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0 gap-1.5"
-                    onClick={() => archiveEntry(key, false)}
+            archived.length > ARCHIVE_COLLAPSE_THRESHOLD ? (
+              <Collapsible open={archivedOpen} onOpenChange={setArchivedOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                   >
-                    <ArchiveRestore className="size-3.5 stroke-[1.7]" />
-                    Unarchive
-                  </Button>
-                </li>
-              ))}
-            </ul>
+                    <ChevronRight size={13} className={cn('transition-transform', archivedOpen && 'rotate-90')} />
+                    {archivedOpen ? 'Hide archived entries' : `Show ${archived.length} archived entries`}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-1.5">
+                  <ArchivedRows archived={archived} />
+                </CollapsibleContent>
+              </Collapsible>
+            ) : (
+              <ArchivedRows archived={archived} />
+            )
           )}
         </SettingsRow>
         <SettingsRow
