@@ -194,7 +194,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-3xl lg:mx-auto">
 
         {archived && (
-          <div className="flex items-center gap-2 rounded-lg bg-warning px-3 py-2 mb-3 text-xs text-warning-foreground">
+          <div className="flex items-center gap-2 rounded-lg bg-warning px-3 py-2 mb-3 text-xs text-warning-foreground shadow-(--shadow-card)">
             <Archive size={14} className="shrink-0" />
             <span className="flex-1">Archived — hidden from the calendar and search.</span>
             <Button
