@@ -156,9 +156,12 @@
   --ink-dark:  var(--background);
   --ink-light: oklch(1 0 0);
 
-  /* Destructive */
-  --destructive: oklch(0.72 0.20 15);   /* rose */
-  --warning:     oklch(0.86 0.16 74);   /* amber */
+  /* Destructive / warning — aliased to priority-1/priority-3 below so the
+     Delete/Archive dialog buttons (and every other destructive/warning
+     usage) match the same reds/yellows used for task priority, rather
+     than an independently-tuned rose/amber pair that can drift from them. */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
@@ -309,9 +312,9 @@
   --ink-light: oklch(0.99 0.004 252);
   --ink-dark:  oklch(0.17 0.030 270);
 
-  /* Destructive / warning — darkened to read on light surfaces */
-  --destructive: oklch(0.55 0.20 15);
-  --warning:     oklch(0.62 0.14 74);
+  /* Destructive / warning — aliased to priority-1/priority-3, same as .meridian */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
@@ -404,9 +407,9 @@
   --ink-dark:  #1a1b2e;
   --ink-light: #ffffff;
 
-  /* Destructive / warning */
-  --destructive: #f7768e;
-  --warning:     #e0af68;
+  /* Destructive / warning — aliased to priority-1/priority-3 */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
@@ -487,9 +490,9 @@
   --ink-light: #fffaf3;
   --ink-dark:  #191724;
 
-  /* Destructive / warning */
-  --destructive: #b4637a;
-  --warning:     #ea9d34;
+  /* Destructive / warning — aliased to priority-1/priority-3 */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
@@ -581,9 +584,9 @@
   --ink-light: #fdf6e3;
   --ink-dark:  #000000;
 
-  /* Destructive / warning */
-  --destructive: #dc322f;
-  --warning:     #b58900;
+  /* Destructive / warning — aliased to priority-1/priority-3 */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
@@ -679,9 +682,9 @@
   --ink-light: #fdf6e3;
   --ink-dark:  #002b36;
 
-  /* Destructive / warning */
-  --destructive: #dc322f;
-  --warning:     #b58900;
+  /* Destructive / warning — aliased to priority-1/priority-3 */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
@@ -763,9 +766,9 @@
   --ink-dark:  #191a21;
   --ink-light: #ffffff;
 
-  /* Destructive / warning */
-  --destructive: #ff5555;
-  --warning:     #f1fa8c;
+  /* Destructive / warning — aliased to priority-1/priority-3 */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
@@ -847,9 +850,9 @@
   --ink-light: #eff1f5;
   --ink-dark:  #11111b;
 
-  /* Destructive / warning */
-  --destructive: #d20f39;   /* red */
-  --warning:     #df8e1d;   /* yellow */
+  /* Destructive / warning — aliased to priority-1/priority-3 */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
@@ -943,9 +946,9 @@
   --ink-dark:  #11111b;
   --ink-light: #eff1f5;
 
-  /* Destructive / warning */
-  --destructive: #f38ba8;
-  --warning:     #f9e2af;
+  /* Destructive / warning — aliased to priority-1/priority-3 */
+  --destructive: var(--priority-1);
+  --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
 
   /* Borders */
