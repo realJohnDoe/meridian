@@ -28,7 +28,7 @@ to, `scripts/layout-smoke.mjs` covers 5 of 14 routes, and one of
 longer exists and is silently inert.
 
 The single biggest structural theme is **guards that are narrower than the
-invariant they were written to protect**. Every finding below except #1 and #2
+invariant they were written to protect**. Every finding below except #1
 is an instance: a correct rule with a selector that misses two-thirds of the
 shapes, a correct smoke test enumerating a third of its routes, a correct
 exclusion glob that has outgrown its own justification, a correct coverage
@@ -90,7 +90,7 @@ coverage of 100%.
 
 ## 3. Category verdicts
 
-1. **Component Architecture & Boundaries** — findings: #1, #2. Otherwise
+1. **Component Architecture & Boundaries** — findings: #1. Otherwise
    strong: 0 whole-store subscriptions, 0 selector-returns-literal
    subscriptions, module boundaries enforced by `no-restricted-paths`, and
    `DayView`/`WeekView` are thin shells over a shared `useCarousel` seam.
@@ -123,11 +123,11 @@ coverage of 100%.
    `src`. The two URL sinks (`EntryViewOnly.tsx:102`, `markdownFormatting.ts:66`)
    both gate on `isSafeUrl` before the element ever carries the href — the
    right shape. #8 is that the gate has no tests, not that it is wrong.
-5. **Code Health & DRY** — findings: #2 (the duplication half). Otherwise
-   clean: `knip` reports no unused files, exports or dependencies; zero
-   `any`/`@ts-expect-error` outside `routeTree.gen.ts`; all 16 hand-written
-   `eslint-disable`s carry a written justification (the 17th is the blanket
-   directive in the generated `routeTree.gen.ts`, which ESLint ignores anyway).
+5. **Code Health & DRY** — **clean.** `knip` reports no unused files, exports
+   or dependencies; zero `any`/`@ts-expect-error` outside `routeTree.gen.ts`;
+   all 16 hand-written `eslint-disable`s carry a written justification (the
+   17th is the blanket directive in the generated `routeTree.gen.ts`, which
+   ESLint ignores anyway).
 6. **React Performance** — findings: #3, #5. Route-level code splitting is on
    (`autoCodeSplitting`, editor in its own 716K chunk); all four list surfaces
    are virtualized; `memo()` decisions are deliberate and documented, including
@@ -175,21 +175,17 @@ identity, not order.
 | #6 | 4 | `_app.tsx` excluded from coverage on a stale rationale | `testing` `toolchain` | 5 | 2 | **Sonnet 5** | 5 |
 | #8 | 5 | `isSafeUrl` — the only XSS gate — has no tests | `security` `testing` | 4 | 1 | **Haiku 4.5** | 4 |
 | #7 | 6 | Stale per-file coverage floor, silently inert | `toolchain` `dead-code` | 3 | 1 | **Haiku 4.5** | 3 |
-| #2 | 7 | Day/week/month topbar config written out three times | `dry` `component-architecture` | 5 | 1 | **Sonnet 5** | 2.5 |
-| #1 | 8 | `AppMain` is a 481-line component with 9 branch chains | `component-architecture` `srp` `testing` | 7 | 1 | **Opus 5** | 2.3 |
+| #1 | 7 | `AppMain` is a 481-line component with 9 branch chains | `component-architecture` `srp` `testing` | 7 | 1 | **Opus 5** | 2.3 |
 
 > **Read the rank column with care.** Breadth-in-files structurally
-> under-ranks #1 and #2: the entire problem is concentrated in one file, which
-> is what makes it a god component in the first place. By impact they are
-> first and third. This is a scoring-rule observation, not a hedge — see
-> "Survey file changes".
+> under-ranks #1: the entire problem is concentrated in one file, which is
+> what makes it a god component in the first place. By impact it is first.
+> This is a scoring-rule observation, not a hedge — see "Survey file changes".
 
-**Sequencing.** #2 then #1 (both rewrite `src/routes/_app.tsx`; #2's
-extraction removes ~90 of the lines #1 then has to place). #6 and #7 together
-(both edit `vitest.config.ts`). #3 and #5 are independent of each other
-despite both concerning the compiler — #5 edits `eslint.config.js`, and its
-rule does not apply to `components/ui/`, which is where #3 lives. #8 is
-independent of everything.
+**Sequencing.** #6 and #7 together (both edit `vitest.config.ts`). #3 and #5
+are independent of each other despite both concerning the compiler — #5 edits
+`eslint.config.js`, and its rule does not apply to `components/ui/`, which is
+where #3 lives. #8 is independent of everything, and so is #1.
 
 ---
 
@@ -199,58 +195,67 @@ independent of everything.
 - **Impact** — 7
 - **Breadth** — 1 file (`src/routes/_app.tsx`). Search:
   `grep -n 'isDayView\|isWeekView\|isMonthView\|isListView' src/routes/_app.tsx`
-  → 9 branch-chain sites at lines 193, 208, 214, 222, 263, 388, 477, 507, 541.
-- **Recommended model** — **Opus 5.** The mechanical half is split out as #2;
-  what remains is a decomposition whose right shape is not determined by the
-  code. **Why the context below does not lower this:** the open question is
-  what unit `AppMain` should decompose *into* — one `useViewConfig()` hook
-  returning a per-view descriptor, five sibling components each owning its own
-  topbar and quick-nav panel, or a route-level `topbar`/`quickNav` slot that
-  each leaf route fills. Those three have materially different consequences
-  for how `viewState.ts`'s preview state is threaded, and the file's existing
-  comments document hard-won reasons (the frozen `agendaQuickNavAnchor`, the
-  desktop-vs-mobile focus split) that any of them could quietly break. That is
-  a judgement call, not a gap in this report.
+  → 9 branch-chain sites at lines 193, 207, 239, 247, 259, 288, 454, 484, 518.
+  (One prior sibling — the topbar's own copy of this chain, then at line 388
+  — has since been consolidated into the `pagedView` lookup below; that fixed
+  finding is what the sites at 220–234 now reflect. It relocated the site, it
+  did not remove it: `AppMain` still independently re-derives the same
+  discriminant 9 times.)
+- **Recommended model** — **Opus 5.** The topbar's own triplicated branches
+  have already been folded into a single `pagedView` lookup
+  (`src/routes/_app.tsx:219–235`); what remains is a decomposition whose
+  right shape is not determined by the code. **Why the context below does not
+  lower this:** the open question is what unit `AppMain` should decompose
+  *into* — one `useViewConfig()` hook returning a per-view descriptor, five
+  sibling components each owning its own topbar and quick-nav panel, or a
+  route-level `topbar`/`quickNav` slot that each leaf route fills. Those
+  three have materially different consequences for how `viewState.ts`'s
+  preview state is threaded, and the file's existing comments document
+  hard-won reasons (the frozen `agendaQuickNavAnchor`, the desktop-vs-mobile
+  focus split) that any of them could quietly break. That is a judgement
+  call, not a gap in this report.
 - **Evidence** — `src/routes/_app.tsx`. The same discriminant, in three
   different orderings. At line 193:
   ```
   const viewKind = isDayView ? 'day' : isWeekView ? 'week' : isMonthView ? 'month' : isListView ? 'list' : 'agenda'
   ```
-  at line 222 (`handleToday`):
+  at line 247 (`handleToday`):
   ```
     if (isDayView) {
   ```
-  and at line 263 (the quick-nav panel), month-first this time:
+  and at line 288 (the quick-nav panel), month-first this time:
   ```
     isMonthView && monthViewDate && monthDisplayDate ? (
   ```
-  while the topbar at line 388 goes day-first:
+  while `pagedView` — now the topbar's single source, computed once rather
+  than duplicated across it — still goes day-first at line 220:
   ```
-                  isDayView && dvDate && dvDisplayDate ? (
+    isDayView && dvDate && dvDisplayDate ? {
   ```
 - **Problem** — Adding a view, or changing what paging does, means finding and
   editing four independent branch chains that are not adjacent, not in the
   same order, and not checked against each other by anything; missing one is a
   silent behavioural inconsistency between the topbar label, the "Today"
   button, and the quick-nav panel rather than a build or type error.
-- **Fix** — After #2 lands, lift the remaining per-view knowledge into one
-  `useViewConfig()` (or equivalent) that returns a single descriptor per view,
-  and let `handleToday`, the quick-nav panel and the `isListView` guards read
-  from it, so the discriminant is computed once.
+- **Fix** — Lift the remaining per-view knowledge (`viewKind`, `handleToday`,
+  `renderQuickNavPanel`, and now `pagedView`) into one `useViewConfig()` (or
+  equivalent) that returns a single descriptor per view, and let
+  `handleToday`, the quick-nav panel and the `isListView` guards read from
+  it, so the discriminant is computed once.
 
 **Task context**
 
-- `AppMain` runs `src/routes/_app.tsx:89` to `:569`. `AppLayout` (`:47–:87`)
+- `AppMain` runs `src/routes/_app.tsx:89` to `:546`. `AppLayout` (`:47–:87`)
   is fine and should stay as-is; `previewAware` (`:42`) is a good helper and
   should stay.
 - The five views and where each is currently spelled out:
   | View | route match (`:97–:101`) | `handleToday` | quick-nav panel | topbar |
   |---|---|---|---|---|
-  | day | `dayMatch` | `:222–:223` | `:265–:287` | `:388–:409` |
-  | week | `weekMatch` | `:224–:233` | `:288–:331` | `:410–:431` |
-  | month | `monthMatch` | `:234–:235` | `:263–:264` | `:432–:451` |
-  | list (backlog/notes) | `backlogMatch`/`notesMatch` | — (falls through) | none | `:452–:458` |
-  | agenda | none of the above | `:236–:239` | `:332–:356` | `:459–:470` |
+  | day | `dayMatch` | `:247–:248` | `:290–:312` | `pagedView` `:220–:224` |
+  | week | `weekMatch` | `:249–:258` | `:313–:356` | `pagedView` `:225–:229` |
+  | month | `monthMatch` | `:259–:260` | `:288–:289` | `pagedView` `:230–:234` |
+  | list (backlog/notes) | `backlogMatch`/`notesMatch` | — (falls through) | none | `:429–:435` |
+  | agenda | none of the above | `:261–:264` | `:357–:380` | `:436–:447` |
 - **The trap, located.** `agendaQuickNavAnchor` (`:126`) is a deliberately
   *frozen* snapshot of `agendaTopDate`, reset in render phase by
   `useResetOnChange` rather than an effect. Its doc comment at `:120–:125`
@@ -264,9 +269,9 @@ independent of everything.
   leaves focus on `document.body`. There is no test for this; it is
   desktop-keyboard-only.
 - **What stays.** All five `PagedTopbar` prop sets keep `replace: true` on
-  prev/next nav — three separate comments (`:389–:395`, `:411–:417`,
-  `:433–:437`) record that this is what keeps chevron taps from stacking one
-  history entry per day/week/month.
+  prev/next nav — one comment on `pagedView` (`:211–:218`, consolidated from
+  three separate copies by the topbar fix above) records that this is what
+  keeps chevron taps from stacking one history entry per day/week/month.
 - **Precedent in-repo.** `src/calendar/useCarousel.ts` is the same shape
   already solved: `DayView`/`WeekView`/`MonthView` pass `unitKey`/`unitAt`/
   `onCommit` into one shared hook instead of each re-implementing paging.
@@ -275,84 +280,6 @@ independent of everything.
   `node scripts/layout-smoke.mjs` (needs a `dist/`) since this file owns the
   `_app` shell's height cap — `src/routes/-appShell.test.ts` pins how it is
   expressed but not the resulting geometry.
-
----
-
-### #2 — The day/week/month paged-topbar configuration is written out three times
-
-- **Category** — `dry` `component-architecture`
-- **Impact** — 5
-- **Breadth** — 1 file (`src/routes/_app.tsx:388–451`). Search:
-  `grep -c '<PagedTopbar' src/routes/_app.tsx` → 5 call sites, 3 of which are
-  the near-identical paged form.
-- **Recommended model** — **Sonnet 5.** Every varying value is enumerated
-  below, and the three branches are structurally identical, so a wrong edit
-  changes a visible label or a route param — it breaks a test or is obvious on
-  screen, not silent. The hazard that would otherwise raise this is the
-  `replace: true` flag and the `weekStartFor` normalization, both named below.
-- **Evidence** — `src/routes/_app.tsx`. Three branches differing only in unit,
-  route and label. Day, at `:396–:403`:
-  ```
-                      isMobile={isMobile}
-                      openSidebar={openSidebar}
-                      label={fmtTopBarMonth(dvDisplayDate, today)}
-                      paging={{
-                        prevLabel: 'Previous day',
-                        nextLabel: 'Next day',
-  ```
-  and week, at `:420–:425`, identical but for the unit:
-  ```
-                      label={fmtTopBarMonth(weekDisplayStart, today)}
-                      paging={{
-                        prevLabel: 'Previous week',
-                        nextLabel: 'Next week',
-  ```
-- **Problem** — 64 lines of JSX expressing four varying values (unit noun,
-  route, step, label source), so a change to the paged topbar's shape has to
-  be made three times identically, with nothing to catch it if one is missed.
-- **Fix** — Replace the three branches with one `PagedTopbar` call driven by a
-  `PAGED_VIEWS` lookup keyed on the active view.
-
-**Task context**
-
-- **The enumerated work.** All three branches share, verbatim:
-  `isMobile={isMobile}`, `openSidebar={openSidebar}`, `expanded={quickNavOpen}`,
-  `onToggle={toggleQuickNav}`, `toggleRef={toggleButtonRef}`, `popoverAnchor`.
-  Only these four values vary:
-
-  | | unit noun | `label` source | `onPrev` / `onNext` target |
-  |---|---|---|---|
-  | day | `'day'` | `fmtTopBarMonth(dvDisplayDate, today)` | `/day/$date`, `fmtISO(addDays(dvDate, ∓1))` |
-  | week | `'week'` | `fmtTopBarMonth(weekDisplayStart, today)` | `/week/$date`, `fmtISO(addDays(weekStartDate, ∓7))` |
-  | month | `'month'` | `fmtTopBarMonth(monthDisplayDate, today)` | `/calendar/$month`, `fmtMonth(new Date(y, m ∓ 1, 1))` |
-
-  `prevLabel`/`nextLabel` are exactly `` `Previous ${unit}` `` /
-  `` `Next ${unit}` `` in all three — derive them, don't tabulate them.
-- **What stays untouched.** The two non-paged branches (`isListView` at
-  `:452–:458`, agenda at `:459–:470`) are structurally different — list has no
-  paging *and* no quick-nav, agenda has quick-nav but no paging. Leave both as
-  literal JSX; folding them into the same table is what turns this from a
-  Sonnet task into #1.
-- **The trap, located.** Every `navigate` call in these three branches carries
-  `replace: true` (`:402`, `:403`, `:424`, `:425`, `:444`, `:445`). Dropping
-  it while tabulating gives one back-press per chevron tap. The three comments
-  at `:389–:395`, `:411–:417` and `:433–:437` say so; keep one of them on the
-  table.
-- **Second trap.** Week's guard is `isWeekView && weekStartDate &&
-  weekDisplayStart && weekDisplayEnd` — a *four*-way guard where day and month
-  have three. `weekDisplayEnd` (`:203`) is not read by the week branch's
-  `PagedTopbar` props at all, so it is redundant in the condition, but
-  `weekStartDate` is `weekStartFor(...)`-normalized at `:188` and the raw route
-  param is *not* week-start-aligned — so the normalized value, not
-  `weekMatch.params.date`, must be what `onPrev`/`onNext` step from.
-- **The seam, verified.** `PagedTopbar`'s props are declared in
-  `src/routes/-pagedTopbar.tsx`; nothing else in the repo constructs a
-  `paging` object (`grep -rn 'paging=' src/` → these 3 sites only), so the
-  table has exactly one consumer and the extraction has no other call sites to
-  update.
-- **Verify after:** `pnpm run test` — `src/routes/-pagedTopbar.test.tsx`
-  covers the component and carries a 92/90/95/92 coverage floor, and
-  `src/routes/_app.test.tsx` covers the quick-nav path.
 
 ---
 

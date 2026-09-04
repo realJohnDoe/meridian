@@ -200,7 +200,6 @@ function AppMain() {
   const monthDisplayDate = monthViewDate && previewAware(monthViewDate, monthPreview, parseMonth)
   const dvDisplayDate    = dvDate && previewAware(dvDate, dayPreview, parseDateString)
   const weekDisplayStart = weekStartDate && previewAware(weekStartDate, weekPreview, parseDateString)
-  const weekDisplayEnd   = weekDisplayStart && addDays(weekDisplayStart, 6)
   // currentDate carried forward into the previewed week, same weekday kept —
   // the week-view quick-nav panel's anchor month and highlighted day both key
   // off this (see below) rather than currentDate directly, so they track a
@@ -208,6 +207,32 @@ function AppMain() {
   const currentDisplayDate = isWeekView
     ? previewAware(currentDate, weekPreview, key => weekdayKeptDate(key, currentDate, ws))
     : currentDate
+
+  // The day/week/month topbar's paging configuration — one lookup instead of
+  // three near-identical PagedTopbar branches below, which used to differ
+  // only in the unit noun, the label's source date, and where prev/next
+  // navigate. replace: true on every nav call mirrors each carousel's own
+  // swipe-to-page semantics (see DayView/WeekView/MonthView) so chevron taps
+  // and swipes leave the same, single history entry per visit instead of
+  // stacking a back-press-per-unit trail. null for backlog/notes/agenda,
+  // which render the plain (non-paged) PagedTopbar branches below instead.
+  const pagedView: { unit: string; label: string; onPrev: () => void; onNext: () => void } | null =
+    isDayView && dvDate && dvDisplayDate ? {
+      unit: 'day',
+      label: fmtTopBarMonth(dvDisplayDate, today),
+      onPrev: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true }),
+      onNext: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true }),
+    } : isWeekView && weekStartDate && weekDisplayStart ? {
+      unit: 'week',
+      label: fmtTopBarMonth(weekDisplayStart, today),
+      onPrev: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true }),
+      onNext: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true }),
+    } : isMonthView && monthViewDate && monthDisplayDate ? {
+      unit: 'month',
+      label: fmtTopBarMonth(monthDisplayDate, today),
+      onPrev: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true }),
+      onNext: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true }),
+    } : null
 
   // Backlog/Notes are fixed strings; the agenda default view shows just the
   // month of its topmost visible row, matching Day/Month/Week's own topbar.
@@ -385,64 +410,16 @@ function AppMain() {
               <TopbarShell
                 leftHasButton={isMobile}
                 left={
-                  isDayView && dvDate && dvDisplayDate ? (
-                    // replace: true on nav — mirrors the day carousel's swipe-to-page
-                    // semantics (see DayView) so chevron taps and swipes leave the
-                    // same, single history entry per visit instead of chevron taps
-                    // alone stacking up a back-press-per-day trail. Label is just the
-                    // month (like month view's own PagedTopbar below) — the weekday
-                    // and day-of-month already show in DayPane's own corner badge.
+                  pagedView ? (
                     <PagedTopbar
                       isMobile={isMobile}
                       openSidebar={openSidebar}
-                      label={fmtTopBarMonth(dvDisplayDate, today)}
+                      label={pagedView.label}
                       paging={{
-                        prevLabel: 'Previous day',
-                        nextLabel: 'Next day',
-                        onPrev: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, -1)) }, replace: true }),
-                        onNext: () => void navigate({ to: '/day/$date', params: { date: fmtISO(addDays(dvDate, 1)) }, replace: true }),
-                      }}
-                      expanded={quickNavOpen}
-                      onToggle={toggleQuickNav}
-                      toggleRef={toggleButtonRef}
-                      popoverAnchor
-                    />
-                  ) : isWeekView && weekStartDate && weekDisplayStart && weekDisplayEnd ? (
-                    // replace: true on nav — mirrors the day/month carousels' swipe-to-page
-                    // semantics (see WeekView) so chevron taps and swipes leave the
-                    // same, single history entry per visit instead of chevron taps
-                    // alone stacking up a back-press-per-week trail. Label is just the
-                    // month of the week's first day, like Day/Month's own topbar —
-                    // the day-of-month range shows in WeekPane's own column badges.
-                    <PagedTopbar
-                      isMobile={isMobile}
-                      openSidebar={openSidebar}
-                      label={fmtTopBarMonth(weekDisplayStart, today)}
-                      paging={{
-                        prevLabel: 'Previous week',
-                        nextLabel: 'Next week',
-                        onPrev: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true }),
-                        onNext: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true }),
-                      }}
-                      expanded={quickNavOpen}
-                      onToggle={toggleQuickNav}
-                      toggleRef={toggleButtonRef}
-                      popoverAnchor
-                    />
-                  ) : isMonthView && monthViewDate && monthDisplayDate ? (
-                    // replace: true on nav — mirrors the month carousel's swipe-to-page
-                    // semantics (see MonthView) so chevron taps and swipes leave
-                    // the same, single history entry per visit instead of chevron
-                    // taps alone stacking up a back-press-per-month trail.
-                    <PagedTopbar
-                      isMobile={isMobile}
-                      openSidebar={openSidebar}
-                      label={fmtTopBarMonth(monthDisplayDate, today)}
-                      paging={{
-                        prevLabel: 'Previous month',
-                        nextLabel: 'Next month',
-                        onPrev: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true }),
-                        onNext: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true }),
+                        prevLabel: `Previous ${pagedView.unit}`,
+                        nextLabel: `Next ${pagedView.unit}`,
+                        onPrev: pagedView.onPrev,
+                        onNext: pagedView.onNext,
                       }}
                       expanded={quickNavOpen}
                       onToggle={toggleQuickNav}
