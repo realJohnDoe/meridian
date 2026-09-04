@@ -204,6 +204,24 @@ describe('GitHubBackend', () => {
     expect(tokens.get('archive/old.md')).toBe('sha-old')
   })
 
+  // An empty repo (created without "Add a README") has no commits yet, so the
+  // Git Data API this endpoint uses can't answer at all — it fails with 409
+  // "Git Repository is empty" rather than an empty listing. That is a normal
+  // state for a freshly-connected vault, not a sync conflict: statAll() must
+  // swallow it and hand back an empty map, same as an empty local folder.
+  it('statAll treats a 409 "Git Repository is empty" as an empty vault, not a conflict', async () => {
+    mockFetch({ message: 'Git Repository is empty.' }, 409)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    const tokens  = await backend.statAll()
+    expect(tokens.size).toBe(0)
+  })
+
+  it('statAll still throws ConflictError for a 409 that is not the empty-repo message', async () => {
+    mockFetch({ message: 'Conflict' }, 409)
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.statAll()).rejects.toBeInstanceOf(ConflictError)
+  })
+
   it('statAll rejects a truncated tree listing instead of returning a partial map', async () => {
     // Past the API's size/entry limit, git/trees silently omits paths rather
     // than erroring — returning what it has would make reconcile treat every
