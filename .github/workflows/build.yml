@@ -22,7 +22,16 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level=high
+      # registry.npmjs.org's bulk advisory endpoint is occasionally slow/unreachable
+      # from Actions runners, which turns into a timeout unrelated to any real
+      # vulnerability (pnpm's own built-in retries already got exhausted by then).
+      # Retry the whole step a few times before treating it as a real failure.
+      - uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: pnpm audit --audit-level=high
       # build first: it regenerates src/routeTree.gen.ts (gitignored, produced
       # by the TanStack Router vite plugin). Type-aware lint rules need it —
       # running lint first left Route.useSearch()/useParams() unresolved on a
