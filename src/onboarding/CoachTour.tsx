@@ -25,6 +25,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
   // Under multi-vault the Tutorial vault is always registered, so keying off
   // its presence would replay the tour forever.
   const hasRealVault = useStore(s => s.vaults.some(v => v.kind !== 'example'))
+  const vaultLoading = useStore(s => s.vaultLoading)
 
   const [active, setActive] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
@@ -79,9 +80,16 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
     },
   ], [setSidebarOpen, navigateHome])
 
-  // Auto-start once, before any real vault exists (never again after Skip/Done)
-  useResetOnChange([hasRealVault], () => {
-    if (!hasRealVault && !isTourDone()) {
+  // Auto-start once, before any real vault exists (never again after
+  // Skip/Done). Gated on `vaultLoading` rather than `hasRealVault` alone:
+  // `vaultLoading` starts `true` at store creation and flips to `false` once
+  // the async restore settles, so that flip is a real change `useResetOnChange`
+  // can catch on both a brand-new visit (nothing to restore) and a returning
+  // one — checking `hasRealVault` alone would fire this on mount, before
+  // restore has had a chance to populate `vaults`, misreading a returning
+  // user as a newcomer.
+  useResetOnChange([vaultLoading, hasRealVault], () => {
+    if (!vaultLoading && !hasRealVault && !isTourDone()) {
       setActive(true)
     }
   })
