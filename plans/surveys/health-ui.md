@@ -22,12 +22,28 @@ Start by identifying which directories constitute the UI layer and state that li
 - **Verify capability claims by inspection, not memory.** For toolchain findings, check the _installed_ version of a plugin/library (its actual rule set, exports, or API) against what the config enables — do not assume from the version number. Where cheap, verify by dry-run: e.g. run the linter with a candidate preset via a temporary config and report the real finding count and distribution (clean up temp files afterwards). The same applies to component libraries: check what the installed shadcn/radix components actually ship before claiming a custom implementation duplicates one.
 - **This extends to build-time tooling, not just linters.** Compilers and transforms (React Compiler/`babel-plugin-react-compiler`, SWC/Babel plugins, CSS transforms) make claims a lint run never checks. Where a source comment asserts build-time behaviour ("this shape makes the compiler bail out", "this is memoized"), reproduce it: run the repo's own preset over a two-case fixture and diff the output. This is often the highest-yield check in the whole survey, because a build-time regression is invisible to build, lint, and tests alike.
 
+  **The recipe, for this repo specifically** — it took several dead ends to find, and a run that loses its budget to setup will skip the check entirely. Put a driver script in the **repo root** (Node resolves `@babel/core` by walking up from the script, so one under a temp directory cannot see `node_modules`), and note that `reactCompilerPreset()` returns `{ preset, rolldown }` — Babel rejects the wrapper object and wants `.preset`:
+
+  ```js
+  import * as babel from '@babel/core'
+  import { reactCompilerPreset } from '@vitejs/plugin-react'
+  const { preset } = reactCompilerPreset({ target: '19' })   // matches vite.config.ts
+  const out = babel.transformSync(src, {
+    filename, presets: [preset], parserOpts: { plugins: ['jsx', 'typescript'] },
+    configFile: false, babelrc: false,
+  })
+  // memoized iff the output imports 'react/compiler-runtime' and calls _c(n)
+  ```
+
+  Counting `_c(` per file turns this into a census over a whole directory, not just a two-case fixture — which is how a partially-memoized component library shows up at all. Clean up the driver afterwards.
+
 ## Budget
 
 - Skim the full directory tree once so nothing is invisible, then confine close reading to the UI layer.
 - Read closely: the app shell / root layout, the most-imported components and hooks (measure this — don't guess), the 15 largest component files, every file in the shared-components directory, and at least 2–3 representative components from every feature directory that renders UI.
 - **Read the UI toolchain, not just the source:** Tailwind config, global CSS / theme tokens, the shadcn component inventory (`components/ui/` or equivalent) and its divergence from upstream, lint config for React/JSX/a11y/Tailwind rules, and the component-test setup (or its absence). From `package.json`, inventory the **UI-related** dependencies (React ecosystem, radix/shadcn, styling, icons, animation, forms, a11y) and know where each is used — this feeds the Library Fit category.
 - **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. On a fresh worktree, install dependencies first (`pnpm install`) — a missing `node_modules` makes every gate fail for a reason that is not a finding, and reads exactly like a broken toolchain. Before trusting lint output, generate the gitignored types it depends on (`pnpm run build` regenerates `src/routeTree.gen.ts`; `pnpm --filter meridian-oauth-worker run cf-typegen` regenerates the worker types) — without them the type-aware rules flood with ~150 spurious errors that are **not** a finding.
+- **Audit the gates' own config, not just their exit codes.** A green gate says nothing about whether it is still aimed at the right files. Check every path in the lint, coverage and smoke-test configs against the filesystem: per-file coverage thresholds naming a moved file, exclusion globs whose stated rationale has been outgrown by a file that has since tripled in size, and route lists that a new route does not automatically join. These fail *open* — Vitest, for one, accepts a threshold for a nonexistent path and exits 0 with no warning — so nothing surfaces them but this check.
 - **Sample git history for co-change patterns** among components, hooks, and style files (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest of the UI. Do not skip a UI directory entirely without recording it in the coverage statement. Non-UI directories may be skipped wholesale — record them as "out of scope" rather than "skipped."
 
@@ -70,6 +86,8 @@ For each finding, output:
 - **Fix** — one sentence: what the concrete fix looks like
 
 Rank and report findings per the [shared convention](./README.md#ranking-findings). Here, "confirming" a fix means re-running the build, lint, or the test suite.
+
+**Breadth-in-files under-ranks concentrated findings — say so rather than inflating it.** A god component is, by construction, one file: the whole defect is that N repetitions of one concern live in the same place. So `(impact × breadth) ÷ effort` scores it below a one-line lint tweak whose guard happens to span 100 files, and the ranking then contradicts this survey's own instruction to prefer systemic and structural issues. Do not fix this by padding the breadth count. Report the honest file count, and where the rank and the impact disagree, add one line under the summary table saying which findings the formula demotes and why. The reader can then re-sort on impact, which is what the separate-fields rule is for.
 
 **Strongly prefer systemic and structural issues over isolated, line-level ones.** A pattern repeated across 10 components beats one misused hook. Cite real code — no generic observations.
 
