@@ -21,7 +21,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from './ui/sidebar'
-import { keyRoute } from '@/routes'
+import { keyRoute } from '@/entryRoute'
 
 /** Mirrors SidebarMenu's own `gap-1`, so a collapsing row can cancel exactly
  *  that much trailing space on its way out (see CollapseRow). */

@@ -6,7 +6,7 @@ import { applyScope, entryFromOccurrence, saveNode, deleteNode, addItemLink, rem
 import type { Occurrence, EditScope } from '@/types'
 import { fmtISO, seriesContext } from '@/model'
 import { useToday } from '@/hooks'
-import { newEntryRoute, keyRoute } from '@/routes'
+import { newEntryRoute, keyRoute } from '@/entryRoute'
 import { resolveWikilink } from '@/wikilinks'
 import { keySlug } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'

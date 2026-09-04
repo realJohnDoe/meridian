@@ -7,6 +7,23 @@ codebase, prompted by a placement smell noticed while reviewing PR 3 of
 Per `plans/CLAUDE.md`: delete each fix's section from this file in the commit
 that implements it, so what remains is only outstanding work.
 
+**The `routes ↔ editor ↔ hooks` fix has shipped** — `newEntryRoute`/
+`entryRoute`/`keyRoute` moved from `routes/-entryRoute.ts` to the new root
+file `src/entryRoute.ts` (see `CLAUDE.md`'s root-residents list and
+invariant 4). `routes/index.ts` is gone too: those three functions were its
+entire public surface, so once they moved, nothing needed a `routes/`
+barrel at all — confirmed by checking every consumer of `@/routes` first.
+Re-running the audit after the fix (41 → 6 raw chains) surfaced a cycle that
+had been sitting inside that tangle all along, invisible while a bigger SCC
+subsumed it: **`calendar ↔ components`** (`AgendaRow.tsx`/
+`AgendaOverdueGroupRow.tsx` use `OccurrenceCard`; `SearchBar.tsx` uses
+`useCurrentDate`). Real, but the same accepted feature-mesh shape invariant 4
+already named an example of — now the example, since the one it used to cite
+(`calendar → components → editor → routes → calendar`) doesn't exist as a
+cycle anymore.
+
+What's left: `storage/sync.ts ↔ storage/syncScheduler.ts`, below.
+
 ---
 
 ## How this was found, and why `import-x/no-cycle` isn't the tool
@@ -38,31 +55,32 @@ or an upstream report) is a separate, lower-priority yak-shave from the
 actual cleanup.
 
 Used `madge --circular --ts-config tsconfig.app.json` instead — a standalone
-whole-graph tool, not an ESLint rule, so it doesn't share this failure mode.
+whole-graph tool, not an ESLint rule, so it doesn't share that failure mode.
+It has its own gap to know about, hit while building the fix above: **it
+does not skip `import type`.** `entryRoute.ts`'s first draft imported
+`type { NewEntrySeed } from '@/editor'` — erased at runtime, so not a real
+cycle — and madge counted it as one anyway, because it builds the *file*
+graph, not the *runtime* one. Fixed by giving `entryRoute.ts` its own local,
+structural type for the handful of fields it reads, rather than importing
+editor's. Point of this note: don't take a madge cycle at face value when
+one leg is `import type` — check whether it's erased before spending time on
+it, the way findings 3/5 below turned out to be.
 
 ## The raw findings, collapsed
 
-`madge` reported 41 circular-dependency chains. That number is misleading on
-its own: madge reports every distinct path that re-enters a cycle, not one
-row per structurally-distinct cycle, so a single tangled cluster produces
-dozens of near-duplicate rows. Collapsing the 41 chains to their cross-module
-edges (script: build a directed edge for every adjacent pair in every chain,
-keep only edges that cross a top-level `src/` directory) gives the real
-picture — four independent things, not 41:
+`madge` reported 41 circular-dependency chains before the fix. That number
+was misleading on its own: madge reports every distinct path that re-enters
+a cycle, not one row per structurally-distinct cycle, so a single tangled
+cluster produces dozens of near-duplicate rows. Collapsing the 41 chains to
+their cross-module edges (build a directed edge for every adjacent pair in
+every chain, keep only edges that cross a top-level `src/` directory) gave
+the real picture — four independent things, not 41 (a fifth,
+`calendar ↔ components`, was hiding inside finding 1 and only became visible
+after fixing it — see the top of this file):
 
-1. **The big one — `routes ↔ editor`, `routes ↔ hooks`, which pulls
-   `calendar` and `components` into the same strongly-connected cluster.**
-   Root cause: `src/routes/-entryRoute.ts` holds three pure URL-shape
-   builders (`newEntryRoute`, `entryRoute`, `keyRoute`) that live inside the
-   `routes/` module only because that's where TanStack Router's file-based
-   convention put the route *components* — but the three functions
-   themselves touch no React, no live router state, nothing that needs to be
-   there. `editor/` (3 files), `hooks/useOpenEntry.ts`, and
-   `components/SearchBar.tsx` + `Sidebar.tsx` all need them, and importing
-   `@/routes` for that is what creates the back-edges — `routes/` legitimately
-   imports every one of those four modules to compose its pages, so the
-   moment any of them imports back, the two are mutually reachable.
-   **This is the fix below.**
+1. **`routes ↔ editor`, `routes ↔ hooks`, pulling `calendar` and
+   `components` into the same strongly-connected cluster. Fixed**, see
+   above.
 
 2. **`components ↔ search`** — `components/SearchBar.tsx` lazy-loads
    `search/SearchOverlay.tsx` via `import()`; `search/FileResultsList.tsx`
@@ -70,16 +88,17 @@ picture — four independent things, not 41:
    not a placement mistake: one leg is a dynamic import (no load-time
    hazard — this is exactly the shape `no-cycle`'s own
    `allowUnsafeDynamicCyclicDependency` option exists to wave through), and
-   it's the same feature-mesh shape invariant 4 in `CLAUDE.md` already
-   accepts. **Left alone** — see that invariant, updated below to name this
-   cycle as its example instead of the stale one fix 1 removes.
+   it's the same feature-mesh shape invariant 4 in `CLAUDE.md` accepts.
+   **Left alone.**
 
 3. **`calendar/agendaSections.ts ↔ overduePool.ts`,
    `storage/cache/db.ts ↔ pendingMoves.ts`** — not actually cycles. Both are
    `import type` in one direction, which TypeScript erases; there's no
-   runtime circularity, just two files whose *types* reference each other.
-   Same-module in both cases. **Not a target** — `no-cycle` itself would
-   skip these (it explicitly ignores type-only imports), and correctly so.
+   runtime circularity, just two files whose *types* reference each other
+   (the same class of madge false-positive `entryRoute.ts` hit while
+   building the fix — see above). Same-module in both cases. **Not a
+   target** — a correctly-working `no-cycle` would skip these too, since it
+   explicitly ignores type-only imports.
 
 4. **`storage/sync.ts ↔ storage/syncScheduler.ts`** — genuine runtime
    cycle: `sync.ts` calls `scheduleAutoPush` from `syncScheduler.ts`;
@@ -96,10 +115,10 @@ Not yet investigated beyond confirming the two call sites
 other's function as a parameter/callback rather than importing it back, but
 this needs reading both files' actual responsibilities first — don't assume
 that shape is right before checking which direction the dependency should
-conceptually run. Same-module, so lower priority than fix 1 (no lint rule
-flags it, and `no-cycle`'s existing "don't restructure a whole SCC on a
-hunch" caution applies even more to a 2-file same-module case): pick this up
-after fix 1, as its own commit.
+conceptually run. Same-module, so lower priority than the fix above (no lint
+rule flags it, and a 2-file same-module cycle is a smaller, more contained
+thing to get wrong than a cross-module one): its own commit, separate from
+everything above.
 
 ---
 
@@ -108,6 +127,7 @@ after fix 1, as its own commit.
 For anyone re-running this audit later and wondering why these don't have
 sections above:
 
+- **`calendar ↔ components`** — accepted, now invariant 4's own example.
 - **`components ↔ search`** (finding 2) — accepted, see invariant 4.
 - **`agendaSections.ts ↔ overduePool.ts`, `cache/db.ts ↔ pendingMoves.ts`**
   (finding 3) — type-only, not runtime cycles, nothing to fix.

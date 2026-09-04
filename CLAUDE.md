@@ -113,6 +113,7 @@ It is an **index, not an encyclopedia** — each entry is one sentence plus a po
 - `occurrenceActions.ts` — user-action orchestration, including its delete-undo toast; used by `editor/` and `calendar/`
 - `storeCommit.ts` + `persistencePort.ts` — persistence-port abstraction (see invariant 3 below); used by `editor/`, `storage/`, and `occurrenceActions.ts`
 - `vaultActions.ts` — used by `components/` and `routes/`
+- `entryRoute.ts` — `newEntryRoute`/`entryRoute`/`keyRoute`, the pure TanStack Router Link/navigate descriptor builders for an entry; used by `editor/`, `hooks/useOpenEntry.ts`, and `components/` (`SearchBar.tsx`, `Sidebar.tsx`). A root leaf rather than `routes/-entryRoute.ts` (where it used to live) because `routes/` itself imports all three of those to compose its pages — a feature dir importing it back from `routes/` created a real cycle, found and fixed per `plans/import-cycles.md`.
 - `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`). `occView.ts` also owns the display vocabulary: `OccState` (what an occurrence is, derived by its own `occState()`) and the painting layer on top of it — `OccHue`/`OccTone`, the `colorBy` preference, and the `OccPainter` that resolves both plus the card's one chip (bound to the store by `hooks/useOccPainter.ts`).
 
 All feature directories already have `index.ts` barrels enforced by the import-boundary lint rules — do not propose adding them.
@@ -156,7 +157,7 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 3. **Core persistence goes through the port.** `storeCommit.ts` and `occurrenceActions.ts` call the `persistencePort` abstraction rather than `@/storage` functions directly. The storage adapter registers the implementation at startup.
 
-4. **Accepted cycles — do not refactor.** Feature-mesh cycles through `root` (e.g. `calendar → components → editor → routes → calendar`) are inherent to feature-sliced React. These are deliberately not targets for restructuring.
+4. **Accepted cycles — do not refactor.** Feature-mesh cycles through `root` (e.g. `calendar ↔ components`: `AgendaRow.tsx`/`AgendaOverdueGroupRow.tsx` use `OccurrenceCard`, `SearchBar.tsx` uses `useCurrentDate`) are inherent to feature-sliced React. These are deliberately not targets for restructuring — but a cycle running *through* a root file rather than *between* two features is a different case: that one's a placement bug, not an inherent mesh, and is worth fixing (see `entryRoute.ts` above, and `plans/import-cycles.md` for the audit that tells the two apart).
 
 5. **View-ephemeral state lives with its view.** `store.ts` holds durable vault/sync/prefs state only. `calendar/viewState.ts` owns calendar view ephemera (agenda scroll position, carousel swipe previews, scroll-to-today) in its own Zustand store, reached through the `@/calendar` barrel like any other feature-internal state — not through `store.ts`/`storeBridge`. `zustand` is otherwise restricted to `store.ts`; `calendar/viewState.ts` is the one named exception in `eslint.config.js`.
 
