@@ -27,6 +27,18 @@ type ContentFile = {
   content: string
 }
 
+/**
+ * True for the Git Data API's answer to a repo with zero commits: 409 with
+ * message "Git Repository is empty." Matched on the message, not the bare
+ * status, since 409 is ambiguous in general (a write conflict is also a
+ * 409) — see the call site in statAll().
+ */
+function isEmptyRepoError(e: unknown): boolean {
+  if ((e as { status?: number }).status !== 409) return false
+  const message = (e as { message?: string }).message
+  return typeof message === 'string' && /repository is empty/i.test(message)
+}
+
 // ── Bulk read helpers ────────────────────────────────────────────
 
 /** Max concurrent Contents-API requests for readFiles — avoids tripping GitHub's secondary rate limit. */
@@ -222,6 +234,19 @@ export class GitHubBackend implements StorageBackend {
       // back to (we always do, since a 304 requires having sent an ETag from
       // one), so the `undefined` case can only be a genuine failure.
       if ((e as { status?: number }).status === 304 && this._treeTokens) return this._treeTokens
+      // A repo with no commits yet — e.g. created without "Add a README" —
+      // has no tree for this endpoint to list, and the Git Data API answers
+      // 409 "Git Repository is empty" rather than an empty listing. That is
+      // not a sync conflict; it's what a freshly-connected vault with no
+      // files yet looks like, same as an empty local folder. Scoped to this
+      // read path only, matched on GitHub's own message rather than the bare
+      // status: a 409 elsewhere (e.g. a write) is a real SHA-mismatch
+      // conflict, per the comment on mapGitHubError in githubApi.ts.
+      if (isEmptyRepoError(e)) {
+        const tokens = new Map<string, string>()
+        this._treeTokens = tokens
+        return tokens
+      }
       throw mapGitHubError(e)
     }
   }
