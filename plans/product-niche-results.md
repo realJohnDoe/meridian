@@ -117,12 +117,12 @@ so nowhere — see finding #3.
 
 ### Unverified, flagged
 
-- **Whether a collaborator on a shared repo needs their own GitHub App
-  installation.** `githubOAuth.ts:387` calls `GET /user/installations`, which
-  *may* surface an owner's installation to a repo collaborator. The README's
-  line 7 sharing promise depends on this. **What would settle it:** two real
-  GitHub accounts and one repo. Finding #5 is written only around the path I
-  could verify from code (the owner's), not around the collaborator's.
+- ~~**Whether a collaborator on a shared repo needs their own GitHub App
+  installation.**~~ **Answered by the app owner, 2026-09-04:** installation is
+  per repo, and each additional person only has to authorize — which matches the
+  intersection semantics of a user-to-server token. `README.md:7` therefore
+  needs no qualification, and `plans/onboarding.md` PR 4 is written against that
+  single case rather than two branches.
 - **Whether the desktop dead gutter is deliberate.** It reads as phone-first
   applied honestly, but nothing in the repo states it as a choice.
 

@@ -179,15 +179,15 @@ picker.
 
 ## PR 2 — An empty repository is a normal state, not a conflict
 
-**Model: Sonnet 5 for the code — but it cannot start until a human runs the
-check below**, which needs a real GitHub account and so is not a model-tier
-question at all. See the split-out risk at the end of this section: one possible
-outcome is a bigger, separate PR.
+**Model: Sonnet 5 for the code — but it cannot start until someone answers the
+one question at the end of this section**, which needs a GitHub token and a
+throwaway repo, so it is not a model-tier question at all. The likely answer
+makes this a small PR; the unlikely one makes it a different, larger one.
 
-**First, confirm the premise** (~5 minutes, needs a real GitHub account): make
-an empty repo with no README, install the App on it, connect it, and record the
-exact error. The 409 → `ConflictError` mapping is verified from source, but the
-observed message is what the fix has to replace.
+The same throwaway repo answers a second, smaller thing worth having: connect it
+and record the **exact error text** the user currently sees. The 409 →
+`ConflictError` mapping is verified from source, but the observed string is what
+the fix has to replace, and it belongs in the PR description.
 
 Then, in `githubBackend.ts:153-186`: catch **409 specifically in `statAll`** and
 return an empty `Map` rather than throwing. An empty repo has no files, which is
@@ -203,20 +203,52 @@ on the error. Scope the change to `statAll`'s catch, matching on GitHub's
 `Git Repository is empty` message rather than the bare status if the live check
 shows the status alone is ambiguous.
 
-**The risk this PR is hiding, stated so it doesn't ambush the implementer.** An
-empty repo has **no default branch** until its first commit, even though
-`fetchInstalledRepos` (`githubOAuth.ts:396`) reports `default_branch` as `main`.
-So the live check has two questions, not one:
+**The one open question, and why it decides the size of this PR.**
 
-1. *Does `statAll` 409?* → if yes, the fix above is the whole PR. Sonnet 5.
-2. *Does the first write then succeed against a branch that doesn't exist yet?*
-   → if **yes**, done. If **no**, stop and re-plan: creating an initial commit
-   and a ref on the user's behalf is a different piece of work with its own
-   failure modes (what to commit, what happens when two devices both try it,
-   how it interacts with `syncJournal`), and it should be its own PR at Opus
-   tier rather than being absorbed into this one.
+Connecting an empty repo touches GitHub twice, and the fix above only covers
+the first:
 
-Record the answer to both here when the check is run, before writing any code.
+1. **The read.** `statAll` asks for the tree of branch `main`. On a repo with
+   no commits that ref does not exist, so GitHub 409s. That is the fix above.
+2. **The first write.** `write()` (`githubBackend.ts:276-296`) uses
+   `PUT /repos/{owner}/{repo}/contents/{path}` with `branch: this._cfg.branch`
+   — i.e. `main`, which still doesn't exist at that moment, because the
+   repo *still* has no commits. Fixing the read gets the user connected; it
+   does nothing about this.
+
+So the question is exactly one thing:
+
+> **Does `PUT /repos/{owner}/{repo}/contents/{path}` with `branch: "main"`
+> succeed on a repository with zero commits, creating the initial commit and
+> the branch?**
+
+- **If yes** → the `statAll` catch is the entire PR. Sonnet 5, as scoped above.
+- **If no** → Meridian has to create an initial commit itself before the first
+  write can land. That is a different piece of work — what to commit, what
+  happens when two devices connect the same empty repo at once, how it
+  interacts with `syncJournal` — and it should be its own PR at Opus tier
+  rather than being absorbed into this one. **Stop and re-plan if the answer
+  is no.**
+
+**Expectation, stated as an expectation:** probably yes. The Contents API is the
+usual way to bootstrap an empty repo, and it is a different endpoint family from
+the Git Data API (blobs/trees/commits/refs), which definitely does 409 on an
+empty repo and is what most "409 Git Repository is empty" reports are about.
+Meridian uses the Contents API, not the Git Data API, so it is on the side of
+that split more likely to work. This could not be confirmed from a primary
+source in the session that wrote this plan — `docs.github.com` was unreachable —
+so it stays a question rather than an assumption.
+
+**How to answer it** (~30 seconds, no code): create a throwaway repo with *no*
+README, then
+
+```
+curl -X PUT -H "Authorization: Bearer $TOKEN" \
+  https://api.github.com/repos/<you>/<throwaway>/contents/test.md \
+  -d '{"message":"test","content":"aGk=","branch":"main"}'
+```
+
+A 201 means yes. Record the answer here, then implement.
 
 ---
 
@@ -262,65 +294,50 @@ it and let #2 do all sites at once. **Check `GLOSSARY.md` before renaming** —
 
 ## PR 4 — An invite path for the shared-repo story
 
-**Model: Sonnet 5, once the experiment below has been run and its answer written
-into this section.** Both outcomes are pre-specified, so settling the experiment
-is a one-line edit here, not a re-plan. Until then it is not implementable by
-anyone — the plan deliberately doesn't know what the invitee has to do.
+**Model: Sonnet 5.** One `SettingsRow`, one link, one copyable message.
 
 The decision above keeps multi-user in the pitch, and right now **all** of it
 happens outside the product: to share a vault, the second person has to be added
 as a repo collaborator on github.com. There is no invite affordance anywhere in
 `src/`.
 
-### The experiment (needs two GitHub accounts and one repo; ~10 minutes)
+### What the invitee actually has to do
 
-Account A owns a repo and has the Meridian App installed on it. Add account B as
-a plain repo collaborator, **without** B installing the App. Sign in as B.
+**Install is per repo, not per person; each additional person only has to
+authorize.** Settled by the app owner, and it matches how user-to-server tokens
+are specified to work: a user access token's reach is the *intersection* of what
+the installation can see and what the user can see. So once A has installed
+Meridian on `A/vault`, a collaborator B who signs in gets `A/vault` back from
+`GET /user/installations` → `GET /user/installations/{id}/repositories`
+(`githubOAuth.ts:384-399`) without installing anything — B's OAuth consent at
+sign-in is the whole of B's setup.
 
-**Does B's repo list include A's repo?** `fetchInstalledRepos`
-(`githubOAuth.ts:384-399`) calls `GET /user/installations` and then
-`GET /user/installations/{id}/repositories`, so the question is whether A's
-installation appears in B's installations list at all.
+Two conditions this rests on, both satisfied by construction: A's installation
+must actually cover that repo (it does — it is the repo A connected), and B must
+have repo access on GitHub (that is what being added as a collaborator means).
 
-> **Answer: _(unrun)_** — write **A** or **B** here, then implement that branch.
+This is asserted from the app's own configuration plus the documented token
+semantics, **not** from a two-account test. The first real shared vault
+confirms it for free; if B ever lands on an empty repo list after being added as
+a collaborator, this is the assumption that broke, and the invite copy below
+then needs `GITHUB_APP_INSTALL_URL` added and `README.md:7` qualified.
 
-### Branch A — B sees the repo without installing anything
+### The PR
 
-The invitee's path is "get added as a collaborator, sign in, pick the repo". The
-PR is a share affordance on the vault settings screen:
+A new `SettingsRow` in the existing **Source** `SettingsSection`
+(`VaultSettings.tsx:142`), directly under the `Repository` row at
+`VaultSettings.tsx:202-210`, gated the same way on `vault.kind === 'github'`:
 
-- A new `SettingsRow` in the existing **Source** `SettingsSection`
-  (`VaultSettings.tsx:142`), directly under the `Repository` row at
-  `VaultSettings.tsx:202-210`, gated the same way on `vault.kind === 'github'`.
-- Its control is a link to
-  `https://github.com/{owner}/{repo}/settings/access` — the page where a
-  collaborator is added. `vault.github.owner`/`.repo` are already in scope there.
-- Plus a copy-to-clipboard button yielding a short message the owner can send:
-  what Meridian is, the app URL, and "you'll be able to open the shared
-  calendar once you sign in with GitHub". No App install step in the text.
+- A link to `https://github.com/{owner}/{repo}/settings/access` — the page where
+  a collaborator is added. `vault.github.owner`/`.repo` are already in scope.
+- A copy-to-clipboard button yielding a short message the owner can send: what
+  Meridian is, the app URL, and that the recipient signs in with GitHub and
+  picks the repo. **No install step in that text** — per the above, they don't
+  need one, and telling them to install would send them somewhere confusing.
 
 `target="_blank" rel="noreferrer"` per PR 1's out-link rule. `README.md:7` needs
-no qualification under this branch.
-
-### Branch B — B must install the App on the repo themselves
-
-Same row and same placement, but the copyable message must also carry
-`GITHUB_APP_INSTALL_URL` (`githubOAuth.ts:7`, already imported into
-`VaultSettings.tsx:23`) and say plainly that the invitee installs Meridian on
-the *same* repo before signing in.
-
-Under this branch **`README.md:7` overstates the current product** — "Point
-Meridian at a repo and everyone you share it with reads and writes the same
-repo — no vault to configure, no plugins" is true of the vault but not of the
-install step. Qualify that sentence in the same PR; it is the sentence this
-whole plan exists to make honest, so shipping the invite path while leaving it
-unqualified would be the worst of both.
-
-### Either way
-
-Don't invent the answer. This is the field where a confident guess is worst —
-Branch A's copy actively tells the invitee *not* to do the thing Branch B
-requires, so guessing wrong produces instructions that don't work.
+no qualification: "everyone you share it with reads and writes the same repo —
+no vault to configure, no plugins" is accurate under this model.
 
 ---
 
