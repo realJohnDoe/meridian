@@ -25,6 +25,10 @@ function waitForVaultsLoaded(): Promise<void> {
   })
 }
 
+// Prefills the name field on GitHub's own new-repository form — verified live
+// (2026-09-04): github.com/new honours ?name= across the sign-in redirect.
+const NEW_REPO_URL = 'https://github.com/new?name=meridian-vault'
+
 export const Route = createFileRoute('/auth/callback')({
   component: AuthCallbackPage,
   validateSearch: (s: Record<string, unknown>): { code?: string; state?: string; error?: string } => ({
@@ -38,7 +42,6 @@ type Phase =
   | { kind: 'exchanging' }
   | { kind: 'connecting' }
   | { kind: 'picking'; tokens: OAuthTokens; repos: InstalledRepo[] }
-  | { kind: 'no-installations' }
   | { kind: 'reconnect-repo-missing'; owner: string; repo: string }
   | { kind: 'error'; message: string }
 
@@ -63,15 +66,14 @@ function AuthCallbackPage() {
   const loadProgress = useStore(s => s.vaultLoadProgress)
 
   // The OAuth exchange runs exactly once against the params this page was
-  // loaded with; `connect`/`reconnect` are hoisted declarations, so capturing
-  // them here picks up the same closure the effect would have seen anyway.
-  // Written as a mount ref rather than an exhaustive-deps suppression because
-  // such a suppression makes the React Compiler skip optimizing the whole
-  // component.
-  const startRef = useRef({ search, connect, reconnect })
+  // loaded with; `reconnect` is a hoisted declaration, so capturing it here
+  // picks up the same closure the effect would have seen anyway. Written as a
+  // mount ref rather than an exhaustive-deps suppression because such a
+  // suppression makes the React Compiler skip optimizing the whole component.
+  const startRef = useRef({ search, reconnect })
 
   useEffect(() => {
-    const { search: mountSearch, connect: mountConnect, reconnect: mountReconnect } = startRef.current
+    const { search: mountSearch, reconnect: mountReconnect } = startRef.current
     const params = new URLSearchParams()
     if (mountSearch.code) params.set('code', mountSearch.code)
     if (mountSearch.state) params.set('state', mountSearch.state)
@@ -86,9 +88,7 @@ function AuthCallbackPage() {
         }
         const repos = await fetchInstalledRepos(tokens.accessToken)
         if (cancelled) return
-        if (repos.length === 0) setPhase({ kind: 'no-installations' })
-        else if (repos.length === 1) await mountConnect(tokens, repos[0]!)
-        else setPhase({ kind: 'picking', tokens, repos })
+        setPhase({ kind: 'picking', tokens, repos })
       })
       .catch((e: unknown) => {
         if (cancelled) return
@@ -114,9 +114,7 @@ function AuthCallbackPage() {
       // reconnect click and this redirect landing — fall through to the
       // ordinary add flow instead of dead-ending.
       const repos = await fetchInstalledRepos(tokens.accessToken)
-      if (repos.length === 0) setPhase({ kind: 'no-installations' })
-      else if (repos.length === 1) await connect(tokens, repos[0]!)
-      else setPhase({ kind: 'picking', tokens, repos })
+      setPhase({ kind: 'picking', tokens, repos })
       return
     }
 
@@ -163,19 +161,6 @@ function AuthCallbackPage() {
     )
   }
 
-  if (phase.kind === 'no-installations') {
-    return (
-      <CenteredMessage
-        title="Install Meridian on a repository"
-        description="You're signed in, but the app isn't installed on any repository yet. Install it, then come back and sign in again."
-      >
-        <Button asChild>
-          <a href={GITHUB_APP_INSTALL_URL}>Install on GitHub</a>
-        </Button>
-      </CenteredMessage>
-    )
-  }
-
   if (phase.kind === 'reconnect-repo-missing') {
     return (
       <CenteredMessage
@@ -189,19 +174,48 @@ function AuthCallbackPage() {
     )
   }
 
+  // A zero-length and a non-empty repo list are the same screen — an empty
+  // list plus these two out-links is a normal state, not a dead end — so
+  // there is no separate "come back and sign in again" phase; only the title
+  // differs.
   return (
-    <CenteredMessage title="Choose a repository">
-      <div className="flex w-full max-w-sm flex-col gap-2">
-        {phase.repos.map(repo => (
-          <button
-            key={`${repo.owner}/${repo.repo}`}
-            type="button"
-            onClick={() => connect(phase.tokens, repo)}
-            className="rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+    <CenteredMessage title={phase.repos.length === 0 ? "Meridian isn't installed on any repository yet" : 'Choose a repository'}>
+      <div className="flex w-full max-w-sm flex-col gap-3">
+        {phase.repos.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {phase.repos.map(repo => (
+              <button
+                key={`${repo.owner}/${repo.repo}`}
+                type="button"
+                onClick={() => connect(phase.tokens, repo)}
+                className="rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+              >
+                {repo.owner}/{repo.repo}
+              </button>
+            ))}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Only repositories with Meridian's GitHub App installed appear here.
+        </p>
+        <div className="flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
+          <a
+            href={NEW_REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >
-            {repo.owner}/{repo.repo}
-          </button>
-        ))}
+            Create a new repository on GitHub
+          </a>
+          <a
+            href={GITHUB_APP_INSTALL_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Add another repository…
+          </a>
+        </div>
       </div>
     </CenteredMessage>
   )

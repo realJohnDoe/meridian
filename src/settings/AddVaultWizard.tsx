@@ -7,7 +7,7 @@ import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
 import {
   addLocalVault, addIcalVault, addExampleVault, startGitHubSignIn, isFolderPickerSupported,
-  previewIcalFeed,
+  previewIcalFeed, GITHUB_APP_INSTALL_URL,
 } from '@/vaultActions'
 
 type WizardStep = 'source' | 'github' | 'ical'
@@ -233,7 +233,16 @@ export default function AddVaultWizard() {
         {signingIn ? 'Redirecting to GitHub…' : 'Sign in with GitHub'}
       </Button>
       <p className="text-xs text-muted-foreground">
-        Choose which repository to connect after signing in.
+        You&rsquo;ll need a GitHub repository with Meridian&rsquo;s app installed on it — you can
+        create one and install the app after signing in.{' '}
+        <a
+          href={GITHUB_APP_INSTALL_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          Install the GitHub App
+        </a>
       </p>
 
       <div className="flex justify-between">
