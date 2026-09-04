@@ -25,12 +25,6 @@ import { getBackend } from './backends'
 import { journal, hashContent, syncJournalDump } from './syncJournal'
 import { parseFiles, reportParseFailures } from './parseReport'
 import { syncStateFor, noteSyncSuccess, noteSyncFailure } from './syncState'
-// The one edge back to the scheduler, and deliberately the only one:
-// releasing a held cross-vault delete has to ask for that vault's push, and
-// "ask for a push" is the scheduler's word. Everything else here is reached
-// from the scheduler, never the other way round. Safe as a cycle — both sides
-// are function declarations touched only at call time, never at module init.
-import { scheduleAutoPush } from './syncScheduler'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
@@ -637,8 +631,15 @@ async function pushDirty(
  *
  * Never throws: a move that cannot be settled stays staged, which is the safe
  * state, and must not take the surrounding sync cycle down with it.
+ *
+ * Releasing a move frees the source vault's held delete, which then wants a
+ * push — but "ask for a push" is the scheduler's word, and the scheduler is
+ * downstream of this file. So the ids of the vaults that need one are
+ * collected into `released` and handed back up through `runSync` for the
+ * scheduler to act on, the same way `runSync`'s own return value already
+ * hands back the mid-cycle push drain. Nothing here calls upward.
  */
-async function settlePendingMoves(): Promise<void> {
+async function settlePendingMoves(released: Set<string>): Promise<void> {
   let moves: PendingMove[]
   try {
     moves = await pendingMovesLoad()
@@ -648,14 +649,14 @@ async function settlePendingMoves(): Promise<void> {
   }
   for (const move of moves) {
     try {
-      await settleMove(move)
+      await settleMove(move, released)
     } catch (e) {
       console.error('[vault] could not settle move', move.id, e)
     }
   }
 }
 
-async function settleMove(move: PendingMove): Promise<void> {
+async function settleMove(move: PendingMove, released: Set<string>): Promise<void> {
   const toVault = keyVaultId(move.toKey)
   // The target vault being gone is the same verdict as its record being gone:
   // removing a vault clears its cache, so either way nothing durable is left
@@ -669,18 +670,23 @@ async function settleMove(move: PendingMove): Promise<void> {
   // `clean` is the ordinary confirmation. `deleted` counts too: the user
   // deleted the moved entry at its new home, so resurrecting the source copy
   // by abandoning here would undo a deliberate delete.
-  await releaseMove(move)
+  await releaseMove(move, released)
 }
 
-/** The target's remote has the entry — let the source's delete go out. */
-async function releaseMove(move: PendingMove): Promise<void> {
+/**
+ * The target's remote has the entry — let the source's delete go out.
+ *
+ * Records the source vault in `released` rather than scheduling its push here;
+ * see `settlePendingMoves` for why the request travels upward instead.
+ */
+async function releaseMove(move: PendingMove, released: Set<string>): Promise<void> {
   await pendingMoveDrop(move.id)
   const fromVault = keyVaultId(move.fromKey)
   journal('move-released', fromVault, keyToPath(move.fromKey), { note: move.id })
   const from = getBackend(fromVault)
   if (!from || from.readOnly) return
   updateSyncUI(from)
-  scheduleAutoPush(from)
+  released.add(from.id)
 }
 
 /**
@@ -708,6 +714,32 @@ async function abandonMove(move: PendingMove): Promise<void> {
 }
 
 /**
+ * What one cycle leaves for its caller to finish.
+ *
+ * Both fields exist so that nothing in this file has to call back into
+ * `syncScheduler.ts`: the sync core is downstream of the scheduler, and an
+ * import in the other direction is a cycle. Requests travel up as data.
+ */
+export interface SyncCycleResult {
+  /**
+   * Whether a cycle actually ran — false when this vault has no remote, or
+   * when one was already in flight and this call bounced off the guard.
+   * `syncScheduler.ts` needs the distinction to know whether a push queued
+   * mid-cycle is now its to re-arm or the running cycle's to finish; only the
+   * call that owned the vault may drain it.
+   */
+  ran: boolean
+  /**
+   * Vaults whose held cross-vault delete was freed this cycle (see
+   * `settlePendingMoves`) and which therefore want a push. Ids rather than
+   * backends so the scheduler re-reads the registry at the moment it acts,
+   * the way `autoSyncTick` re-checks each vault rather than trusting a list
+   * assembled before the awaits.
+   */
+  releasedVaults: string[]
+}
+
+/**
  * Run one sync cycle for one vault.
  *
  * `backend` is threaded in explicitly by every caller (each of which looks it
@@ -721,16 +753,16 @@ async function abandonMove(move: PendingMove): Promise<void> {
  * a manual "Sync now" on one vault must not be swallowed just because another
  * vault happens to be reconciling.
  *
- * Resolves to whether a cycle actually ran — false when this vault has no
- * remote, or when one was already in flight and this call bounced off the
- * guard. `syncScheduler.ts` needs that distinction to know whether a push
- * queued mid-cycle is now its to re-arm or the running cycle's to finish; only
- * the call that owned the vault may drain it. Never rejects: every failure is
- * classified and reported below, so callers can fire-and-forget.
+ * Never rejects: every failure is classified and reported below, so callers
+ * can fire-and-forget.
  */
-export async function runSync(backend: StorageBackend, opts: { silent: boolean; pull: boolean }): Promise<boolean> {
+export async function runSync(
+  backend: StorageBackend,
+  opts: { silent: boolean; pull: boolean },
+): Promise<SyncCycleResult> {
   const vaultId    = backend.id
   const syncState  = syncStateFor(vaultId)
+  const released   = new Set<string>()
 
   // A read-only vault is no longer a dead end — only a vault with no remote is.
   // The Tutorial vault is synthesized fresh on every load, so there is nothing
@@ -740,9 +772,9 @@ export async function runSync(backend: StorageBackend, opts: { silent: boolean; 
   if (!backend.hasRemote) {
     if (!opts.silent) notify(`"${backend.name}" is read-only — there is nothing to sync.`)
     updateSyncUI(backend)
-    return false
+    return { ran: false, releasedVaults: [] }
   }
-  if (syncState.syncing) return false
+  if (syncState.syncing) return { ran: false, releasedVaults: [] }
   syncState.syncing       = true
   syncState.lastAttemptAt = Date.now()
   setVaultSync(vaultId, { inProgress: true })
@@ -783,7 +815,7 @@ export async function runSync(backend: StorageBackend, opts: { silent: boolean; 
     // target's copy reached its remote? — is answered by the target's cache
     // record, which any cycle can read. That way a move still settles when the
     // vault that would have noticed is the one sitting in backoff.
-    await settlePendingMoves()
+    await settlePendingMoves(released)
     setVaultSync(vaultId, { error: null, offline: false, lastSyncedAt: Date.now(), needsAttention: null })
     noteSyncSuccess(syncState)
     if (pulled) syncState.lastPullAt = Date.now()
@@ -824,6 +856,7 @@ export async function runSync(backend: StorageBackend, opts: { silent: boolean; 
   }
   // A push that arrived mid-sync was queued (see attemptPush) rather than
   // dropped; draining it is the scheduler's job, and this is what tells it
-  // this call is the one that may.
-  return true
+  // this call is the one that may. `releasedVaults` travels the same way, for
+  // the same reason — see SyncCycleResult.
+  return { ran: true, releasedVaults: [...released] }
 }

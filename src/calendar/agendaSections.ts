@@ -5,6 +5,7 @@ import { CHUNK_DAYS, chunkIndexFor, chunkRange } from './agendaChunks'
 import { weekStartFor, weekNumberFor } from './weekRange'
 import { sortOccs } from './occSort'
 import type { OverdueGroup } from './overduePool'
+import type { FilterOccs } from './useCalendarFilter'
 
 // Size estimates for the virtualizer. Real sizes are measured after render
 // (measureElement); accurate estimates just keep the scrollbar/scrollToIndex
@@ -166,7 +167,6 @@ function dayRows(items: Occurrence[], dateKey: string, date: Date, isToday: bool
   }))
 }
 
-export type FilterOccs = (occs: Occurrence[]) => Occurrence[]
 
 const NO_CHANGES: number[] = []
 

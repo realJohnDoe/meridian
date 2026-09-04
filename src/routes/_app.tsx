@@ -14,9 +14,11 @@ import {
   useCurrentDate, setCurrentDate, weekdayKeptDate, useQuickNavSwipe, setQuickNavBrowsePreview,
 } from '@/calendar'
 import { CoachTour } from '@/onboarding'
-import { AppSidebar, SyncButton, SearchBar, ViewFilterButton } from '@/components'
+import { SyncButton, ViewFilterButton } from '@/components'
 import { IconButton } from '@/components/primitives/icon-button'
 import { SidebarProvider, useSidebar } from '@/components/ui/sidebar'
+import AppSidebar from './-appSidebar'
+import SearchBar from './-searchBar'
 import { TopbarShell } from './-topbarShell'
 import { PagedTopbar } from './-pagedTopbar'
 

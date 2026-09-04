@@ -103,11 +103,11 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 // test and each with its own real dependencies (auth, vaults, onboarding
 // state) not worth wiring up here.
 vi.mock('@/components', () => ({
-  AppSidebar: () => null,
   SyncButton: () => null,
-  SearchBar: () => null,
   ViewFilterButton: () => null,
 }))
+vi.mock('./-appSidebar', () => ({ default: () => null }))
+vi.mock('./-searchBar', () => ({ default: () => null }))
 vi.mock('@/onboarding', () => ({ CoachTour: () => null }))
 
 setupStore()

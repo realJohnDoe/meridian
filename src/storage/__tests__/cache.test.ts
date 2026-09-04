@@ -489,16 +489,20 @@ describe('cache/pendingMoves', () => {
     const good = await m.moves.pendingMoveAdd(FROM, TO)
     const d = await open()
     const record = await d.meta.get('pendingMoves')
+    // `meta.value` is `unknown` (see db.ts) — the cast is what makes the row
+    // spreadable here, standing in for the `isPendingMove` check the module
+    // under test does for itself.
+    const stored = record?.value as PendingMovesModule.PendingMove[]
     await d.meta.put({
       key: 'pendingMoves',
       value: [
-        ...(record?.value as PendingMovesModule.PendingMove[]),
+        ...stored,
         null,
         'a string',
         { id: 'x' },
         { id: 'x', fromKey: 'no-separator', toKey: TO, startedAt: 1 },
         { id: 'x', fromKey: FROM, toKey: TO },
-      ] as unknown as PendingMovesModule.PendingMove[],
+      ],
     })
 
     expect(await m.moves.pendingMovesLoad()).toEqual([good])

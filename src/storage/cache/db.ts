@@ -1,6 +1,4 @@
 import Dexie from 'dexie'
-import type { VaultRef } from '@/vaultRef'
-import type { PendingMove } from './pendingMoves'
 
 // The single Dexie seam. Every other file in this directory reaches IndexedDB
 // through `cacheInit()` — this is the only module allowed to import dexie
@@ -34,12 +32,31 @@ export interface DexieFileRow {
   baseContent?: string
 }
 
-/** Row shape stored in Dexie's `meta` table — the key/value store behind
+/**
+ * Row shape stored in Dexie's `meta` table — the key/value store behind
  * cache/credentials.ts (handles, tokens), cache/registry.ts (vault list) and
- * cache/pendingMoves.ts (held cross-vault deletes). */
+ * cache/pendingMoves.ts (held cross-vault deletes).
+ *
+ * `value` is `unknown`, not a union of those modules' payload types. Two
+ * reasons, and the first is the one that matters: this is the bottom of the
+ * directory — every other file here imports `cacheInit` from it — so a union
+ * naming `VaultRef[]` and `PendingMove[]` had the Dexie seam importing its own
+ * consumers back, which is a cycle (invariant 4 counts type edges, and
+ * `PendingMove` closed a real one with cache/pendingMoves.ts).
+ *
+ * The second is that the union was never load-bearing anyway. A heterogeneous
+ * key/value table cannot say which type a given key holds, so every reader
+ * already re-establishes that itself against whatever came back out of
+ * IndexedDB — `v instanceof FileSystemDirectoryHandle`, `typeof v === 'string'`,
+ * `isVaultRef`, `isPendingMove`. That validation is not belt-and-braces; it is
+ * the only thing standing between a hand-edited or half-written row and the
+ * code downstream of it. `unknown` is what those readers were treating `value`
+ * as regardless, now said out loud — and it makes the check mandatory rather
+ * than merely conventional for the next reader added here.
+ */
 interface MetaRecord {
   key:   string
-  value: FileSystemDirectoryHandle | string | number | boolean | VaultRef[] | PendingMove[]
+  value: unknown
 }
 
 export class MeridianDB extends Dexie {

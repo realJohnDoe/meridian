@@ -76,6 +76,23 @@ CI does exactly this before linting (`.github/workflows/build.yml`), which is wh
 - `src/routeTree.gen.ts` — without it, `Route.useSearch()`/`useParams()` resolve to `any` and `src/` lint fails.
 - `worker/worker-configuration.d.ts` — without it, `Request`/`Response`/`HeadersInit`/`Env` resolve to `any` and **all** of `worker/src` lint fails (~150 errors).
 
+### Two gates, not one
+
+`pnpm run lint` is `eslint … && pnpm run lint:deps`. ESLint is per-file: it
+enforces the module boundaries (invariants 1–3, 5) by asking of each import in
+isolation "is this file allowed to import that one". `lint:deps` is
+[dependency-cruiser](https://github.com/sverweij/dependency-cruiser), which
+builds the whole `src/` module graph first and then asks the questions no
+single file can answer — today just one, invariant 4's "is there a cycle".
+`import type` is counted as an edge, so type-only loops fail too. Config and
+reasoning: `.dependency-cruiser.mjs`.
+
+It reads the same `tsconfig.app.json` path aliases as vite and tsc, so it
+needs `src/routeTree.gen.ts` for the same reason the type-aware rules above
+do. Run it alone with `pnpm run lint:deps`; `pnpm exec depcruise src
+--output-type dot | dot -Tsvg > graph.svg` draws the graph when you want to
+look at it.
+
 ## TypeScript pinned to 6.0.x
 
 `typescript` is intentionally pinned below the TS 7 major in both `package.json` (root) and `worker/package.json`. `typescript-eslint` (even at latest, 8.65.0) hard-refuses to run against TS 7: `eslint` exits with `typescript-eslint does not support TS 7.0`. `vite build`/`tsc -b` themselves are fine under TS 7 — only the lint step breaks. Tracked upstream: https://github.com/typescript-eslint/typescript-eslint/issues/10940 (support for TS ≥7.1). Don't attempt the TS 7 bump again until that lands — re-check the issue first.
@@ -99,9 +116,9 @@ It is an **index, not an encyclopedia** — each entry is one sentence plus a po
 | `editor/` | CodeMirror editor, entry UI, dialogs, save logic. |
 | `calendar/` | Day/month/agenda views and occurrence rendering. |
 | `settings/` | The settings screens — general preferences, the theme picker, the vault list and each vault's own screen, and the add-vault wizard. Reached by route (`/settings/…`), not as a modal. |
-| `components/` | Shared React components. Two primitive layers below it: `components/ui/` is a faithful mirror of the **shadcn registry** — only files the shadcn CLI wrote go there, never hand-written ones — and `components/primitives/` holds **our own** shared primitives (`IconButton`, `ResponsiveModal`, `SurfaceButton`, …). This split is load-bearing: `vitest.config.ts` excludes `components/ui/**` from coverage as boilerplate, `knip.json` ignores its unused exports/types, and `shadcn diff` compares that directory against upstream. `components/primitives/` is deliberately covered by none of those exemptions — do not add it to them. A first-party primitive used by only one feature dir belongs in that feature dir, not here — see the placement rule above. |
+| `components/` | Shared React components. Two primitive layers below it: `components/ui/` is a faithful mirror of the **shadcn registry** — only files the shadcn CLI wrote go there, never hand-written ones — and `components/primitives/` holds **our own** shared primitives (`IconButton`, `ResponsiveModal`, `SurfaceButton`, …). This split is load-bearing: `vitest.config.ts` excludes `components/ui/**` from coverage as boilerplate, `knip.json` ignores its unused exports/types, and `shadcn diff` compares that directory against upstream. `components/primitives/` is deliberately covered by none of those exemptions — do not add it to them. A first-party primitive used by only one feature dir belongs in that feature dir, not here — see the placement rule above. **Leaf layer:** the feature dirs import `components/`, so nothing here may import a feature module back (`@/calendar`, `@/search`, `@/editor`, …) — that is a cycle, see invariant 4. A component that needs one is a shell composite, not a shared component; it belongs beside whatever mounts it. |
 | `hooks/` | Shared React hooks. |
-| `routes/` | TanStack Router route definitions. |
+| `routes/` | TanStack Router route definitions, plus the `-`-prefixed files (excluded from route generation) that a route composes: the topbars, and the `_app` shell's own `-appSidebar.tsx`/`-searchBar.tsx`. This is the top of the graph — nothing imports `routes/` — so it is where a composite that reaches across several feature modules belongs. |
 
 **Root-level files are intentionally cross-cutting** — they are imported by three or more unrelated layers and have no single owning directory. The deliberate root residents are:
 
@@ -113,7 +130,7 @@ It is an **index, not an encyclopedia** — each entry is one sentence plus a po
 - `occurrenceActions.ts` — user-action orchestration, including its delete-undo toast; used by `editor/` and `calendar/`
 - `storeCommit.ts` + `persistencePort.ts` — persistence-port abstraction (see invariant 3 below); used by `editor/`, `storage/`, and `occurrenceActions.ts`
 - `vaultActions.ts` — used by `components/` and `routes/`
-- `entryRoute.ts` — `newEntryRoute`/`entryRoute`/`keyRoute`, the pure TanStack Router Link/navigate descriptor builders for an entry; used by `editor/`, `hooks/useOpenEntry.ts`, and `components/` (`SearchBar.tsx`, `Sidebar.tsx`). A root leaf rather than `routes/-entryRoute.ts` (where it used to live) because `routes/` itself imports all three of those to compose its pages — a feature dir importing it back from `routes/` created a real cycle, found and fixed per `plans/import-cycles.md`.
+- `entryRoute.ts` — `newEntryRoute`/`entryRoute`/`keyRoute`, the pure TanStack Router Link/navigate descriptor builders for an entry; used by `editor/`, `hooks/useOpenEntry.ts`, and `routes/` (`-searchBar.tsx`, `-appSidebar.tsx`). A root leaf rather than `routes/-entryRoute.ts` (where it used to live) because `routes/` itself imports all three of those to compose its pages — a feature dir importing it back from `routes/` created a real cycle.
 - `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`). `occView.ts` also owns the display vocabulary: `OccState` (what an occurrence is, derived by its own `occState()`) and the painting layer on top of it — `OccHue`/`OccTone`, the `colorBy` preference, and the `OccPainter` that resolves both plus the card's one chip (bound to the store by `hooks/useOccPainter.ts`).
 
 All feature directories already have `index.ts` barrels enforced by the import-boundary lint rules — do not propose adding them.
@@ -157,7 +174,49 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 3. **Core persistence goes through the port.** `storeCommit.ts` and `occurrenceActions.ts` call the `persistencePort` abstraction rather than `@/storage` functions directly. The storage adapter registers the implementation at startup.
 
-4. **Accepted cycles — do not refactor.** Feature-mesh cycles through `root` (e.g. `calendar ↔ components`: `AgendaRow.tsx`/`AgendaOverdueGroupRow.tsx` use `OccurrenceCard`, `SearchBar.tsx` uses `useCurrentDate`) are inherent to feature-sliced React. These are deliberately not targets for restructuring — but a cycle running *through* a root file rather than *between* two features is a different case: that one's a placement bug, not an inherent mesh, and is worth fixing (see `entryRoute.ts` above, and `plans/import-cycles.md` for the audit that tells the two apart).
+4. **No import cycles. There are no accepted ones, and `import type` counts.**
+   Enforced by `pnpm run lint:deps` (dependency-cruiser, config in
+   `.dependency-cruiser.mjs`), which `pnpm run lint` chains and CI therefore
+   runs.
+
+   This is a hard rule and not a stylistic one, for two separate reasons.
+   A *runtime* cycle means some module in the loop necessarily executes
+   against a half-initialised copy of the next, so whether it works at all
+   depends on the order the bundler happens to emit — the failure is silent
+   until it isn't, and it lands at load time, where there is no stack to read.
+   A *type-only* cycle has no such bug and is still forbidden: two modules
+   that name each other's types cannot be read, moved, tested or extracted
+   independently, which is most of what the boundary was for. Treating the two
+   differently would also make the rule one keystroke wide — deleting `type`
+   from an import would turn a tolerated loop into a real one with nothing to
+   catch it. So the checked graph counts type edges (`tsPreCompilationDeps`),
+   and a shared type gets the same fix as shared code: put it where neither
+   consumer has to import the other. Usually that is the module that *produces*
+   values of it — `FilterOccs` sits in `calendar/useCalendarFilter.ts`, which
+   builds the live filter, not in either of the two builders that take one.
+
+   A cycle is a **placement bug**, not something inherent to feature-sliced
+   React. Every one this codebase has had turned out to be a file sitting in
+   the wrong directory, and the two shapes it takes both have a standard fix:
+
+   - **A leaf layer importing a feature back.** `components/` is imported by
+     the features; nothing in it may import `@/calendar`, `@/search`,
+     `@/editor` or any other feature module. When a component genuinely needs
+     one, it is not a shared component — it is a composite that belongs beside
+     whatever mounts it. `SearchBar`/`AppSidebar` were exactly this, and moved
+     to `routes/-searchBar.tsx`/`routes/-appSidebar.tsx`.
+   - **A downstream module calling back upstream.** Return the request as data
+     and let the caller act on it, rather than importing the caller. See
+     `storage/sync.ts`'s `SyncCycleResult`: the sync core reports "these vaults
+     want a push" and `syncScheduler.ts` — which is upstream of it — does the
+     pushing. The type-level form of this is a low layer enumerating its own
+     consumers: `storage/cache/db.ts`'s `meta` row is `value: unknown` rather
+     than a union naming `VaultRef[]` and `PendingMove[]`, because every reader
+     validates what came out of IndexedDB anyway.
+
+   Both are ordinary dependency inversion; reach for them before considering
+   anything more exotic. A cycle is never fixed by adding an exception to
+   `.dependency-cruiser.mjs`.
 
 5. **View-ephemeral state lives with its view.** `store.ts` holds durable vault/sync/prefs state only. `calendar/viewState.ts` owns calendar view ephemera (agenda scroll position, carousel swipe previews, scroll-to-today) in its own Zustand store, reached through the `@/calendar` barrel like any other feature-internal state — not through `store.ts`/`storeBridge`. `zustand` is otherwise restricted to `store.ts`; `calendar/viewState.ts` is the one named exception in `eslint.config.js`.
 

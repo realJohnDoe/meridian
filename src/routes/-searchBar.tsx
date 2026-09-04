@@ -1,13 +1,24 @@
+/**
+ * The `_app` shell's topbar search field, and the trigger that mounts the
+ * search overlay beneath it.
+ *
+ * Lives in `routes/`, not `components/`: it lazy-loads `@/search` and reads
+ * `@/calendar`'s current date, and `_app.tsx` is its only caller — which is
+ * what CLAUDE.md's placement rule asks for. Sitting in `components/` it was
+ * the back-edge of two cycles at once (`components → search → components`,
+ * `components → calendar → components`): a leaf-UI directory that features
+ * import, importing those features back.
+ */
 import { lazy, Suspense, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
-import { Button } from './ui/button'
-import { IconButton } from './primitives/icon-button'
-import { Input } from './ui/input'
+import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/primitives/icon-button'
+import { Input } from '@/components/ui/input'
 import { newEntryRoute } from '@/entryRoute'
 import { useOpenEntry } from '@/hooks'
 import { useCurrentDate } from '@/calendar'
-import { useSidebar } from './ui/sidebar'
+import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 
 // Lazy: SearchResults/FileResultsList pull in enough weight that they

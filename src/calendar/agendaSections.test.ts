@@ -4,8 +4,9 @@ import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import {
   computeAgendaSections, estimateRow,
-  type AgendaChunkOccs, type AgendaSectionCache, type Section, type FilterOccs, type AgendaRow,
+  type AgendaChunkOccs, type AgendaSectionCache, type Section, type AgendaRow,
 } from './agendaSections'
+import type { FilterOccs } from './useCalendarFilter'
 import { agendaChunkRun, chunkIndexFor, chunkRange, chunkIndicesFor, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS } from './agendaChunks'
 import { weekStartFor } from './weekRange'
 import { sortOccs } from './occSort'
