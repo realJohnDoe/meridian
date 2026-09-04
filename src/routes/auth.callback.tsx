@@ -42,7 +42,6 @@ type Phase =
   | { kind: 'exchanging' }
   | { kind: 'connecting' }
   | { kind: 'picking'; tokens: OAuthTokens; repos: InstalledRepo[] }
-  | { kind: 'no-installations' }
   | { kind: 'reconnect-repo-missing'; owner: string; repo: string }
   | { kind: 'error'; message: string }
 
@@ -89,8 +88,7 @@ function AuthCallbackPage() {
         }
         const repos = await fetchInstalledRepos(tokens.accessToken)
         if (cancelled) return
-        if (repos.length === 0) setPhase({ kind: 'no-installations' })
-        else setPhase({ kind: 'picking', tokens, repos })
+        setPhase({ kind: 'picking', tokens, repos })
       })
       .catch((e: unknown) => {
         if (cancelled) return
@@ -116,8 +114,7 @@ function AuthCallbackPage() {
       // reconnect click and this redirect landing — fall through to the
       // ordinary add flow instead of dead-ending.
       const repos = await fetchInstalledRepos(tokens.accessToken)
-      if (repos.length === 0) setPhase({ kind: 'no-installations' })
-      else setPhase({ kind: 'picking', tokens, repos })
+      setPhase({ kind: 'picking', tokens, repos })
       return
     }
 
@@ -177,17 +174,14 @@ function AuthCallbackPage() {
     )
   }
 
-  // Zero-repo ('no-installations') and multi-repo ('picking') sign-ins land
-  // on the same screen: an empty repo list plus these two out-links is a
-  // normal state, not a dead end, so it is not a distinct phase with its own
-  // "come back and sign in again" instruction.
+  // A zero-length and a non-empty repo list are the same screen — an empty
+  // list plus these two out-links is a normal state, not a dead end — so
+  // there is no separate "come back and sign in again" phase; only the title
+  // differs.
   return (
-    <CenteredMessage
-      title="Choose a repository"
-      description="Only repositories with Meridian's GitHub App installed appear below."
-    >
+    <CenteredMessage title={phase.repos.length === 0 ? "Meridian isn't installed on any repository yet" : 'Choose a repository'}>
       <div className="flex w-full max-w-sm flex-col gap-3">
-        {phase.kind === 'picking' && (
+        {phase.repos.length > 0 && (
           <div className="flex flex-col gap-2">
             {phase.repos.map(repo => (
               <button
@@ -201,6 +195,9 @@ function AuthCallbackPage() {
             ))}
           </div>
         )}
+        <p className="text-xs text-muted-foreground">
+          Only repositories with Meridian's GitHub App installed appear here.
+        </p>
         <div className="flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
           <a
             href={NEW_REPO_URL}

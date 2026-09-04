@@ -170,7 +170,7 @@ describe('auth.callback — repository fan-out', () => {
     fetchInstalledRepos.mockResolvedValue([])
     render(<AuthCallbackPage />)
 
-    expect(await screen.findByText('Choose a repository')).toBeInTheDocument()
+    expect(await screen.findByText("Meridian isn't installed on any repository yet")).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Create a new repository on GitHub' }))
       .toHaveAttribute('href', 'https://github.com/new?name=meridian-vault')
     expect(screen.getByRole('link', { name: 'Add another repository…' }))
