@@ -580,6 +580,15 @@ export async function setVaultColor(id: string, color: VaultColor | null): Promi
   await updateVaultRefs(current => current.map(r => (r.id === id ? { ...r, color: color ?? undefined } : r)))
 }
 
+/**
+ * Set (or, with `null`, clear) a registered vault's auto-archive threshold —
+ * plans/archived-entries.md 4c. Same no-op-for-the-Tutorial-vault shape as
+ * `renameVault`/`setVaultColor` above.
+ */
+export async function setVaultRetentionDays(id: string, days: number | null): Promise<void> {
+  await updateVaultRefs(current => current.map(r => (r.id === id ? { ...r, retentionDays: days ?? undefined } : r)))
+}
+
 export async function addLocalVault(): Promise<void> {
   try {
     await cacheInit()

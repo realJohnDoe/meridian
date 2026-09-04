@@ -7,17 +7,18 @@ import { setupStore, installFakePersistence, seedStore, makeOcc, makeRoots, test
 import { entryKey } from '@/fileIO'
 import type { Roots } from '@/types'
 import type { VaultRef } from '@/vaultRef'
-import { setVaultColor } from '@/vaultActions'
+import { setVaultColor, setVaultRetentionDays } from '@/vaultActions'
 import type * as VaultActions from '@/vaultActions'
 import { VaultSettings } from './VaultSettings'
 
-// Only setVaultColor is faked — everything else (exportVaultIcs et al.) stays
-// real, since the export test below exercises it for real. Faking just this
-// one export sidesteps a real Dexie/IndexedDB write, which jsdom has no
-// backing store for.
+// Only setVaultColor/setVaultRetentionDays are faked — everything else
+// (exportVaultIcs et al.) stays real, since the export test below exercises
+// it for real. Faking just these two sidesteps a real Dexie/IndexedDB write,
+// which jsdom has no backing store for.
 vi.mock('@/vaultActions', async (importOriginal) => ({
   ...(await importOriginal<typeof VaultActions>()),
   setVaultColor: vi.fn(),
+  setVaultRetentionDays: vi.fn(),
 }))
 
 // The archived list's rows are real `Link`s (see keyRoute), which need a
@@ -109,6 +110,61 @@ describe('VaultSettings — color', () => {
   it('hides the color picker for the Tutorial vault', () => {
     render(<VaultSettings vault={{ id: 'example', name: 'Tutorial', kind: 'example' }} />)
     expect(screen.queryByRole('button', { name: 'No color' })).not.toBeInTheDocument()
+  })
+})
+
+describe('VaultSettings — auto-archive', () => {
+  afterEach(() => { vi.mocked(setVaultRetentionDays).mockClear() })
+
+  it('shows the current retentionDays value', () => {
+    render(<VaultSettings vault={{ ...GITHUB_VAULT, retentionDays: 30 }} />)
+    expect(screen.getByPlaceholderText('Off')).toHaveValue(30)
+  })
+
+  it('is blank when retentionDays is unset', () => {
+    render(<VaultSettings vault={GITHUB_VAULT} />)
+    expect(screen.getByPlaceholderText('Off')).toHaveValue(null)
+  })
+
+  it('sets retentionDays on blur after a valid value is typed', () => {
+    render(<VaultSettings vault={GITHUB_VAULT} />)
+    const input = screen.getByPlaceholderText('Off')
+    fireEvent.change(input, { target: { value: '14' } })
+    fireEvent.blur(input)
+    expect(setVaultRetentionDays).toHaveBeenCalledWith(GITHUB_VAULT.id, 14)
+  })
+
+  it('clears retentionDays on blur when the field is emptied', () => {
+    render(<VaultSettings vault={{ ...GITHUB_VAULT, retentionDays: 30 }} />)
+    const input = screen.getByPlaceholderText('Off')
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.blur(input)
+    expect(setVaultRetentionDays).toHaveBeenCalledWith(GITHUB_VAULT.id, null)
+  })
+
+  it('treats a non-positive value as clearing it, not as zero', () => {
+    render(<VaultSettings vault={{ ...GITHUB_VAULT, retentionDays: 30 }} />)
+    const input = screen.getByPlaceholderText('Off')
+    fireEvent.change(input, { target: { value: '0' } })
+    fireEvent.blur(input)
+    expect(setVaultRetentionDays).toHaveBeenCalledWith(GITHUB_VAULT.id, null)
+  })
+
+  it('does not call the action when the value is unchanged', () => {
+    render(<VaultSettings vault={{ ...GITHUB_VAULT, retentionDays: 30 }} />)
+    const input = screen.getByPlaceholderText('Off')
+    fireEvent.blur(input)
+    expect(setVaultRetentionDays).not.toHaveBeenCalled()
+  })
+
+  it('hides the row for the Tutorial vault (not writable)', () => {
+    render(<VaultSettings vault={{ id: 'example', name: 'Tutorial', kind: 'example' }} />)
+    expect(screen.queryByPlaceholderText('Off')).not.toBeInTheDocument()
+  })
+
+  it('hides the row for an iCal subscription (not writable)', () => {
+    render(<VaultSettings vault={{ id: 'cal', name: 'Calendar', kind: 'ical', ical: { url: 'https://example.com/feed.ics' } }} />)
+    expect(screen.queryByPlaceholderText('Off')).not.toBeInTheDocument()
   })
 })
 

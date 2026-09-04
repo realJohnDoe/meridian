@@ -528,19 +528,42 @@ describe('GitHubBackend', () => {
       // readFiles responses (two parallel Contents-API fetches — no GraphQL call)
       .mockResolvedValueOnce(makeResp(makeFileResponse('a.md', '# A', 'sha-a')))
       .mockResolvedValueOnce(makeResp(makeFileResponse('b.md', '# B', 'sha-b')))
+      // lastModified backfill — one aliased history request over both paths.
+      .mockResolvedValueOnce(makeHistoryResp(['a.md', 'b.md']))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const files   = await backend.readAll()
 
     expect(files).toHaveLength(2)
     expect(files.map(f => f.path).sort()).toEqual(['a.md', 'b.md'])
-    expect(fetchSpy).toHaveBeenCalledTimes(3) // tree + 2 Contents requests, no /graphql
+    expect(files.every(f => f.lastModified !== undefined)).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledTimes(4) // tree + 2 Contents requests + 1 history backfill
   })
 
   // ── readAll — GraphQL batching (large vaults) ──────────────────────────
 
   function makeGraphQLResp(repository: Record<string, { text: string | null } | null>) {
     const body = { data: { repository } }
+    return {
+      ok: true, status: 200,
+      headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '4999' }),
+      json: () => Promise.resolve(body),
+      text: () => Promise.resolve(JSON.stringify(body)),
+    }
+  }
+
+  /**
+   * A `readAll()` call also backfills `lastModified` (plans/archived-entries.md
+   * 4b) via its own aliased-`history` GraphQL request, one `f{n}` per path in
+   * `paths` order — this stands in for that response. `committedDate` is the
+   * same fixed instant for every path; these tests only care that the request
+   * happened, not about specific dates.
+   */
+  function makeHistoryResp(paths: string[]) {
+    const target = Object.fromEntries(
+      paths.map((_, i) => [`f${i}`, { nodes: [{ committedDate: '2026-01-01T00:00:00Z' }] }]),
+    )
+    const body = { data: { repository: { ref: { target } } } }
     return {
       ok: true, status: 200,
       headers: new Headers({ 'content-type': 'application/json', 'x-ratelimit-remaining': '4999' }),
@@ -563,6 +586,8 @@ describe('GitHubBackend', () => {
       .mockResolvedValueOnce(makeGraphQLResp(
         Object.fromEntries(specs.map((s, i) => [`f${i}`, { text: s.content }])),
       ))
+      // lastModified backfill — 10 files fits in one HISTORY_BATCH_SIZE (20) batch.
+      .mockResolvedValueOnce(makeHistoryResp(specs.map(s => s.path)))
 
     const progressUpdates: Array<{ loaded: number; total: number }> = []
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
@@ -573,11 +598,13 @@ describe('GitHubBackend', () => {
       const f = files.find(f => f.path === s.path)
       expect(f?.content).toBe(s.content)
       expect(f?.version).toBe(s.sha)
+      expect(f?.lastModified).toBeDefined()
     }
 
-    // Exactly 2 requests total: the tree listing and one GraphQL batch —
-    // no per-file Contents requests.
-    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    // Exactly 3 requests total: the tree listing, one GraphQL blob batch, and
+    // one GraphQL history batch for the lastModified backfill — no per-file
+    // Contents requests.
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
     const [graphqlUrl, graphqlInit] = fetchSpy.mock.calls[1] as [string, RequestInit]
     expect(graphqlUrl).toContain('/graphql')
     const sentBody = JSON.parse(graphqlInit.body as string) as { variables: { owner: string; name: string } }
@@ -598,6 +625,8 @@ describe('GitHubBackend', () => {
       .mockResolvedValueOnce(makeGraphQLResp(repository))
       // Fallback Contents-API fetch for the one null-text path (note-3.md).
       .mockResolvedValueOnce(makeJsonResp(makeFileResponse('note-3.md', specs[3]!.content, 'sha-3')))
+      // lastModified backfill — 8 files fits in one HISTORY_BATCH_SIZE (20) batch.
+      .mockResolvedValueOnce(makeHistoryResp([...specs.filter(s => s.path !== 'note-3.md').map(s => s.path), 'note-3.md']))
 
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     const files   = await backend.readAll()
@@ -606,9 +635,10 @@ describe('GitHubBackend', () => {
     const fallback = files.find(f => f.path === 'note-3.md')
     expect(fallback?.content).toBe(specs[3]!.content)
     expect(fallback?.version).toBe('sha-3')
+    expect(fallback?.lastModified).toBeDefined()
 
-    // 1 tree + 1 GraphQL batch + 1 Contents fallback = 3 requests.
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    // 1 tree + 1 GraphQL batch + 1 Contents fallback + 1 history backfill = 4 requests.
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
   })
 
   it('readAll splits large path lists into multiple GraphQL batches, dispatched from a pool, reporting monotonic progress', async () => {
@@ -653,8 +683,12 @@ describe('GitHubBackend', () => {
     expect(files.find(f => f.path === 'note-50.md')?.content).toBe('# Note 50')
     expect(files.find(f => f.path === 'note-119.md')?.content).toBe('# Note 119')
 
-    // 1 tree + 3 GraphQL batches = 4 requests.
-    expect(fetchSpy).toHaveBeenCalledTimes(4)
+    // 1 tree + 3 blob GraphQL batches + 6 history-backfill GraphQL batches
+    // (120 files / HISTORY_BATCH_SIZE 20) = 10 requests. The mockImplementation
+    // above answers any /graphql POST, blob or history alike — a history
+    // request's aliases just don't match its blob-query regex, so those
+    // batches come back with no lastModified, which this test doesn't assert on.
+    expect(fetchSpy).toHaveBeenCalledTimes(10)
 
     // One progress update per batch, monotonically increasing, ending at the total.
     expect(progressUpdates).toHaveLength(3)

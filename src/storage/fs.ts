@@ -175,26 +175,26 @@ export async function diskStatAll(
 export async function diskReadFiles(
   dh: FileSystemDirectoryHandle,
   paths: string[],
-): Promise<Array<{ path: string; content: string; version: string }>> {
+): Promise<Array<{ path: string; content: string; version: string; lastModified: number }>> {
   const results = await Promise.all(
     paths.map(async path => {
       try {
         const fh   = await resolveFileHandle(dh, path)
         const file = await fh.getFile()
         const content = await file.text()
-        return { path, content, version: await contentHash(content) }
+        return { path, content, version: await contentHash(content), lastModified: file.lastModified }
       } catch (e) {
         console.warn('[storage] could not read', path, e)
         return null
       }
     })
   )
-  return results.filter((r): r is { path: string; content: string; version: string } => r !== null)
+  return results.filter((r): r is { path: string; content: string; version: string; lastModified: number } => r !== null)
 }
 
 export async function diskReadAll(
   dh: FileSystemDirectoryHandle,
-): Promise<Array<{ path: string; content: string; version: string }>> {
+): Promise<Array<{ path: string; content: string; version: string; lastModified: number }>> {
   const handles: Array<[string, FileSystemFileHandle]> = []
   await collectVaultFiles(dh, '', handles)
   const results = await Promise.all(
@@ -202,14 +202,14 @@ export async function diskReadAll(
       try {
         const file = await fh.getFile()
         const content = await file.text()
-        return { path, content, version: await contentHash(content) }
+        return { path, content, version: await contentHash(content), lastModified: file.lastModified }
       } catch (e) {
         console.warn('[storage] could not read', path, e)
         return null
       }
     })
   )
-  return results.filter((r): r is { path: string; content: string; version: string } => r !== null)
+  return results.filter((r): r is { path: string; content: string; version: string; lastModified: number } => r !== null)
 }
 
 export async function diskWrite(

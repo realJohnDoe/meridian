@@ -30,6 +30,14 @@ interface VaultRefBase {
   id:    string
   name:  string
   color?: VaultColor
+  /**
+   * Auto-archive threshold, in days — plans/archived-entries.md PR 4. An
+   * entry archives once every item is finished (`model/retention.ts`'s
+   * `isEntryFinished`) AND its file's `lastModified` is older than this many
+   * days. `undefined` means the sweep is off for this vault — optional, so no
+   * store migration, the same shape as `color` above.
+   */
+  retentionDays?: number
 }
 
 interface LocalVaultRef extends VaultRefBase {

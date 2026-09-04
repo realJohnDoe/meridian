@@ -19,13 +19,13 @@ import { readVaultStringArray } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
 import {
-  syncToBackend, removeVault, renameVault, setVaultColor, cacheDirtyCount, startGitHubSignIn,
+  syncToBackend, removeVault, renameVault, setVaultColor, setVaultRetentionDays, cacheDirtyCount, startGitHubSignIn,
   GITHUB_APP_INSTALL_URL, exportVaultIcs,
 } from '@/vaultActions'
 import { ParticipantsRow, archiveEntry } from '@/editor'
 import { keyRoute } from '@/entryRoute'
 import type { VaultRef } from '@/vaultActions'
-import { VAULT_COLORS } from '@/vaultRef'
+import { VAULT_COLORS, isWritableVault } from '@/vaultRef'
 import { VAULT_COLOR_SWATCH } from '@/components/primitives/occurrence-variants'
 import { cn } from '@/lib/cn'
 import { SettingsSection, SettingsRow } from './SettingsSection'
@@ -80,6 +80,7 @@ function sanitizeFilename(name: string): string {
 export function VaultSettings({ vault }: Props) {
   const [syncing,      setSyncing]      = useState(false)
   const [name,         setName]         = useState(vault.name)
+  const [retentionDays, setRetentionDays] = useState(vault.retentionDays?.toString() ?? '')
   const [confirmOpen,  setConfirmOpen]  = useState(false)
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [dirtyCount,   setDirtyCount]   = useState(0)
@@ -103,6 +104,14 @@ export function VaultSettings({ vault }: Props) {
     const trimmed = name.trim()
     if (trimmed && trimmed !== vault.name) void renameVault(vault.id, trimmed)
     else setName(vault.name)
+  }
+
+  function handleRetentionDaysBlur() {
+    const trimmed = retentionDays.trim()
+    const parsed = trimmed ? parseInt(trimmed, 10) : NaN
+    const days = Number.isFinite(parsed) && parsed > 0 ? parsed : null
+    setRetentionDays(days?.toString() ?? '')
+    if (days !== (vault.retentionDays ?? null)) void setVaultRetentionDays(vault.id, days)
   }
 
   function handleParticipantsChange(next: string[]) {
@@ -308,6 +317,23 @@ export function VaultSettings({ vault }: Props) {
       )}
 
       <SettingsSection title="Data">
+        {isWritableVault(vault) && (
+          <SettingsRow
+            label="Auto-archive"
+            description="Archive entries automatically once every item is finished and the file hasn't changed for this many days. Leave blank to turn it off."
+          >
+            <Input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              placeholder="Off"
+              value={retentionDays}
+              onChange={e => { setRetentionDays(e.target.value) }}
+              onBlur={handleRetentionDaysBlur}
+              className="w-20"
+            />
+          </SettingsRow>
+        )}
         <SettingsRow
           label="Export calendar"
           description="Download every entry in this vault as a single .ics file."

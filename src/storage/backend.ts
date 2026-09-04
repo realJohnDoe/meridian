@@ -9,6 +9,27 @@ export interface RawFile {
   path:    string
   content: string
   version: string
+  /**
+   * When the backend last saw this file's bytes change, epoch ms — the
+   * retention sweep's age signal (plans/archived-entries.md 4b). Never a
+   * heuristic: local FS is `File.lastModified`, "bytes written on this
+   * machine"; GitHub is a commit's `committedDate`, "committed to this
+   * branch". The two answer different questions (a fresh clone or a
+   * Dropbox/Syncthing resync resets every FS mtime to now; a squash-merge
+   * does the same on the GitHub side) but both fail *safe* the same way —
+   * recent rather than stale — so callers never need to know which backend
+   * produced it.
+   *
+   * Populated by `readAll()` only — a bulk read is where the cost of getting
+   * it (an FS stat that's already happening, or GitHub's batched commit-date
+   * backfill) is worth paying. `readFiles()` never sets it: an incremental
+   * pull already has a cheaper signal for "this changed" (its version token
+   * drifted from the cache's), so `reconcileWithBackend` stamps the current
+   * time instead of asking the backend for one. `undefined` when the backend
+   * doesn't know (or wasn't asked) — the sweep treats that as "never archive"
+   * rather than guessing.
+   */
+  lastModified?: number
 }
 
 /**

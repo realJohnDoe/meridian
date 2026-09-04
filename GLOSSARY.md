@@ -99,6 +99,13 @@ Two different questions. `readOnly` gates whether writes are pushed;
 read-only with no remote; an iCal feed is read-only *with* one.
 → `storage/backend.ts` · `StorageBackend`
 
+### retentionDays
+Per-vault auto-archive threshold, in days. An entry archives once every item
+is finished (see `archived` below) and its file's `lastModified` is older
+than this. `undefined` means the sweep is off. Writable vaults only.
+→ `vaultRef.ts` · `VaultRefBase`
+→ `storage/retentionSweep.ts` · `sweepRetention`
+
 ### needsAttention
 Replaces the boolean `needsReconnect`: null, or which of four actionable
 states a vault is in (`fs-permission`, `reauth`, `access`, `config`) plus a
@@ -305,6 +312,15 @@ been *read*) only approximates. Reserved against new entries and moves.
 Raised when a compare-and-swap write loses — the backend's version token no
 longer matches what the writer saw.
 → `storage/conflictError.ts` · `ConflictError`
+
+### lastModified
+The retention sweep's age signal — a real "when did this file's bytes last
+change", from the backend rather than the device. FS: `File.lastModified`.
+GitHub: a commit's `committedDate`, batch-backfilled on `readAll()` and
+otherwise stamped to "now" on an incremental pull. Absent means unknown, and
+unknown never archives.
+→ `storage/backend.ts` · `RawFile`
+→ `storage/cache/db.ts` · `DexieFileRow`
 
 ### base version / base content
 Two halves of the same ancestor, on one dirty cache record. The **base
