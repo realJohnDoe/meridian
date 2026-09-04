@@ -20,9 +20,10 @@ interface Props {
    * Archives the entry instead of deleting it. Optional so a caller with
    * nothing archivable (there is none today, but the type shouldn't assume
    * that forever) isn't forced to supply one — see `plans/archived-entries.md`
-   * PR 2. Rendered with the warning color, deliberately not styled like
-   * `onConfirm`: it isn't destructive, but it's still a consequential
-   * alternative to plain "Cancel", not the primary choice either.
+   * PR 2. Rendered in the priority-3 (yellow) tone, deliberately not
+   * styled like `onConfirm`: it isn't destructive, but it's still a
+   * consequential alternative to plain "Cancel", not the primary choice
+   * either.
    */
   onArchive?: () => void
 }
@@ -38,10 +39,10 @@ export default function DeleteDialog({ open, title, onConfirm, onClose, onArchiv
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="gap-2 sm:gap-0">
-          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose} className="mt-0">Cancel</AlertDialogCancel>
           {onArchive && (
             <AlertDialogAction
-              className="bg-warning text-warning-foreground hover:bg-warning/90 gap-1.5"
+              className="bg-priority-3 text-priority-3-foreground hover:bg-priority-3/90 gap-1.5"
               onClick={() => { onArchive(); onClose() }}
             >
               <Archive size={13} />
@@ -49,7 +50,7 @@ export default function DeleteDialog({ open, title, onConfirm, onClose, onArchiv
             </AlertDialogAction>
           )}
           <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+            className="bg-priority-1 text-priority-1-foreground hover:bg-priority-1/90 gap-1.5"
             onClick={() => { onConfirm(); onClose() }}
           >
             <Trash2 size={13} />
