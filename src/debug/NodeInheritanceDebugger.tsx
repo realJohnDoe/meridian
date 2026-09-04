@@ -786,6 +786,9 @@ export default function NodeInheritanceDebugger() {
                 handleScopeChange: handleDebugScopeChange,
                 handleTypeChange: () => {},
                 handleDoneToggle: () => {},
+                // The scratch snapshot below is never archived, so this never fires —
+                // a no-op like handleDoneToggle above, not a genuine absence.
+                handleUnarchive: () => {},
                 // The debugger edits a scratch snapshot outside any real vault, so
                 // there is nowhere for a wikilink to navigate to — genuinely absent,
                 // not a no-op (see ListedOnRow's onNavigate truthiness check).

@@ -1,5 +1,5 @@
 import { startOfToday } from 'date-fns'
-import { fmtISO, applyEdit, mergeEditFields, joinFileMeta, newEntryKey, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
+import { fmtISO, applyEdit, mergeEditFields, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
@@ -49,7 +49,19 @@ type SeriesSheetOption = {
   warning?: string
   onClick: () => void
 }
-export type SeriesSheetConfig = { title: string; options: SeriesSheetOption[] }
+export type SeriesSheetConfig = {
+  title:    string
+  options:  SeriesSheetOption[]
+  /**
+   * Archives the whole file instead of deleting some slice of its
+   * occurrences. Deliberately not a fourth `option`: the radio group above
+   * answers "which occurrences", a file-level action answers a different
+   * question, and giving it its own slot keeps a scope choice from ever
+   * looking like a peer of a one-shot action — see `plans/archived-entries.md`
+   * PR 2. Optional for the same reason `DeleteDialog`'s `onArchive` is.
+   */
+  onArchive?: () => void
+}
 
 // ── ENTRY EDITOR HELPERS ──────────────────────────────────────
 
@@ -252,12 +264,24 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   return entryKey
 }
 
+/**
+ * Set or clear an entry's archived flag and persist it. The one shared write
+ * path for both directions: `deleteNode`'s "Archive instead" (below) and
+ * `useEntryEditor`'s Unarchive banner action call this the same way — see
+ * `plans/archived-entries.md` PR 2. What actually changes on disk is
+ * `setArchived` (`model/storeOps.ts`); this just wires it to `commitNext`.
+ */
+export function archiveEntry(entryKey: EntryKey, archived: boolean): void {
+  const next = setArchived(getSnapshot(), entryKey, archived)
+  commitNext(next, [entryKey])
+}
+
 export function deleteNode(
   item:             Occurrence | null,
   navigateBack:     () => void,
   onShowSeries?:    (config: SeriesSheetConfig) => void,
   onHideSeries?:    () => void,
-  onConfirmSingle?: (title: string, onConfirm: () => void) => void,
+  onConfirmSingle?: (title: string, onConfirm: () => void, onArchive: () => void) => void,
 ): void {
   if (!item) return
   const items     = getItems()
@@ -289,6 +313,15 @@ export function deleteNode(
     commitNext(next, [item.entryKey])
     hideSheet(); navigateBack()
   }
+  // No hideSheet()/navigateBack(): archiving neither removes the entry nor
+  // shows anything the dialog stack itself doesn't already tear down — both
+  // callers' own dialogs close themselves right after invoking this (see
+  // DeleteDialog and SeriesDeleteDialog). The entry stays open, now showing
+  // EntryEditor's archived banner.
+  function archiveThis() {
+    if (!item) return
+    archiveEntry(item.entryKey, true)
+  }
 
   if (!isRecurring && !hasSiblings) {
     const doDelete = () => {
@@ -296,7 +329,7 @@ export function deleteNode(
       commitDelete(next, item.entryKey, affectedKeys)
       navigateBack()
     }
-    if (onConfirmSingle) { onConfirmSingle(title, doDelete); return }
+    if (onConfirmSingle) { onConfirmSingle(title, doDelete, archiveThis); return }
     doDelete()
     return
   }
@@ -316,5 +349,5 @@ export function deleteNode(
     options.push({ icon: 'calendar-range', label: 'All occurrences',        sublabel: 'Remove all occurrences',                  onClick: deleteAll   })
   }
 
-  onShowSeries?.({ title: `Delete "${title}"`, options })
+  onShowSeries?.({ title: `Delete "${title}"`, options, onArchive: archiveThis })
 }

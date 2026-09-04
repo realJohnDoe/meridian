@@ -927,6 +927,34 @@ export function deleteByEntryKey(
   return { data: { ...data, entries: next }, affectedKeys }
 }
 
+// ── Archive ──────────────────────────────────────────────────────────────────
+
+/**
+ * Set or clear `archived` on an entry's file root — plans/archived-entries.md
+ * PR 2. The one file-level field with no dedicated edit path (`EditFields`/
+ * `editedEntry` don't carry it — the entry editor form has no control for
+ * archiving), so this mirrors `moveEntryKey` immediately below rather than
+ * routing through that machinery: only the root changes, `items` is carried
+ * over verbatim, and — unlike a move — the key is untouched and no other
+ * file's `items:` list is touched, since archiving is not a delete and has no
+ * backlink cleanup.
+ *
+ * Clearing drops the key entirely rather than writing `archived: false`.
+ * `archived` is not `required` in the field registry, so an absent key and a
+ * `false` key are NOT the same on save — `inlineFieldEmpty` only treats
+ * `undefined` as empty for a boolean field, so leaving `false` here would
+ * write `archived: false` into the user's frontmatter forever instead of
+ * reading identically to a file that was never archived. See
+ * `FileMetadata.archived`'s doc comment.
+ */
+export function setArchived(data: StoreData, entryKey: EntryKey, archived: boolean): StoreData {
+  const entry = data.entries.get(entryKey)
+  if (!entry) return data
+  const { archived: _drop, ...unarchived } = entry.root
+  const root = archived ? { ...entry.root, archived: true } : unarchived
+  return { ...data, entries: withEntry(data.entries, { ...entry, root }) }
+}
+
 // ── Cross-vault move ──────────────────────────────────────────────────────────
 
 /**

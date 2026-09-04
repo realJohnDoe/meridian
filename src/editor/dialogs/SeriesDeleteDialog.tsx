@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { Archive, TriangleAlert } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,7 +10,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { buttonVariants } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { cn } from '@/lib/cn'
 import { useResetOnChange } from '@/hooks'
 import type { SeriesSheetConfig } from '@/editor/save'
 
@@ -29,6 +31,11 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
 
   function handleDelete() {
     config?.options[Number(selected)]?.onClick()
+    onClose()
+  }
+
+  function handleArchive() {
+    config?.onArchive?.()
     onClose()
   }
 
@@ -79,6 +86,15 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
 
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+          {config?.onArchive && (
+            <AlertDialogAction
+              className={cn(buttonVariants({ variant: 'secondary' }), 'gap-1.5')}
+              onClick={handleArchive}
+            >
+              <Archive size={13} />
+              Archive whole file instead
+            </AlertDialogAction>
+          )}
           <AlertDialogAction
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
             onClick={handleDelete}

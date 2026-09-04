@@ -78,6 +78,7 @@ export default function DialogStack({ entry, handlers }: Props) {
         open={!!pendingDelete}
         title={pendingDelete?.title ?? ''}
         onConfirm={() => pendingDelete?.onConfirm()}
+        onArchive={() => pendingDelete?.onArchive()}
         onClose={onDeleteClose}
       />
     </>

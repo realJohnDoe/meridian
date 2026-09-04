@@ -5,7 +5,7 @@ import type { EntryState } from './state'
 
 export interface DialogHandlers {
   activeDialog: string | null
-  pendingDelete: { title: string; onConfirm: () => void } | null
+  pendingDelete: { title: string; onConfirm: () => void; onArchive: () => void } | null
   seriesSheetConfig: SeriesSheetConfig | null
   onClose: () => void
   onDateConfirm: (dateStr: string) => void
@@ -23,7 +23,7 @@ export interface DialogHandlers {
 
 export function useEntryDialogs(entry: EntryState, updateEntry: (next: EntryState) => void) {
   const [activeDialog, setActiveDialog] = useState<string | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void } | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void; onArchive: () => void } | null>(null)
   const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
 
   // No document-level Escape listener here on purpose. Every dialog in

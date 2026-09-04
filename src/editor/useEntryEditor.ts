@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
-import { applyScope, entryFromOccurrence, saveNode, deleteNode, addItemLink, removeItemLink } from './save'
+import { applyScope, entryFromOccurrence, saveNode, deleteNode, addItemLink, removeItemLink, archiveEntry } from './save'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtISO, seriesContext } from '@/model'
 import { useToday } from '@/hooks'
@@ -289,8 +289,16 @@ export function useEntryEditor(
       goBack,
       setSeriesSheetConfig,
       () => setSeriesSheetConfig(null),
-      (title, onConfirm) => setPendingDelete({ title, onConfirm }),
+      (title, onConfirm, onArchive) => setPendingDelete({ title, onConfirm, onArchive }),
     )
+  }
+
+  // The banner's Unarchive action (EntryEditor). No dialog, no navigation —
+  // symmetric with `deleteNode`'s "Archive instead", which also just flips
+  // the flag and leaves the editor open on the same entry.
+  const handleUnarchive = () => {
+    if (!effectiveKey) return
+    archiveEntry(effectiveKey, false)
   }
 
   const handleClose = () => goBack()
@@ -367,6 +375,7 @@ export function useEntryEditor(
     handleOpenWikilink,
     handleSave,
     handleDelete,
+    handleUnarchive,
     handleClose,
     handleScopeChange,
     handleTypeChange,

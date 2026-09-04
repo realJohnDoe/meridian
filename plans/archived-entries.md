@@ -4,13 +4,26 @@ Plan for hiding finished entries from every browsing surface without deleting
 or moving their files. Written 2026-09-03, design settled.
 
 Per `plans/CLAUDE.md`: delete each PR's section from this file in the PR that
-implements it, so what remains is only outstanding work. **PR 1 (the field and
-the hiding) has shipped** — the field, the shared `isArchived` predicate
-(`src/occView.ts`), and both filter chokepoints (`fileEntries` in
-`src/fileOccurrence.ts`; `hideEverywhere` in `src/calendar/useCalendarFilter.ts`,
-which `filterOccs` and `useParticipantFilteredOccs` both now funnel through)
-are live. Nothing can set `archived` yet — that's PR 2 — so none of it is
-reachable from the UI.
+implements it, so what remains is only outstanding work.
+
+**PR 1 (the field and the hiding) has shipped** — the field, the shared
+`isArchived` predicate (`src/occView.ts`), and both filter chokepoints
+(`fileEntries` in `src/fileOccurrence.ts`; `hideEverywhere` in
+`src/calendar/useCalendarFilter.ts`, which `filterOccs` and
+`useParticipantFilteredOccs` both now funnel through) are live.
+
+**PR 2 (the actions and the editor UI) has shipped** — `setArchived`
+(`src/model/storeOps.ts`) and its `archiveEntry` write path
+(`src/editor/save.ts`); "Archive instead" in both `DeleteDialog` and
+`SeriesDeleteDialog`; the amber banner with its Unarchive button in
+`EntryEditor.tsx`. `EntryViewOnly.tsx` was left untouched — confirmed
+unreachable, since nothing can write `archived` on an iCal-synthesized entry
+(no editor UI reaches a view-only vault) even though those entries do carry
+ordinary YAML frontmatter.
+
+Archiving is now fully usable by hand. What's still missing: an escape hatch
+for an archived entry nothing links to (PR 3), and the retention sweep that
+does most of the archiving in practice (PR 4).
 
 ---
 
@@ -32,10 +45,10 @@ twice. The reasoning is recorded here so it isn't re-derived:
   sync work, no undo machinery, no new derived store state.
 
 Four PRs: the flag and the hiding (1, shipped), the actions and editor banner
-(2), the settings escape hatch (3), then the retention sweep that does most of
-the archiving in practice (4). Because archiving is mostly automatic, the
-manual entry point is deliberately tucked inside the delete dialogs rather
-than given a topbar button.
+(2, shipped), the settings escape hatch (3), then the retention sweep that
+does most of the archiving in practice (4). Because archiving is mostly
+automatic, the manual entry point is deliberately tucked inside the delete
+dialogs rather than given a topbar button.
 
 ---
 
@@ -121,62 +134,6 @@ Archived-ness reaches occurrences for free: `archived` is file-level, and
 `joinFileMeta` (`src/model/expansion.ts:783`) spreads the root into every
 expanded occurrence's `AppMetadata` — the same mechanism that gives every
 occurrence its `vaultId`.
-
----
-
-## PR 2 — the actions and the editor UI
-
-**2a. The store op.** `setArchived(data, entryKey, archived): StoreData` in
-`src/model/storeOps.ts`, mirroring `moveEntryKey` (`:950`): edits
-`entries.get(key).root` only, setting `archived: true` or deleting the key. No
-other file is touched — unlike a delete, archiving has no backlink cleanup.
-
-Commit with `commitNext(next, [entryKey])`, the same path `excludeThis` uses
-(`src/editor/save.ts:274`). A root-only change serialises correctly:
-`fileMetaToYaml` emits file-level fields from the root.
-
-**2b. Archive from the delete dialogs — no topbar button.** Both entry points
-widen a callback shape rather than gaining a prop:
-
-- **Single entry.** `deleteNode`'s `onConfirmSingle(title, onConfirm)`
-  (`src/editor/save.ts:260`) feeds `pendingDelete: { title, onConfirm }`, which
-  feeds `<DeleteDialog>` (`src/editor/DialogStack.tsx:77`). Widen it to carry
-  an archive callback and add an "Archive instead" secondary action.
-- **Series / multi-item files.** `SeriesDeleteDialog`
-  (`src/editor/dialogs/SeriesDeleteDialog.tsx`) is a radio group of
-  `SeriesSheetOption`s (`src/editor/save.ts:44`) that chooses *which
-  occurrences to delete*, under a destructive "Delete" footer button. Archive
-  is file-level, so it must **not** be a fourth radio option — it doesn't
-  answer that question and it isn't destructive. Add the same "Archive
-  instead" secondary action, labelled to say it applies to the whole file, and
-  give `SeriesSheetConfig` (`:52`) an optional archive callback.
-
-  Keeping one affordance shape across both dialogs is the point; a scope
-  selector and a file-level action must not look like peers.
-
-**2c. The banner.** Top of `src/editor/EntryEditor.tsx`, above the title block
-(around `:200`). Reuse the existing warning idiom verbatim — it appears twice
-already, at `src/editor/dialogs/SeriesDeleteDialog.tsx:74` and
-`src/settings/VaultSettings.tsx:316`:
-
-```
-flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning
-```
-
-with `<TriangleAlert size={14} className="shrink-0 mt-0.5" />`. `--warning` is
-amber and defined in all four themes (`src/index.css:161`, `:313`, `:409`,
-`:492`), so it is theme-safe without extra work.
-
-Banner text says the entry is archived and hidden from the calendar and search,
-and carries the **Unarchive** button. Archived state comes from
-`roots.get(effectiveKey)?.archived`.
-
-`src/editor/EntryViewOnly.tsx` needs the banner too if an archived entry can be
-reached in a view-only vault — check whether `archived` can occur there before
-adding it (iCal feeds have no frontmatter, so it may be unreachable).
-
-**Tests.** Archiving from each dialog sets the flag and leaves other files
-untouched; unarchiving clears the key; the banner renders only when archived.
 
 ---
 
