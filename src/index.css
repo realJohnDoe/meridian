@@ -268,12 +268,18 @@
    AppearanceSettings previews each theme by applying its class to a
    nested swatch element rather than to <html> — a var(--priority-1)
    reference declared only on :root would resolve against whichever
-   theme is active on <html>, not the theme the swatch is previewing. */
+   theme is active on <html>, not the theme the swatch is previewing.
+   --warning-foreground aliases --priority-3-foreground (each theme's own
+   block, further down) rather than hardcoding --ink-dark: every other
+   domain foreground is tuned per theme against its own swatch, and
+   priority-3-foreground already is (Solarized picks ink-light there,
+   verified — see its own comment). Hardcoding ink-dark here would silently
+   diverge from that pick on a solid warning fill. */
 :root, .meridian, .meridian-light, .tokyo-night, .rose-pine-dawn,
 .solarized-light, .solarized-dark, .dracula, .catppuccin-latte, .catppuccin-mocha {
   --destructive: var(--priority-1);
   --warning:     var(--priority-3);
-  --warning-foreground: var(--ink-dark);
+  --warning-foreground: var(--priority-3-foreground);
 }
 
 /* ── MERIDIAN LIGHT THEME ───────────────────────────────────────── */
