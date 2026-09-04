@@ -21,9 +21,18 @@ unreachable, since nothing can write `archived` on an iCal-synthesized entry
 (no editor UI reaches a view-only vault) even though those entries do carry
 ordinary YAML frontmatter.
 
-Archiving is now fully usable by hand. What's still missing: an escape hatch
-for an archived entry nothing links to (PR 3), and the retention sweep that
-does most of the archiving in practice (PR 4).
+**PR 3 (the settings escape hatch) has shipped** — `archivedEntriesFor`
+(`src/settings/archivedEntries.ts`) and the **Archived** row it feeds in
+`VaultSettings.tsx`'s Data section: every archived entry in that vault, by
+title, each with its own Unarchive button (routed through PR 2's
+`archiveEntry`, re-exported from the `@/editor` barrel — `settings/` already
+imports `ParticipantsRow` from there, so this follows the same path rather
+than a new one). An empty vault gets a plain "show up here" message instead
+of nothing, so the row is worth checking even before anything's archived.
+
+Archiving is now fully usable by hand, with nothing left unreachable. What's
+still missing is the retention sweep that does most of the archiving in
+practice (PR 4).
 
 ---
 
@@ -45,10 +54,10 @@ twice. The reasoning is recorded here so it isn't re-derived:
   sync work, no undo machinery, no new derived store state.
 
 Four PRs: the flag and the hiding (1, shipped), the actions and editor banner
-(2, shipped), the settings escape hatch (3), then the retention sweep that
-does most of the archiving in practice (4). Because archiving is mostly
-automatic, the manual entry point is deliberately tucked inside the delete
-dialogs rather than given a topbar button.
+(2, shipped), the settings escape hatch (3, shipped), then the retention
+sweep that does most of the archiving in practice (4). Because archiving is
+mostly automatic, the manual entry point is deliberately tucked inside the
+delete dialogs rather than given a topbar button.
 
 ---
 
@@ -134,22 +143,6 @@ Archived-ness reaches occurrences for free: `archived` is file-level, and
 `joinFileMeta` (`src/model/expansion.ts:783`) spreads the root into every
 expanded occurrence's `AppMetadata` — the same mechanism that gives every
 occurrence its `vaultId`.
-
----
-
-## PR 3 — the Archived list in vault settings
-
-**Required, not a nicety.** An archived entry that nothing links to is hidden
-from every view *and* from search, so with no inbound link it is unreachable —
-and standalone notes and one-off tasks are exactly what people archive.
-
-Add an **Archived** row to the Data section of `src/settings/VaultSettings.tsx`
-(`:272`, beside Export and Remove): iterate `roots` for that vault's archived
-entries, list titles, unarchive from there. It doubles as the place to see how
-much has accumulated.
-
-Small and independent — fold into PR 2 if that PR comes in smaller than
-expected.
 
 ---
 

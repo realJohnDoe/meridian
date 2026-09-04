@@ -2,7 +2,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useStore, emptySyncStatus } from '@/store'
-import { setupStore } from '@/test-utils'
+import { setupStore, installFakePersistence, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
+import { entryKey } from '@/fileIO'
 import type { VaultRef } from '@/vaultRef'
 import { setVaultColor } from '@/vaultActions'
 import type * as VaultActions from '@/vaultActions'
@@ -128,5 +129,56 @@ describe('VaultSettings — GitHub attention rows', () => {
 
     expect(screen.queryByText(/no longer has access/)).not.toBeInTheDocument()
     expect(screen.queryByText(/isn.t reachable/)).not.toBeInTheDocument()
+  })
+})
+
+// plans/archived-entries.md PR 3 — the vault's own escape hatch for an
+// archived entry nothing links to.
+describe('VaultSettings — archived', () => {
+  installFakePersistence()
+
+  // TEST_VAULT, not GITHUB_VAULT above: makeOcc/testKey/makeRoots default to
+  // it, and the row only lists entries whose root.vaultId matches vault.id.
+  const LOCAL_VAULT: VaultRef = { id: TEST_VAULT, name: 'Notes', kind: 'local' }
+
+  function seedArchived(slug: string, title: string) {
+    const occ = makeOcc({ entryKey: testKey(slug), metadata: { vaultId: TEST_VAULT, fileSlug: slug, participants: [], title, tags: [], items: [] } })
+    seedStore([occ], makeRoots(slug, { title, archived: true }))
+  }
+
+  it('shows a friendly empty state when nothing is archived', () => {
+    render(<VaultSettings vault={LOCAL_VAULT} />)
+    expect(screen.getByText(/show up here/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /unarchive/i })).not.toBeInTheDocument()
+  })
+
+  it('lists archived entries by title, with a count', () => {
+    seedArchived('old-task', 'Old Task')
+
+    render(<VaultSettings vault={LOCAL_VAULT} />)
+
+    expect(screen.getByText('Old Task')).toBeInTheDocument()
+    expect(screen.getByText(/1 entry is hidden/i)).toBeInTheDocument()
+  })
+
+  it('unarchiving clears the flag in the store', () => {
+    seedArchived('old-task', 'Old Task')
+
+    render(<VaultSettings vault={LOCAL_VAULT} />)
+    fireEvent.click(screen.getByRole('button', { name: /unarchive/i }))
+
+    expect(useStore.getState().roots.get(testKey('old-task'))?.archived).toBeUndefined()
+  })
+
+  // A vault only ever sees its own archived entries — plans/archived-entries.md
+  // PR 3 is explicit that the list is per vault, not global.
+  it('never lists another vault\'s archived entry', () => {
+    const otherKey = entryKey('other-vault', 'stray')
+    const otherOcc = makeOcc({ entryKey: otherKey, metadata: { vaultId: 'other-vault', fileSlug: 'stray', participants: [], title: 'Stray', tags: [], items: [] } })
+    seedStore([otherOcc], new Map([[otherKey, { title: 'Stray', tags: [], items: [], vaultId: 'other-vault', fileSlug: 'stray', archived: true }]]))
+
+    render(<VaultSettings vault={LOCAL_VAULT} />)
+
+    expect(screen.queryByText('Stray')).not.toBeInTheDocument()
   })
 })

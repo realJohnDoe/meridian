@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
-import { Trash2, TriangleAlert, AlertCircle, Download, RefreshCw } from 'lucide-react'
+import { Trash2, TriangleAlert, AlertCircle, Download, RefreshCw, ArchiveRestore } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -20,13 +20,14 @@ import {
   syncToBackend, removeVault, renameVault, setVaultColor, cacheDirtyCount, startGitHubSignIn,
   GITHUB_APP_INSTALL_URL, exportVaultIcs,
 } from '@/vaultActions'
-import { ParticipantsRow } from '@/editor'
+import { ParticipantsRow, archiveEntry } from '@/editor'
 import type { VaultRef } from '@/vaultActions'
 import { VAULT_COLORS } from '@/vaultRef'
 import { VAULT_COLOR_SWATCH } from '@/components/primitives/occurrence-variants'
 import { cn } from '@/lib/cn'
 import { SettingsSection, SettingsRow } from './SettingsSection'
 import { vaultSummary } from './vaultSummary'
+import { archivedEntriesFor } from './archivedEntries'
 
 interface Props {
   vault: VaultRef
@@ -56,10 +57,15 @@ export function VaultSettings({ vault }: Props) {
 
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
   const items                  = useStore(s => s.items)
+  const roots                  = useStore(s => s.roots)
   const lastRefreshed          = useStore(s => s.syncByVault.get(vault.id)?.lastSyncedAt ?? null)
   const needsAttention         = useStore(s => s.syncByVault.get(vault.id)?.needsAttention ?? null)
 
   const allParticipants = useAllParticipants(items, vault.id)
+  // The one escape hatch for an archived entry nothing links to — hidden from
+  // the calendar and search alike, so this is the only place left to find and
+  // undo one. See plans/archived-entries.md PR 3.
+  const archived = archivedEntriesFor(roots, vault.id)
 
   function handleNameBlur() {
     const trimmed = name.trim()
@@ -280,6 +286,33 @@ export function VaultSettings({ vault }: Props) {
             </Button>
           }
         />
+        <SettingsRow
+          label="Archived"
+          description={
+            archived.length === 0
+              ? 'Entries you archive are hidden from the calendar and search, and show up here.'
+              : `${archived.length} ${archived.length === 1 ? 'entry is' : 'entries are'} hidden from the calendar and search.`
+          }
+        >
+          {archived.length > 0 && (
+            <ul className="flex flex-col gap-1.5">
+              {archived.map(({ key, title }) => (
+                <li key={key} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{title}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="shrink-0 gap-1.5"
+                    onClick={() => archiveEntry(key, false)}
+                  >
+                    <ArchiveRestore className="size-3.5 stroke-[1.7]" />
+                    Unarchive
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SettingsRow>
         <SettingsRow
           label="Remove vault"
           description={
