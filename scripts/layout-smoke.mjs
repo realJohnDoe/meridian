@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process'
+import { readdirSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 
 /**
@@ -43,22 +46,112 @@ const VIEWPORTS = [
 ]
 
 /**
- * `_app` routes — the fixed shell. Static paths only, so no date arithmetic here.
+ * `_app` routes — the fixed shell. Dates/months are concrete, not symbolic —
+ * this drives a real browser, not the router's type layer.
  *
- * Each carries the selector that means "this route has painted". It used to be
- * one hardcoded entry-card wait, which only works for routes that list entries;
- * the settings screens are `_app` routes with no entries in them, and the shell
- * invariants below are exactly as load-bearing there.
+ * Each carries the `ready` selector that means "this route has painted".
+ * It used to be one hardcoded entry-card wait, which only works for the
+ * three list-shaped routes (agenda, backlog, notes); day/week/month render
+ * an hour-grid or month grid, not entry cards, and an empty day/week/month
+ * would leave that wait hanging for 30s and failing for the wrong reason.
+ * `[data-topbar]` is the one thing every `_app` view renders regardless of
+ * its content (see `_app.tsx`'s `header[data-topbar]`, outside the per-view
+ * branch), so it's the ready selector for the routes with no list to wait on.
  */
-const APP_ROUTES = ['/', '/backlog', '/notes']
+const APP_ROUTES = [
+  { path: '/', ready: '[data-testid="entry-card"]' },
+  { path: '/backlog', ready: '[data-testid="entry-card"]' },
+  { path: '/notes', ready: '[data-testid="entry-card"]' },
+  { path: '/day/2026-09-04', ready: '[data-topbar]' },
+  { path: '/week/2026-09-04', ready: '[data-topbar]' },
+  { path: '/calendar/2026-09', ready: '[data-topbar]' },
+]
 
 /**
  * Routes on the document-flow chain, which hold the opposite invariant. Both
- * mount text inputs and no virtualizer, so they live outside `_app` precisely
- * so the browser can lift a focused input above the on-screen keyboard.
- * `ready` is the selector that means the route has painted.
+ * shells (`_entry.tsx`, `settings.tsx`) mount text inputs and no virtualizer,
+ * so they live outside `_app` precisely so the browser can lift a focused
+ * input above the on-screen keyboard. `[data-flow-screen]` is the one
+ * selector every route on this chain renders (each shell's own `Outlet`
+ * wrapper carries it), so unlike `APP_ROUTES` these don't need a per-route
+ * `ready` selector.
+ *
+ * `/auth/callback` is deliberately not here: it mounts under neither shell,
+ * and its error phase (the one reachable with no `?code=`, which is what a
+ * static geometry check would land on) renders a bare `CenteredMessage` with
+ * no `[data-flow-screen]` host for the growth probe to anchor to — see
+ * `ROUTE_COVERAGE_EXEMPTIONS` below, which documents this so the check
+ * doesn't just silently forget the route.
  */
-const FLOW_ROUTES = ['/entry/example/01-start-here', '/settings']
+const FLOW_ROUTES = [
+  '/entry/example/01-start-here',
+  '/entry/01-start-here',
+  '/entry/new',
+  '/settings',
+  '/settings/appearance',
+  '/settings/vault/example',
+  '/settings/vault/new',
+]
+
+/**
+ * Route files with no `[data-flow-screen]`/`[data-topbar]` host for this
+ * script to check, so `assertRouteCoverage()` below would otherwise flag
+ * them as silently unguarded forever. Keyed by the route's registered path
+ * (the same shape `assertRouteCoverage` matches against), each with the
+ * reason it can't be covered.
+ */
+const ROUTE_COVERAGE_EXEMPTIONS = {
+  '/auth/callback': 'no [data-flow-screen]/[data-topbar] host in any of its phases (see FLOW_ROUTES comment)',
+}
+
+/**
+ * Guards the two lists above against going stale the way CLAUDE.md's "Route
+ * shells" section warns they will: "the filename is the whole declaration"
+ * and nothing else notices when a new route file lands uncovered. Walks
+ * every leaf route file, extracts the path it registers with
+ * `createFileRoute(...)`, and confirms some URL in `APP_ROUTES` or
+ * `FLOW_ROUTES` (or `ROUTE_COVERAGE_EXEMPTIONS`) actually exercises it.
+ *
+ * A route file's registered path always carries its pathless layout prefix
+ * (`/_app`, `/_entry`) and `$param` placeholders — neither of which appears
+ * in a real URL — so both are normalized away before matching.
+ */
+function assertRouteCoverage() {
+  const routesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'routes')
+  const leafFiles = readdirSync(routesDir).filter(f =>
+    f.endsWith('.tsx') && !f.startsWith('-') && !f.endsWith('.test.tsx') &&
+    !['__root.tsx', '_app.tsx', '_entry.tsx', 'settings.tsx'].includes(f),
+  )
+
+  const knownUrls = [...APP_ROUTES.map(r => r.path), ...FLOW_ROUTES, ...Object.keys(ROUTE_COVERAGE_EXEMPTIONS)]
+  const uncovered = []
+
+  for (const file of leafFiles) {
+    const src = readFileSync(join(routesDir, file), 'utf8')
+    const registered = src.match(/createFileRoute\(\s*['"]([^'"]+)['"]\s*\)/)?.[1]
+    if (!registered) { uncovered.push(`${file}: no createFileRoute(...) call found`); continue }
+
+    let normalized = registered.replace(/^\/_app\b/, '').replace(/^\/_entry\b/, '')
+    normalized = normalized === '' ? '/' : normalized.length > 1 ? normalized.replace(/\/$/, '') : normalized
+    const pattern = new RegExp('^' + normalized
+      .split('/')
+      .map(seg => (seg.startsWith('$') ? '[^/]+' : seg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      .join('/') + '$')
+
+    if (!knownUrls.some(url => pattern.test(url))) {
+      uncovered.push(`${file} (registers ${registered}) — add a matching URL to APP_ROUTES, FLOW_ROUTES, or ROUTE_COVERAGE_EXEMPTIONS`)
+    }
+  }
+
+  if (uncovered.length) {
+    console.error(`\nRoute coverage check failed (${uncovered.length}):\n`)
+    for (const u of uncovered) console.error(`  ✗ ${u}`)
+    console.error('')
+    process.exit(1)
+  }
+}
+
+assertRouteCoverage()
 
 const failures = []
 function check(scope, label, ok, detail) {
@@ -206,10 +299,10 @@ try {
     const page = await context.newPage()
     page.on('pageerror', e => failures.push(`${name} — uncaught page error: ${e.message}`))
 
-    for (const route of APP_ROUTES) {
+    for (const { path: route, ready } of APP_ROUTES) {
       const scope = `${name} ${route}`
       await page.goto(`${BASE}${route}`, { waitUntil: 'load' })
-      await page.waitForSelector('[data-testid="entry-card"]', { timeout: 30_000 })
+      await page.waitForSelector(ready, { timeout: 30_000 })
       await page.waitForTimeout(1500) // let the virtualizer measure and settle
 
       const m = await page.evaluate(readAppShell)

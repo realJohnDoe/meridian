@@ -132,7 +132,7 @@ coverage of 100%.
    (`autoCodeSplitting`, editor in its own 716K chunk); all four list surfaces
    are virtualized; `memo()` decisions are deliberate and documented, including
    the two documented *non*-memo cases.
-7. **UI Toolchain & Feedback Loops** — findings: #4, #5, #6, #7. The enabled
+7. **UI Toolchain & Feedback Loops** — findings: #5, #6, #7. The enabled
    rule set is genuinely strong (full `jsx-a11y` recommended, `react-hooks`
    `recommended-latest` including the compiler diagnostics,
    `@eslint-react` `recommended-type-checked` plus 15 individually-raised
@@ -171,7 +171,6 @@ identity, not order.
 | # | Rank | Title | Categories | Impact | Breadth | Recommended model | Score |
 |---|------|-------|-----------|--------|---------|-------------------|-------|
 | #5 | 1 | Compiler bail-out rule matches only `FunctionDeclaration` | `toolchain` `performance` | 3 | 100 | **Haiku 4.5** | 300 |
-| #4 | 2 | `layout-smoke.mjs` covers 5 of 14 routes | `testing` `toolchain` `layout` | 6 | 10 | **Sonnet 5** | 30 |
 | #3 | 3 | `Button`/`Separator` get zero compiler memoization | `performance` `library-fit` | 6 | 9 | **Opus 5** (Sonnet 5 if the mirror policy is pre-decided) | 18 |
 | #6 | 4 | `_app.tsx` excluded from coverage on a stale rationale | `testing` `toolchain` | 5 | 2 | **Sonnet 5** | 5 |
 | #8 | 5 | `isSafeUrl` — the only XSS gate — has no tests | `security` `testing` | 4 | 1 | **Haiku 4.5** | 4 |
@@ -189,8 +188,8 @@ identity, not order.
 extraction removes ~90 of the lines #1 then has to place). #6 and #7 together
 (both edit `vitest.config.ts`). #3 and #5 are independent of each other
 despite both concerning the compiler — #5 edits `eslint.config.js`, and its
-rule does not apply to `components/ui/`, which is where #3 lives. #4 and #8
-are independent of everything.
+rule does not apply to `components/ui/`, which is where #3 lives. #8 is
+independent of everything.
 
 ---
 
@@ -433,77 +432,6 @@ are independent of everything.
 - **Verify after:** re-run the per-file census and confirm `button.tsx` and
   `separator.tsx` report a non-zero `_c()` count, then
   `pnpm run build && pnpm run lint && pnpm run test`.
-
----
-
-### #4 — `scripts/layout-smoke.mjs` guards 5 of the app's 14 routes
-
-- **Category** — `testing` `toolchain` `layout`
-- **Impact** — 6
-- **Breadth** — 10 files (the script, plus 9 uncovered route files). Search:
-  `ls src/routes/*.tsx | grep -v '/-' | grep -v '\.test\.' | grep -vE '(__root|_app|_entry|settings)\.tsx$'`
-  → 14 leaf routes; `APP_ROUTES` + `FLOW_ROUTES` name 5.
-- **Recommended model** — **Sonnet 5.** Adding routes to two arrays is
-  mechanical, but the failure mode is silent: a route whose `ready` selector
-  never matches, or matches before layout settles, makes the check pass
-  vacuously — it looks green and guards nothing. The selectors and the settle
-  requirement are specified below, which is what keeps this off Opus.
-- **Evidence** — `scripts/layout-smoke.mjs:53` and `:61`:
-  ```
-  const APP_ROUTES = ['/', '/backlog', '/notes']
-  ```
-  ```
-  const FLOW_ROUTES = ['/entry/example/01-start-here', '/settings']
-  ```
-  CLAUDE.md states the consequence outright: "A new route is covered by
-  neither until someone adds it."
-- **Problem** — The two most layout-complex routes in the app
-  (`/week/$date`, whose `WeekPane.tsx` is 517 lines of timeline geometry, and
-  `/calendar/$month`) have no geometry guard at all, and this exact failure
-  class — a route on the wrong shell chain, or a shell that silently lost its
-  height cap — has already shipped twice (the entry routes before `3de767a`;
-  `/settings` in PR #840, fixed in #844). The failure is mobile-only, invisible
-  to every test in `src/` because jsdom has no layout engine, and invisible to
-  this script because the route simply is not listed.
-- **Fix** — Add the 9 missing routes to the two arrays with a `ready` selector
-  each, and make the arrays derived from or checked against the route files so
-  a new route cannot be silently absent.
-
-**Task context**
-
-- **The enumerated work.** Add to `APP_ROUTES` (3): `/day/2026-09-04`,
-  `/week/2026-09-04`, `/calendar/2026-09`. Add to `FLOW_ROUTES` (6):
-  `/entry/new`, `/entry/01-start-here` (the bare-slug redirect form),
-  `/settings/appearance`, `/settings/vault/example`, `/settings/vault/new`,
-  `/auth/callback`. Date/month params must be concrete — the script drives a
-  real browser, not the router's type layer.
-- **The trap, located.** `APP_ROUTES` entries currently wait on
-  `[data-testid="entry-card"]` (`layout-smoke.mjs:212`) plus a 1500ms settle
-  for the virtualizer. `/week/$date` and `/day/$date` render an hour-grid
-  timeline, not agenda entry cards — an empty day renders **no**
-  `entry-card` at all, so reusing that selector will hang for 30s and then
-  fail for a reason that is not the geometry. `FLOW_ROUTES` waits on
-  `[data-flow-screen]` (`:291`); confirm each added flow route actually
-  renders that attribute before adding it, or the wait passes on the shell
-  rather than the route.
-- **`/auth/callback` needs care** — it is the OAuth phase machine and will
-  land in an error phase with no `code` search param. That is fine for a
-  *geometry* check as long as the error phase renders `[data-flow-screen]`;
-  confirm at `src/routes/auth.callback.tsx` before adding, and drop it from
-  the list if it does not.
-- **The structural half of the fix.** The arrays going stale is the actual
-  finding, not the 9 missing entries. Derive the expected route list from
-  `src/routes/*.tsx` (the `_app.` prefix already declares which chain a route
-  is on — that is CLAUDE.md's "the filename is the whole declaration") and
-  fail the script when a route file exists that neither array names. That
-  turns a one-time catch-up into a standing guard.
-- **The seam, verified.** `scripts/layout-smoke.mjs` runs against a built
-  `dist/` via `vite preview` (`:81`) and is not part of `pnpm run test`;
-  check `.github/workflows/build.yml` for whether CI invokes it before
-  assuming a new failure would be seen.
-- **Verify after:** `pnpm run build && node scripts/layout-smoke.mjs`, and
-  deliberately break one added route's shell placement (rename it to the other
-  chain's prefix) to confirm the new entry actually fails.
 
 ---
 
