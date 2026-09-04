@@ -72,9 +72,9 @@ function sanitizeFilename(name: string): string {
 /**
  * The message a vault owner sends a collaborator to invite them in.
  *
- * No install step: per `plans/onboarding.md` PR 4, install is per repo (done
- * already, by the owner) and a collaborator's GitHub sign-in is their whole
- * setup — telling them to install would send them somewhere confusing.
+ * No install step: install is per repo (done already, by the owner), and a
+ * collaborator's GitHub sign-in is their whole setup — telling them to
+ * install would send them somewhere confusing.
  */
 function inviteMessage(owner: string, repo: string): string {
   return `I'm sharing a calendar/task vault with you in Meridian — plain Markdown files in a GitHub repo, no plugin needed. Once you're added as a collaborator on ${owner}/${repo}, open ${APP_URL}, sign in with GitHub, and pick that repo.`
