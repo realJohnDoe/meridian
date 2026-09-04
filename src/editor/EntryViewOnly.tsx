@@ -12,7 +12,7 @@ import { fmtT, parseDateString } from '@/model'
 import { fmtShort, formatDurationChip, fmtDuration } from '@/format'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
-import { newEntryRoute, keyRoute } from '@/routes'
+import { newEntryRoute, keyRoute } from '@/entryRoute'
 
 interface Props {
   occ:   Occurrence

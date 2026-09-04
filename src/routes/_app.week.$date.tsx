@@ -5,7 +5,7 @@ import { useStore } from '@/store'
 import { useOpenEntry } from '@/hooks'
 import { setCurrentWeekKeepingWeekday, useQuickNavBrowsePreview, setQuickNavBrowsePreview } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
-import { newEntryRoute } from './-entryRoute'
+import { newEntryRoute } from '@/entryRoute'
 
 const WeekView = lazy(() => import('@/calendar').then(m => ({ default: m.WeekView })))
 

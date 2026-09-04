@@ -4,7 +4,7 @@ import { fmtISO } from '@/model'
 import { useOpenEntry } from '@/hooks'
 import { setCurrentDate, useQuickNavBrowsePreview, setQuickNavBrowsePreview } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
-import { newEntryRoute } from './-entryRoute'
+import { newEntryRoute } from '@/entryRoute'
 
 const DayView = lazy(() => import('@/calendar').then(m => ({ default: m.DayView })))
 

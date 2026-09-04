@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeOcc, testKey, TEST_VAULT } from '@/test-utils'
 import { entryKey } from '@/fileIO'
-import { newEntryRoute, entryRoute, keyRoute } from './-entryRoute'
+import { newEntryRoute, entryRoute, keyRoute } from './entryRoute'
 
 // These build the navigate() descriptors every caller of the entry routes
 // passes to TanStack Router. The `?? undefined` normalisation matters: a search

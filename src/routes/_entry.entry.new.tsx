@@ -5,7 +5,7 @@ import { useEntryEditor } from '@/editor'
 import { draftEntryKey } from '@/model'
 import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
-import { keyRoute } from './-entryRoute'
+import { keyRoute } from '@/entryRoute'
 import { EntryTopbar } from './-entryTopbar'
 
 const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))

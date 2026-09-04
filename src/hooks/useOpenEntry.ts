@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { entryRoute } from '@/routes'
+import { entryRoute } from '@/entryRoute'
 import type { Occurrence, EditScope } from '@/types'
 
 export function useOpenEntry() {
