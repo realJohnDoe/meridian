@@ -32,6 +32,10 @@ jobs:
       # the worker's type-aware lint rules need it for the same reason routeTree.gen.ts
       # is needed above (Request/Response/Env resolve to `any` without it).
       - run: pnpm --filter meridian-oauth-worker run cf-typegen
+      # Also runs `lint:deps` (dependency-cruiser), which needs the same
+      # generated routeTree.gen.ts the type-aware rules do — it is part of the
+      # module graph. ESLint enforces the per-file import boundaries; this is
+      # what catches an import *cycle*, which no single file is guilty of.
       - run: pnpm run lint
       - run: pnpm run test:coverage
       - run: pnpm run knip

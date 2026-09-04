@@ -7,10 +7,11 @@
  * The two share one mutable record per vault, which is why that record lives
  * in `syncState.ts` rather than in either of them — see the note there.
  *
- * The dependency runs scheduler → core, with exactly one edge back:
- * `releaseMove` asks for the source vault's push once a held cross-vault
- * delete is freed. `runCycle` below is what keeps that to one — the re-arm of
- * a push queued mid-cycle used to live in `runSync`'s own `finally`.
+ * The dependency runs scheduler → core, one-way: nothing in `sync.ts` imports
+ * this file. Both things the core once reached back up for — re-arming a push
+ * queued mid-cycle, and pushing a vault whose held cross-vault delete just got
+ * freed — now come back as fields on `SyncCycleResult` for `runCycle` below to
+ * act on.
  */
 import type { StorageBackend } from './backend'
 import type { VaultKind } from '@/vaultRef'
@@ -21,16 +22,29 @@ import { runSync } from './sync'
 import { syncStateFor, clearBackoff, resetVaultBackoff } from './syncState'
 
 /**
- * Run one cycle, then drain a push that arrived while it was in flight.
+ * Run one cycle, then do the two things the cycle asked for but could not do
+ * itself: push the vaults whose staged move it settled, and drain a push that
+ * arrived while it was in flight.
  *
- * The drain used to sit in `runSync`'s own `finally`, which made the sync core
- * depend on the scheduler for the one line that re-arms the debounce. `runSync`
- * reports whether it actually ran a cycle instead, so this only drains on the
- * calls that owned the vault — a call that bounced off the in-flight guard
- * must leave `pushQueued` for the cycle already running to pick up.
+ * Both used to be `sync.ts` calling back into this file — the drain from
+ * `runSync`'s own `finally`, the move-release from `releaseMove` — which made
+ * the sync core depend on its own scheduler. `runSync` returns the requests as
+ * data instead, and this is the one place that acts on them.
+ *
+ * The drain is gated on `ran` because only the call that owned the vault may
+ * take it: a call that bounced off the in-flight guard must leave `pushQueued`
+ * for the cycle already running to pick up. `releasedVaults` needs no such
+ * gate — a call that did not run returns none.
  */
 async function runCycle(backend: StorageBackend, opts: { silent: boolean; pull: boolean }): Promise<void> {
-  const ran = await runSync(backend, opts)
+  const { ran, releasedVaults } = await runSync(backend, opts)
+  // A settled move frees the *source* vault's held delete, which is usually
+  // some other vault than the one this cycle synced — re-read the registry
+  // rather than assuming it is still mounted.
+  for (const vaultId of releasedVaults) {
+    const from = getBackend(vaultId)
+    if (from) scheduleAutoPush(from)
+  }
   if (!ran) return
   const syncState = syncStateFor(backend.id)
   // A push that arrived mid-sync was queued (see attemptPush) instead of

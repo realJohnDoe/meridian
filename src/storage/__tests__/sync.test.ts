@@ -969,6 +969,31 @@ describe('pushDirty — a held cross-vault delete', () => {
     expect(cacheStore.has(vp(SOURCE, 'note.md'))).toBe(false)
   })
 
+  it('asks for the released vault\'s push itself, rather than waiting for its next scheduled cycle', async () => {
+    // How the request travels is the thing under test. `releaseMove` used to
+    // call `scheduleAutoPush` directly — the single import that made
+    // sync.ts ↔ syncScheduler.ts a cycle. It now reports the freed vault back
+    // through `SyncCycleResult.releasedVaults` and the scheduler's `runCycle`
+    // acts on it, which has to leave the observable behaviour untouched: the
+    // source's held delete goes out on its own 1s debounce, not whenever the
+    // source vault next happens to fall due.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const { source } = stageMove()
+
+      await syncToBackend(TARGET)
+      expect(pendingMoves).toEqual([])
+      expect(source.deleteCallCount).toBe(0) // nothing sent yet — the debounce is still pending
+
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(source.listPaths()).not.toContain('note.md')
+      expect(cacheStore.has(vp(SOURCE, 'note.md'))).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('is released by any vault\'s cycle when the confirming push landed before a reload', async () => {
     // The tab went away between markPushed and the release. The target's
     // record is clean, so no future push will ever confirm it again — the

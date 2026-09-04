@@ -1,13 +1,22 @@
+/**
+ * The `_app` shell's left navigation rail.
+ *
+ * Lives in `routes/`, not `components/`: it reaches into `@/calendar` for the
+ * current date and `requestScrollToDate`, and `_app.tsx` is its only caller —
+ * which is what CLAUDE.md's placement rule asks for. Sitting in `components/`
+ * it was the back-edge of `components → calendar → components`: a leaf-UI
+ * directory that features import, importing a feature back.
+ */
 import { useState } from 'react'
 import { AlignLeft, CalendarDays, CalendarRange, CalendarClock, Settings2, Pencil, Check, ChevronUp, ChevronDown, X, Inbox, NotebookPen } from 'lucide-react'
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { useResetOnChange, useLeavingRows } from '@/hooks'
 import { useCurrentDate, requestScrollToDate } from '@/calendar'
-import { FlipList } from './FlipList'
-import { Checkbox } from './ui/checkbox'
-import { IconButton } from './primitives/icon-button'
-import { CollapseRow } from './primitives/collapse-row'
+import { FlipList } from '@/components'
+import { Checkbox } from '@/components/ui/checkbox'
+import { IconButton } from '@/components/primitives/icon-button'
+import { CollapseRow } from '@/components/primitives/collapse-row'
 
 import {
   Sidebar,
@@ -20,7 +29,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
   useSidebar,
-} from './ui/sidebar'
+} from '@/components/ui/sidebar'
 import { keyRoute } from '@/entryRoute'
 
 /** Mirrors SidebarMenu's own `gap-1`, so a collapsing row can cancel exactly
