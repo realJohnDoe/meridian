@@ -84,7 +84,8 @@ isolation "is this file allowed to import that one". `lint:deps` is
 [dependency-cruiser](https://github.com/sverweij/dependency-cruiser), which
 builds the whole `src/` module graph first and then asks the questions no
 single file can answer — today just one, invariant 4's "is there a cycle".
-Config and reasoning: `.dependency-cruiser.mjs`.
+`import type` is counted as an edge, so type-only loops fail too. Config and
+reasoning: `.dependency-cruiser.mjs`.
 
 It reads the same `tsconfig.app.json` path aliases as vite and tsc, so it
 needs `src/routeTree.gen.ts` for the same reason the type-aware rules above
@@ -173,18 +174,24 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 3. **Core persistence goes through the port.** `storeCommit.ts` and `occurrenceActions.ts` call the `persistencePort` abstraction rather than `@/storage` functions directly. The storage adapter registers the implementation at startup.
 
-4. **No import cycles. There are no accepted ones.** Enforced by
-   `pnpm run lint:deps` (dependency-cruiser, config in
+4. **No import cycles. There are no accepted ones, and `import type` counts.**
+   Enforced by `pnpm run lint:deps` (dependency-cruiser, config in
    `.dependency-cruiser.mjs`), which `pnpm run lint` chains and CI therefore
-   runs. The graph it checks is the *runtime* one — `import type` is erased by
-   tsc and is not an edge, so a type-only loop is not a finding and must not
-   be "fixed".
+   runs.
 
-   This is a hard rule and not a stylistic one. A cycle means some module in
-   the loop necessarily executes against a half-initialised copy of the next,
-   so whether it works at all depends on the order the bundler happens to emit
-   — the failure is silent until it isn't, and it lands at load time, where
-   there is no stack to read.
+   This is a hard rule and not a stylistic one, for two separate reasons.
+   A *runtime* cycle means some module in the loop necessarily executes
+   against a half-initialised copy of the next, so whether it works at all
+   depends on the order the bundler happens to emit — the failure is silent
+   until it isn't, and it lands at load time, where there is no stack to read.
+   A *type-only* cycle has no such bug and is still forbidden: two modules
+   that name each other's types cannot be read, moved, tested or extracted
+   independently, which is most of what the boundary was for. Treating the two
+   differently would also make the rule one keystroke wide — deleting `type`
+   from an import would turn a tolerated loop into a real one with nothing to
+   catch it. So the checked graph counts type edges (`tsPreCompilationDeps`),
+   and a shared type gets the same fix as shared code: move it below both
+   sides. See `calendar/occFilter.ts`, which exists for exactly that.
 
    A cycle is a **placement bug**, not something inherent to feature-sliced
    React. Every one this codebase has had turned out to be a file sitting in
@@ -200,7 +207,10 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
      and let the caller act on it, rather than importing the caller. See
      `storage/sync.ts`'s `SyncCycleResult`: the sync core reports "these vaults
      want a push" and `syncScheduler.ts` — which is upstream of it — does the
-     pushing.
+     pushing. The type-level form of this is a low layer enumerating its own
+     consumers: `storage/cache/db.ts`'s `meta` row is `value: unknown` rather
+     than a union naming `VaultRef[]` and `PendingMove[]`, because every reader
+     validates what came out of IndexedDB anyway.
 
    Both are ordinary dependency inversion; reach for them before considering
    anything more exotic. A cycle is never fixed by adding an exception to

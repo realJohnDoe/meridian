@@ -43,12 +43,25 @@ export default {
     // Resolves the `@/*` path alias exactly as vite and tsc do.
     tsConfig: { fileName: 'tsconfig.app.json' },
 
-    // The graph we care about is the *runtime* one. `false` here means
-    // dependency-cruiser reports post-compilation dependencies, so an
-    // `import type` — erased by tsc, present in no bundle — is not an edge.
-    // This is the distinction madge does not make, and the reason two of the
-    // "cycles" the original audit turned up were never cycles at all.
-    tsPreCompilationDeps: false,
+    // Count `import type` as an edge, so the rule above sees *design* cycles
+    // and not only load-order ones.
+    //
+    // The default (`false`) reports post-compilation dependencies, which drops
+    // type-only imports because tsc erases them — a defensible setting if the
+    // only thing you fear is the half-initialised-module bug at load time. It
+    // is not the rule here. Two modules that name each other's types are
+    // mutually dependent whatever the emitted JS looks like: neither can be
+    // read, moved, tested or extracted without the other, which is most of
+    // what having a module boundary was for. And the distinction is one
+    // keystroke wide — deleting `type` from an import turns a tolerated loop
+    // into a real one, with nothing to catch it.
+    //
+    // Both loops this flag surfaced when it was turned on were genuine
+    // placement bugs of exactly that kind: `cache/db.ts` (the bottom of its
+    // directory) naming the payload types of the consumers that import it, and
+    // `agendaSections.ts`/`overduePool.ts` each reaching for a type the other
+    // declared.
+    tsPreCompilationDeps: true,
 
     enhancedResolveOptions: {
       exportsFields: ['exports'],
