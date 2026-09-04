@@ -8,8 +8,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/cn'
 import { Archive, Trash2 } from 'lucide-react'
 
 interface Props {
@@ -22,8 +20,9 @@ interface Props {
    * Archives the entry instead of deleting it. Optional so a caller with
    * nothing archivable (there is none today, but the type shouldn't assume
    * that forever) isn't forced to supply one — see `plans/archived-entries.md`
-   * PR 2. Rendered as a secondary action, deliberately not styled like
-   * `onConfirm`: it isn't destructive, and it isn't the primary choice either.
+   * PR 2. Rendered with the warning color, deliberately not styled like
+   * `onConfirm`: it isn't destructive, but it's still a consequential
+   * alternative to plain "Cancel", not the primary choice either.
    */
   onArchive?: () => void
 }
@@ -38,11 +37,11 @@ export default function DeleteDialog({ open, title, onConfirm, onClose, onArchiv
             Delete &ldquo;{title}&rdquo;? This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter>
+        <AlertDialogFooter className="gap-2 sm:gap-0">
           <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
           {onArchive && (
             <AlertDialogAction
-              className={cn(buttonVariants({ variant: 'secondary' }), 'gap-1.5')}
+              className="bg-warning text-warning-foreground hover:bg-warning/90 gap-1.5"
               onClick={() => { onArchive(); onClose() }}
             >
               <Archive size={13} />
