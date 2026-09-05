@@ -38,6 +38,7 @@ Only one column has all four.
 - **Participants** — tag people on entries and filter the whole calendar to show only their items.
 - **Priority and duration** — first-class metadata on every task or event.
 - **Search** — find any entry by title or content across your entire vault.
+- **Calendar subscriptions** — subscribe to an iCal feed (Google, Outlook, Apple, or anywhere else) and see its events alongside your own, read-only; export a vault back out as a single `.ics` file to plug into another calendar.
 - **Offline-first** — the app works without a network connection and syncs automatically when you're back online.
 - **Installable** — add Meridian to your home screen or desktop like any native app (it's a PWA).
 
@@ -51,6 +52,7 @@ Meridian doesn't run a server that holds your notes. You choose where your files
 |---|---|
 | **GitHub repository** ⭐ | Reads and writes directly to a repo of your choice via the GitHub API. Instant cloud sync, full git history, and works on any device including iOS. This is the recommended backend for most users. |
 | **Local folder** | Opens a folder on your device via the browser's File System API. Files stay on your device. Supported in Chrome or Edge, desktop or Android — not available in Safari or Firefox. |
+| **Calendar subscription** | Paste an iCal feed URL — Google, Outlook, Apple, or anywhere else — and its events show up read-only alongside your own. A feed the browser can't fetch directly is relayed through Meridian's own Worker, which doesn't hold your notes any more than the app does. |
 | **Tutorial vault** | A built-in demo you can explore before connecting anything — no account needed. |
 
 Files are plain `.md` files. Open them in any text editor, check them into git, sync them with any tool you already use.

@@ -112,8 +112,8 @@ competitor from memory. The rows most worth a human check are Obsidian "Works in
 the browser ❌" and GitHub Issues "Phone-first UI | Partial".
 
 **Found while verifying:** TaskNotes advertises "Calendar sync with Google and
-Microsoft (OAuth) or any ICS feed". Meridian now matches the ICS half and says
-so nowhere — see finding #3.
+Microsoft (OAuth) or any ICS feed". Meridian now matches the ICS half, and the
+README's backend table and feature list now say so.
 
 ### Unverified, flagged
 
@@ -137,19 +137,19 @@ PMF signal in this repository to read. Section 5 is written accordingly.
 
 ## 3. Category verdicts
 
-1. **Niche fit** — *findings: #3.* The product honours its stated non-goal:
+1. **Niche fit** — **clean.** The product honours its stated non-goal:
    `src/search/` is 313 lines and there is no graph view, no plugin API, no
    backlink-heavy note tooling — "it doesn't try to be a better note-taking app
    than Obsidian" is a decision the code keeps. Confirmed as strategy, not a gap.
 2. **Niche recognition** — *findings: #4.*
 3. **Visual identity & aesthetic fit** — *findings: below the cut* (see G).
    Fully assessed via real screenshots.
-4. **Differentiation & alternatives** — *findings: #3.*
+4. **Differentiation & alternatives** — **clean.**
 5. **Audience selection** — *findings: #5.*
 6. **Adoption gates** — *findings: #5.* Confirmed as working: the read-only
    Tutorial vault is a genuine try-before-committing path, reachable with zero
    setup, and it is the app's default state.
-7. **Niche drift & emerging signals** — *findings: #3, and below the cut* (F).
+7. **Niche drift & emerging signals** — *findings: below the cut* (F).
 
 ---
 
@@ -161,62 +161,13 @@ leads on impact and names #4 as the change to make; the table below ranks on
 
 | Rank | # | Finding | Gap | Question | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|---|
-| 3 | #3 | iCal, backlog, favorites, themes, multi-vault shipped and unclaimed — blog says the opposite | declared-vs-revealed | both | 7 | 4 | Sonnet 5 | 14 |
 | 5 | #5 | "Usable by someone who won't configure a vault" — the setup half is fixed, the word isn't | declared-vs-served | communication | 5 | 4 | Haiku 4.5 | 20 |
 
 **Sequencing note.** #5's decision (keep the promise, build the sharing path
 rather than soften the claim) has been made and its harder half shipped —
 `plans/onboarding.md`'s PR 4 landed the invite path, 2026-09-04
-(realJohnDoe/meridian#959). What's left is #3's README edits. #4 is
-independent (source only) and can go first or in parallel.
-
----
-
-### #3 — The product shipped its own biggest stated blocker and no surface says so
-
-- **Gap:** `declared-vs-revealed`
-- **Question:** fit + communication
-- **Category:** `differentiation` `niche-definition` `proof`
-- **Who it costs us:** the Obsidian/TaskNotes user comparing feature lists, who
-  reads that Meridian cannot import their existing calendar and stops.
-  **Share: unknown.** What is knowable: the blog post is the project's only
-  long-form pitch, and the sentence sits in its closing section.
-- **Impact:** 7
-- **Evidence:**
-  - `blog/1-meridian-why-i-built-a-markdown-first-calendar/meridian-why-i-built-a-markdown-first-calendar.md:241` — `off Proton yet. The most useful missing piece is probably iCal import — until you can pull` *(hard-wrapped prose at ~90 chars; the thought runs lines 241–243)*
-  - Same file, `:77` — `iCal compatibility ever matters, I can add it underneath.)` *(thought runs 76–77)*
-  - Contradicted by shipped code: `src/settings/AddVaultWizard.tsx:33` —
-    `    desc:  'Paste an iCal address from Google, Outlook, Apple or anywhere else. Read-only — its events appear alongside your own.',`
-  - Scale of the unclaimed investment: `src/storage/ical/` is 1,948 lines across
-    6 non-test files, plus `icalBackend.ts` (182) and `exportVaultIcs` — roughly
-    28% of `src/storage/`, more than all of `src/settings/`.
-  - Also shipped and absent from the README's "What it does" (lines 30–42), each
-    from an actual count of user-visible `src/` strings: **Backlog** (own route
-    `_app.backlog.tsx`, 29), **Favorites** (76), **themes** (113 — nine
-    palettes, `src/settings/themes.ts:30-38`), and multi-vault
-    (`vaultRegistry.ts`, 766 lines), which the README's backend table presents
-    as a one-of-three choice rather than something you can add several of.
-- **Breadth:** 4 surfaces (`README.md` — both the backend table and the feature
-  list, `blog/1-…`, `index.html` description, `vite.config.ts` manifest
-  description).
-- **Recommended model:** **Sonnet 5.**
-  - *Task context:* **the trap is overclaiming.** The iCal backend is a
-    **read-only subscription** — `icalBackend.ts:6-15` synthesizes virtual `.md`
-    files and the wizard copy says "Read-only" — so copy must not imply two-way
-    calendar sync. Export is separate (`exportVaultIcs`, one direction out).
-    Feeds the browser cannot read go through Meridian's own Worker
-    (`icalBackend.ts:20-23`), which is worth a word in a README that otherwise
-    says "Meridian doesn't run a server that holds your notes" (`README.md:46`)
-    — that sentence stays true (the Worker proxies, it does not hold notes), but
-    the two claims should be written so they do not appear to contradict.
-    **The blog is a dated post, not a spec** — prefer a short correction note to
-    silently rewriting a first-person narrative about what was missing in July.
-- **Problem:** the product's strongest recent answer to "why can't I switch?" is
-  invisible, and its own blog still tells the reader the answer is no.
-- **Fix:** add a "Calendar subscription" row to the README backend table and an
-  iCal bullet to "What it does"; append a dated note to the blog post; decide
-  separately (section 6) whether backlog/favorites/themes/multi-vault join the
-  feature list or stay deliberately unlisted.
+(realJohnDoe/meridian#959). #4 is independent (source only) and can go first
+or in parallel.
 
 ---
 
@@ -363,10 +314,11 @@ author has used it for their own tasks for about two months, their wife is
 off Proton. So bet 5 is untested even in the author's own household, and bet 3
 is confirmed only for the person who built the app to fit their hands.
 
-The code corroborates the shape of that use. The unclaimed iCal subsystem
-(finding #3) is the author solving their own named blocker — you cannot leave
-Proton until you can pull a calendar in. Participants, per-vault colours and
-multi-vault are all the household-scheduling problem. `next-steps.md` lists
+The code corroborates the shape of that use. The iCal subsystem is the author
+solving their own named blocker — you cannot leave Proton until you can pull
+a calendar in, and the README now claims it. Participants, per-vault colours
+and multi-vault are all the household-scheduling problem, and remain
+unclaimed. `next-steps.md` lists
 "Fix flow for adding a second vault", which is a friction only a multi-calendar
 user hits. This is a product being shaped, visibly and coherently, around one
 household's migration — which is the classic way a niche stays a niche of one,
@@ -416,9 +368,10 @@ read, and watch which of the five bets the replies are about.
 2. **Does the revealed niche become the declared one?** The code has been
    investing in multi-source household calendaring (iCal, multi-vault,
    participants, ICS export) while the copy still leads with Obsidian +
-   TaskNotes. Either update the pitch to match where the effort went, or decide
-   the effort was a detour. *Consequence:* leaving it means the strongest recent
-   work stays invisible (finding #3).
+   TaskNotes. iCal itself is now claimed in the README and blog; multi-vault,
+   participants and ICS export are not. Either update the pitch to match where
+   the effort went, or decide the effort was a detour. *Consequence:* leaving
+   it means that remaining investment stays invisible.
 3. **Which differentiator leads?** Today "phone-first" leads the headline but
    recurrence depth is the thing no competitor has (verified: TaskNotes is one
    RRULE per task). Phone-first is easier to feel and easier for others to copy;

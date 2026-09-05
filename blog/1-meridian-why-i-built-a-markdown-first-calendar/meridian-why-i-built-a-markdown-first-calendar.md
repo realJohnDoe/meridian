@@ -244,6 +244,11 @@ recent work has been the unshowy kind, spread across sync, layout, and UX, plus 
 performance work to keep the calendar smooth on a phone as a vault fills up. That polish is
 most of the distance between a prototype that works in a demo and something you'd rely on.
 
+> **Update, 2026-09-05:** iCal import shipped. You can add a calendar subscription as its
+> own read-only backend — its events show up alongside your own, and there's a matching
+> one-way `.ics` export if you want your Meridian vault to show up somewhere else. See the
+> "Your data, your way" section of the [README](../../README.md).
+
 ## Where it fits
 
 It is not a better note-taking app than Obsidian, and it isn't trying to be. Obsidian's
