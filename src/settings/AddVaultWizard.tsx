@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { HardDrive, GitBranch, CalendarDays, BookOpen } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/primitives/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'

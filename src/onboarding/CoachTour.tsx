@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useStore } from '@/store'
 import { isTourDone, markTourDone } from './tourState'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/primitives/button'
 import { useResetOnChange, useFocusTrap } from '@/hooks'
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))

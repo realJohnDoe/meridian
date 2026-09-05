@@ -1,6 +1,6 @@
 import { AlertTriangle } from 'lucide-react'
 import type { ErrorComponentProps } from '@tanstack/react-router'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/primitives/button'
 
 // Router-level defaultErrorComponent (wired in main.tsx) — every route match,
 // including root, is wrapped in its own CatchBoundary, so this is the single
