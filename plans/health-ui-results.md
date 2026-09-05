@@ -132,7 +132,7 @@ coverage of 100%.
    (`autoCodeSplitting`, editor in its own 716K chunk); all four list surfaces
    are virtualized; `memo()` decisions are deliberate and documented, including
    the two documented *non*-memo cases.
-7. **UI Toolchain & Feedback Loops** — findings: #5, #6, #7. The enabled
+7. **UI Toolchain & Feedback Loops** — findings: #5. The enabled
    rule set is genuinely strong (full `jsx-a11y` recommended, `react-hooks`
    `recommended-latest` including the compiler diagnostics,
    `@eslint-react` `recommended-type-checked` plus 15 individually-raised
@@ -172,9 +172,7 @@ identity, not order.
 |---|------|-------|-----------|--------|---------|-------------------|-------|
 | #5 | 1 | Compiler bail-out rule matches only `FunctionDeclaration` | `toolchain` `performance` | 3 | 100 | **Haiku 4.5** | 300 |
 | #3 | 3 | `Button`/`Separator` get zero compiler memoization | `performance` `library-fit` | 6 | 9 | **Opus 5** (Sonnet 5 if the mirror policy is pre-decided) | 18 |
-| #6 | 4 | `_app.tsx` excluded from coverage on a stale rationale | `testing` `toolchain` | 5 | 2 | **Sonnet 5** | 5 |
 | #8 | 5 | `isSafeUrl` — the only XSS gate — has no tests | `security` `testing` | 4 | 1 | **Haiku 4.5** | 4 |
-| #7 | 6 | Stale per-file coverage floor, silently inert | `toolchain` `dead-code` | 3 | 1 | **Haiku 4.5** | 3 |
 | #1 | 7 | `AppMain` is a 481-line component with 9 branch chains | `component-architecture` `srp` `testing` | 7 | 1 | **Opus 5** | 2.3 |
 
 > **Read the rank column with care.** Breadth-in-files structurally
@@ -182,10 +180,10 @@ identity, not order.
 > what makes it a god component in the first place. By impact it is first.
 > This is a scoring-rule observation, not a hedge — see "Survey file changes".
 
-**Sequencing.** #6 and #7 together (both edit `vitest.config.ts`). #3 and #5
-are independent of each other despite both concerning the compiler — #5 edits
-`eslint.config.js`, and its rule does not apply to `components/ui/`, which is
-where #3 lives. #8 is independent of everything, and so is #1.
+**Sequencing.** #3 and #5 are independent of each other despite both
+concerning the compiler — #5 edits `eslint.config.js`, and its rule does not
+apply to `components/ui/`, which is where #3 lives. #8 is independent of
+everything, and so is #1.
 
 ---
 
@@ -419,124 +417,6 @@ where #3 lives. #8 is independent of everything, and so is #1.
 - **Verify after:** `pnpm run lint` (must stay green), then paste an
   arrow-function component with a destructured default into any `src/*.tsx`
   and confirm it now errors.
-
----
-
-### #6 — `_app.tsx` is excluded from coverage under a rationale that no longer describes it
-
-- **Category** — `testing` `toolchain`
-- **Impact** — 5
-- **Breadth** — 2 files directly (`vitest.config.ts`, `src/routes/_app.tsx`);
-  the glob pair covers 11 files totalling 1410 lines. Search:
-  `wc -l src/routes/_app*.tsx src/routes/_entry*.tsx` → `_app.tsx` alone is
-  569 of those 1410 lines (40%); the other ten average 84.
-- **Recommended model** — **Sonnet 5.** Narrowing the glob is trivial, but
-  doing so surfaces ~569 previously-invisible lines in the coverage total and
-  can drop the project below the global floor (`statements: 68`), so the task
-  includes writing enough tests to hold it — which needs judgement about what
-  in `AppMain` is worth pinning. The floor values and the existing test file
-  are named below.
-- **Evidence** — `vitest.config.ts:39–40`:
-  ```
-        'src/routes/_app*.tsx',
-        'src/routes/_entry*.tsx',
-  ```
-  under the comment at `:34–:38` justifying them:
-  ```
-        // Route registration: the `_app*`/`_entry*` files wire a component to a
-        // path and little else.
-  ```
-  That is accurate for the other ten files. `src/routes/_app.tsx` is 569 lines
-  containing the app's entire topbar composition, quick-nav orchestration,
-  focus management and "Today" behaviour — see #1.
-- **Problem** — The largest and most branch-dense file in `src/routes/` is
-  invisible to the coverage report *and* to the global floor, so the nine
-  branch chains in #1 can be edited, or broken, without any coverage signal —
-  and the exclusion reads as deliberate and reasoned, so nobody re-examines it.
-- **Fix** — Replace the `_app*` glob with an explicit list of the genuinely
-  registration-only `_app.*` leaf routes, letting `src/routes/_app.tsx` itself
-  be counted, and add tests until the global floor holds.
-
-**Task context**
-
-- **The enumerated work.** Keep excluding, by name:
-  `_app.index.tsx` (60), `_app.backlog.tsx` (19), `_app.notes.tsx` (19),
-  `_app.day.$date.tsx` (69), `_app.week.$date.tsx` (76),
-  `_app.calendar.$month.tsx` (46). Stop excluding: `src/routes/_app.tsx`.
-  Leave the `_entry*` glob alone — its four files are 18/47/124/134 lines and
-  the rationale does hold for them.
-- **Measured numbers, to re-derive rather than trust.** The current global
-  floor is `statements: 68, branches: 62, functions: 59, lines: 70`
-  (`vitest.config.ts:53–56`). Un-excluding 569 uncovered lines will move the
-  project total; run `pnpm exec vitest run --coverage` **before** editing to
-  get today's baseline, then again after, and only then decide whether the
-  floor needs tests added or a documented adjustment. Do not lower the global
-  floor silently to make room.
-- **What already exists to build on.** `src/routes/_app.test.tsx` is 229 lines
-  and already mounts the quick-nav path with a mocked `useCarousel` — its
-  three tests cover the `agendaQuickNavAnchor` freeze. The untested surface is
-  the five-way topbar branch: which label and which paging each route yields.
-  Those are cheap table-driven tests and are exactly what #1 needs as a safety
-  net, which is why this is worth doing **before** #1, not after.
-- **Precedent in-repo.** `src/routes/-pagedTopbar.tsx`,
-  `-entryTopbar.tsx` and `__root.tsx` each carry a 92/90/95/92 per-file floor
-  (`vitest.config.ts:129–132`) — the same treatment is the natural landing
-  place for `_app.tsx` once it has tests, but set it from a measurement, not
-  from that number.
-- **Verify after:** `pnpm run test` and confirm `src/routes/_app.tsx` now
-  appears in the coverage table with a real percentage.
-
----
-
-### #7 — A per-file coverage floor points at a moved file and is silently inert
-
-- **Category** — `toolchain` `dead-code`
-- **Impact** — 3
-- **Breadth** — 1 file (`vitest.config.ts`), 1 of its 46 path keys. Search:
-  every `'src/…'` key in the file checked against the filesystem — one
-  threshold key does not resolve.
-- **Recommended model** — **Haiku 4.5.** Correcting a path is mechanical and
-  the guard test proposed below fails loudly if wrong. Verified inert by
-  dry-run, so there is no hidden interaction to reason about.
-- **Evidence** — `vitest.config.ts:130`:
-  ```
-        'src/routes/-entryRoute.ts': { statements: 92, branches: 85, functions: 95, lines: 95 },
-  ```
-  `src/routes/-entryRoute.ts` does not exist; the file is `src/entryRoute.ts`,
-  moved to the root per CLAUDE.md ("A root leaf rather than
-  `routes/-entryRoute.ts` (where it used to live)"). A dry-run confirms the key
-  is inert rather than an error: a config whose only threshold is a
-  nonexistent path at 99/99/99/99 exits **0** with no warning.
-- **Problem** — `src/entryRoute.ts` builds every Link/navigate descriptor for
-  entries and is imported by `editor/`, `hooks/` and three files in `routes/`;
-  it was deliberately floored at 92/85/95/95 and is now guarded only by the
-  global floor, with nothing anywhere reporting the downgrade. More generally,
-  nothing validates that any of the 46 keys still names a real file, so the
-  next rename does the same thing silently.
-- **Fix** — Retarget the key to `src/entryRoute.ts`, and add a test that
-  asserts every per-file threshold key in `vitest.config.ts` resolves to an
-  existing file.
-
-**Task context**
-
-- **Exact site.** `vitest.config.ts:130`. Change the key to
-  `'src/entryRoute.ts'`; the values need no change —
-  `src/entryRoute.test.ts` exists (13 tests) and the file measures
-  100/100/100/100 today, so the 92/85/95/95 floor passes as-is.
-- **The other three non-resolving strings are fine and must not be "fixed":**
-  `src/components/ui/**`, `src/routes/_app*.tsx`, `src/routes/_entry*.tsx` are
-  globs in the `exclude` array (`:32`, `:39`, `:40`), not threshold keys. Only
-  keys under `thresholds` are literal paths. (`_app*.tsx` is separately
-  wrong for a different reason — that is #6, not this.)
-- **The guard test.** `src/glossary.test.ts` is the in-repo precedent for
-  exactly this shape: it asserts that every file and symbol `GLOSSARY.md`
-  names still exists, so a rename is forced to update the doc. Model the new
-  test on it — import the config, walk
-  `test.coverage.thresholds`, skip the four non-path keys
-  (`statements`/`branches`/`functions`/`lines`), and `expect(existsSync(key))`
-  for the rest.
-- **Verify after:** `pnpm run test`, and confirm the new test fails if you
-  temporarily rename a floored file.
 
 ---
 

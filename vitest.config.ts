@@ -30,13 +30,22 @@ export default defineConfig({
         // feature-owned ones in their feature dir), where they ARE counted.
         // Don't hand-write first-party files in here.
         'src/components/ui/**',
-        // Route registration: the `_app*`/`_entry*` files wire a component to a
-        // path and little else. Deliberately NOT all of src/routes/ — `-`
-        // prefixed files aren't routes at all (TanStack ignores them; see
+        // Route registration: these files wire a component to a path and
+        // little else. Deliberately NOT all of src/routes/ — `-` prefixed
+        // files aren't routes at all (TanStack ignores them; see
         // routeFileIgnorePrefix), they're ordinary modules that live here
         // because their callers do, and __root.tsx / auth.callback.tsx carry
-        // real logic. All of those are counted and tested.
-        'src/routes/_app*.tsx',
+        // real logic. All of those are counted and tested. Listed
+        // individually rather than as a `_app*`/`_entry*` glob — the glob
+        // used to also swallow src/routes/_app.tsx, which is 569 lines of
+        // topbar composition, quick-nav orchestration and focus management,
+        // not registration (health-ui-results.md finding #6).
+        'src/routes/_app.index.tsx',
+        'src/routes/_app.backlog.tsx',
+        'src/routes/_app.notes.tsx',
+        'src/routes/_app.day.$date.tsx',
+        'src/routes/_app.week.$date.tsx',
+        'src/routes/_app.calendar.$month.tsx',
         'src/routes/_entry*.tsx',
         'src/routeTree.gen.ts',
         'src/main.tsx',
@@ -127,7 +136,16 @@ export default defineConfig({
         // with no other way in — so it gets the tightest floor here.
         'src/routes/auth.callback.tsx': { statements: 92, branches: 88, functions: 95, lines: 95 },
         'src/routes/__root.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
-        'src/routes/-entryRoute.ts': { statements: 92, branches: 85, functions: 95, lines: 95 },
+        // Un-excluded from coverage (health-ui-results.md finding #6):
+        // AppMain's topbar composition, quick-nav orchestration and focus
+        // management, not registration. Floored a few points under measured
+        // coverage rather than at -entryTopbar.tsx/-pagedTopbar.tsx's 92+ —
+        // the remaining gap is per-view callback props (onSelectDay,
+        // onBrowseMonth, ...) that only fire on a real pointer gesture inside
+        // MiniMonth/MonthStrip, which _app.viewBranches.test.tsx's per-view
+        // rendering exercises but doesn't drive.
+        'src/routes/_app.tsx': { statements: 70, branches: 80, functions: 48, lines: 72 },
+        'src/entryRoute.ts': { statements: 92, branches: 85, functions: 95, lines: 95 },
         'src/routes/-entryTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         'src/routes/-pagedTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         'src/routes/-topbarEdgePadding.ts': { statements: 92, branches: 90, functions: 95, lines: 92 },
