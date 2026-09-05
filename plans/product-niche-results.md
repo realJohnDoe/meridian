@@ -149,7 +149,7 @@ PMF signal in this repository to read. Section 5 is written accordingly.
 6. **Adoption gates** — *findings: #5.* Confirmed as working: the read-only
    Tutorial vault is a genuine try-before-committing path, reachable with zero
    setup, and it is the app's default state.
-7. **Niche drift & emerging signals** — *findings: #2, #3, and below the cut* (F).
+7. **Niche drift & emerging signals** — *findings: #3, and below the cut* (F).
 
 ---
 
@@ -157,23 +157,20 @@ PMF signal in this repository to read. Section 5 is written accordingly.
 
 **The verdict and this table disagree on order, deliberately.** The niche verdict
 leads on impact and names #4 as the change to make; the table below ranks on
-`(impact × breadth) ÷ effort`, which is return on effort. #1 and #2 outrank #4
-and #5 because they are cheap and wide, not because they matter more.
+`(impact × breadth) ÷ effort`, which is return on effort. #1 outranks #4
+and #5 because it is cheap and wide, not because it matters more.
 
 | Rank | # | Finding | Gap | Question | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|---|
 | 1 | #1 | No visual proof of the phone claim | declared-vs-served (inverted) | communication | 7 | 3 | Haiku 4.5 | 21 |
-| 2 | #2 | "Example vault" / "Tutorial vault" and the folder/vault/repo fracture | declared-vs-served | communication | 4 | 5 | Haiku 4.5 | 20 |
 | 3 | #3 | iCal, backlog, favorites, themes, multi-vault shipped and unclaimed — blog says the opposite | declared-vs-revealed | both | 7 | 4 | Sonnet 5 | 14 |
 | 5 | #5 | "Usable by someone who won't configure a vault" — the setup half is fixed, the word isn't | declared-vs-served | communication | 5 | 4 | Haiku 4.5 | 20 |
 
 **Sequencing note.** #5's decision (keep the promise, build the sharing path
 rather than soften the claim) has been made and its harder half shipped —
 `plans/onboarding.md`'s PR 4 landed the invite path, 2026-09-04
-(realJohnDoe/meridian#959). What's left of #5 is the same vocabulary problem
-#2 already tracks, so #2 is unblocked and should land next, then #1 and #3's
-README edits — otherwise the copy gets written twice. #4 is independent
-(source only) and can go first or in parallel.
+(realJohnDoe/meridian#959). What's left is #1 and #3's README edits. #4 is
+independent (source only) and can go first or in parallel.
 
 ---
 
@@ -222,52 +219,6 @@ README edits — otherwise the copy gets written twice. #4 is independent
   important claim entirely on trust, on every surface where they meet it.
 - **Fix:** put a phone screenshot directly under the README headline, point
   `og:image` at it, and add a `screenshots` array to the manifest.
-
----
-
-### #2 — The product renamed the Tutorial vault and the copy still says "Example vault"
-
-- **Gap:** `declared-vs-served`
-- **Question:** communication
-- **Category:** `recognition` `identity`
-- **Who it costs us:** the visitor following the README's getting-started list
-  literally and looking for a button that no longer exists. **Share: unknown**,
-  but this is on the default path — `README.md:61` is step 2 of 4 in the only
-  setup instructions the project publishes.
-- **Impact:** 4
-- **Evidence:**
-  - `README.md:61` — `2. Try the **Example vault** to get a feel for the interface — click through the onboarding tour.`
-  - `src/settings/AddVaultWizard.tsx:40` — `  title: 'Tutorial vault',`
-  - `src/storage/devFixtures/tutorialVault.ts:426` — `This example vault is **read-only** — edits and new entries won't be saved here.` (the vault's own content still uses the retired name)
-  - The wider fracture, same concept, four words: `src/onboarding/CoachTour.tsx:47`
-    says `plain Markdown files in a folder you own`, then
-    `src/onboarding/CoachTour.tsx:73` says `manage vaults in Settings` — the term
-    is introduced, undefined, two steps after a different word for the same
-    thing. `README.md:63` adds a third: `click "Connect GitHub repo"`.
-  - Term census (method: whole-word, case-insensitive; `src/` counted over
-    quoted string literals and JSX text in non-test `.tsx` only, so identifiers
-    are excluded): `vault` 33 in user-visible `src/` strings vs 8 in the README;
-    the same raw grep including identifiers gives 1,749, which is why the
-    identifier-excluded count is the one to use.
-- **Breadth:** 5 files, from an actual search (`README.md` ×3 occurrences,
-  `AddVaultWizard.tsx`, `tutorialVault.ts`, `CoachTour.tsx`, `index.html`).
-- **Recommended model:** **Haiku 4.5**, *given the surviving term is named in the
-  task* — that choice is #5's to make, not the fixer's.
-  - *Task context:* the enumerated work, once the term is decided — `README.md`
-    lines 9, 52, 61 ("Example vault" → decided term); `tutorialVault.ts:426`
-    ("This example vault"); and if the decision is to define "vault" rather than
-    drop it, one clause at `CoachTour.tsx:47`. **What stays:** the ~1,749
-    `vault` identifiers in `src/` — this is a user-visible-copy change only, and
-    `vaultRegistry`/`VaultRef`/`AddVaultWizard` symbol names must not be touched.
-    **The trap:** `GLOSSARY.md` is enforced by `src/glossary.test.ts`, which
-    fails the build if a renamed term is not updated there and blocks retired
-    names from returning — check `GLOSSARY.md` before renaming anything, per
-    `CLAUDE.md`.
-- **Problem:** a reader cannot tell whether a folder, a vault and a repo are
-  three things or one, and the one button the README names is labelled
-  differently in the app.
-- **Fix:** pick one user-facing word, apply it to the five sites above, and
-  define it once on first use.
 
 ---
 
@@ -538,8 +489,7 @@ read, and watch which of the five bets the replies are about.
    *Consequence of none:* the first launch teaches nothing, and every bet above
    stays open indefinitely.
 
-Everything outside this list is actionable without further input, except
-finding #2's choice of surviving term, which decision 1 settles.
+Everything outside this list is actionable without further input.
 
 ---
 
