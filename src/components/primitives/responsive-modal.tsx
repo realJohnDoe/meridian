@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useMediaQuery } from '@/hooks'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/dialog'
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerActions } from '../ui/drawer'
-import { Separator } from '../ui/separator'
+import { Separator } from './separator'
 import { cn } from '@/lib/cn'
 
 const ModalContext = React.createContext(false) // false = mobile (drawer)

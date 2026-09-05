@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { Link } from '@tanstack/react-router'
 import { Trash2, TriangleAlert, AlertCircle, Download, RefreshCw, ArchiveRestore, ChevronRight, Copy, Check, ExternalLink } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/primitives/button'
 import {
   AlertDialog,
   AlertDialogAction,
