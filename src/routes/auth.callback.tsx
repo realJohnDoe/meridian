@@ -5,7 +5,7 @@ import {
   OAuthCallbackError, GITHUB_APP_INSTALL_URL,
   type InstalledRepo, type OAuthTokens,
 } from '@/vaultActions'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/primitives/button'
 import { useStore } from '@/store'
 
 /**

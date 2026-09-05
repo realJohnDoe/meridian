@@ -1,7 +1,7 @@
 import { Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useStore } from '@/store'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/primitives/button'
 
 interface Props {
   Icon:  LucideIcon

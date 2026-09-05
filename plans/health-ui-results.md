@@ -85,8 +85,6 @@ coverage of 100%.
   6 `useRef`) is the editor's state hub and the most likely remaining home for
   an effect-chain finding. Its coverage floor (68/55/55/70) is the loosest
   non-global one in `vitest.config.ts`, which is itself a hint.
-- No runtime profiling was done. Finding #3 is a static/build-time
-  measurement of memoization, not measured render cost.
 
 ## 3. Category verdicts
 
@@ -128,7 +126,7 @@ coverage of 100%.
    all 16 hand-written `eslint-disable`s carry a written justification (the
    17th is the blanket directive in the generated `routeTree.gen.ts`, which
    ESLint ignores anyway).
-6. **React Performance** — findings: #3. Route-level code splitting is on
+6. **React Performance** — **clean.** Route-level code splitting is on
    (`autoCodeSplitting`, editor in its own 716K chunk); all four list surfaces
    are virtualized; `memo()` decisions are deliberate and documented, including
    the two documented *non*-memo cases.
@@ -169,90 +167,7 @@ identity, not order.
 
 | # | Rank | Title | Categories | Impact | Breadth | Recommended model | Score |
 |---|------|-------|-----------|--------|---------|-------------------|-------|
-| #3 | 3 | `Button`/`Separator` get zero compiler memoization | `performance` `library-fit` | 6 | 9 | **Opus 5** (Sonnet 5 if the mirror policy is pre-decided) | 18 |
 | #8 | 5 | `isSafeUrl` — the only XSS gate — has no tests | `security` `testing` | 4 | 1 | **Haiku 4.5** | 4 |
-
-**Sequencing.** #3 and #8 are independent of each other and can be done in
-any order.
-
----
-
-### #3 — `Button` and `Separator` receive zero React Compiler memoization
-
-- **Category** — `performance` `library-fit`
-- **Impact** — 6
-- **Breadth** — 9 files. Search: an ESLint dry-run over `src/components/ui/`
-  with the destructured-default selector broadened to all three function
-  shapes reported **23 hits across 9 files** — `button.tsx`, `calendar.tsx`,
-  `drawer.tsx`, `popover.tsx`, `select.tsx`, `separator.tsx`, `sheet.tsx`,
-  `sidebar.tsx`, `tooltip.tsx`. Of those, `button.tsx` and `separator.tsx`
-  are memoized **not at all**. `@/components/ui/button` is imported by 17
-  non-test modules; `<Button` is rendered in 15.
-- **Recommended model** — **Opus 5**, because the blocking question is a
-  policy call the user owns: `components/ui/` is a deliberate shadcn mirror
-  (CLAUDE.md, and `eslint.config.js:316` excludes it from the very rule
-  that would flag this) so that `shadcn diff` stays meaningful, and patching
-  it trades that fidelity for memoization. **If the user pre-decides the
-  policy** — patch and record the divergence, or wrap rather than patch, or
-  accept the cost — the remaining edit is **Sonnet 5**: mechanical, with the
-  in-repo recipe named below, and verifiable by re-running the census.
-- **Evidence** — `src/components/ui/button.tsx:43`:
-  ```
-  function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
-  ```
-  Running the repo's own preset over the file — `babel.transformSync(src,
-  { presets: [reactCompilerPreset({ target: '19' }).preset] })`, i.e. exactly
-  what `vite.config.ts:139` installs — yields **no `react/compiler-runtime`
-  import and 0 `_c()` calls**. The same census over all 22 files in the
-  directory: `badge.tsx` 1, `card.tsx` 6, `dialog.tsx` 10, `tooltip.tsx` 3,
-  `alert-dialog.tsx` 11 — and `button.tsx` 0, `separator.tsx` 0. A two-case
-  fixture confirms the mechanism and the cure: `function DeclDefault({ a, b = 3 })`
-  compiles to plain JSX, while `function DeclBody(props)` with `props.b ?? 3`
-  compiles to `const $ = _c(2)`.
-- **Problem** — The repo's most-used UI primitive re-renders unmemoized on
-  every parent render, and the one guard written to prevent exactly this
-  (`eslint.config.js:317–321`) is configured not to look at the directory
-  where it is happening — so the cost is invisible to build, lint and tests
-  alike.
-- **Fix** — Decide the mirror policy, then either move the defaults into the
-  body (`props.asChild ?? false`) in `button.tsx` and `separator.tsx` and
-  record the divergence, or leave them and record the measured cost so the
-  next reader does not have to re-derive it.
-
-**Task context**
-
-- **Exact sites for the minimal fix.** `src/components/ui/button.tsx:43`
-  (`asChild = false`) and `src/components/ui/separator.tsx:7–8`
-  (`orientation = 'horizontal'`) and `:8` (`decorative = true`).
-  These two files are the whole of the "0 memoization" set; the other seven
-  are partially memoized and are a follow-on, not this fix.
-- **The precedent, in-repo and already written up.** Three first-party
-  components already use the cure and each carries the rationale in a comment:
-  `src/components/primitives/icon-button.tsx:34–39`,
-  `src/components/primitives/collapse-row.tsx:58–61`, and
-  `src/components/KindIcon.tsx:22–25`, all pointing at `OccurrenceCard.tsx`
-  for the full explanation. Copy that shape.
-- **Measured numbers, and how to re-measure.** The `_c()` counts above are
-  from this run against `babel-plugin-react-compiler@1.0.0`. Re-measure rather
-  than trust them after any bump of that package or `@vitejs/plugin-react`.
-  The recipe: `reactCompilerPreset({ target: '19' })` returns
-  `{ preset, rolldown }` — pass `.preset` to Babel, not the object — and the
-  script must live inside the repo root for Node to resolve `@babel/core`.
-- **The trap, located.** `separator.tsx` destructures `orientation` and uses
-  it at `:18` (`orientation === 'horizontal' ? 'h-px w-full' : 'h-full w-px'`)
-  *and* forwards it to the Radix primitive. Moving the default to the body
-  must keep both readers on the defaulted value, not the raw prop.
-- **The policy question to put to the user, concretely.** `components.json`
-  configures the shadcn CLI against this directory and CLAUDE.md states only
-  the CLI may write there. Patching two files means `shadcn diff` reports them
-  as divergent forever. The alternatives are: (a) patch and record the
-  divergence in a comment the next `shadcn diff` reader will find; (b) leave
-  `button.tsx` alone and re-export a memo-friendly wrapper from
-  `components/primitives/`, which costs an indirection on 17 import sites;
-  (c) accept the cost. This report does not pick.
-- **Verify after:** re-run the per-file census and confirm `button.tsx` and
-  `separator.tsx` report a non-zero `_c()` count, then
-  `pnpm run build && pnpm run lint && pnpm run test`.
 
 ---
 

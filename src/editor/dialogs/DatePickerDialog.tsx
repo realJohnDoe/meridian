@@ -10,7 +10,7 @@ import {
   ResponsiveModalActions,
 } from '@/components/primitives/responsive-modal'
 import { Calendar } from '@/components/ui/calendar'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/primitives/button'
 
 // ── Component ───────────────────────────────────────────────────
 interface Props {

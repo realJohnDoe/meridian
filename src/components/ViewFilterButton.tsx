@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Users, ChevronRight } from 'lucide-react'
 import { useStore, NO_PARTICIPANT } from '@/store'
-import { Button } from './ui/button'
+import { Button } from './primitives/button'
 import { Checkbox } from './ui/checkbox'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
 import { Collapsible, CollapsibleContent } from './ui/collapsible'

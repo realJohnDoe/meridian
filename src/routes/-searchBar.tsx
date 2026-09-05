@@ -12,7 +12,7 @@
 import { lazy, Suspense, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/primitives/button'
 import { IconButton } from '@/components/primitives/icon-button'
 import { Input } from '@/components/ui/input'
 import { newEntryRoute } from '@/entryRoute'
