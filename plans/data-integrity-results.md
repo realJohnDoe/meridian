@@ -20,21 +20,18 @@ PWA) share one IndexedDB but not one in-memory store, so Tab B's next save
 carries the version token Tab A's push just wrote into the shared cache — the
 compare-and-swap precondition matches, the write lands, and Tab A's edit is gone
 with no `ConflictError`, no conflict copy, no three-way merge and no toast
-(finding #2). The second is **hand-authored frontmatter the model can't type**:
-a file with Obsidian's ordinary `tags: shopping`, or `done: yes`, or a numeric
-`priority`, loads fine and round-trips byte-perfectly while untouched — and then
-renaming its title through the editor silently deletes all three lines
-(finding #1), because the edit path strips every registry key out of the
-verbatim `extra` bag unconditionally rather than only for the field it is
-actually writing.
+(finding #2). The second is a **malformed structural key**: a hand-written
+`date:`, `excluded:` or `instances:` in a shape the parser can't type has no
+`extra` home and is silently deleted on the next save, in one case reviving an
+occurrence the user had deliberately hidden (finding #4).
 
 The single biggest structural theme is that **the round-trip guard checks the
 wrong round trip, and checks it on parsed values rather than bytes**.
 `roundTripLoss` is sound only on an *unedited* file (its own doc comment says
 so), and it compares `key=value` pairs after both sides have been through
-`yamlParse` — so it reports `[]` for every one of findings #1, #4 and #6.
-Every loss this run found is invisible to the one runtime check that exists to
-find the next one.
+`yamlParse` — so it reports `[]` for every one of findings #4 and #6. Every
+loss this run found is invisible to the one runtime check that exists to find
+the next one.
 
 ---
 
@@ -151,7 +148,7 @@ end: `fileIO.ts`, `nodeSchema.ts`, `inheritance.ts`, `storeItems.ts`,
 
 | # | Category | Verdict |
 |---|---|---|
-| 1 | Round-trip fidelity & edit locality | **findings: #1, #4, #5, #6** |
+| 1 | Round-trip fidelity & edit locality | **findings: #4, #5, #6** |
 | 2 | Lost updates & conflict handling | **findings: #2** |
 | 3 | Cache coherence & durability | **findings: #2, #7** |
 | 4 | Atomicity & partial failure | **partially assessed** — read end to end (`pushDirty`, `applyRemoteBatch`, `markInFlight`/`clearInFlight`'s refcounting, `moveEntityInCache`'s stage-then-release, `settlePendingMoves`) and nothing wrong was found by inspection, but no interruption was actually injected. The one concrete suspicion is recorded as unverified above. |
@@ -168,7 +165,6 @@ recommended-model ordinal (Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode = 5).
 
 | # / rank | Finding | Invariant | Failure mode | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| **#1** | An editor save deletes hand-authored frontmatter the model can't type | 1, 2 | **silent** | 8 | 13 of 18 probed shapes; 2 sites; every file using e.g. Obsidian's `tags: <string>` | Sonnet 5 |
 | **#2** | A second tab silently overwrites the first, CAS and all | 4, 5 | **silent** | 9 | every entry in every writable vault; 3 write paths; 0 coherence mechanisms in `src/` | Opus 5, plan mode / multi-PR |
 | **#3** | A DST spring-forward truncates bounded series and rewrites clock times | 8 | **silent** | 6 | 2 defects in 1 file; every bounded or `after_completion` series timed inside the gap | Sonnet 5 |
 | **#4** | A malformed *structural* key has nowhere to live and is deleted on save | 1, 7 | **silent** | 7 | all 6 `STRUCTURAL_KEYS`, every node of every file; 6 of 14 probed shapes lose bytes | Opus 5 |
@@ -179,220 +175,13 @@ recommended-model ordinal (Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode = 5).
 Numbers are identity **and** rank for this run — the two coincided, so there is
 no separate rank column to read.
 
-**Sequencing note.** #1, #4 and #6 all land in the parse/emit pipeline and #5
-is the guard over it: do **#5 first** (it is the only one that will *tell you*
-whether the other three are fixed), then #1 (`storeOps.ts`), then #4
-(`fieldRegistry.ts`/`storeItems.ts`/`roundTripCheck.ts`), then #6 (`fileIO.ts`/
-`inheritance.ts`). #4 and #5 both touch `collectKeyValues`' `STRUCTURAL_KEYS`
-skip — doing #5 first means #4 only has to widen a check that already exists.
-#2, #3 and #7 are independent of all of these and of each other.
-
----
-
-### #1 — An editor save deletes hand-authored frontmatter the model can't type
-
-- **Invariant violated:** 1 (round-trip fidelity) and 2 (edit locality). Fires
-  on **every editor save** of an affected file, including one that changes only
-  the title or only the body. Not triggered by the agenda checkbox, the archive
-  button or a sync.
-- **Category:** `round-trip` `edit-locality`
-- **Failure mode:** **Silent.** No toast, no console warning, no round-trip
-  warning. The user finds out from a `git diff`, from an Obsidian tag query
-  that has quietly gone empty, or never.
-- **Impact:** **8** — silent loss of user-authored content on the app's most
-  common write path. Not a 9/10 only because the *body* and unknown keys are
-  untouched; what disappears is the frontmatter the user wrote in a shape
-  Meridian's registry doesn't recognise.
-
-**Repro.** Starting file, verbatim — ordinary Obsidian-flavoured frontmatter
-(`tags:` as a bare scalar is Obsidian's own single-tag form):
-
-```markdown
----
-title: Groceries
-tags: shopping
-done: yes
-priority: 1
-date: 2026-04-08
----
-
-Buy milk.
-```
-
-Operation: open the entry, change the title to `Groceries (weekly)`, save
-(scope `all`). Nothing else touched.
-
-**Observed:**
-
-```markdown
----
-title: Groceries (weekly)
-date: 2026-04-08
----
-
-Buy milk.
-```
-
-`tags: shopping`, `done: yes` and `priority: 1` are gone.
-
-**Expected:** all three survive verbatim — an edit to `title` writes `title`.
-
-Failing test (drop into `src/model/__tests__/`, adjusting the harness imports
-to that suite's helpers):
-
-```ts
-import { describe, it, expect } from 'vitest'
-import { parseToStoreItems } from '@/model/storeItems'
-import { serializeEntry } from '@/model/collapse'
-import { expandRange } from '@/model/expansion'
-import { applyEdit } from '@/model/storeOps'
-import { mergeEditFields } from '@/model/merge'
-import { entryFromOccurrence } from '@/editor/save'
-import type { EditFields } from '@/model'
-import type { Entries } from '@/types'
-
-function fieldsOf(s: ReturnType<typeof entryFromOccurrence>): EditFields {
-  return {
-    title: s.title, tags: s.tags, items: s.items, participants: s.participants,
-    body: s.body, tracked: s.tracked, done: s.done, priority: s.priority ?? null,
-    scheduled: s.scheduled ?? null, duration: s.duration, repeat: s.repeat ?? null,
-  }
-}
-
-const OBSIDIAN = `---
-title: Groceries
-tags: shopping
-done: yes
-priority: 1
-date: 2026-04-08
----
-
-Buy milk.
-`
-
-describe('editing a hand-authored file', () => {
-  it('an unedited save preserves every hand-authored key', () => {
-    const parsed = parseToStoreItems('note.md', OBSIDIAN, 'v')
-    expect(serializeEntry(parsed.items, parsed.root)).toBe(OBSIDIAN)
-  })
-
-  it('renaming the title keeps tags/done/priority', () => {
-    const parsed = parseToStoreItems('note.md', OBSIDIAN, 'v')
-    const entries: Entries = new Map([[parsed.key, parsed]])
-    const [occ] = expandRange(parsed.items, new Map([[parsed.key, parsed.root]]),
-      new Date(2020, 0, 1), new Date(2030, 0, 1))
-    const base = fieldsOf(entryFromOccurrence(occ!, 'all', parsed.items))
-    const merged = mergeEditFields(base, { ...base, title: 'Groceries (weekly)' }, base)
-    const next = applyEdit({ entries }, occ!, 'all', merged, { vaultId: 'v' })
-    const e = next.entries.get(parsed.key)!
-    const after = serializeEntry(e.items, e.root)
-
-    expect(after).toContain('tags: shopping')   // ← fails today
-    expect(after).toContain('done: yes')
-    expect(after).toContain('priority: 1')
-  })
-})
-```
-
-The first `it` **passes** today — which is the point: the file is fine until it
-is edited, so `roundTripLoss` reports `[]` and the runtime guard never fires.
-
-**Breadth.** Two call sites strip, covering all seven registry keys that
-`EditFields` writes. Search run: a sweep of 18 hand-authored frontmatter shapes
-through parse → `mergeEditFields` → `applyEdit` → `serializeEntry`. **13 of 18
-survive the load and are deleted by the edit:**
-
-| Shape | Load | After a title-only edit |
-|---|---|---|
-| `tags: shopping` (Obsidian single-tag form) | kept | **deleted** |
-| `tags: a, b, c` | kept | **deleted** |
-| `done: yes` / `done: "true"` / `done: 1` | kept | **deleted** |
-| `priority: 1` / `priority: urgent` / `priority: High` | kept | **deleted** |
-| `duration: [1, 2]` | kept | **deleted** |
-| `participants: alice` / `participants: [{name: alice}]` | kept | **deleted** |
-| `items: "[[a]]"` / `items: [{a: 1}]` | kept | **deleted** |
-| `archived: yes`, `timezone: {tz: UTC}`, `project: apollo` | kept | kept |
-
-`timezone` and `archived` survive only because they are absent from the two
-strip lists; that is coincidence, not design. Fraction of vault files affected:
-every file whose frontmatter writes one of `title`/`tags`/`items`/
-`participants`/`done`/`priority`/`duration` in a non-registry shape — in a vault
-imported from Obsidian, plausibly a large minority, since `tags: <string>` alone
-qualifies. Cannot be counted from this repo (no real user vault available).
-
-**Evidence.** `src/model/storeOps.ts:304-312`:
-
-```ts
-function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMetadata {
-  return {
-    ...(base as OccurrenceMetadata),
-    participants: f.participants,
-    duration:     f.duration || undefined,
-    priority:     f.priority ?? undefined,
-    done:         f.tracked ? f.done : undefined,
-    extra:        withoutKeys(base.extra, ['participants', 'duration', 'priority', 'done']),
-  }
-}
-```
-
-and `src/model/storeOps.ts:367`:
-
-```ts
-      extra: withoutKeys(prevRoot?.extra, ['title', 'tags', 'items']),
-```
-
-`src/model/AGENTS.md` states the intent the code overshoots:
-
-> The edit path must therefore strip a registry key out of `extra` **whenever it
-> writes that field**
-
-— but both call sites strip all of their keys on every save, whether or not that
-field was written.
-
-**Problem.** Every editor save unconditionally deletes the verbatim copy of any
-known frontmatter key the model could not type, so editing one field destroys
-the user's hand-written value for six unrelated ones.
-
-**Fix.** Strip a key from `extra` only when the edit actually changed that
-field, and afterwards the second `it` above passes while the first still does.
-
-**Task context**
-
-- **Sites to change:** `src/model/storeOps.ts:311` (occurrence level:
-  `participants`, `duration`, `priority`, `done`) and `src/model/storeOps.ts:367`
-  (file level: `title`, `tags`, `items`). `withoutKeys` itself
-  (`storeOps.ts:257`) is correct and does not move.
-- **The seam, verified in both directions.** The touched-field set is already
-  computed one layer up: `mergeEditFields` (`src/model/merge.ts:160`) walks
-  `EDIT_FIELD_KEYS` (`merge.ts:143`) and assigns only where
-  `!sameValue(base[key], next[key])`. It currently *discards* that set, returning
-  only the merged values. Have it also return the changed keys (or export a
-  sibling `changedEditFields(base, next): ReadonlySet<keyof EditFields>`), thread
-  that through `saveNode` → `applyEdit` → `occMeta`/`seriesMeta`/`editedEntry`,
-  and pass it as the `keys` argument to `withoutKeys`. Callers of `applyEdit`:
-  `src/editor/save.ts` (the only production one) plus the model test suite —
-  make the new parameter optional, defaulting to "all keys", so no test has to
-  change to keep compiling and the behaviour change is opt-in from `save.ts`.
-- **The trap, located.** `touchedFieldsOnly` (`src/editor/save.ts:194-206`)
-  short-circuits and returns `next` verbatim for `editScope === 'add'` and when
-  `base` is null — in both cases there is no touched-field set to compute, and
-  the correct answer there is the current behaviour (strip everything), because
-  an `add` builds a fresh occurrence rather than editing one. Do not let the
-  default leak the other way.
-- **The other trap.** Do *not* implement this as "strip only when the value
-  being written is non-empty". A user who deliberately clears `duration` while
-  `extra.duration` holds `[1, 2]` would then have the malformed raw value
-  resurrected on the next emit — the mirror image of this bug. The predicate has
-  to be "did this field change", not "is the new value interesting".
-- **Precedent.** `mergeEditFields` was itself introduced for exactly this shape
-  of problem ("a save writes only what the user actually touched" — `merge.ts:9-27`).
-  This finding is that same idea not yet reaching one layer further down.
-- **Why Sonnet 5 and not Opus.** The decision is made (the intent is already
-  written down in `AGENTS.md`), the seam exists and is named above, and a wrong
-  fix fails loudly: `extras-preservation.test.ts` asserts extras survive every
-  exported `storeOps` operation, and `unknown-keys.test.ts` asserts set
-  containment, so an over-broad or inverted change breaks the suite rather than
-  passing quietly.
+**Sequencing note.** #4 and #6 both land in the parse/emit pipeline and #5 is
+the guard over it: do **#5 first** (it is the only one that will *tell you*
+whether the other two are fixed), then #4 (`fieldRegistry.ts`/`storeItems.ts`/
+`roundTripCheck.ts`), then #6 (`fileIO.ts`/`inheritance.ts`). #4 and #5 both
+touch `collectKeyValues`' `STRUCTURAL_KEYS` skip — doing #5 first means #4
+only has to widen a check that already exists. #2, #3 and #7 are independent
+of all of these and of each other.
 
 ---
 

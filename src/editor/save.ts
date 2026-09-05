@@ -1,5 +1,5 @@
 import { startOfToday } from 'date-fns'
-import { fmtISO, applyEdit, mergeEditFields, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
+import { fmtISO, applyEdit, mergeEditFields, changedEditFields, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
@@ -176,6 +176,14 @@ function currentFields(item: Occurrence, editScope: EditScope, next: EditFields)
   return editFieldsOf(entryFromOccurrence({ ...live, metadata: joined }, editScope, getItems()))
 }
 
+/** `touchedFieldsOnly`'s result: the fields to write, plus which `EditFields`
+ *  keys the diff against `base` actually named — see `applyEdit`'s
+ *  `touchedKeys` parameter for what the second half is for. */
+interface TouchedFields {
+  fields: EditFields
+  touchedKeys: ReturnType<typeof changedEditFields> | undefined
+}
+
 /**
  * Narrow a save to the fields the user actually touched, leaving every other
  * field at whatever the store holds *now*.
@@ -194,15 +202,29 @@ function currentFields(item: Occurrence, editScope: EditScope, next: EditFields)
  * updating the one the editor is holding, so "what this entry looks like now"
  * is not the right base for it — `entryFromOccurrence` deliberately answers
  * with today's date and a cleared `done` for that scope.
+ *
+ * `touchedKeys` travels alongside the merged fields for the same reason this
+ * function exists in the first place: `applyEdit` uses it to scope its
+ * `extra`-bag strip to the field actually being written, rather than every
+ * registry field regardless of whether this edit touched it (data-integrity
+ * survey, finding #1) — a save that renamed only the title must not delete an
+ * unrelated hand-authored `tags`/`done`/`priority` the model can't type.
+ * `undefined` in the two short-circuit cases below means "no such distinction
+ * to offer", which `applyEdit` treats as "strip everything", matching the
+ * behaviour before this parameter existed.
  */
 function touchedFieldsOnly(
   item:      Occurrence,
   editScope: EditScope,
   next:      EditFields,
   base:      SaveFields | null | undefined,
-): EditFields {
-  if (!base || editScope === 'add') return next
-  return mergeEditFields(editFieldsOf(base), next, currentFields(item, editScope, next))
+): TouchedFields {
+  if (!base || editScope === 'add') return { fields: next, touchedKeys: undefined }
+  const baseFields = editFieldsOf(base)
+  return {
+    fields: mergeEditFields(baseFields, next, currentFields(item, editScope, next)),
+    touchedKeys: changedEditFields(baseFields, next),
+  }
 }
 
 /** Everything `saveNode` needs beyond the item and its fields. */
@@ -252,10 +274,13 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   // but this device has not pulled yet. See `getSlugSnapshot`.
   const snapshot = getSlugSnapshot()
   const edited = editFieldsOf(fields)
+  const { fields: toWrite, touchedKeys } = item
+    ? touchedFieldsOnly(item, editScope, edited, opts.base)
+    : { fields: edited, touchedKeys: undefined }
   const nextData = applyEdit(
-    snapshot, item, editScope,
-    item ? touchedFieldsOnly(item, editScope, edited, opts.base) : edited,
+    snapshot, item, editScope, toWrite,
     { vaultId, draftId },
+    touchedKeys,
   )
   // Same snapshot, vault and draftId as the applyEdit above, so this is exactly
   // the key applyNew allocated for it.

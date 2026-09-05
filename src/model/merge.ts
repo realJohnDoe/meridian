@@ -143,6 +143,28 @@ const EDIT_FIELD_KEYS = [
 ] as const satisfies ReadonlyArray<keyof EditFields>
 
 /**
+ * Which of `EDIT_FIELD_KEYS` differ between `base` and `next` — the load-time
+ * snapshot versus what the editor is now proposing. The same predicate
+ * `mergeEditFields` uses to decide what to write, exposed on its own for a
+ * caller that needs to know *which* fields changed, not just their merged
+ * values.
+ *
+ * `storeOps.ts` uses this to scope its `extra`-bag strip to the field a save
+ * is actually writing a fresh typed value for, rather than every registry
+ * field regardless of whether this edit touched it — see the "Metadata
+ * constructors" note there. Untouched fields must keep whatever raw value an
+ * earlier malformed write parked in `extra`, or a save the user made to one
+ * field silently deletes their hand-authored value for an unrelated one.
+ */
+export function changedEditFields(base: EditFields, next: EditFields): ReadonlySet<keyof EditFields> {
+  const changed = new Set<keyof EditFields>()
+  for (const key of EDIT_FIELD_KEYS) {
+    if (!sameValue(base[key], next[key])) changed.add(key)
+  }
+  return changed
+}
+
+/**
  * Apply the fields `next` changed relative to `base` onto `current`.
  *
  * `base` is what the editor loaded, `next` is what it is proposing, `current`
@@ -159,13 +181,11 @@ const EDIT_FIELD_KEYS = [
  */
 export function mergeEditFields(base: EditFields, next: EditFields, current: EditFields): EditFields {
   const out = { ...current }
-  for (const key of EDIT_FIELD_KEYS) {
-    if (!sameValue(base[key], next[key])) {
-      // Each key's value type is preserved across this assignment; the
-      // narrowing TypeScript can't do over a union of keys is the only reason
-      // this needs a cast at all.
-      (out as Record<string, unknown>)[key] = next[key]
-    }
+  for (const key of changedEditFields(base, next)) {
+    // Each key's value type is preserved across this assignment; the
+    // narrowing TypeScript can't do over a union of keys is the only reason
+    // this needs a cast at all.
+    (out as Record<string, unknown>)[key] = next[key]
   }
   return out
 }
