@@ -29,8 +29,8 @@ describe('no key loss', () => {
   // relocates keys between the root and `defaults:` and may duplicate a key
   // across instances — but it must never drop one.
   it.each(names)('%s keeps every frontmatter key/value across a save', (name) => {
-    const before = collectKeyValues(frontmatterOf(loadFixture(name)))
-    const after = new Set(collectKeyValues(frontmatterOf(roundTrip(name))))
+    const before = collectKeyValues(loadFixture(name))
+    const after = new Set(collectKeyValues(roundTrip(name)))
     expect([...new Set(before)].filter(pair => !after.has(pair))).toEqual([])
   })
 })
