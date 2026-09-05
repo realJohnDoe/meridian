@@ -28,6 +28,20 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
   1. **Threat plan.** For each invariant above, name the code that is supposed to uphold it (function, file) and the inputs or interleavings that could break it. State this plan before you start.
   2. **Reproduction pass.** Attempt to break each invariant against the real code — adversarial inputs, hand-authored files, interleaved sync operations, simulated failures. Capture concrete reproductions _before_ forming conclusions.
   3. **Report.** Only after both passes, write the findings. Do not draft the verdict early and select repros to confirm it.
+- **Probe both round trips, and say which one you probed.** "Parse → serialize"
+  and "parse → edit → serialize" are different checks that fail for different
+  reasons, and the repo's own runtime guard (`roundTripLoss`) only performs the
+  first — its doc comment says so. A file can round-trip byte-perfectly while
+  untouched and lose three hand-authored keys on the first editor save; that is
+  where three of the 2026-09-05 run's four fidelity findings lived. The cheap
+  harness for the second is a no-op save: derive `EditFields` from an expanded
+  occurrence via `entryFromOccurrence`, run it back through
+  `mergeEditFields` → `applyEdit` → `serializeEntry`, and diff against the
+  unedited serialization, for every fixture × every scope.
+- **Ask what the repo's own guard can see.** Whenever you find a loss, run
+  `roundTripLoss` over the same input and record its verdict in the finding. A
+  loss the guard reports is a different — and much smaller — problem from one it
+  calls clean, and a guard that is blind to a whole class is itself a finding.
 - **Every finding needs a reproduction.** A suspicion without one is at most an "unverified" note in the coverage statement — not a finding. For each finding record:
   - **Repro:** the starting vault state (file content, verbatim), the exact operation sequence, and the **observed** wrong result versus the expected one. "Observed" means you ran it.
   - The cheapest repro is usually a failing test against the existing Vitest setup. Where that works, **quote the test verbatim in the report** so it can be committed alongside the fix — a finding here should arrive with its own regression test.
@@ -39,32 +53,68 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 
 ## Known suspects
 
-> **Surveyed 2026-07-31 — verdicts below.** Full report with reproductions:
+> **Surveyed 2026-09-05 — verdicts below.** Full report with reproductions:
 > [data-integrity-results.md](../data-integrity-results.md).
 > Each suspect's original hypothesis is kept verbatim, with the verdict appended.
+> Verdicts are re-issued on each run and describe the code as of that run;
+> the finding numbers in them are that run's. (The 2026-07-31 run's verdicts
+> are in git history — its findings are all fixed, which is why its results
+> file is gone. Code comments citing "data-integrity survey, finding #N"
+> refer to that earlier run and have not been renumbered.)
 
 - **The `collapseToYaml` contract is the central claim of the whole model layer.** `src/model/AGENTS.md` describes its output as "the most compact `Record<string, unknown>` that round-trips back to the same store state." Verify that claim adversarially — especially the three hoisting branches (simple, single-series-with-instances, multi-series/container) and the `hoistSharedMetadata` diffing — rather than trusting it.
-  - **CONFIRMED false** — three reproduced round-trip losses: a field cleared against an inherited `defaults:` value silently reverts on reload (finding #2), an excluded instance loses all its metadata (finding #3), and a key on a node with no `StoreItem` home is deleted (finding #5). The **hoisting itself is sound**: `hoistSharedMetadata` / `computeSharedFields` / `diffMetadata` hoist and diff correctly across all three branches, including `deepEqual` on nested unknown values. The contract fails on *what reaches* the hoisting, not on the hoisting.
+  - **2026-09-05: still false, but for entirely different reasons.** All three 2026-07 losses are fixed and pinned, and the hoisting remains sound — `computeSharedFields` / `occMetaToYaml` / `emitExtra` were re-read end to end and a no-op-save sweep over all 20 fixtures × 3 scopes × 3 occurrences found no hoisting defect. What still breaks the "round-trips back to the same store state" claim now sits on either side of collapse rather than inside it: a **structural** key in a shape the parser can't type (`date: [...]`, `excluded: "yes"`, `instances: {…}`) has no `extra` home at all and is deleted (finding #4), and a scalar the *parser* already flattened (`zip: 01234`, an ID past 2⁵³, `phone: +49…`) is re-emitted from its JS value and comes back changed (finding #6). Collapse is doing the right thing with what it is handed; it is handed less than the file contained.
 
 - **Unknown / hand-authored frontmatter.** A user's own keys, comments, anchors, aliases, multi-line block scalars, and key order all pass through `fileIO.ts` and `inheritance.ts`'s `serializeRawNode`. Determine what survives an edit-and-save cycle and what does not.
-  - **MOSTLY REFUTED, one real hole.** Unknown keys, explicit `null`, empty lists, nested mappings and known-fields-with-wrong-types all survive an edit-and-save cycle — the `extra`-bag design works and `unknown-keys.test.ts` / `extras-preservation.test.ts` are thorough. The hole is finding #5: `title` / `tags` / `items` on a **non-root** node, and *all* keys on an intermediate **container** node, are filtered out by `RESERVED_KEYS` and land nowhere. Comments, anchors/aliases, key order and quoting are lost — deliberately, per `AGENTS.md`. Body whitespace and CRLF are rewritten on every save (finding #8).
+  - **2026-09-05: the LOAD side is sound; the EDIT side is not.** Genuinely unknown keys survive both an unedited save and an edit — the `extra`-bag design works, and the 2026-07 holes (non-root `title`/`tags`/`items`, container-node keys, body whitespace, CRLF) are all fixed. Two new holes, both on paths the earlier run did not separate:
+    - **A *known* key in an unrepresentable shape survives the load and is deleted by the first editor save** (finding #1). `occMeta`/`editedEntry` strip all seven registry keys out of `extra` unconditionally, not just the field being written, so renaming a title deletes `tags: shopping`, `done: yes` and `priority: 1`. 13 of 18 probed hand-authored shapes are affected.
+    - **A *structural* key in an unrepresentable shape is deleted on any save** (finding #4) — `RESERVED_KEYS` keeps it out of `extra` and `malformedKnownFields` only covers `INLINE_FIELDS`, so it lands nowhere. A scalar `defaults:` is additionally exploded into per-character keys.
+    Comments, anchors/aliases and key order are still lost, deliberately per `AGENTS.md`. Quoting is **not** purely cosmetic after all: `defaultStringType: 'PLAIN'` turns `x: "yes"` into `x: yes`, which YAML 1.1 readers (Obsidian, PyYAML) read as boolean `true` — see finding #6.
 
 - **`src/model/AGENTS.md`'s layering table is stale** — it points persistence at `src/meridian.ts` and React state at `src/App.tsx`, neither of which exists (persistence now lives in `src/storage/cache.ts`, state in `src/store.ts`). Treat that as a warning that the documented invariants in that file may also have drifted from the code, and check rather than cite them.
-  - **CONFIRMED, worse than stated.** Beyond the layering table: `nodeSchema.ts` is documented as holding a **Zod schema** — it is 11 lines of `type RawNode`, and Zod is not in `package.json` at all, so there is **no validation layer**; `storeItems.ts` is documented as exporting `parseYamlToStoreItems`, which it does not. Against that, the *invariants* in the "Unknown-key preservation" section held up under adversarial probing, and its "still-open losses" paragraph honestly pre-declares findings #3, #5 and #8. **Stale on structure, honest on semantics** — the file needs a pass, but its rules are worth keeping.
+  - **2026-09-05: mostly fixed; one stale claim left, and it is the load-bearing one.** The layering table now points at `src/storage/cache/` and `src/store.ts` correctly, and `storeItems.ts`'s documented exports match the code. But `AGENTS.md:25` still says `nodeSchema.ts` holds a **Zod schema and TypeScript type for `RawNode`** — it is 11 lines of `type RawNode` and `grep zod package.json worker/package.json` returns nothing, so **there is still no validation layer anywhere in the parse pipeline**. That is not merely a doc bug: it is precisely why findings #1, #4 and #6 exist, since nothing between `yamlParse` and the store ever asks whether a value has the shape the model assumes. Everything else in the file held up under adversarial probing, including the "Unknown-key preservation" invariants and the exactly-once emission table.
 
 ### Two suspects the survey adds
 
 - **`src/storage/cache.ts` is at 3.73% statement / 0% branch coverage.** Every real Dexie transaction (`recordLocalEdit`, `markPushed`, `applyRemoteBatch`, `recordLocalDelete`, `confirmDeleted`) is exercised only through **hand-written re-implementations** in `sync.test.ts`'s `vi.mock('@/storage/cache')`. Mock and real code agree today only because someone kept them in sync by hand. This is the least-defended integrity-critical file in the repo.
+  - **2026-09-05: REFUTED — fixed since.** The file is now `src/storage/cache/`, and `src/storage/__tests__/cache.test.ts` (718 lines) runs the *real* Dexie code against `fake-indexeddb`, pinning both the persisted `dirty` 0/1/2 representation and the read-then-conditional-write preconditions. `vitest.config.ts` floors `cache/files.ts` at 95/92/95/95. `sync.test.ts` still uses a hand-written fake, which is the right call there, and it is now backed by real tests rather than being the only coverage. One divergence is visible by inspection and worth closing: the fake's `applyRemoteBatch` drops `lastModified`, which the real one carries through via `...r`, so no sync test can catch a regression in the retention sweep's age signal.
 - **Two tabs of one vault have no coherence mechanism at all.** No `BroadcastChannel`, `storage` event or Dexie `liveQuery` anywhere in `src/`. Tab B's in-memory store never learns of Tab A's edits, so B's next `writeEntityToCache` collapses from a stale store and overwrites A. **Unverified** — settling it needs a two-store harness the current test-utils don't support.
+  - **2026-09-05: CONFIRMED, and worse than the hypothesis.** Reproduced against the *real* Dexie cache (`fake-indexeddb`) plus a CAS backend — no two-store harness was needed, because the loss is entirely in the cache's version bookkeeping (finding #2). The hypothesis assumed the overwrite would at least be *caught* by CAS; it is not. `recordLocalEdit` inherits `existing.version` — which Tab A's push just refreshed in the **shared** cache — so Tab B's precondition matches the backend, the write succeeds, and `resolveCollision` is never entered: no conflict copy, no three-way merge (even though `baseContent` correctly holds A's content), no toast, no journal `push-conflict`. No later reconcile can repair Tab B either, since the cache row now agrees with the backend. `grep -rn "BroadcastChannel\|liveQuery\|addEventListener('storage'" src/` is still **zero hits**.
 
 ## Budget
 
 - **Read closely, end to end:**
   - The parse/serialize pipeline: `src/fileIO.ts`, `src/model/nodeSchema.ts`, `src/model/inheritance.ts`, `src/model/storeItems.ts`, `src/model/collapse.ts`.
   - The edit and commit path: `src/model/storeOps.ts` (`applyEdit` and all four scopes), `src/storeCommit.ts`, `src/persistencePort.ts`, `src/occurrenceActions.ts` (including the delete-undo toast).
-  - The sync and cache path: `src/storage/sync.ts` (`planReconcile`, `reconcileWithBackend`, `applyRemoteBatch`, `runSync`), `src/storage/syncScheduler.ts` (`syncToBackend`, `autoSyncTick`, `flushPendingPush`), `src/storage/syncState.ts`, `src/storage/entityWrites.ts` (the in-flight path tracking), `src/storage/cache.ts` (`recordLocalEdit`, `recordLocalDelete`, `cacheGetDirty`, `markPushed`, `confirmDeleted`, tombstones), `src/storage/conflictError.ts`, `src/storage/conflictName.ts`.
+  - The sync and cache path: `src/storage/sync.ts` (`planReconcile`, `reconcileWithBackend`, `applyRemoteBatch`, `runSync`), `src/storage/syncScheduler.ts` (`syncToBackend`, `autoSyncTick`, `flushPendingPush`), `src/storage/syncState.ts`, `src/storage/entityWrites.ts` and `src/storage/inFlight.ts` (the in-flight path tracking), `src/storage/cache/` — `files.ts` (`recordLocalEdit`, `recordLocalDelete`, `cacheGetDirty`, `markPushed`, `markMerged`, `confirmDeleted`, tombstones), `db.ts`, `pendingMoves.ts` — `src/storage/conflictError.ts`, `src/storage/conflictName.ts`.
+  - The teardown path, which is where "the UI said saved" is decided:
+    `src/editor/useAutoSave.ts`'s debounce and every call site of its flush,
+    against the `visibilitychange`/`pagehide` handlers in
+    `src/routes/__root.tsx`. A commit that only fires on React unmount is not
+    durable — unmount effects do not run when a tab is closed.
   - The backend contract in `src/storage/backend.ts` — in particular whether every implementation actually honours the documented CAS semantics of `write(path, content, expectedVersion)` and the `ConflictError` it promises.
   - The temporal engine: `src/model/expansion.ts` (`expandNode`, `mergeNode`, `expandRange`, multiday), `src/model/repeat.ts`, `src/model/dateUtils.ts`, `src/model/duration.ts`, and `src/model/expansionCache.ts` (a cache over derived temporal data is a coherence risk in its own right — check its invalidation keys).
+- **The cache layer can be exercised for real — do it rather than reasoning
+  about it.** `src/storage/__tests__/cache.test.ts` shows the recipe: import
+  `fake-indexeddb/auto`, `vi.resetModules()` per test, and drive the genuine
+  Dexie code. Pairing that with a twenty-line in-memory CAS backend is enough to
+  reproduce whole classes this Budget otherwise calls un-exercisable — the
+  2026-07-31 run parked the two-tab suspect as "unverified, needs a two-store
+  harness", and the 2026-09-05 run settled it with no second store at all,
+  because the defect was in the cache's version bookkeeping rather than in the
+  stores.
+- **Run the temporal probes under other timezones.** Category 6 is unreachable
+  from a single `TZ`. `TZ=<zone> pnpm exec vitest run <file>` is the whole
+  recipe; a differential sweep — same rules, several zones, diff the emitted
+  occurrence sets — finds in one pass what no single-zone assertion will. Zones
+  worth including, and why: **America/New_York** and **Europe/Berlin** (ordinary
+  one-hour spring-forward, the two halves of the user base), **Antarctica/Troll**
+  (a *two*-hour jump, which catches an off-by-one-hour fix that a one-hour zone
+  hides), **Australia/Lord_Howe** (a 30-minute DST shift), **Pacific/Chatham**
+  (a :45 offset), and **America/Santiago** (a transition at midnight, so the
+  skipped wall-clock hour is `00:00`, not `02:00`). Sweep every half-hour of the
+  day rather than a handful of times: the 2026-09-05 temporal finding fires only
+  for anchors inside the skipped hour, which is 2 of 48 times in most zones.
 - **Compare the three backends against the same contract.** `localBackend.ts`, `githubBackend.ts` (+ `githubApi.ts`), and `exampleBackend.ts` each implement `StorageBackend`. Differences in version-token semantics, CAS enforcement, and delete behaviour are prime lost-update territory. Note honestly which you could exercise: the automated browser cannot grant File System Access permissions or complete the GitHub OAuth flow, so **local-FS and GitHub backends can generally only be probed statically or through their unit tests** — record that up front rather than discovering it mid-pass.
 - **Exercise realistic scale where it matters.** A deterministic large-vault generator exists at `src/storage/devFixtures/testVaultGen.ts` (set `localStorage.setItem('meridian_bigvault', '300')`, then reload the Tutorial vault). Use it for anything where volume changes behaviour — batch writes, partial failure, reconcile over many files. It is dev-only and absent from production builds.
 - **Run the quality gates once** — `pnpm run build`, `pnpm run lint`, `pnpm test` — and report each gate's status in the coverage statement. On a fresh worktree, generate the gitignored types before trusting lint (`pnpm run build` for `src/routeTree.gen.ts`, `pnpm --filter meridian-oauth-worker run cf-typegen` for the worker types); without them the type-aware rules flood with spurious errors that are **not** a finding.
@@ -78,6 +128,15 @@ section above (verdicts appended per suspect), plus the full report per the
 [shared reporting conventions](./README.md#reporting) — see that section for
 the existing pattern. Also append suggested improvements to this survey file
 itself, per the same conventions.
+
+**Finding numbers restart every run, and that is a trap worth naming.** The
+shared convention treats `#N` as an identity *within* a results file, but this
+survey outlives its results files: they are deleted once their last finding
+closes, while the suspect verdicts above — and a dozen `data-integrity survey,
+finding #N` comments in `src/` — keep pointing at numbers whose report no
+longer exists. So: date every verdict you re-issue above, state in the results
+file which run its numbers belong to, and do **not** renumber the old code
+comments.
 
 ### 1. Integrity verdict (~5 sentences)
 
@@ -108,7 +167,7 @@ For each finding:
 - **Failure mode** — **silent** or **loud**, stated explicitly; if silent, say how a user would ever notice
 - **Impact** — 1–10, where 10 = silent, unrecoverable loss or corruption of user-authored content on a common path; 5 = recoverable or visible corruption, or silent loss on a rare path; 1 = cosmetic normalization the user would not miss
 - **Repro** — the starting file content (verbatim), the operation sequence, the observed result, and the expected result. Include the failing test verbatim where you wrote one
-- **Breadth** — number of files affected, or the fraction of vault files that could hit it; counts from an actual search — name the search you ran; write "est." if estimated
+- **Breadth** — number of files affected, or the fraction of vault files that could hit it; counts from an actual search — name the search you ran; write "est." if estimated. Where the exposure is a *condition* rather than a file set ("every entry, whenever two tabs are open"; "every series whose time falls in the DST gap"), say that instead of forcing a file count — but still name the search that established it, including a `grep` that returned **zero** hits where absence is the point
 - **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is especially nasty, because the obvious "fix" often just moves the corruption (a round-trip assertion loosened until it passes, a conflict resolved by always preferring local, a cache invalidation that works on one device and rots on the second, a repeat-rule fix correct in the author's timezone only). Reserve plan mode + multi-PR for findings that need a structural change **or** a product decision the user should make (e.g. "preserve comments" vs "declare the file format normalized on save"). Example hazard note: "Sonnet 5 if the CAS precondition to preserve is spelled out in the task; else Opus 5."
 - **Evidence** — at least one file path plus a short **verbatim code quote** (copy-pasted, not paraphrased — I will spot-check by grepping) identifying the code responsible
 - **Problem** — one sentence: what breaks, and what the user loses as a result
@@ -191,7 +250,13 @@ The ranking is a tiebreaker, not a filter — a severe finding in any category o
 
 **Scope:** what happens when a vault file isn't what the app expects.
 
-- Zod schema (`nodeSchema.ts`) rejections that surface as a crash or a blank vault rather than a per-file error the user can act on
+- Values that reach the model in a shape it does not expect. There is **no**
+  validation layer — `nodeSchema.ts` is a bare `type RawNode` and Zod is not a
+  dependency, whatever `src/model/AGENTS.md` still says — so every coercion is
+  ad hoc and per-field. Check both halves: an *inline* field (where
+  `malformedKnownFields` routes the raw value into `extra`) and a *structural*
+  key (`date`, `time`, `repeat`, `excluded`, `instances`, `defaults`), which
+  `RESERVED_KEYS` keeps out of `extra` and nothing else catches
 - Malformed YAML, wrong types, deeply nested or cyclic structures, enormous files — and whether a single bad file can prevent the rest of the vault from loading
 - Path handling in `pathToSlug` / `slugToPath` / `titleToSlug`: collisions between distinct titles, traversal-ish paths, case-insensitive filesystems, or characters a backend rejects — any of which can make two entries fight over one file
 - Files added out of band (hand-created, synced by a desktop client) that the app then normalizes destructively on first save
