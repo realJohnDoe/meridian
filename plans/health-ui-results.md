@@ -115,14 +115,14 @@ coverage of 100%.
    `Badge`/`Card`/`DimmableCard`. Safe-area insets are handled in all three
    shells and the sidebar; `AppErrorFallback` is wired as the router's
    `defaultErrorComponent`; deletes have an undo toast.
-4. **Security (UI-facing)** — findings: #8. Threat model: `.ics` subscription
+4. **Security (UI-facing)** — **clean.** Threat model: `.ics` subscription
    feeds, GitHub repo contents, and local Markdown files supply frontmatter
    (`url`, `location`, `organizer`, `attendees`), body Markdown and wikilinks,
    all rendered as React children. No `dangerouslySetInnerHTML`, no
    `innerHTML`/`insertAdjacentHTML`, no `document.write`, no user-controlled
    `src`. The two URL sinks (`EntryViewOnly.tsx:102`, `markdownFormatting.ts:66`)
    both gate on `isSafeUrl` before the element ever carries the href — the
-   right shape. #8 is that the gate has no tests, not that it is wrong.
+   right shape, and `urlSafety.test.ts` now covers the gate itself.
 5. **Code Health & DRY** — **clean.** `knip` reports no unused files, exports
    or dependencies; zero `any`/`@ts-expect-error` outside `routeTree.gen.ts`;
    all 16 hand-written `eslint-disable`s carry a written justification (the
@@ -170,10 +170,6 @@ identity, not order.
 | # | Rank | Title | Categories | Impact | Breadth | Recommended model | Score |
 |---|------|-------|-----------|--------|---------|-------------------|-------|
 | #3 | 3 | `Button`/`Separator` get zero compiler memoization | `performance` `library-fit` | 6 | 9 | **Opus 5** (Sonnet 5 if the mirror policy is pre-decided) | 18 |
-| #8 | 5 | `isSafeUrl` — the only XSS gate — has no tests | `security` `testing` | 4 | 1 | **Haiku 4.5** | 4 |
-
-**Sequencing.** #3 and #8 are independent of each other and can be done in
-any order.
 
 ---
 
@@ -253,66 +249,6 @@ any order.
 - **Verify after:** re-run the per-file census and confirm `button.tsx` and
   `separator.tsx` report a non-zero `_c()` count, then
   `pnpm run build && pnpm run lint && pnpm run test`.
-
----
-
-### #8 — `isSafeUrl`, the app's only XSS gate, has no tests
-
-- **Category** — `security` `testing`
-- **Impact** — 4
-- **Breadth** — 1 file (`src/editor/urlSafety.ts`), 2 call sites. Search:
-  `grep -rn 'isSafeUrl' src/` → definition plus `EntryViewOnly.tsx:102` and
-  `cm/markdownFormatting.ts:66`; `ls src/editor/urlSafety*` → no test file.
-- **Recommended model** — **Haiku 4.5.** Writing table-driven tests for a
-  pure single-expression predicate is fully specified once the cases are
-  listed, and a wrong test fails loudly. The one hazard — that this is an
-  allowlist and must stay one — is named below.
-- **Evidence** — `src/editor/urlSafety.ts:6`:
-  ```
-  export function isSafeUrl(url: string): boolean {
-    return /^(https?|mailto):/i.test(url)
-  }
-  ```
-  and its consumer at `src/editor/EntryViewOnly.tsx:102`:
-  ```
-            {url && (isSafeUrl(url) ? (
-  ```
-- **Problem** — This one regex is the entire barrier between an `.ics`
-  subscription's or a synced repo's `url:` frontmatter and a rendered
-  `<a href>`; the file's own comment notes an `<a href>` fires on middle-click
-  and context-menu "open in new tab", so the element must never carry an
-  unsafe href at all. In a repo with 3395 tests and per-file coverage floors
-  on iCal date parsing and chevron components, the security predicate is the
-  thing with no test — so a future "let's also allow `tel:` and relative
-  paths" refactor has nothing to stop it from admitting `javascript:`.
-- **Fix** — Add `src/editor/urlSafety.test.ts` covering the allow and deny
-  sets below, and give the file a per-file coverage floor.
-
-**Task context**
-
-- **The enumerated cases.** Must return `true`: `https://x.test/a`,
-  `http://x.test`, `HTTPS://X.TEST` (the regex is `i`-flagged),
-  `mailto:a@b.test`. Must return `false`: `javascript:alert(1)`,
-  `JavaScript:alert(1)`, `data:text/html,<script>`, `vbscript:msgbox`,
-  `file:///etc/passwd`, `tel:+1`, `//evil.test` (protocol-relative),
-  `/relative/path`, `` (empty), and — the one most likely to regress —
-  `\n javascript:alert(1)` and ` javascript:alert(1)`, which are rejected only
-  because the pattern is anchored with `^`.
-- **The trap, located.** The predicate is an **allowlist anchored at `^`**,
-  which is why leading-whitespace and control-character tricks fail safe. Any
-  future edit that relaxes the anchor, drops the `^`, or switches to a
-  denylist of bad schemes inverts that property. Write at least one test whose
-  name says so, so the intent survives the refactor that breaks it.
-- **Both call sites already do the right thing** and should not change:
-  `EntryViewOnly.tsx:102–:111` renders a plain `<span>` (not a dead link) when
-  the check fails, and `markdownFormatting.ts:66` gates `window.open`. The fix
-  is tests only — do not touch the predicate.
-- **Precedent for the floor.** `vitest.config.ts` already floors comparably
-  small pure modules (`src/storage/conflictError.ts` at 90/85/95/95,
-  `src/calendar/ContinuationChevron.tsx` at 92/90/95/92). A 100/100/100/100
-  floor is achievable here — the function has one expression.
-- **Verify after:** `pnpm run test`, and confirm the suite fails if you
-  temporarily replace the pattern with `/(https?|mailto):/i` (unanchored).
 
 ---
 
