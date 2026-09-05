@@ -23,4 +23,3 @@ function Separator(props: SeparatorProps) {
 }
 
 export { Separator }
-export type { SeparatorProps }

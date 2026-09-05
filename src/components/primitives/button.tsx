@@ -14,12 +14,11 @@
  * instead of importing `components/ui/button` directly wherever a component
  * needs to be memoizable.
  */
-import { Button as ShadcnButton, buttonVariants } from '../ui/button'
+import { Button as ShadcnButton } from '../ui/button'
 import type { ButtonProps } from '../ui/button'
 
 function Button(props: ButtonProps) {
   return <ShadcnButton {...props} />
 }
 
-export { Button, buttonVariants }
-export type { ButtonProps }
+export { Button }
