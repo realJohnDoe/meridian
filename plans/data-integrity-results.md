@@ -13,17 +13,19 @@ earlier run; they have not been renumbered.
 
 ## 1. Integrity verdict
 
-Yes — Meridian can lose the user's writing, in two structurally different ways,
-and in both the mechanism built to catch it is looking the other way. The worst
-is **a second view of the same vault**: two tabs (or a tab plus the installed
-PWA) share one IndexedDB but not one in-memory store, so Tab B's next save
-carries the version token Tab A's push just wrote into the shared cache — the
-compare-and-swap precondition matches, the write lands, and Tab A's edit is gone
-with no `ConflictError`, no conflict copy, no three-way merge and no toast
-(finding #2). The second is a **malformed structural key**: a hand-written
-`date:`, `excluded:` or `instances:` in a shape the parser can't type has no
-`extra` home and is silently deleted on the next save, in one case reviving an
-occurrence the user had deliberately hidden (finding #4).
+Yes — Meridian can lose the user's writing. The worst still-open case is a
+**malformed structural key**: a hand-written `date:`, `excluded:` or
+`instances:` in a shape the parser can't type has no `extra` home and is
+silently deleted on the next save, in one case reviving an occurrence the user
+had deliberately hidden (finding #4).
+
+(Two of the run's worst findings are now fixed: an editor save deleting
+unrelated hand-authored frontmatter — `tags`/`done`/`priority` the model can't
+type — on every save regardless of what was actually edited (finding #1); and
+a second view of the same vault silently overwriting the first with its
+compare-and-swap intact (finding #2) — cache writes are now announced across
+views and folded back into each one's store, and an open editor adopts what it
+did not touch and reports what both sides moved.)
 
 The single biggest structural theme is that **the round-trip guard checks the
 wrong round trip, and checks it on parsed values rather than bytes**.
@@ -149,8 +151,8 @@ end: `fileIO.ts`, `nodeSchema.ts`, `inheritance.ts`, `storeItems.ts`,
 | # | Category | Verdict |
 |---|---|---|
 | 1 | Round-trip fidelity & edit locality | **findings: #4, #6** |
-| 2 | Lost updates & conflict handling | **findings: #2** |
-| 3 | Cache coherence & durability | **findings: #2, #7** |
+| 2 | Lost updates & conflict handling | **clean** |
+| 3 | Cache coherence & durability | **findings: #7** |
 | 4 | Atomicity & partial failure | **partially assessed** — read end to end (`pushDirty`, `applyRemoteBatch`, `markInFlight`/`clearInFlight`'s refcounting, `moveEntityInCache`'s stage-then-release, `settlePendingMoves`) and nothing wrong was found by inspection, but no interruption was actually injected. The one concrete suspicion is recorded as unverified above. |
 | 5 | Destruction & recoverability | **findings: #4** (a hand-written `excluded:` marker in a shape the parser can't type is deleted on save, so a deliberately-hidden occurrence silently returns). Everything else in this category — swipe-delete undo, `deleteFollowing`, the staged cross-vault move, the retention sweep's undo — was probed and is **clean**. |
 | 6 | Temporal correctness | **findings: #3** |
@@ -165,7 +167,6 @@ recommended-model ordinal (Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode = 5).
 
 | # / rank | Finding | Invariant | Failure mode | Impact | Breadth | Recommended model |
 |---|---|---|---|---|---|---|
-| **#2** | A second tab silently overwrites the first, CAS and all | 4, 5 | **silent** | 9 | every entry in every writable vault; 3 write paths; 0 coherence mechanisms in `src/` | Opus 5, plan mode / multi-PR |
 | **#3** | A DST spring-forward truncates bounded series and rewrites clock times | 8 | **silent** | 6 | 2 defects in 1 file; every bounded or `after_completion` series timed inside the gap | Sonnet 5 |
 | **#4** | A malformed *structural* key has nowhere to live and is deleted on save | 1, 7 | **silent** | 7 | all 6 `STRUCTURAL_KEYS`, every node of every file; 6 of 14 probed shapes lose bytes | Opus 5 |
 | **#6** | YAML scalars are re-emitted from JavaScript values, not from source | 1 | **silent** | 5 | every unknown key in every file; 7 of 39 probed shapes change | Opus 5 |
@@ -180,213 +181,8 @@ rather than source text and skipped `date`/`time`/`repeat`/`excluded`
 outright) is now fixed, so `roundTripLoss` will surface each of these two as
 soon as its own fix lands. #4's own widening of `collectKeyValues`'
 `STRUCTURAL_KEYS` skip is already done as part of the guard fix, so #4 only
-has the deletion itself left to fix. #2, #3 and #7 are independent of all of
-these and of each other.
-
----
-
-### #2 — A second tab silently overwrites the first, CAS and all
-
-- **Invariant violated:** 4 (no lost update) and 5 (cache coherence). Fires
-  whenever **two views of the same vault are open** — two browser tabs, a tab
-  plus the installed PWA, or two windows. Not two devices: those each have their
-  own IndexedDB, and CAS catches them correctly.
-- **Category:** `lost-update` `cache-coherence`
-- **Failure mode:** **Silent, and unrecoverable.** No `ConflictError` is raised,
-  so none of the conflict machinery runs: no conflict copy, no three-way merge,
-  no `warnWithDetails` toast, no journal `push-conflict` line. The overwritten
-  content is not preserved anywhere — the cache row that held it was replaced by
-  the same push. A user notices only by remembering what they wrote in the other
-  tab.
-- **Impact:** **9** — silent, unrecoverable loss of user-authored content, on a
-  path any multi-tab user reaches, with the entire collision-resolution system
-  bypassed rather than defeated.
-
-**Repro.** Starting state: one file at `note.md` in a writable vault, identical
-in both tabs, clean in the cache at version `v0`:
-
-```markdown
----
-title: Note
----
-
-Original body.
-```
-
-Operation sequence:
-
-1. Tab A renames the title to `Note (renamed by A)` and its push cycle runs.
-   The backend is now at `v1`; the shared Dexie row is `clean`, `content` = A's
-   text, `version` = `v1`.
-2. Tab B — which has been open the whole time and never heard about step 1 —
-   appends a line to the body and saves. Its store still holds the *original*
-   text, so `recordLocalEdit` writes B's content, inheriting `version: v1` from
-   the existing row (by design: `version` is documented as "the *base* backend
-   token the edit derives from").
-3. Tab B's push CASes `v1` against a backend that is at `v1`. The precondition
-   matches.
-
-**Observed** — the backend now holds:
-
-```markdown
----
-title: Note
----
-
-Original body.
-
-B added a line.
-```
-
-A's rename is gone. `resolveCollision` was never entered.
-
-**Expected:** either B's write is refused (a `ConflictError` → three-way merge
-against `baseContent`, which the cache *does* correctly hold as A's content →
-both changes survive), or B's store learns of A's edit before B saves.
-
-Failing test, run against the **real** Dexie code (put it beside
-`src/storage/__tests__/cache.test.ts`, which already sets up `fake-indexeddb`):
-
-```ts
-import 'fake-indexeddb/auto'
-import { describe, it, expect, beforeEach } from 'vitest'
-import { recordLocalEdit, markPushed, cacheGetDirty } from '@/storage/cache/files'
-import { cacheInit } from '@/storage/cache/db'
-import { ConflictError } from '@/storage/conflictError'
-
-const remote = new Map<string, { content: string; version: string }>()
-let seq = 0
-async function write(path: string, content: string, expectedVersion?: string): Promise<string> {
-  if (remote.get(path)?.version !== expectedVersion) throw new ConflictError(path)
-  const version = `v${++seq}`
-  remote.set(path, { content, version })
-  return version
-}
-
-/** One vault's push cycle, exactly as pushDirty does it. */
-async function push(vaultId: string) {
-  for (const f of await cacheGetDirty(vaultId)) {
-    const v = await write(f.path, f.content, f.version)
-    await markPushed(vaultId, f.path, f.content, v)
-  }
-}
-
-describe('two tabs, one vault', () => {
-  beforeEach(() => { remote.clear(); seq = 0 })
-
-  it('Tab B does not silently overwrite Tab A', async () => {
-    await cacheInit()
-    const V = 'vault', P = 'note.md'
-    const ORIGINAL = '---\ntitle: Note\n---\n\nOriginal body.\n'
-
-    remote.set(P, { content: ORIGINAL, version: 'v0' })
-    await recordLocalEdit(V, P, ORIGINAL)
-    await markPushed(V, P, ORIGINAL, 'v0')
-
-    // Tab A edits the title and pushes.
-    const aEdit = ORIGINAL.replace('title: Note', 'title: Note (renamed by A)')
-    await recordLocalEdit(V, P, aEdit)
-    await push(V)
-    expect(remote.get(P)!.content).toBe(aEdit)
-
-    // Tab B still holds the ORIGINAL in memory, and appends to it.
-    const bEdit = ORIGINAL.replace('Original body.', 'Original body.\n\nB added a line.')
-    await recordLocalEdit(V, P, bEdit)
-    await push(V)
-
-    expect(remote.get(P)!.content).toContain('title: Note (renamed by A)')  // ← fails today
-  })
-})
-```
-
-**No later sync repairs Tab B.** After step 3 the shared cache row agrees with
-the backend, so `planReconcile` (`sync.ts:305-341`) puts `note.md` in neither
-`changed` (`entry.version === diskToken`) nor `deleted`. `hydrateFromCache`
-(`vaultRegistry.ts:209`) runs only on restore and registration, and
-`visibilitychange` calls `autoSyncTick()` and nothing else
-(`routes/__root.tsx:170-190`). Tab B stays wrong until it is reloaded.
-
-**Breadth.** Every entry in every writable vault, through all three port write
-paths (`writeEntityToCache`, `deleteFromBackend`, `moveEntityInCache`). Search
-run: `grep -rn "BroadcastChannel\|liveQuery\|addEventListener('storage'" src/` —
-**zero hits**; there is no cross-tab coherence mechanism of any kind in `src/`.
-
-**Evidence.** `src/storage/cache/files.ts:73-88` — the version inheritance that
-is correct for one tab and wrong for two:
-
-```ts
-export async function recordLocalEdit(vaultId: string, path: string, content: string): Promise<void> {
-  const d = await cacheInit()
-  const key = vp(vaultId, path)
-  await d.transaction('rw', d.files, async () => {
-    const existing = await d.files.get(key)
-    if (existing && existing.content === content) return
-    await d.files.put({
-      vaultPath: key, vaultId, path, content,
-      dirty: DIRTY_BY_STATUS.dirty, updatedAt: Date.now(),
-      version: existing?.version,
-      baseContent: baseFor(existing),
-    })
-  })
-}
-```
-
-Note that `baseContent` here is *correct* — it is A's content, exactly the
-ancestor a three-way merge would need. The merge simply never runs, because
-`version` also came from A and so the CAS succeeds.
-
-**Problem.** A second tab's save inherits the version token the first tab's push
-just wrote into the shared cache, so its compare-and-swap passes against content
-it has never seen, and the first tab's edit is destroyed with no conflict, no
-copy and no message.
-
-**Fix.** Give the in-memory store a way to learn that a cache row changed under
-it — a `BroadcastChannel` posting `{vaultId, path}` from `markPushed` /
-`markMerged` / `applyRemoteBatch` / `setResolvedClean`, with listening tabs
-re-reading those rows and folding them in through the existing
-`mergeChangedIntoStore` path — so that after the repro's step 3 the backend
-still contains A's rename (whether because B's store was refreshed before it
-saved, or because B's write was refused and three-way merged).
-
-**Task context**
-
-- **Why this stays at Opus 5 in plan mode, and why more context would not
-  help.** Two genuine decisions have to be made by someone who owns the product,
-  not inferred from the code:
-  1. **What happens to a tab with an open editor on the affected entry.** The
-     editor deliberately never re-reads its fields (`merge.ts:145-158`: "a live
-     re-read would move the cursor and reshuffle the form under the user's
-     hands"). Refreshing the store under an open editor therefore does *not*
-     refresh the editor, and `touchedFieldsOnly` would then merge the user's
-     next save against the newly-arrived content — which is probably right, but
-     it is a behaviour change to the editor's contract and should be chosen
-     deliberately.
-  2. **Refresh, or force a conflict?** A narrower alternative closes the *loss*
-     without any cross-tab messaging: stamp each row with the id of the tab that
-     last wrote it, and have `recordLocalEdit` drop `version` to `undefined`
-     when the existing row was last written by a different tab — the write then
-     goes out as a create, the backend refuses it, and `resolveCollision`'s
-     three-way merge (which already has the right `baseContent`) does the rest.
-     That is smaller and safer but leaves Tab B's *display* stale, which is its
-     own reportable bug. Choosing between "make tabs coherent" and "make the
-     second tab conflict loudly" is the plan-mode question.
-- **Where a fix lands, once chosen.** Publishers: `cache/files.ts`'s
-  `markPushed` (line 108), `markMerged` (line 140), `setResolvedClean` (line 99)
-  and `applyRemoteBatch` (line 167). Subscriber: the same seam `reconcileWithBackend`
-  already uses — `mergeChangedIntoStore` (`sync.ts:361-390`), which is already
-  written to touch one vault layer and to route parse failures and the
-  round-trip audit correctly. A new listener should call it rather than write
-  the store directly.
-- **The trap, located.** `getInFlightPaths` (`inFlight.ts:45`) is per-process
-  in-memory bookkeeping, so it protects nothing across tabs: a broadcast landing
-  while this tab has a write in flight must be filtered by that set, or the
-  refresh will paint over an edit that is still only in the store. The same
-  reasoning that put `effectiveSkip` in `reconcileWithBackend` (`sync.ts:429-433`)
-  applies verbatim.
-- **The precedent for returning-a-request-rather-than-calling-up.**
-  `SyncCycleResult` (`sync.ts:722-745`) — the cache layer is downstream of the
-  store, so a broadcast handler must not import `@/store`; hand the affected
-  paths upward as data, the way `releasedVaults` already travels.
+has the deletion itself left to fix. #3 and #7 are independent of all of these
+and of each other.
 
 ---
 

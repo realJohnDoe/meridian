@@ -1,4 +1,5 @@
 import { cacheInit, openedDb, vp, type DexieFileRow } from './db'
+import { publishCacheChange } from './broadcast'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -63,6 +64,19 @@ function toCacheRecord(r: DexieFileRow): CacheRecord {
 // setResolvedClean, which exists solely for resolveCollision's two
 // intentional overwrites (the local content has already been copied out by
 // the time it's called).
+//
+// Every one of them that changes a row's `content` also calls
+// publishCacheChange, so the other views of this vault hear about it — see
+// broadcast.ts. Two deliberate exceptions: markPushed, because neither of its
+// branches changes content (it writes back either exactly what was pushed —
+// already announced when recordLocalEdit staged it — or the row it found,
+// untouched), and cacheDeleteAll, whose caller is removing the vault from this
+// device entirely and whose cross-view story is the vault registry's, not a
+// file's. `version` is not store state, so nobody listens for it either way.
+//
+// The call always follows the transaction rather than sitting inside it: a
+// listener re-reads the row the instant it hears, and there is no second
+// announcement if it gets there first.
 
 /**
  * Records a local edit (status: dirty). Preserves the existing record's
@@ -73,16 +87,18 @@ function toCacheRecord(r: DexieFileRow): CacheRecord {
 export async function recordLocalEdit(vaultId: string, path: string, content: string): Promise<void> {
   const d = await cacheInit()
   const key = vp(vaultId, path)
-  await d.transaction('rw', d.files, async () => {
+  const wrote = await d.transaction('rw', d.files, async () => {
     const existing = await d.files.get(key)
-    if (existing && existing.content === content) return
+    if (existing && existing.content === content) return false
     await d.files.put({
       vaultPath: key, vaultId, path, content,
       dirty: DIRTY_BY_STATUS.dirty, updatedAt: Date.now(),
       version: existing?.version,
       baseContent: baseFor(existing),
     })
+    return true
   })
+  if (wrote) publishCacheChange(vaultId, [path])
 }
 
 /**
@@ -109,6 +125,7 @@ function baseFor(existing: DexieFileRow | undefined): string | undefined {
 export async function setResolvedClean(vaultId: string, path: string, content: string, version?: string): Promise<void> {
   const d = await cacheInit()
   await d.files.put({ vaultPath: vp(vaultId, path), vaultId, path, content, dirty: DIRTY_BY_STATUS.clean, updatedAt: Date.now(), version })
+  publishCacheChange(vaultId, [path])
 }
 
 /**
@@ -161,14 +178,16 @@ export async function markMerged(
 ): Promise<void> {
   const d = await cacheInit()
   const key = vp(vaultId, path)
-  await d.transaction('rw', d.files, async () => {
+  const wrote = await d.transaction('rw', d.files, async () => {
     const existing = await d.files.get(key)
     if (existing && existing.content !== mergedFrom) {
       await d.files.put({ ...existing, version, updatedAt: Date.now(), baseContent: mergedContent })
-      return
+      return false
     }
     await d.files.put({ vaultPath: key, vaultId, path, content: mergedContent, dirty: DIRTY_BY_STATUS.clean, updatedAt: Date.now(), version })
+    return true
   })
+  if (wrote) publishCacheChange(vaultId, [path])
 }
 
 /**
@@ -205,6 +224,7 @@ export async function applyRemoteBatch(
     })
     if (toPut.length > 0) await d.files.bulkPut(toPut)
   })
+  publishCacheChange(vaultId, written)
   return written
 }
 
@@ -231,6 +251,7 @@ export async function cacheLoadAll(vaultId: string): Promise<CacheRecord[]> {
 export async function confirmDeleted(vaultId: string, path: string): Promise<void> {
   const d = await cacheInit()
   await d.files.delete(vp(vaultId, path))
+  publishCacheChange(vaultId, [path])
 }
 
 export async function cacheGetDirty(vaultId: string): Promise<CacheRecord[]> {
@@ -250,6 +271,7 @@ export async function recordLocalDelete(vaultId: string, path: string): Promise<
   const key = vp(vaultId, path)
   const existing = await d.files.get(key)
   await d.files.put({ vaultPath: key, vaultId, path, content: '', dirty: DIRTY_BY_STATUS.deleted, updatedAt: Date.now(), version: existing?.version })
+  publishCacheChange(vaultId, [path])
 }
 
 export async function cacheGetTombstones(vaultId: string): Promise<CacheRecord[]> {

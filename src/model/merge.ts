@@ -189,3 +189,49 @@ export function mergeEditFields(base: EditFields, next: EditFields, current: Edi
   }
   return out
 }
+
+/**
+ * The two halves of `mergeEditFields`'s verdict, said out loud — for an editor
+ * that wants to *react* to what moved underneath it rather than only write the
+ * right thing at the end.
+ *
+ * Same three-way rule, same ancestor: `base` is what the editor loaded, `local`
+ * is what it is holding now, `remote` is what the store holds now.
+ *
+ *  - `untouchedRemoteChanges` — fields only the other side moved. Nothing the
+ *    user did is at stake in them, so an editor can adopt them on the spot and
+ *    show the change live. Returned as a partial rather than a whole
+ *    `EditFields` precisely so a caller can decline some of them: a text field
+ *    with a cursor in it is not always safe to replace under the user's hands.
+ *  - `overlappingFields` — fields both sides moved, to different values. These
+ *    are the genuine conflicts, and the only ones: `mergeEditFields` resolves
+ *    them in the local side's favour, silently, which is right for the write
+ *    and wrong for the user, who should hear that something of theirs won a
+ *    race it was never told about.
+ *
+ * Together they partition every key `mergeEditFields` considers into "adopt",
+ * "conflict", and "nobody moved it / only we did" — the third needing nothing.
+ */
+export function untouchedRemoteChanges(
+  base: EditFields, local: EditFields, remote: EditFields,
+): Partial<EditFields> {
+  const out: Partial<EditFields> = {}
+  for (const key of EDIT_FIELD_KEYS) {
+    if (sameValue(base[key], local[key]) && !sameValue(base[key], remote[key])) {
+      (out as Record<string, unknown>)[key] = remote[key]
+    }
+  }
+  return out
+}
+
+/** See `untouchedRemoteChanges`. Order follows `EDIT_FIELD_KEYS`, so a report
+ *  built from it reads the same way twice. */
+export function overlappingFields(
+  base: EditFields, local: EditFields, remote: EditFields,
+): Array<keyof EditFields> {
+  return EDIT_FIELD_KEYS.filter(key =>
+    !sameValue(base[key], local[key])
+    && !sameValue(base[key], remote[key])
+    && !sameValue(local[key], remote[key]),
+  )
+}
