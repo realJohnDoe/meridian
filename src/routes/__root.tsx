@@ -4,7 +4,7 @@ import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { fmtISO } from '@/model'
 import { useVisibleViewportCssVars } from '@/hooks'
-import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged } from '@/storage'
+import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync } from '@/storage'
 import { requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -165,6 +165,11 @@ function Root() {
 
   useEffect(() => {
     void restoreVaults()
+    // Before the first sync, not after: a second tab (or the installed PWA)
+    // shares this one's IndexedDB but not its store, and whatever it writes
+    // while this one is restoring is only ever announced once. See
+    // startCrossTabSync.
+    const stopCrossTabSync = startCrossTabSync()
     const intervalId = setInterval(autoSyncTick, 60_000)
     const onOnline = () => { resetSyncBackoff(); autoSyncTick() }
     const onVisible = () => {
@@ -197,6 +202,7 @@ function Root() {
     window.addEventListener('pagehide', flushPendingPush)
     return () => {
       clearInterval(intervalId)
+      stopCrossTabSync()
       window.removeEventListener('online', onOnline)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('pagehide', flushPendingPush)

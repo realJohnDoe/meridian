@@ -8,9 +8,10 @@ import { THEMES } from '@/settings'
 
 const {
   restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
-  resetCalendarOnVaultChange, onVaultChanged, triggerVaultChanged,
+  resetCalendarOnVaultChange, onVaultChanged, triggerVaultChanged, startCrossTabSync, stopCrossTabSync,
 } = vi.hoisted(() => {
   const listeners = new Set<(change: { contentReplaced: boolean }) => void>()
+  const stopCrossTabSync = vi.fn()
   return {
     restoreVaults: vi.fn(),
     autoSyncTick: vi.fn(),
@@ -19,6 +20,8 @@ const {
     requestScrollToToday: vi.fn(),
     setCurrentDate: vi.fn(),
     resetCalendarOnVaultChange: vi.fn(),
+    startCrossTabSync: vi.fn(() => stopCrossTabSync),
+    stopCrossTabSync,
     onVaultChanged: vi.fn((fn: (change: { contentReplaced: boolean }) => void) => {
       listeners.add(fn)
       return () => listeners.delete(fn)
@@ -39,7 +42,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   }
 })
 
-vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged }))
+vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync }))
 vi.mock('@/calendar', () => ({ requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange }))
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }))
 
@@ -72,6 +75,18 @@ describe('__root — startup', () => {
   it('renders the routed content', () => {
     const { getByTestId } = render(<Root />)
     expect(getByTestId('outlet')).toBeInTheDocument()
+  })
+
+  // A second tab shares this one's IndexedDB but not its store, and every
+  // cross-view announcement is one-shot — a listener attached late simply never
+  // hears what it missed. So it goes up with the app, and comes down with it.
+  it('listens for other tabs\' cache writes for as long as it is mounted', () => {
+    const { unmount } = render(<Root />)
+    expect(startCrossTabSync).toHaveBeenCalledTimes(1)
+    expect(stopCrossTabSync).not.toHaveBeenCalled()
+
+    unmount()
+    expect(stopCrossTabSync).toHaveBeenCalledTimes(1)
   })
 })
 
