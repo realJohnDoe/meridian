@@ -85,8 +85,8 @@ coverage of 100%.
   6 `useRef`) is the editor's state hub and the most likely remaining home for
   an effect-chain finding. Its coverage floor (68/55/55/70) is the loosest
   non-global one in `vitest.config.ts`, which is itself a hint.
-- No runtime profiling was done. Findings #3 and #5 are static/build-time
-  measurements of memoization, not measured render cost.
+- No runtime profiling was done. Finding #3 is a static/build-time
+  measurement of memoization, not measured render cost.
 
 ## 3. Category verdicts
 
@@ -128,17 +128,16 @@ coverage of 100%.
    all 16 hand-written `eslint-disable`s carry a written justification (the
    17th is the blanket directive in the generated `routeTree.gen.ts`, which
    ESLint ignores anyway).
-6. **React Performance** — findings: #3, #5. Route-level code splitting is on
+6. **React Performance** — findings: #3. Route-level code splitting is on
    (`autoCodeSplitting`, editor in its own 716K chunk); all four list surfaces
    are virtualized; `memo()` decisions are deliberate and documented, including
    the two documented *non*-memo cases.
-7. **UI Toolchain & Feedback Loops** — findings: #5. The enabled
-   rule set is genuinely strong (full `jsx-a11y` recommended, `react-hooks`
+7. **UI Toolchain & Feedback Loops** — **clean.** The enabled rule set is
+   genuinely strong (full `jsx-a11y` recommended, `react-hooks`
    `recommended-latest` including the compiler diagnostics,
    `@eslint-react` `recommended-type-checked` plus 15 individually-raised
    rules, full `@typescript-eslint` type-checked, `import-x` boundary zones
-   derived from the filesystem, `dependency-cruiser` for cycles). The findings
-   are all about guards narrower than their invariant, not missing guards.
+   derived from the filesystem, `dependency-cruiser` for cycles).
 8. **UI Dependencies & Library Fit** — **clean**, with three keep-custom
    verdicts. Every UI dependency is used and `knip` confirms none are
    unreferenced. **Keep-custom verdicts:**
@@ -170,7 +169,6 @@ identity, not order.
 
 | # | Rank | Title | Categories | Impact | Breadth | Recommended model | Score |
 |---|------|-------|-----------|--------|---------|-------------------|-------|
-| #5 | 1 | Compiler bail-out rule matches only `FunctionDeclaration` | `toolchain` `performance` | 3 | 100 | **Haiku 4.5** | 300 |
 | #3 | 3 | `Button`/`Separator` get zero compiler memoization | `performance` `library-fit` | 6 | 9 | **Opus 5** (Sonnet 5 if the mirror policy is pre-decided) | 18 |
 | #8 | 5 | `isSafeUrl` — the only XSS gate — has no tests | `security` `testing` | 4 | 1 | **Haiku 4.5** | 4 |
 | #1 | 7 | `AppMain` is a 481-line component with 9 branch chains | `component-architecture` `srp` `testing` | 7 | 1 | **Opus 5** | 2.3 |
@@ -180,10 +178,8 @@ identity, not order.
 > what makes it a god component in the first place. By impact it is first.
 > This is a scoring-rule observation, not a hedge — see "Survey file changes".
 
-**Sequencing.** #3 and #5 are independent of each other despite both
-concerning the compiler — #5 edits `eslint.config.js`, and its rule does not
-apply to `components/ui/`, which is where #3 lives. #8 is independent of
-everything, and so is #1.
+**Sequencing.** #3, #8 and #1 are independent of each other and can be done
+in any order.
 
 ---
 
@@ -357,66 +353,6 @@ everything, and so is #1.
 - **Verify after:** re-run the per-file census and confirm `button.tsx` and
   `separator.tsx` report a non-zero `_c()` count, then
   `pnpm run build && pnpm run lint && pnpm run test`.
-
----
-
-### #5 — The React Compiler bail-out rule matches only `FunctionDeclaration`
-
-- **Category** — `toolchain` `performance`
-- **Impact** — 3 (latent — zero current violations; this prevents a class
-  rather than fixing one)
-- **Breadth** — 100 files. Search:
-  `find src -name '*.tsx' ! -name '*.test.tsx' ! -path 'src/components/ui/*' ! -path 'src/debug/*'`
-  → 100 files in the rule's scope. A dry-run of the broadened selector over
-  `src/` reports **0** violations today, so nothing is currently broken.
-- **Recommended model** — **Haiku 4.5.** A one-line selector change,
-  already dry-run-verified below, whose failure mode is a loud lint error. The
-  hazard that would otherwise raise this — accidentally broadening it into
-  `components/ui/` or the test files — is prevented by the existing `ignores`
-  list, which must be left exactly as it is.
-- **Evidence** — `eslint.config.js:319`:
-  ```
-        selector: 'FunctionDeclaration > ObjectPattern > Property > AssignmentPattern',
-  ```
-  A fixture through the repo's own preset shows the rule's premise is correct
-  *and* that it is shape-blind: `function DeclDefault({ a, b = 3 })` → no
-  `_c()`; `const ArrowDefault = ({ a, b = 3 }) => …` → **also** no `_c()`;
-  `function DeclBody(props)` with `props.b ?? 3` → `const $ = _c(2)`. Linting
-  a two-line probe file confirms the gap directly: the repo's config reports
-  1 error (the declaration), a config whose only change is
-  `:matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression) > ObjectPattern > Property > AssignmentPattern`
-  reports 2.
-- **Problem** — The codebase is 137 function-declaration components to 1
-  arrow-function component, so the rule happens to be sufficient today; the
-  first arrow-function component anyone writes with a destructured default
-  loses memoization with no build error, no lint error and no test failure —
-  exactly the silent regression the rule exists to prevent.
-- **Fix** — Change the selector to `:matches(FunctionDeclaration,
-  FunctionExpression, ArrowFunctionExpression) > ObjectPattern > Property >
-  AssignmentPattern`, leaving the `files`/`ignores` and the message unchanged.
-
-**Task context**
-
-- **Exact site.** `eslint.config.js:317–322` — the `no-restricted-syntax`
-  block. Change line 319 only.
-- **What stays.** The `files: ['src/**/*.tsx']` and
-  `ignores: ['src/components/ui/**', 'src/debug/**', 'src/**/*.test.tsx']`
-  at `:314–:315` must not change. `components/ui/` is excluded on purpose
-  (see #3, which is the cost of that exclusion) and broadening the selector
-  into it would fail the lint gate immediately on 23 hits.
-- **Measured numbers.** 0 violations in `src/` after the change — verified by
-  dry-run this session, so the lint gate stays green. 23 violations would
-  appear if `components/ui/` were also un-ignored; do not.
-- **The trap, located.** The `AssignmentPattern` must stay a child of
-  `ObjectPattern > Property`, not of the function's parameter list directly —
-  a plain parameter default (`function f(a = 1)`) does **not** cause the
-  bail-out, and matching it would produce false positives the message does not
-  describe.
-- **Consider also updating the message** to say "component" rather than
-  implying a declaration, since it will now fire on arrows too.
-- **Verify after:** `pnpm run lint` (must stay green), then paste an
-  arrow-function component with a destructured default into any `src/*.tsx`
-  and confirm it now errors.
 
 ---
 

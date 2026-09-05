@@ -316,8 +316,8 @@ export default [
     ignores: ['src/components/ui/**', 'src/debug/**', 'src/**/*.test.tsx'],
     rules: {
       'no-restricted-syntax': ['error', {
-        selector: 'FunctionDeclaration > ObjectPattern > Property > AssignmentPattern',
-        message: 'A default in a destructured parameter makes babel-plugin-react-compiler silently skip memoizing this component. Use `props.x ?? default` in the body (see OccurrenceCard.tsx).',
+        selector: ':matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression) > ObjectPattern > Property > AssignmentPattern',
+        message: 'A default in a destructured parameter makes babel-plugin-react-compiler silently skip memoizing this component, whether declared with `function` or as an arrow. Use `props.x ?? default` in the body (see OccurrenceCard.tsx).',
       }],
     },
   },

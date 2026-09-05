@@ -45,7 +45,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
   const steps = useMemo<Step[]>(() => [
     {
       title: 'Welcome to Meridian',
-      body: 'Meridian keeps your notes, events, and tasks as plain Markdown files in a folder you own. Here\'s a quick look at where things live.',
+      body: 'Meridian keeps your notes, events, and tasks as plain Markdown files in a folder — called a vault — that you own. Here\'s a quick look at where things live.',
       before: async () => {
         setSidebarOpen(false)
         navigateHome()
