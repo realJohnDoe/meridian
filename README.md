@@ -6,7 +6,7 @@
 
 **And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins. Tag people on entries, filter the calendar down to one person.
 
-**[Open the app →](https://realjohndoe.github.io/meridian/)** — try the example vault first, nothing to sign up for.
+**[Open the app →](https://realjohndoe.github.io/meridian/)** — try the Tutorial vault first, nothing to sign up for.
 
 *Meridian does tasks and calendar. It doesn't try to out-note Obsidian, and doesn't want to.*
 
@@ -49,7 +49,7 @@ Meridian doesn't run a server that holds your notes. You choose where your files
 |---|---|
 | **GitHub repository** ⭐ | Reads and writes directly to a repo of your choice via the GitHub API. Instant cloud sync, full git history, and works on any device including iOS. This is the recommended backend for most users. |
 | **Local folder** | Opens a folder on your device via the browser's File System API. Files stay on your device. Supported in Chrome or Edge, desktop or Android — not available in Safari or Firefox. |
-| **Example vault** | A built-in demo you can explore before connecting anything — no account needed. |
+| **Tutorial vault** | A built-in demo you can explore before connecting anything — no account needed. |
 
 Files are plain `.md` files. Open them in any text editor, check them into git, sync them with any tool you already use.
 
@@ -58,7 +58,7 @@ Files are plain `.md` files. Open them in any text editor, check them into git, 
 ## 🚀 Getting started
 
 1. **Open the app** at [realjohndoe.github.io/meridian](https://realjohndoe.github.io/meridian/).
-2. Try the **Example vault** to get a feel for the interface — click through the onboarding tour.
+2. Try the **Tutorial vault** to get a feel for the interface — click through the onboarding tour.
 3. When you're ready, connect your own storage:
    - **GitHub** (recommended) — click "Connect GitHub repo", **Sign in with GitHub**, and pick the repository to use — no token to create by hand. Meridian reads and writes files directly, so you can reach your vault from any device.
    - **Local folder** — click "Connect local folder" and pick a directory. Chrome or Edge, desktop or Android; not available in Safari or Firefox.
