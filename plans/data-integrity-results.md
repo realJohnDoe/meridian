@@ -148,7 +148,7 @@ end: `fileIO.ts`, `nodeSchema.ts`, `inheritance.ts`, `storeItems.ts`,
 
 | # | Category | Verdict |
 |---|---|---|
-| 1 | Round-trip fidelity & edit locality | **findings: #4, #5, #6** |
+| 1 | Round-trip fidelity & edit locality | **findings: #4, #6** |
 | 2 | Lost updates & conflict handling | **findings: #2** |
 | 3 | Cache coherence & durability | **findings: #2, #7** |
 | 4 | Atomicity & partial failure | **partially assessed** — read end to end (`pushDirty`, `applyRemoteBatch`, `markInFlight`/`clearInFlight`'s refcounting, `moveEntityInCache`'s stage-then-release, `settlePendingMoves`) and nothing wrong was found by inspection, but no interruption was actually injected. The one concrete suspicion is recorded as unverified above. |
@@ -168,20 +168,20 @@ recommended-model ordinal (Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode = 5).
 | **#2** | A second tab silently overwrites the first, CAS and all | 4, 5 | **silent** | 9 | every entry in every writable vault; 3 write paths; 0 coherence mechanisms in `src/` | Opus 5, plan mode / multi-PR |
 | **#3** | A DST spring-forward truncates bounded series and rewrites clock times | 8 | **silent** | 6 | 2 defects in 1 file; every bounded or `after_completion` series timed inside the gap | Sonnet 5 |
 | **#4** | A malformed *structural* key has nowhere to live and is deleted on save | 1, 7 | **silent** | 7 | all 6 `STRUCTURAL_KEYS`, every node of every file; 6 of 14 probed shapes lose bytes | Opus 5 |
-| **#5** | The round-trip guard cannot see any value-level loss | 1 (guard) | **silent** | 4 | 1 file, guarding every file on every load | Sonnet 5 |
 | **#6** | YAML scalars are re-emitted from JavaScript values, not from source | 1 | **silent** | 5 | every unknown key in every file; 7 of 39 probed shapes change | Opus 5 |
 | **#7** | A pending editor autosave is never flushed at page teardown | 6 | **silent** | 4 | 1 file; every editor session | Sonnet 5 |
 
 Numbers are identity **and** rank for this run — the two coincided, so there is
 no separate rank column to read.
 
-**Sequencing note.** #4 and #6 both land in the parse/emit pipeline and #5 is
-the guard over it: do **#5 first** (it is the only one that will *tell you*
-whether the other two are fixed), then #4 (`fieldRegistry.ts`/`storeItems.ts`/
-`roundTripCheck.ts`), then #6 (`fileIO.ts`/`inheritance.ts`). #4 and #5 both
-touch `collectKeyValues`' `STRUCTURAL_KEYS` skip — doing #5 first means #4
-only has to widen a check that already exists. #2, #3 and #7 are independent
-of all of these and of each other.
+**Sequencing note.** #4 and #6 both land in the parse/emit pipeline. The guard
+over that pipeline (formerly tracked as finding #5 — it compared parsed values
+rather than source text and skipped `date`/`time`/`repeat`/`excluded`
+outright) is now fixed, so `roundTripLoss` will surface each of these two as
+soon as its own fix lands. #4's own widening of `collectKeyValues`'
+`STRUCTURAL_KEYS` skip is already done as part of the guard fix, so #4 only
+has the deletion itself left to fix. #2, #3 and #7 are independent of all of
+these and of each other.
 
 ---
 
@@ -746,18 +746,12 @@ either way; afterwards the test above passes for all six cases.
   node.instances : []` in `inheritance.ts`'s `buildEffectiveTree`. `defaults` is
   the `buildRoot` spread quoted above, and separately `childDefaults`'
   `node.defaults ?? {}` in `inheritance.ts`.
-- **The guard half is independent and cheap.** `roundTripCheck.ts:47`'s skip can
-  be narrowed to `instances`/`defaults` (which legitimately restructure) while
-  letting `date`/`time`/`repeat`/`excluded` through — those are emitted at
-  predictable positions and a lost pair is always a real loss. Doing that half
-  first turns this finding from invisible into merely unfixed, and gives the
-  larger change a check to work against. It pairs naturally with finding #5.
-- **The trap, located.** `collectKeyValues` compares **stringified parsed
-  values** (`roundTripCheck.ts:49`: `` out.push(`${k}=${JSON.stringify(v)}`) ``),
-  so simply un-skipping structural keys will *not* catch finding #6's class and
-  will produce false positives wherever collapse legitimately relocates a
-  `date` between a node and its `defaults:`. Read that line before assuming the
-  guard half is a one-character change.
+- **The guard half is done.** It shipped as part of finding #5's fix:
+  `roundTripCheck.ts`'s skip now only special-cases `instances`/`defaults`
+  (which legitimately restructure); `date`/`time`/`repeat`/`excluded` are
+  compared by parsed value like any other registry field, so a save that
+  drops one is no longer invisible to `roundTripLoss` — only unfixed. What is
+  left for this finding is the deletion itself.
 - **Precedent.** `malformedKnownFields` (`fieldRegistry.ts`) is exactly this
   problem already solved once, for inline fields — including the "the raw value
   wins over the typed fallback on emission" rule that `fileMetaToYaml` /
@@ -767,152 +761,21 @@ either way; afterwards the test above passes for all six cases.
 
 ---
 
-### #5 — The round-trip guard cannot see any value-level loss
-
-- **Invariant violated:** none directly — this is the *guard* over invariant 1,
-  and it is the reason findings #1, #4 and #6 all shipped silently.
-- **Category:** `testing-gap`
-- **Failure mode:** **Silent** by construction: the guard's own verdict is
-  "clean", which is indistinguishable from "checked and fine".
-- **Impact:** **4** — it loses no byte itself; it is why three findings that do
-  were invisible.
-
-**Repro.** `roundTripLoss` returns `[]` for all of the following, each of which
-this run reproduced as a real loss or corruption:
-
-| Input | What a save produces | `roundTripLoss` says |
-|---|---|---|
-| `tags: shopping` + a title edit | the line is deleted (finding #1) | `[]` |
-| `date:`<br>`  - 2026-04-08` | the `date:` block is deleted (finding #4) | `[]` |
-| `discord: 1234567890123456789` | `discord: 1234567890123456800` (finding #6) | `[]` |
-| `zip: 01234` | `zip: 1234` (finding #6) | `[]` |
-| `phone: +49123456789` | `phone: 49123456789` (finding #6) | `[]` |
-
-Two independent causes, both quotable:
-
-1. **It compares parsed values, not source text.** `collectKeyValues` runs on
-   the output of `loadFile(...).rawNode` for *both* sides, so anything the YAML
-   parser flattened is flattened identically before and after and cancels out.
-   `12345678901234567890` and `12345678901234567000` are the same JS double, so
-   the pair matches.
-2. **It only ever checks the unedited round trip.** `roundTripCheck.ts`'s own
-   header says so — "sound only on an UNEDITED round trip" — and `parseFiles`
-   captures the parse specifically to keep it that way. Finding #1 happens
-   entirely on the edited path.
-
-Failing test:
-
-```ts
-import { describe, it, expect } from 'vitest'
-import { parseToStoreItems } from '@/model/storeItems'
-import { roundTripLoss } from '@/model/roundTripCheck'
-
-describe('roundTripLoss sees value-level loss', () => {
-  it.each([
-    ['a big integer',       'discord: 1234567890123456789'],
-    ['a leading zero',      'zip: 01234'],
-    ['a leading plus',      'phone: +49123456789'],
-    ['a malformed date',    'date:\n  - 2026-04-08'],
-  ])('%s', (_n, frag) => {
-    const content = `---\ntitle: T\n${frag}\n---\n`
-    const parsed = parseToStoreItems('n.md', content, 'v')
-    expect(roundTripLoss('n.md', content, parsed)).not.toEqual([])  // ← fails today
-  })
-})
-```
-
-**Breadth.** One file (`src/model/roundTripCheck.ts`, 70 lines) guarding every
-file in every vault, on every load — `parseFiles` runs it over the whole corpus
-via `runInIdleBatches` (`parseReport.ts:37-49`). The three findings it is blind
-to together cover the entire hand-authored-frontmatter surface.
-
-**Evidence.** `src/model/roundTripCheck.ts:41-52`:
-
-```ts
-export function collectKeyValues(node: unknown): string[] {
-  if (!node || typeof node !== 'object' || Array.isArray(node)) return []
-  const out: string[] = []
-  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
-    if (k === 'defaults') { out.push(...collectKeyValues(v)); continue }
-    if (k === 'instances') {
-      if (Array.isArray(v)) for (const child of v) out.push(...collectKeyValues(child))
-      continue
-    }
-    if (STRUCTURAL_KEYS.has(k)) continue
-    out.push(`${k}=${JSON.stringify(v)}`)
-  }
-  return out
-}
-```
-
-and `src/model/roundTripCheck.ts:63-70`, where both sides go through `loadFile`:
-
-```ts
-  const before = new Set(collectKeyValues(loadFile(path, content).rawNode))
-  const after = new Set(collectKeyValues(loadFile(path, saved).rawNode))
-  return [...before].filter(pair => !after.has(pair))
-```
-
-**Problem.** The only runtime check standing between a user's frontmatter and a
-lossy save compares values after both sides have already been flattened by the
-same parser, and only ever inspects a save nobody edited — so it reports "clean"
-for every loss this survey found.
-
-**Fix.** Compare the frontmatter *source text* key-by-key (parse both sides with
-the `yaml` package's `parseDocument` and compare each `Scalar`'s `source`, not
-its JS value) and stop skipping `date`/`time`/`repeat`/`excluded`; afterwards
-every row in the table above is reported instead of silently passing.
-
-**Task context**
-
-- **Sites to change.** `src/model/roundTripCheck.ts` only —
-  `collectKeyValues` (line 41) and `roundTripLoss` (line 63). Its two consumers
-  are `src/storage/parseReport.ts:40` (the idle sweep) and
-  `src/model/__tests__/helpers.ts`, which **re-exports `collectKeyValues`
-  deliberately** so that `unknown-keys.test.ts` uses the production comparison
-  rather than a hand-synced copy. Any signature change has to keep that
-  re-export working; `unknown-keys.test.ts` is the suite that will tell you
-  whether the new comparison is too strict.
-- **The scope split, and where it stops being Sonnet-able.** The *source-text*
-  half is fully specified: `parseDocument(text)` from the `yaml` package (already
-  a direct dependency — `inheritance.ts` imports `stringify` from it) gives
-  `Scalar` nodes carrying `.source`, the original characters. Walking the
-  document instead of the plain object and emitting `` `${k}=${scalar.source}` ``
-  is a mechanical rewrite of ~20 lines. That half is **Sonnet 5**.
-  The *edited-round-trip* half — checking that an `applyEdit` result did not
-  lose anything it was not asked to change — is **not**: the file's header
-  explains why (it needs id-normalised `StoreItem` comparison, can only say
-  "something changed" rather than naming a key, and only means anything relative
-  to a specific `applyEdit` call). Leave it deferred, and cover finding #1 with
-  its own regression test instead.
-- **The trap, located.** Collapse legitimately **relocates** a key between a
-  node and its `defaults:` block and changes how many times it appears — which
-  is exactly why the current check is set containment rather than equality (see
-  the doc comment at `roundTripCheck.ts:34-40`). A source-text comparison must
-  keep that containment semantics; switching to a positional or ordered
-  comparison at the same time will produce a flood of false "losses" on every
-  series file. Quoting also changes legitimately (`fileMetaToYaml` emits
-  `title: "2024"` for a numeric-looking title on purpose), so a strict
-  source-equality rule on *typed* fields will fire; scope the source comparison
-  to keys in the `extra` bag, where nothing may be reformatted at all.
-- **Measured baseline to re-check after the change.** Today the guard fires on
-  exactly one shape out of the 39 probed: `duration: 90` (a bare number where the
-  registry wants a string) is coerced to `duration: "90"` and correctly reported.
-  After the fix, re-run the fixture corpus and confirm the only reports are the
-  ones findings #1/#4/#6 predict — a guard that fires on ordinary files will be
-  turned off, which is worse than one that fires on none.
-
----
-
 ### #6 — YAML scalars are re-emitted from JavaScript values, not from source
 
 - **Invariant violated:** 1 (round-trip fidelity). Fires on **every save** of a
   file whose frontmatter carries a numeric-looking or explicitly-quoted scalar
   under a key Meridian does not type.
 - **Category:** `round-trip`
-- **Failure mode:** **Silent**, and invisible to `roundTripLoss` for the reason
-  finding #5 describes — both sides parse to the same JS value, so the pair
-  matches.
+- **Failure mode:** **Silent for the value itself** — the corruption or
+  reformatting still happens on disk either way. It used to be invisible to
+  `roundTripLoss` too (both sides parsed to the same JS value, so the pair
+  matched); now that finding #5 compares an unknown key by source text, the
+  guard does report most of these rows (a toast fires) even though nothing yet
+  repairs them. The one exception is the `x: "yes"` interop row: the `yaml`
+  package's `Scalar.source` resolves the quote/escape syntax away along with
+  the value, so detecting a dropped quote needs the node's `type` compared
+  too, which is outside what finding #5 covers.
 - **Impact:** **5** — the two genuinely destructive cases (integers past 2⁵³, a
   leading `+`) lose information that cannot be recovered from the file; the rest
   is reformatting that changes what *other* tools read. Not higher because the

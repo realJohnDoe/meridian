@@ -93,7 +93,33 @@ describe('roundTripLoss — the runtime guard', () => {
     const strip = (i: StoreItem): StoreItem => ({ ...i, metadata: { ...i.metadata, extra: undefined } })
     const [head, ...tail] = parsed.items
     const lobotomised: Entry = { ...parsed, items: [strip(head), ...tail.map(strip)] }
-    expect(roundTripLoss('qr.md', source, lobotomised)).toEqual(['project="apollo"'])
+    expect(roundTripLoss('qr.md', source, lobotomised)).toEqual(['project=apollo'])
+  })
+
+  // Finding #5, fixed: the guard used to compare parsed JS values on both
+  // sides, so anything the YAML parser flattened identically (a big integer
+  // past 2^53, a leading zero, a leading `+`) cancelled out and reported
+  // clean even though the value it wrote back genuinely differs from what the
+  // user typed. It now compares an unknown key's SOURCE text instead.
+  it.each([
+    ['a big integer',  'discord: 1234567890123456789'],
+    ['a leading zero', 'zip: 01234'],
+    ['a leading plus', 'phone: +49123456789'],
+  ])('detects a reformatted value behind %s', (_name, line) => {
+    const source = `---\ntitle: T\n${line}\n---\n`
+    const parsed = parseToStoreItems('n.md', source, TEST_VAULT)
+    expect(roundTripLoss('n.md', source, parsed)).not.toEqual([])
+  })
+
+  // Finding #5, fixed (the other half): `date`/`time`/`repeat`/`excluded` used
+  // to be skipped outright, so a save that dropped one of them — finding #4,
+  // still open — was as invisible as the value-level losses above. The guard
+  // now watches these keys too; it is finding #4's own fix that will make the
+  // key survive in the first place.
+  it('detects a structural key a save would drop', () => {
+    const source = '---\ntitle: T\ndate:\n  - 2026-04-08\n---\n'
+    const parsed = parseToStoreItems('n.md', source, TEST_VAULT)
+    expect(roundTripLoss('n.md', source, parsed)).not.toEqual([])
   })
 })
 

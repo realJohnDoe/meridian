@@ -67,6 +67,10 @@ export default defineConfig({
         'src/editor/cm/taskLines.ts': { statements: 90, branches: 80, functions: 95, lines: 95 },
         'src/editor/cm/markdownFormatting.ts': { statements: 88, branches: 78, functions: 70, lines: 87 },
         'src/editor/cm/ReactWidget.ts': { statements: 78, branches: 90, functions: 50, lines: 77 },
+        // The only XSS gate between file-/feed-derived `url:` frontmatter and a
+        // rendered `<a href>` (health-ui-results.md finding #8) — a single
+        // anchored allowlist regex, fully exercised by urlSafety.test.ts.
+        'src/editor/urlSafety.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
         'src/model/fieldRegistry.ts': { statements: 90, branches: 80, functions: 85, lines: 90 },
         'src/model/storeOps.ts': { statements: 88, branches: 82, functions: 92, lines: 92 },
         'src/model/expansion.ts': { statements: 87, branches: 76, functions: 94, lines: 92 },
