@@ -368,7 +368,7 @@ read, and watch which of the five bets the replies are about.
 2. **Does the revealed niche become the declared one?** The code has been
    investing in multi-source household calendaring (iCal, multi-vault,
    participants, ICS export) while the copy still leads with Obsidian +
-   TaskNotes. iCal itself is now claimed in the README and blog; multi-vault,
+   TaskNotes. iCal itself is now claimed in the README; multi-vault,
    participants and ICS export are not. Either update the pitch to match where
    the effort went, or decide the effort was a detour. *Consequence:* leaving
    it means that remaining investment stays invisible.
