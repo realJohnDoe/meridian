@@ -37,6 +37,7 @@ import type * as FilesModule from '@/storage/cache/files'
 import type * as CredentialsModule from '@/storage/cache/credentials'
 import type * as RegistryModule from '@/storage/cache/registry'
 import type * as PendingMovesModule from '@/storage/cache/pendingMoves'
+import type * as BroadcastModule from '@/storage/cache/broadcast'
 import { entryKey } from '@/fileIO'
 
 // ── Fixtures and helpers ───────────────────────────────────────
@@ -67,6 +68,7 @@ type CacheModules = {
   creds: typeof CredentialsModule
   reg:   typeof RegistryModule
   moves: typeof PendingMovesModule
+  bc:    typeof BroadcastModule
 }
 
 let m!: CacheModules
@@ -99,6 +101,7 @@ async function freshCache(): Promise<CacheModules> {
     creds: await import('@/storage/cache/credentials'),
     reg:   await import('@/storage/cache/registry'),
     moves: await import('@/storage/cache/pendingMoves'),
+    bc:    await import('@/storage/cache/broadcast'),
   }
 }
 
@@ -454,6 +457,129 @@ describe('cache/files — cacheDirtyCount degrades to 0 rather than throwing', (
 })
 
 // ── credentials.ts ─────────────────────────────────────────────
+
+// ── broadcast.ts ───────────────────────────────────────────────
+//
+// The cross-view announcement (data-integrity survey 2026-09-05, finding #2).
+// These use the real BroadcastChannel: a second channel object stands in for
+// the second tab, which is exactly what it is — the API never delivers a
+// message back to the object that posted it, so the module's own channel
+// hearing itself is not a case that can arise.
+
+describe('cache/broadcast', () => {
+  /** The other tab's end of the channel: what it hears, and how it speaks. */
+  function otherTab() {
+    const heard: BroadcastModule.CacheChange[] = []
+    const channel = new BroadcastChannel('meridian-cache')
+    channel.addEventListener('message', (e: MessageEvent<BroadcastModule.CacheChange>) => { heard.push(e.data) })
+    return { heard, channel, close: () => { channel.close() } }
+  }
+
+  /** Delivery is a macrotask on the event loop, not a microtask. */
+  const delivered = () => new Promise(resolve => setTimeout(resolve, 20))
+
+  it('announces a recorded local edit, once, with its path', async () => {
+    const other = otherTab()
+
+    await m.files.recordLocalEdit(V, 'a.md', 'body')
+    await delivered()
+
+    expect(other.heard).toEqual([{ vaultId: V, paths: ['a.md'] }])
+    other.close()
+  })
+
+  it('says nothing when a write changed no content', async () => {
+    await m.files.setResolvedClean(V, 'a.md', 'body', 'sha1')
+    const other = otherTab()
+
+    // recordLocalEdit's no-op branch, and markPushed, whose two branches both
+    // leave `content` exactly as they found it.
+    await m.files.recordLocalEdit(V, 'a.md', 'body')
+    await m.files.markPushed(V, 'a.md', 'body', 'sha2')
+    await delivered()
+
+    expect(other.heard).toEqual([])
+    other.close()
+  })
+
+  it('announces only the paths applyRemoteBatch actually wrote', async () => {
+    await m.files.recordLocalEdit(V, 'dirty.md', 'local edit')
+    const other = otherTab()
+
+    await m.files.applyRemoteBatch(V, [
+      { path: 'fresh.md', content: 'remote', version: 'sha1' },
+      { path: 'dirty.md', content: 'remote', version: 'sha1' }, // skipped: locally modified
+    ])
+    await delivered()
+
+    expect(other.heard).toEqual([{ vaultId: V, paths: ['fresh.md'] }])
+    other.close()
+  })
+
+  it('announces both halves of a delete — the tombstone and its confirmation', async () => {
+    await m.files.setResolvedClean(V, 'a.md', 'body', 'sha1')
+    const other = otherTab()
+
+    await m.files.recordLocalDelete(V, 'a.md')
+    await m.files.confirmDeleted(V, 'a.md')
+    await delivered()
+
+    expect(other.heard).toEqual([
+      { vaultId: V, paths: ['a.md'] },
+      { vaultId: V, paths: ['a.md'] },
+    ])
+    other.close()
+  })
+
+  it('announces a merge it adopted, but not one it declined', async () => {
+    await m.files.setResolvedClean(V, 'a.md', 'base', 'sha1')
+    await m.files.recordLocalEdit(V, 'a.md', 'local')
+    const other = otherTab()
+
+    // Declined: the record moved on during the round trip, so markMerged only
+    // re-bases it and leaves `content` alone.
+    await m.files.markMerged(V, 'a.md', 'stale', 'merged', 'sha2')
+    // Adopted: the record still holds what went into the merge.
+    await m.files.markMerged(V, 'a.md', 'local', 'merged', 'sha3')
+    await delivered()
+
+    expect(other.heard).toEqual([{ vaultId: V, paths: ['a.md'] }])
+    other.close()
+  })
+
+  it('hands a subscriber what another view posted, and drops malformed messages', async () => {
+    const seen: BroadcastModule.CacheChange[] = []
+    const off = m.bc.onCacheChange(change => { seen.push(change) })
+    const other = otherTab()
+
+    // A tab left open across a deploy posts whatever shape it was built with;
+    // one bad message must not stop the well-formed ones that follow.
+    other.channel.postMessage('not an object')
+    other.channel.postMessage({ vaultId: 42, paths: ['a.md'] })
+    other.channel.postMessage({ vaultId: V, paths: [] })
+    other.channel.postMessage({ vaultId: V, paths: ['a.md', 7, 'b.md'] })
+    await delivered()
+
+    expect(seen).toEqual([{ vaultId: V, paths: ['a.md', 'b.md'] }])
+
+    off()
+    other.channel.postMessage({ vaultId: V, paths: ['c.md'] })
+    await delivered()
+    expect(seen).toHaveLength(1)
+
+    other.close()
+  })
+
+  it('publishes nothing when there are no paths to publish', async () => {
+    const other = otherTab()
+
+    m.bc.publishCacheChange(V, [])
+    await delivered()
+
+    expect(other.heard).toEqual([])
+    other.close()
+  })
+})
 
 describe('cache/pendingMoves', () => {
   const FROM = entryKey(V, 'meeting-notes')

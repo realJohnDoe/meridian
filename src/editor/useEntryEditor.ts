@@ -17,6 +17,7 @@ import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 import { usePendingLinks } from './usePendingLinks'
 import { useAutoSave } from './useAutoSave'
+import { useLiveReload } from './useLiveReload'
 import { useVaultTarget, initialTargetVault } from './useVaultTarget'
 
 export type { DialogHandlers } from './useEntryDialogs'
@@ -171,6 +172,17 @@ export function useEntryEditor(
 
   const { scheduleAutoSave, flushAutoSave, cancelAutoSave, bodyRef } = useAutoSave(commitEntry, entryRef, entry.body)
   useEffect(() => { flushEditsRef.current = flushAutoSave })
+
+  // Something else writing to this entry while it is open — a second tab, the
+  // installed PWA, a sync from another device — moves the store under the
+  // fields on screen. Take the ones the user has not touched, and advance the
+  // base with them so the next save doesn't write them straight back out.
+  // Adopting is deliberately all this does; the overlaps are `saveNode`'s to
+  // report. See useLiveReload.
+  useLiveReload(entry.item?.entryKey ?? createdKey, entryRef, createdItemRef, baseRef, bodyRef, fields => {
+    setEntry(prev => ({ ...prev, ...fields }))
+    baseRef.current = { ...baseRef.current, ...fields }
+  })
 
   const saveMeta = (next: EntryState) => {
     if (next.editScope === 'add') return

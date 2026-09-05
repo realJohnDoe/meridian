@@ -9,7 +9,7 @@
  * as important — that it refuses when the two sides really did overlap.
  */
 import { describe, it, expect } from 'vitest'
-import { mergeFileContent, mergeEditFields } from '@/model'
+import { mergeFileContent, mergeEditFields, untouchedRemoteChanges, overlappingFields } from '@/model'
 import { loadFile } from '@/fileIO'
 import type { EditFields } from '@/model'
 
@@ -184,5 +184,72 @@ describe('mergeEditFields', () => {
     const merged = mergeEditFields(base, next, current)
     expect(merged.scheduled).toEqual({ date: '2026-08-30', time: '18:00' })
     expect(merged.title).toBe('Renamed')
+  })
+})
+
+// ── untouchedRemoteChanges / overlappingFields ─────────────────
+//
+// The same verdict `mergeEditFields` acts on, named so an open editor can act
+// on it too: adopt what only the store moved, and say so when both sides moved
+// the same field. See useLiveReload.
+
+describe('untouchedRemoteChanges', () => {
+  it('reports a field only the store moved', () => {
+    const base   = FIELDS
+    const local  = FIELDS
+    const remote = { ...FIELDS, priority: 'high' as const }
+
+    expect(untouchedRemoteChanges(base, local, remote)).toEqual({ priority: 'high' })
+  })
+
+  it('says nothing about a field the editor touched, whatever the store did', () => {
+    const base   = FIELDS
+    const local  = { ...FIELDS, title: 'Mine' }
+    const remote = { ...FIELDS, title: 'Theirs' }
+
+    expect(untouchedRemoteChanges(base, local, remote)).toEqual({})
+  })
+
+  it('says nothing when neither side moved', () => {
+    expect(untouchedRemoteChanges(FIELDS, { ...FIELDS }, { ...FIELDS })).toEqual({})
+  })
+
+  it('reports a value the store cleared, not just one it set', () => {
+    const base   = { ...FIELDS, duration: '30m' }
+    const remote = { ...FIELDS, duration: '' }
+
+    expect(untouchedRemoteChanges(base, { ...base }, remote)).toEqual({ duration: '' })
+  })
+
+  it('compares by content, so a re-created array is not something to adopt', () => {
+    const base   = { ...FIELDS, tags: ['food'] }
+    const local  = { ...FIELDS, tags: ['food'] }
+    const remote = { ...FIELDS, tags: ['food'] }
+
+    expect(untouchedRemoteChanges(base, local, remote)).toEqual({})
+  })
+})
+
+describe('overlappingFields', () => {
+  it('names a field both sides moved to different values', () => {
+    const base   = FIELDS
+    const local  = { ...FIELDS, title: 'Mine', body: 'Mine too' }
+    const remote = { ...FIELDS, title: 'Theirs', body: 'Theirs too' }
+
+    expect(overlappingFields(base, local, remote)).toEqual(['title', 'body'])
+  })
+
+  it('is not a conflict when both sides made the same change', () => {
+    const base   = FIELDS
+    const local  = { ...FIELDS, done: true }
+    const remote = { ...FIELDS, done: true }
+
+    expect(overlappingFields(base, local, remote)).toEqual([])
+  })
+
+  it('is not a conflict when only one side moved', () => {
+    const base   = FIELDS
+    expect(overlappingFields(base, { ...FIELDS, done: true }, { ...FIELDS })).toEqual([])
+    expect(overlappingFields(base, { ...FIELDS }, { ...FIELDS, done: true })).toEqual([])
   })
 })

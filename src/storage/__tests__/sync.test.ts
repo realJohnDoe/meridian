@@ -201,7 +201,7 @@ vi.mock('@/model', async (importActual) => ({
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { reconcileWithBackend } from '@/storage/sync'
+import { reconcileWithBackend, startCrossTabSync } from '@/storage/sync'
 import { syncToBackend, autoSyncTick, flushPendingPush, syncOnActivate, scheduleAutoPush } from '@/storage/syncScheduler'
 import { resetSyncBackoff, dropAllSyncState } from '@/storage/syncState'
 import { writeEntityToCache, deleteFromBackend } from '@/storage/entityWrites'
@@ -243,7 +243,7 @@ function syncOf(vaultId = 'fake-vault') {
     needsAttention: null as VaultAttention | null,
   }
 }
-import { recordLocalEdit, recordLocalDelete } from '@/storage/cache/files'
+import { recordLocalEdit, recordLocalDelete, cacheGetRecord } from '@/storage/cache/files'
 
 // ── FakeBackend ──────────────────────────────────────────────────────────
 
@@ -1873,6 +1873,192 @@ describe('in-flight write registry — protects against a concurrent reconcile',
     await syncToBackend()
 
     expect(cacheStore.has(vp('fake-vault', 'note.md'))).toBe(false)
+  })
+})
+
+// ── Cross-tab coherence ─────────────────────────────────────────────────
+
+// Two views of one vault (two tabs, or a tab plus the installed PWA) share one
+// IndexedDB and nothing else, so before `startCrossTabSync` a second view's
+// store simply never heard about the first view's writes — and its next save
+// inherited the very version token that write had left in the shared row, so
+// its CAS passed against content it had never seen (data-integrity survey
+// 2026-09-05, finding #2). These drive the listener the way the other view
+// does: write the shared cache, then announce the path on the channel.
+//
+// The announcement carries no content — the listener re-reads the row — which
+// is also what makes two views converge rather than flip-flop when both write:
+// whatever the row ends up holding is what both of them read back.
+
+describe('startCrossTabSync — another view of the same vault', () => {
+  const oneItem = () => [{ date: '', time: null, source: 'explicit' as const, entryKey: K('note'), id: 'i1', metadata: {} }]
+  const NOTE = (title: string) => `---\ntitle: ${title}\n---\n\nOriginal body.\n`
+
+  /** The other view: it writes the shared row, then announces the path on its
+   *  own channel object (ours never receives what it posts itself). */
+  function otherView(): { write: (path: string, content: string) => void; close: () => void } {
+    const channel = new BroadcastChannel('meridian-cache')
+    return {
+      write: (path, content) => {
+        seedClean('fake-vault', path, content, 'v2', Date.now())
+        channel.postMessage({ vaultId: 'fake-vault', paths: [path] })
+      },
+      close: () => { channel.close() },
+    }
+  }
+
+  /** The channel delivers on a macrotask and the listener coalesces for a
+   *  beat after that (CROSS_TAB_COALESCE_MS), so a real wait is what clears
+   *  both — then a flush for the fold's own awaits. Real timers, not fake
+   *  ones: BroadcastChannel delivery is the event loop's, not vitest's. */
+  async function settle(): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, 120))
+    await flush()
+  }
+
+  function titleInStore(slug: string): unknown {
+    return (storeState.roots.get(K(slug)) as { title?: string } | undefined)?.title
+  }
+
+  it('folds the other view\'s write into this view\'s store', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    const stop = startCrossTabSync()
+    const other = otherView()
+
+    other.write('note.md', NOTE('Note (renamed by A)'))
+    await settle()
+
+    expect(titleInStore('note')).toBe('Note (renamed by A)')
+
+    stop(); other.close()
+  })
+
+  it('evicts an entry the other view deleted', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    const stop = startCrossTabSync()
+    const channel = new BroadcastChannel('meridian-cache')
+
+    // A staged delete keeps its row (content '', status 'deleted') until the
+    // push confirms it — an eviction here, not an entry with an empty title.
+    cacheStore.set(vp('fake-vault', 'note.md'), {
+      vaultPath: vp('fake-vault', 'note.md'), vaultId: 'fake-vault', path: 'note.md',
+      content: '', status: 'deleted', updatedAt: Date.now(), version: 'v1',
+    })
+    channel.postMessage({ vaultId: 'fake-vault', paths: ['note.md'] })
+    await settle()
+
+    expect(storeState.roots.has(K('note'))).toBe(false)
+
+    stop(); channel.close()
+  })
+
+  it('leaves a path this view has a write in flight for alone', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    const stop = startCrossTabSync()
+    const other = otherView()
+
+    // Same gating idiom as the in-flight registry tests above: markInFlight
+    // fires synchronously inside writeEntityToCache, before its first await.
+    const originalRecordLocalEdit = vi.mocked(recordLocalEdit).getMockImplementation()!
+    let releaseWrite!: () => void
+    const gate = new Promise<void>(resolve => { releaseWrite = resolve })
+    vi.mocked(recordLocalEdit).mockImplementationOnce(async (...args: Parameters<typeof recordLocalEdit>) => {
+      await gate
+      return originalRecordLocalEdit(...args)
+    })
+    const writePromise = writeEntityToCache(K('note'), NOTE('Note (being written here)'))
+
+    other.write('note.md', NOTE('Note (renamed by A)'))
+    await settle()
+
+    // Folding here would paint the row over an edit that is still only in this
+    // view's store — the same hazard `effectiveSkip` guards in reconcile.
+    expect(titleInStore('note')).toBe('Note')
+
+    releaseWrite()
+    await writePromise
+    stop(); other.close()
+  })
+
+  it('ignores a vault this view has not registered', async () => {
+    seedLayer('other-vault', [], new Map())
+    const stop = startCrossTabSync()
+    const channel = new BroadcastChannel('meridian-cache')
+
+    seedClean('other-vault', 'note.md', NOTE('Renamed elsewhere'), 'v2', Date.now())
+    channel.postMessage({ vaultId: 'other-vault', paths: ['note.md'] })
+    await settle()
+
+    expect(storeState.layers.get('other-vault')?.size ?? 0).toBe(0)
+
+    stop(); channel.close()
+  })
+
+  it('coalesces a burst of announcements into one fold', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    const stop = startCrossTabSync()
+    const other = otherView()
+    const setVaultLayer = vi.mocked((await import('@/storeBridge')).setVaultLayer)
+    setVaultLayer.mockClear()
+
+    other.write('a.md', NOTE('A'))
+    other.write('b.md', NOTE('B'))
+    other.write('c.md', NOTE('C'))
+    await settle()
+
+    expect(setVaultLayer).toHaveBeenCalledTimes(1)
+    expect(titleInStore('a')).toBe('A')
+    expect(titleInStore('c')).toBe('C')
+
+    stop(); other.close()
+  })
+
+  it('logs and carries on when a fold fails, rather than rejecting into nothing', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    const stop = startCrossTabSync()
+    const other = otherView()
+    // The fold is fire-and-forget by construction (the channel's handler cannot
+    // await it), so a failure here has nowhere to go but an unhandled rejection
+    // — which would take the whole tab down under a strict handler.
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(cacheGetRecord).mockRejectedValueOnce(new Error('IndexedDB went away'))
+
+    other.write('note.md', NOTE('Note (renamed by A)'))
+    await settle()
+
+    expect(errors).toHaveBeenCalledWith(
+      expect.stringContaining('cross-tab change'), expect.any(Error),
+    )
+    expect(titleInStore('note')).toBe('Note')
+
+    errors.mockRestore()
+    stop(); other.close()
+  })
+
+  it('stops listening once unsubscribed', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedLayer('fake-vault', oneItem(), new Map([[K('note'), rootFor('note', { title: 'Note', tags: [], items: [] })]]))
+    const stop = startCrossTabSync()
+    stop()
+    const other = otherView()
+
+    other.write('note.md', NOTE('Note (renamed by A)'))
+    await settle()
+
+    expect(titleInStore('note')).toBe('Note')
+
+    other.close()
   })
 })
 

@@ -1,5 +1,6 @@
 import { startOfToday } from 'date-fns'
-import { fmtISO, applyEdit, mergeEditFields, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
+import { toast } from 'sonner'
+import { fmtISO, applyEdit, mergeEditFields, untouchedRemoteChanges, overlappingFields, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
@@ -202,7 +203,77 @@ function touchedFieldsOnly(
   base:      SaveFields | null | undefined,
 ): EditFields {
   if (!base || editScope === 'add') return next
-  return mergeEditFields(editFieldsOf(base), next, currentFields(item, editScope, next))
+  const baseFields = editFieldsOf(base)
+  const current    = currentFields(item, editScope, next)
+  reportDriftConflicts(overlappingFields(baseFields, next, current))
+  return mergeEditFields(baseFields, next, current)
+}
+
+/** How each field is named to the user. Not derived from the key: `tracked`
+ *  and `items` are terms of art here (see GLOSSARY.md) and neither reads as
+ *  itself in a sentence. */
+const FIELD_LABELS: Record<keyof EditFields, string> = {
+  title:        'the title',
+  body:         'the description',
+  tags:         'the tags',
+  items:        'the checklist',
+  participants: 'the participants',
+  tracked:      'the item type',
+  done:         'the done state',
+  priority:     'the priority',
+  scheduled:    'the date',
+  duration:     'the duration',
+  repeat:       'the repeat',
+}
+
+/**
+ * Tell the user that a field they were editing had also been changed
+ * elsewhere, and that theirs is the version that was written.
+ *
+ * These are the genuine overlaps and the only ones: the same field, moved on
+ * both sides, to different values. Everything else the merge above settles
+ * without anyone losing anything. The other writer is usually a second view of
+ * this same vault — another tab, or the installed PWA, whose writes reach this
+ * store through `startCrossTabSync` — but a sync pulling another device's
+ * change produces the identical situation and deserves the identical notice.
+ *
+ * A warning rather than a conflict copy, unlike the backend collision this
+ * mirrors: the loser here is one field rather than a whole file, and there is
+ * nowhere sensible to put a timestamped copy of one. What matters is that the
+ * user hears about it — the loss is otherwise completely invisible.
+ */
+function reportDriftConflicts(conflicts: Array<keyof EditFields>): void {
+  if (conflicts.length === 0) return
+  const labels = conflicts.map(f => FIELD_LABELS[f])
+  const named = labels.length === 1
+    ? labels[0]
+    : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)!}`
+  toast.warning(`${named} also changed somewhere else — your version was kept.`, { duration: 7000 })
+}
+
+/**
+ * The fields the store has moved that an open editor has not — the ones it can
+ * adopt on the spot without overriding anything the user did.
+ *
+ * `touchedFieldsOnly` above asks the same three-way question at the last
+ * possible moment: it makes a *save* correct and says nothing to anyone. This
+ * asks it continuously, so the editor can show a change while the entry is
+ * still open rather than holding a value the file stopped having minutes ago.
+ * See `useLiveReload`, its only caller, for what it does and does not take.
+ *
+ * `local` is the editor's live state, which for the description means whatever
+ * CodeMirror holds right now rather than the `body` on the last render.
+ */
+export function untouchedStoreChanges(
+  item:      Occurrence,
+  editScope: EditScope,
+  base:      SaveFields,
+  local:     SaveFields,
+): Partial<EditFields> {
+  const localFields = editFieldsOf(local)
+  return untouchedRemoteChanges(
+    editFieldsOf(base), localFields, currentFields(item, editScope, localFields),
+  )
 }
 
 /** Everything `saveNode` needs beyond the item and its fields. */

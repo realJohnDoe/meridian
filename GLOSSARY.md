@@ -349,6 +349,28 @@ A save writes only these, leaving the rest at whatever the store holds by then
 that moved underneath it. Same three-way rule as `merge`, one layer up.
 → `model/merge.ts` · `mergeEditFields`
 
+### second view / live reload
+A **second view** is another window onto the same vault on the same device — a
+second tab, or the installed PWA — sharing one IndexedDB but not one in-memory
+store, which is why it is not a second *device* and its divergence is not
+caught by the compare-and-swap. Every cache write that changes content is
+announced on a channel, and the views that hear re-read those rows into their
+own store: the **live reload**. An open editor takes from it only the fields
+its user has not touched; the ones both sides moved are the drift conflict
+below.
+→ `storage/cache/broadcast.ts` · `publishCacheChange`, `onCacheChange`
+→ `storage/sync.ts` · `startCrossTabSync`
+→ `editor/useLiveReload.ts` · `useLiveReload`
+
+### drift conflict
+The editor-level counterpart of a conflict copy: one field, moved on both
+sides to different values, with no ancestor left to reconcile them. The user's
+version is the one written (`touched fields` decides that) and they are told
+which fields it happened to — the only signal that the other side's edit
+existed at all.
+→ `model/merge.ts` · `untouchedRemoteChanges`, `overlappingFields`
+→ `editor/save.ts` · `untouchedStoreChanges`
+
 ### staged move / held delete
 A cross-vault move, which cannot be one transaction across two vault layers and
 two remotes, so it is ordered instead. The target's copy is made durable first;
