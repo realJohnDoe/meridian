@@ -2,6 +2,8 @@
 
 **Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**
 
+<img src="public/screenshots/agenda-narrow.png" width="340" alt="Meridian's agenda view on a phone, showing scheduled tasks and events grouped by day." />
+
 **Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 
 **And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins. Tag people on entries, filter the calendar down to one person.
