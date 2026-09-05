@@ -180,6 +180,13 @@ export default defineConfig({
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
         ],
+        // Chrome/Android use these for the richer install prompt (installability
+        // itself doesn't need them — name, icons, start_url and display cover
+        // that). form_factor picks which shot each platform shows.
+        screenshots: [
+          { src: 'screenshots/agenda-narrow.png', sizes: '780x1688', type: 'image/png', form_factor: 'narrow' },
+          { src: 'screenshots/agenda-wide.png', sizes: '2880x1800', type: 'image/png', form_factor: 'wide' },
+        ],
       },
     }),
     spaFallbackPlugin(),

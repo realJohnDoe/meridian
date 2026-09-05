@@ -144,7 +144,7 @@ PMF signal in this repository to read. Section 5 is written accordingly.
 2. **Niche recognition** — *findings: #4.*
 3. **Visual identity & aesthetic fit** — *findings: below the cut* (see G).
    Fully assessed via real screenshots.
-4. **Differentiation & alternatives** — *findings: #1, #3.*
+4. **Differentiation & alternatives** — *findings: #3.*
 5. **Audience selection** — *findings: #5.*
 6. **Adoption gates** — *findings: #5.* Confirmed as working: the read-only
    Tutorial vault is a genuine try-before-committing path, reachable with zero
@@ -157,68 +157,18 @@ PMF signal in this repository to read. Section 5 is written accordingly.
 
 **The verdict and this table disagree on order, deliberately.** The niche verdict
 leads on impact and names #4 as the change to make; the table below ranks on
-`(impact × breadth) ÷ effort`, which is return on effort. #1 outranks #4
-and #5 because it is cheap and wide, not because it matters more.
+`(impact × breadth) ÷ effort`, which is return on effort.
 
 | Rank | # | Finding | Gap | Question | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|---|
-| 1 | #1 | No visual proof of the phone claim | declared-vs-served (inverted) | communication | 7 | 3 | Haiku 4.5 | 21 |
 | 3 | #3 | iCal, backlog, favorites, themes, multi-vault shipped and unclaimed — blog says the opposite | declared-vs-revealed | both | 7 | 4 | Sonnet 5 | 14 |
 | 5 | #5 | "Usable by someone who won't configure a vault" — the setup half is fixed, the word isn't | declared-vs-served | communication | 5 | 4 | Haiku 4.5 | 20 |
 
 **Sequencing note.** #5's decision (keep the promise, build the sharing path
 rather than soften the claim) has been made and its harder half shipped —
 `plans/onboarding.md`'s PR 4 landed the invite path, 2026-09-04
-(realJohnDoe/meridian#959). What's left is #1 and #3's README edits. #4 is
+(realJohnDoe/meridian#959). What's left is #3's README edits. #4 is
 independent (source only) and can go first or in parallel.
-
----
-
-### #1 — The phone claim is asserted five times and shown zero times
-
-- **Gap:** `declared-vs-served`, inverted — the served experience is *better*
-  than the declared surface can prove. Worth stating plainly rather than forcing
-  it into one of the three labels.
-- **Question:** communication
-- **Category:** `proof` `differentiation` `recognition`
-- **Who it costs us:** the visitor who arrives from a link or a forum post and
-  does not click through to the app. **Share: unknown** — there is no analytics.
-  What *is* knowable from artifacts: the claim carries the headline (README:3),
-  so every arrival meets it, and the only three surfaces that could carry an
-  image carry none.
-- **Impact:** 7
-- **Evidence:**
-  - `README.md:3` — `**Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**`
-  - `README.md` contains **no image at all** (`grep -n '!\[' README.md` → no matches).
-  - `index.html:42` — `    <meta property="og:image" content="https://realjohndoe.github.io/meridian/icon-512.png">` — every shared link previews the app *icon*, not the product.
-  - `vite.config.ts:151-183` — the manifest declares `name`, `description`,
-    `icons`, `display`, `start_url`, `background_color`. There is **no
-    `screenshots` key**, so the Android install prompt shows the minimal dialog
-    rather than the richer install UI.
-  - Product evidence: the mobile UI genuinely is the differentiator — verified by
-    screenshot at 390×844 (bottom-anchored search + FAB, one-handed reach,
-    no reflowed desktop chrome). And usable screenshots already exist in-repo at
-    `blog/1-meridian-why-i-built-a-markdown-first-calendar/images/agenda-view.png`.
-- **Breadth:** 3 surfaces, from an actual search (`README.md`, `index.html`,
-  `vite.config.ts` manifest).
-- **Recommended model:** **Haiku 4.5.** The work is adding images and one
-  manifest key; a wrong version is visibly wrong, not silently wrong.
-  - *Task context:* the in-repo `agenda-view.png` is from a July build (red sync
-    icon, no bottom search bar) — **regenerate rather than reuse it**. The recipe
-    that produced fresh ones this run: `pnpm exec vite --port 5199 --strictPort`,
-    then `playwright-core` (already a devDependency) with
-    `executablePath: '/opt/pw-browsers/chromium'`, viewport 390×844,
-    `deviceScaleFactor: 2`, navigate to `http://localhost:5199/meridian/`, wait
-    ~2.5s. **The trap:** the PWA manifest's `theme_color` is deliberately
-    `undefined` and `vite.config.ts:155-174` is a 20-line comment explaining why
-    — add `screenshots` **without** touching `theme_color`, or you re-introduce
-    the Firefox-for-Android status-bar bug that comment documents. `screenshots`
-    entries need `src`, `sizes`, `type` and `form_factor` (`"narrow"` for the
-    390×844 shot, `"wide"` for a desktop one) for Chrome to use the rich prompt.
-- **Problem:** the target user is asked to take the product's single most
-  important claim entirely on trust, on every surface where they meet it.
-- **Fix:** put a phone screenshot directly under the README headline, point
-  `og:image` at it, and add a `screenshots` array to the manifest.
 
 ---
 
