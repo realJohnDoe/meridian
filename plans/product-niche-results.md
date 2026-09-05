@@ -145,8 +145,8 @@ PMF signal in this repository to read. Section 5 is written accordingly.
 3. **Visual identity & aesthetic fit** — *findings: below the cut* (see G).
    Fully assessed via real screenshots.
 4. **Differentiation & alternatives** — **clean.**
-5. **Audience selection** — *findings: #5.*
-6. **Adoption gates** — *findings: #5.* Confirmed as working: the read-only
+5. **Audience selection** — **clean.**
+6. **Adoption gates** — **clean.** Confirmed as working: the read-only
    Tutorial vault is a genuine try-before-committing path, reachable with zero
    setup, and it is the app's default state.
 7. **Niche drift & emerging signals** — *findings: below the cut* (F).
@@ -161,72 +161,9 @@ leads on impact and names #4 as the change to make; the table below ranks on
 
 | Rank | # | Finding | Gap | Question | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|---|
-| 5 | #5 | "Usable by someone who won't configure a vault" — the setup half is fixed, the word isn't | declared-vs-served | communication | 5 | 4 | Haiku 4.5 | 20 |
 
-**Sequencing note.** #5's decision (keep the promise, build the sharing path
-rather than soften the claim) has been made and its harder half shipped —
-`plans/onboarding.md`'s PR 4 landed the invite path, 2026-09-04
-(realJohnDoe/meridian#959). #4 is independent (source only) and can go first
-or in parallel.
-
----
-
-### #5 — "Usable by someone who won't configure a vault" — the setup half is fixed, the word isn't
-
-- **Gap:** `declared-vs-served`
-- **Question:** communication (was fit + communication — the fit question, "is a
-  shared repo a viable calendar for a non-technical second person," is answered:
-  the invite path now does what the README says. What's left is a naming
-  inconsistency, not a fit gap.)
-- **Category:** `recognition` (was also `audience-selection` `adoption-gate` — the
-  hard adoption gate, a required GitHub App install, is gone for this audience)
-- **Who it costs us:** the non-technical person a current user tries to share a
-  calendar with — the exact person README:7 recruits. They can now actually do
-  what the README says (sign in, pick the repo); what still costs them is
-  meeting the word "vault" along the way, not a technical wall.
-- **Impact:** 5 *(was 8 — downgraded now that evidence point 2, the hard block, is resolved)*
-- **Evidence:**
-  - `README.md:24` — `| Usable by someone who won't configure a vault | ✅ | ❌ | ✅ |`
-  - `README.md:7` recruits that person explicitly: `**And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins. Tag people on entries, filter the calendar down to one person.`
-  - The served path contradicted it three ways; one is now fixed:
-    1. **The word.** Still open. 33 user-visible `vault` strings in `src/`; the
-       settings screen is a vault list; the wizard is `AddVaultWizard`; and
-       `src/onboarding/CoachTour.tsx:73` tells the user to `manage vaults in Settings`.
-       This is the same underlying problem finding #2 already tracks — closing
-       #2's rename closes this too, no separate fix needed.
-    2. ~~**The setup.** `src/routes/auth.callback.tsx:170` — a round trip out to
-       GitHub to install a third-party App, then a second sign-in.~~ **Resolved
-       2026-09-04:** `plans/onboarding.md` PR 4 (merged as
-       realJohnDoe/meridian#959) shipped an in-app invite path for exactly the
-       audience this finding is about — a collaborator adds an "Invite someone"
-       row (`src/settings/VaultSettings.tsx`) that links to the repo's
-       collaborator-access page and copies a message telling the recipient to
-       sign in with GitHub and pick the repo, with no install step, because per
-       the app owner's confirmation (see "Unverified, flagged" above) a
-       collaborator never needs one. `README.md:7`'s claim now holds for this
-       path. (The *owner's* own first-time setup still goes through the
-       App-install round trip at `auth.callback.tsx:170` — untouched, but that
-       was never who this finding is about.)
-    3. **The alternative.** Still open, and minor: the only non-GitHub writable
-       backend needs Chrome or Edge (`AddVaultWizard.tsx:27`) — a real
-       limitation, but a disclosed one (the README concedes it at lines 51 and
-       64), so it is not the same kind of broken promise as points 1 and 2 were.
-  - Counter-evidence worth weighing before changing anything: the visual identity
-    genuinely does recruit that person (see the blind visual read — it looks like
-    a consumer app), and the read-only Tutorial vault genuinely is a zero-setup
-    front door. The claim is not fantasy; it is ahead of the setup path.
-- **Breadth:** 4 surfaces *(was 5 — `auth.callback.tsx` dropped, resolved)*:
-  `README.md` lines 7/24, `AddVaultWizard.tsx`, `CoachTour.tsx:73`, the settings
-  vault screens.
-- **Recommended model:** **Haiku 4.5** *(was Opus 5, plan mode, multi-PR)* — the
-  expensive part was the beachhead decision and the sharing-path build; both are
-  done. What remains is the copy-level rename finding #2 already scopes.
-- **Problem:** a person invited to a shared vault no longer meets a GitHub App
-  install, but still meets the word "vault" the moment they add the shared
-  repo — the promise is functionally true now and terminologically inconsistent.
-- **Fix:** none beyond finding #2's rename. Once #2 lands, re-check that the
-  invite path's own screens (Settings → Vaults → Add vault) don't still say
-  "vault" to the person README:7 told they wouldn't have to learn that word.
+No finding currently ranks in the top 5 — see "Below the cut" for the two
+sub-threshold items still open.
 
 ---
 
