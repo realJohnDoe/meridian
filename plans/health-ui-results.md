@@ -90,10 +90,10 @@ coverage of 100%.
 
 ## 3. Category verdicts
 
-1. **Component Architecture & Boundaries** — findings: #1. Otherwise
-   strong: 0 whole-store subscriptions, 0 selector-returns-literal
-   subscriptions, module boundaries enforced by `no-restricted-paths`, and
-   `DayView`/`WeekView` are thin shells over a shared `useCarousel` seam.
+1. **Component Architecture & Boundaries** — **clean.** 0 whole-store
+   subscriptions, 0 selector-returns-literal subscriptions, module boundaries
+   enforced by `no-restricted-paths`, and `DayView`/`WeekView` are thin shells
+   over a shared `useCarousel` seam.
 2. **Styling System Consistency** — **clean.** One CSS file; 0 hardcoded hex
    outside `src/debug/` and one deliberate `PARSE_PROBE`; 14 arbitrary
    Tailwind values, every one a genuine computed length (`calc`, `env()`,
@@ -171,109 +171,9 @@ identity, not order.
 |---|------|-------|-----------|--------|---------|-------------------|-------|
 | #3 | 3 | `Button`/`Separator` get zero compiler memoization | `performance` `library-fit` | 6 | 9 | **Opus 5** (Sonnet 5 if the mirror policy is pre-decided) | 18 |
 | #8 | 5 | `isSafeUrl` — the only XSS gate — has no tests | `security` `testing` | 4 | 1 | **Haiku 4.5** | 4 |
-| #1 | 7 | `AppMain` is a 481-line component with 9 branch chains | `component-architecture` `srp` `testing` | 7 | 1 | **Opus 5** | 2.3 |
 
-> **Read the rank column with care.** Breadth-in-files structurally
-> under-ranks #1: the entire problem is concentrated in one file, which is
-> what makes it a god component in the first place. By impact it is first.
-> This is a scoring-rule observation, not a hedge — see "Survey file changes".
-
-**Sequencing.** #3, #8 and #1 are independent of each other and can be done
-in any order.
-
----
-
-### #1 — `AppMain` is a 481-line component that re-derives the view discriminant nine times
-
-- **Category** — `component-architecture` `srp` `testing`
-- **Impact** — 7
-- **Breadth** — 1 file (`src/routes/_app.tsx`). Search:
-  `grep -n 'isDayView\|isWeekView\|isMonthView\|isListView' src/routes/_app.tsx`
-  → 9 branch-chain sites at lines 193, 207, 239, 247, 259, 288, 454, 484, 518.
-  (One prior sibling — the topbar's own copy of this chain, then at line 388
-  — has since been consolidated into the `pagedView` lookup below; that fixed
-  finding is what the sites at 220–234 now reflect. It relocated the site, it
-  did not remove it: `AppMain` still independently re-derives the same
-  discriminant 9 times.)
-- **Recommended model** — **Opus 5.** The topbar's own triplicated branches
-  have already been folded into a single `pagedView` lookup
-  (`src/routes/_app.tsx:219–235`); what remains is a decomposition whose
-  right shape is not determined by the code. **Why the context below does not
-  lower this:** the open question is what unit `AppMain` should decompose
-  *into* — one `useViewConfig()` hook returning a per-view descriptor, five
-  sibling components each owning its own topbar and quick-nav panel, or a
-  route-level `topbar`/`quickNav` slot that each leaf route fills. Those
-  three have materially different consequences for how `viewState.ts`'s
-  preview state is threaded, and the file's existing comments document
-  hard-won reasons (the frozen `agendaQuickNavAnchor`, the desktop-vs-mobile
-  focus split) that any of them could quietly break. That is a judgement
-  call, not a gap in this report.
-- **Evidence** — `src/routes/_app.tsx`. The same discriminant, in three
-  different orderings. At line 193:
-  ```
-  const viewKind = isDayView ? 'day' : isWeekView ? 'week' : isMonthView ? 'month' : isListView ? 'list' : 'agenda'
-  ```
-  at line 247 (`handleToday`):
-  ```
-    if (isDayView) {
-  ```
-  and at line 288 (the quick-nav panel), month-first this time:
-  ```
-    isMonthView && monthViewDate && monthDisplayDate ? (
-  ```
-  while `pagedView` — now the topbar's single source, computed once rather
-  than duplicated across it — still goes day-first at line 220:
-  ```
-    isDayView && dvDate && dvDisplayDate ? {
-  ```
-- **Problem** — Adding a view, or changing what paging does, means finding and
-  editing four independent branch chains that are not adjacent, not in the
-  same order, and not checked against each other by anything; missing one is a
-  silent behavioural inconsistency between the topbar label, the "Today"
-  button, and the quick-nav panel rather than a build or type error.
-- **Fix** — Lift the remaining per-view knowledge (`viewKind`, `handleToday`,
-  `renderQuickNavPanel`, and now `pagedView`) into one `useViewConfig()` (or
-  equivalent) that returns a single descriptor per view, and let
-  `handleToday`, the quick-nav panel and the `isListView` guards read from
-  it, so the discriminant is computed once.
-
-**Task context**
-
-- `AppMain` runs `src/routes/_app.tsx:89` to `:546`. `AppLayout` (`:47–:87`)
-  is fine and should stay as-is; `previewAware` (`:42`) is a good helper and
-  should stay.
-- The five views and where each is currently spelled out:
-  | View | route match (`:97–:101`) | `handleToday` | quick-nav panel | topbar |
-  |---|---|---|---|---|
-  | day | `dayMatch` | `:247–:248` | `:290–:312` | `pagedView` `:220–:224` |
-  | week | `weekMatch` | `:249–:258` | `:313–:356` | `pagedView` `:225–:229` |
-  | month | `monthMatch` | `:259–:260` | `:288–:289` | `pagedView` `:230–:234` |
-  | list (backlog/notes) | `backlogMatch`/`notesMatch` | — (falls through) | none | `:429–:435` |
-  | agenda | none of the above | `:261–:264` | `:357–:380` | `:436–:447` |
-- **The trap, located.** `agendaQuickNavAnchor` (`:126`) is a deliberately
-  *frozen* snapshot of `agendaTopDate`, reset in render phase by
-  `useResetOnChange` rather than an effect. Its doc comment at `:120–:125`
-  explains that feeding the live value back in makes repeated swipes unable to
-  advance past the first browsed month. Any descriptor that hands the agenda
-  its anchor must preserve the freeze, and `src/routes/_app.test.tsx:163–214`
-  is the test that catches it if you don't — run it.
-- **Second trap.** The `useEffect` at `:163` (Escape/focus for the mobile
-  inline panel) must keep its `isDesktopQuickNav` guard. Its comment at
-  `:154–:162` records that running it on desktop fights Radix `FocusScope` and
-  leaves focus on `document.body`. There is no test for this; it is
-  desktop-keyboard-only.
-- **What stays.** All five `PagedTopbar` prop sets keep `replace: true` on
-  prev/next nav — one comment on `pagedView` (`:211–:218`, consolidated from
-  three separate copies by the topbar fix above) records that this is what
-  keeps chevron taps from stacking one history entry per day/week/month.
-- **Precedent in-repo.** `src/calendar/useCarousel.ts` is the same shape
-  already solved: `DayView`/`WeekView`/`MonthView` pass `unitKey`/`unitAt`/
-  `onCommit` into one shared hook instead of each re-implementing paging.
-  `src/calendar/DayView.tsx` is 80 lines as a result. That is the target.
-- **Verify after:** `pnpm run build && pnpm run lint && pnpm run test`, plus
-  `node scripts/layout-smoke.mjs` (needs a `dist/`) since this file owns the
-  `_app` shell's height cap — `src/routes/-appShell.test.ts` pins how it is
-  expressed but not the resulting geometry.
+**Sequencing.** #3 and #8 are independent of each other and can be done in
+any order.
 
 ---
 

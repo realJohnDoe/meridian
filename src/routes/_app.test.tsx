@@ -83,11 +83,12 @@ vi.mock('@/calendar', async (importOriginal) => {
 })
 
 // createFileRoute/useMatch/useNavigate/Outlet mocked the same way
-// __root.test.tsx mocks createRootRoute/Outlet — _app.tsx's useMatch calls
-// need real router context otherwise, which nothing here sets up. A blanket
-// `undefined` for every useMatch call is enough to land on the agenda
-// branch (isDayView/isWeekView/isMonthView/isListView all false), the one
-// this bug lives in.
+// __root.test.tsx mocks createRootRoute/Outlet — the per-view chrome adapters
+// _app.tsx composes (see -useViewChrome.ts) call useMatch, which needs real
+// router context otherwise, and nothing here sets that up. A blanket
+// `undefined` for every useMatch call means none of the four named routes
+// matches, so useViewChrome falls through to the agenda — the view this bug
+// lives in.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactRouter>()
   return {
@@ -225,5 +226,49 @@ describe('_app — agenda quick-nav panel: one browse per swipe', () => {
 
     act(() => { latestOpts!.onCommit('2026-10') })
     expect(scrollCalls).toEqual(['2026-10-01'])
+  })
+})
+
+// _app.tsx's remaining, view-agnostic half after the finding #1 decomposition:
+// the panel's own presentation mechanics. The inline mobile panel isn't
+// Radix-managed, so its Escape handling and focus restore are hand-rolled
+// (see the effect's own doc comment) and had no test of their own.
+describe('_app — quick-nav panel keyboard dismissal', () => {
+  it('closes on Escape and returns focus to the disclosure button that opened it', () => {
+    seedStore([], makeRoots('note.md'))
+    const { container } = render(<AppLayout />)
+
+    const toggle = container.querySelector('[aria-controls="quickNavPanel"]')
+    expect(toggle).toBeInstanceOf(HTMLButtonElement)
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false')
+
+    act(() => toggleQuickNav())
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+
+    act(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })) })
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false')
+    // Focus must land back on the opener, not fall through to document.body.
+    expect(document.activeElement).toBe(toggle)
+  })
+
+  it('ignores other keys while the panel is open', () => {
+    seedStore([], makeRoots('note.md'))
+    const { container } = render(<AppLayout />)
+    const toggle = container.querySelector('[aria-controls="quickNavPanel"]')
+
+    act(() => toggleQuickNav())
+    act(() => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })) })
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
+describe('_app — search param validation', () => {
+  it('keeps sq only when it is a string', () => {
+    const { validateSearch } = Route as unknown as {
+      validateSearch: (search: Record<string, unknown>) => { sq?: string }
+    }
+    expect(validateSearch({ sq: 'groceries' })).toEqual({ sq: 'groceries' })
+    expect(validateSearch({ sq: 42 })).toEqual({ sq: undefined })
+    expect(validateSearch({})).toEqual({ sq: undefined })
   })
 })

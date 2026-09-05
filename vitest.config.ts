@@ -137,14 +137,28 @@ export default defineConfig({
         'src/routes/auth.callback.tsx': { statements: 92, branches: 88, functions: 95, lines: 95 },
         'src/routes/__root.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         // Un-excluded from coverage (health-ui-results.md finding #6):
-        // AppMain's topbar composition, quick-nav orchestration and focus
-        // management, not registration. Floored a few points under measured
-        // coverage rather than at -entryTopbar.tsx/-pagedTopbar.tsx's 92+ —
-        // the remaining gap is per-view callback props (onSelectDay,
-        // onBrowseMonth, ...) that only fire on a real pointer gesture inside
-        // MiniMonth/MonthStrip, which _app.viewBranches.test.tsx's per-view
-        // rendering exercises but doesn't drive.
-        'src/routes/_app.tsx': { statements: 70, branches: 80, functions: 48, lines: 72 },
+        // AppMain's shell layout and quick-nav panel mechanics, not
+        // registration. Re-measured after finding #1 moved the per-view half
+        // out to the chrome adapters below — the file got smaller and its
+        // covered fraction rose, but the two Radix desktop-popover callbacks
+        // (onOpenChange, onCloseAutoFocus) stay out of reach under jsdom and
+        // now weigh more against a shorter file, which is why functions sits
+        // well below -entryTopbar.tsx/-pagedTopbar.tsx's 95.
+        'src/routes/_app.tsx': { statements: 75, branches: 80, functions: 55, lines: 85 },
+        // The five per-view chrome adapters, the ViewChrome port they
+        // implement and the composition root that picks between them
+        // (health-ui-results.md finding #1). This is the per-view topbar and
+        // quick-nav logic that used to live inside _app.tsx and was floored as
+        // part of it; keeping it floored here is what stops the extraction
+        // from quietly downgrading its guard. -weekChrome.tsx is the loosest
+        // because its onBrowseMonthPreview only fires mid-gesture.
+        'src/routes/-viewChrome.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        'src/routes/-useViewChrome.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        'src/routes/-dayChrome.tsx': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        'src/routes/-weekChrome.tsx': { statements: 88, branches: 78, functions: 75, lines: 90 },
+        'src/routes/-monthChrome.tsx': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        'src/routes/-listChrome.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        'src/routes/-agendaChrome.tsx': { statements: 92, branches: 82, functions: 95, lines: 95 },
         'src/entryRoute.ts': { statements: 92, branches: 85, functions: 95, lines: 95 },
         'src/routes/-entryTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         'src/routes/-pagedTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
