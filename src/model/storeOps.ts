@@ -236,6 +236,17 @@ export interface EditFields extends EditorFields {
   body: string
 }
 
+/**
+ * Which `EditFields` keys a save actually changed relative to what the editor
+ * loaded — `undefined` means "unknown, treat every field as changed", the
+ * default for every caller that has no such distinction to offer (a
+ * brand-new entry, a rebuild of a remotely-deleted one, the debug view).
+ * Threaded from `applyEdit` down to `occMeta`/`seriesMeta`/`editedEntry`,
+ * which use it to decide which `extra` keys a save is entitled to strip —
+ * see the "Metadata constructors" note below.
+ */
+type TouchedKeys = ReadonlySet<keyof EditFields> | undefined
+
 // ── Metadata constructors ─────────────────────────────────────────────────────
 //
 // THE four places a metadata value is built: `occFromAppMeta` (convert),
@@ -261,6 +272,38 @@ function withoutKeys(extra: Record<string, unknown> | undefined, keys: readonly 
     if (!keys.includes(k)) out[k] = v
   }
   return Object.keys(out).length > 0 ? out : undefined
+}
+
+/**
+ * The occurrence-level `extra` keys `occMeta` is about to write a fresh typed
+ * value for, given which `EditFields` this save touched.
+ *
+ * `undefined` (the "unknown, treat everything as changed" default — see
+ * `TouchedKeys`) strips all four, which is every caller's old behaviour before
+ * this distinction existed. `done` maps from *either* `tracked` or `done`:
+ * `occMeta` derives the typed field from both together
+ * (`f.tracked ? f.done : undefined`), so a save that touched either one is
+ * about to write a fresh `done` and must not leave a stale raw value parked
+ * under it (data-integrity survey, finding #1).
+ */
+function touchedOccKeys(touched: TouchedKeys): readonly string[] {
+  if (!touched) return ['participants', 'duration', 'priority', 'done']
+  const keys: string[] = []
+  if (touched.has('participants'))                   keys.push('participants')
+  if (touched.has('duration'))                        keys.push('duration')
+  if (touched.has('priority'))                        keys.push('priority')
+  if (touched.has('tracked') || touched.has('done'))  keys.push('done')
+  return keys
+}
+
+/** `editedEntry`'s file-level counterpart to `touchedOccKeys` — see its doc comment. */
+function touchedFileKeys(touched: TouchedKeys): readonly string[] {
+  if (!touched) return ['title', 'tags', 'items']
+  const keys: string[] = []
+  if (touched.has('title')) keys.push('title')
+  if (touched.has('tags'))  keys.push('tags')
+  if (touched.has('items')) keys.push('items')
+  return keys
 }
 
 /**
@@ -296,19 +339,23 @@ export function occFromAppMeta(m: { done?: boolean; participants?: string[]; pri
  * Build occurrence-level metadata from editor fields.
  * File-level fields (title/tags/items/body) never appear here — they go to roots.
  *
- * Strips the registry keys this function writes out of `base.extra`: a
- * malformed known field (e.g. `duration: [1, 2]`) is preserved in `extra` under
- * its own key, and that stale raw value must not shadow a value the editor just
- * wrote for the same field.
+ * Strips `touched`'s registry keys out of `base.extra` (all four when
+ * `touched` is `undefined` — see `TouchedKeys`): a malformed known field
+ * (e.g. `duration: [1, 2]`) is preserved in `extra` under its own key, and
+ * that stale raw value must not shadow a value the editor just wrote for the
+ * same field. A field this save did NOT touch keeps its raw value in `extra`
+ * instead — see `touchedOccKeys` and data-integrity survey finding #1: this
+ * function used to strip all four unconditionally, so renaming a title alone
+ * deleted an unrelated hand-authored `tags`/`done`/`priority`.
  */
-function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMetadata {
+function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields, touched?: TouchedKeys): OccurrenceMetadata {
   return {
     ...(base as OccurrenceMetadata),
     participants: f.participants,
     duration:     f.duration || undefined,
     priority:     f.priority ?? undefined,
     done:         f.tracked ? f.done : undefined,
-    extra:        withoutKeys(base.extra, ['participants', 'duration', 'priority', 'done']),
+    extra:        withoutKeys(base.extra, touchedOccKeys(touched)),
   }
 }
 
@@ -324,8 +371,8 @@ function occMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMe
  * against here. Per-occurrence completion is always stored as an override, never
  * on the series root.
  */
-function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): OccurrenceMetadata {
-  return { ...occMeta(base, f), done: f.tracked ? false : undefined }
+function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields, touched?: TouchedKeys): OccurrenceMetadata {
+  return { ...occMeta(base, f, touched), done: f.tracked ? false : undefined }
 }
 
 /**
@@ -348,12 +395,17 @@ function seriesMeta(base: Partial<OccurrenceMetadata>, f: EditFields): Occurrenc
  * silently revert the file to Meridian's LF default the moment it's next
  * saved — the exact class of loss finding #8 was about, reintroduced one
  * layer up if this line is ever dropped.
+ *
+ * Strips `touched`'s file-level keys out of `prevRoot.extra` (all three when
+ * `touched` is `undefined`) on the same rule `occMeta` applies — see
+ * `touchedFileKeys` and data-integrity survey finding #1.
  */
 function editedEntry(
   prev: Entry | undefined,
   key: EntryKey,
   fields: EditFields,
   items: Entry['items'],
+  touched?: TouchedKeys,
 ): Entry {
   const prevRoot = prev?.root
   return {
@@ -364,7 +416,7 @@ function editedEntry(
       tags:  fields.tags,
       items: fields.items,
       body:  fields.body || undefined,
-      extra: withoutKeys(prevRoot?.extra, ['title', 'tags', 'items']),
+      extra: withoutKeys(prevRoot?.extra, touchedFileKeys(touched)),
       // Derived from the key rather than copied from `prev`, which is the same
       // carry-forward as `fileConvention` below but strictly safer: it is also
       // correct when there IS no previous entry (a brand-new file), and it makes
@@ -378,13 +430,13 @@ function editedEntry(
 }
 
 /** Apply editor fields onto an existing series or standalone item's structural + metadata fields. */
-function applyFieldsToItem(item: StoreItem, fields: EditFields): StoreItem {
+function applyFieldsToItem(item: StoreItem, fields: EditFields, touched?: TouchedKeys): StoreItem {
   const { scheduled, repeat } = fields
   if (isSeries(item)) {
-    return { ...item, metadata: seriesMeta(item.metadata, fields), repeat: repeat ?? item.repeat,
+    return { ...item, metadata: seriesMeta(item.metadata, fields, touched), repeat: repeat ?? item.repeat,
       date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
   }
-  return { ...item, metadata: occMeta(item.metadata, fields),
+  return { ...item, metadata: occMeta(item.metadata, fields, touched),
     date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
 }
 
@@ -413,10 +465,10 @@ function applyFieldsToItem(item: StoreItem, fields: EditFields): StoreItem {
  * Spreading `occMeta`'s result rather than assembling a literal is the
  * sanctioned form — see the "Metadata constructors" note above.
  */
-function applyFieldsToChildren(items: Entry['items'], seriesId: string, fields: EditFields): Entry['items'] {
+function applyFieldsToChildren(items: Entry['items'], seriesId: string, fields: EditFields, touched?: TouchedKeys): Entry['items'] {
   return mapItems(items, i => {
     if (isSeries(i) || i.ownerId !== seriesId) return i
-    return { ...i, metadata: { ...occMeta(i.metadata, fields), done: i.metadata.done } }
+    return { ...i, metadata: { ...occMeta(i.metadata, fields, touched), done: i.metadata.done } }
   })
 }
 
@@ -594,17 +646,17 @@ function freshItem(entryKey: EntryKey, fields: EditFields, id: string): StoreIte
 }
 
 /** Update the series (or standalone) metadata across all occurrences. */
-function applyAll(data: StoreData, occ: Occurrence, fields: EditFields): StoreData {
+function applyAll(data: StoreData, occ: Occurrence, fields: EditFields, touched?: TouchedKeys): StoreData {
   const entry = data.entries.get(occ.entryKey)
   if (!entry) return data
   const matchItem = occ.ownerId
     ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
     : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
-  let items = mapItems(entry.items, i => matchItem(i) ? applyFieldsToItem(i, fields) : i)
+  let items = mapItems(entry.items, i => matchItem(i) ? applyFieldsToItem(i, fields, touched) : i)
   // …and onto the series' override children, so "all events" reaches the
   // occurrences the user already overrode — see `applyFieldsToChildren`.
-  if (occ.ownerId) items = applyFieldsToChildren(items, occ.ownerId, fields)
-  return { ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items)) }
+  if (occ.ownerId) items = applyFieldsToChildren(items, occ.ownerId, fields, touched)
+  return { ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items, touched)) }
 }
 
 /**
@@ -618,12 +670,12 @@ function applyAll(data: StoreData, occ: Occurrence, fields: EditFields): StoreDa
  * moving the occurrence back to where it started) clears that stub first —
  * see `dropExclusionStub`.
  */
-function applySingle(data: StoreData, occ: Occurrence, fields: EditFields): StoreData {
+function applySingle(data: StoreData, occ: Occurrence, fields: EditFields, touched?: TouchedKeys): StoreData {
   const { scheduled, repeat } = fields
   const entry = data.entries.get(occ.entryKey)
   if (!entry) return data
   const commit = (items: Entry['items']): StoreData =>
-    ({ ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items)) })
+    ({ ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items, touched)) })
   let items: Entry['items'] = entry.items
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
@@ -637,7 +689,7 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields): Stor
       repeat,
       entryKey: occ.entryKey,
       id:       occ.id,
-      metadata: seriesMeta(base, fields),
+      metadata: seriesMeta(base, fields, touched),
     }
     return commit(mapItems(items, i => i.id === occ.id ? newSeries : i))
   }
@@ -659,7 +711,7 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields): Stor
       entryKey: occ.entryKey,
       id:       movedId,
       ownerId:  occ.ownerId,
-      metadata: occMeta(base, fields),
+      metadata: occMeta(base, fields, touched),
     }
     const already = items.some(i => i.id === movedId)
     return commit(already ? mapItems(items, i => i.id === movedId ? moved : i) : addItem(items, moved))
@@ -669,7 +721,7 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields): Stor
     items = dropExclusionStub(items, occ.ownerId, newDate)
   }
 
-  return commit(upsertOverride(items, occ, { date: newDate, time: newTime, metadata: occMeta(base, fields) }))
+  return commit(upsertOverride(items, occ, { date: newDate, time: newTime, metadata: occMeta(base, fields, touched) }))
 }
 
 /**
@@ -677,19 +729,19 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields): Stor
  * series from occDate onward. Falls back to `applyAll` when occ is not part of
  * a series (standalone occurrence edited with scope 'future').
  */
-function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): StoreData {
+function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touched?: TouchedKeys): StoreData {
   const { scheduled, repeat } = fields
   const entry = data.entries.get(occ.entryKey)
   if (!entry) return data
   const series = occ.ownerId
     ? (entry.items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined)
     : undefined
-  if (!series) return applyAll(data, occ, fields)
+  if (!series) return applyAll(data, occ, fields, touched)
 
   const occDate = occ.date
   const newSeriesId = crypto.randomUUID()
   const newRepeat = repeat ?? series.repeat
-  const newMeta = seriesMeta(series.metadata, fields)
+  const newMeta = seriesMeta(series.metadata, fields, touched)
 
   const [head, ...tail] = entry.items
   const expand = (i: StoreItem): StoreItem[] => {
@@ -716,7 +768,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
     // same reasoning: "this and following" covers the overridden occurrences in
     // that range too. `done`/`excluded`/date/time stay the child's own.
     if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
-      return [{ ...i, ownerId: newSeriesId, metadata: { ...occMeta(i.metadata, fields), done: i.metadata.done } }]
+      return [{ ...i, ownerId: newSeriesId, metadata: { ...occMeta(i.metadata, fields, touched), done: i.metadata.done } }]
     }
     return [i]
   }
@@ -725,7 +777,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
   // result non-empty without a cast.
   const [first = head, ...restOfHead] = expand(head)
   const items: Entry['items'] = [first, ...restOfHead, ...tail.flatMap(expand)]
-  return { ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items)) }
+  return { ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items, touched)) }
 }
 
 /**
@@ -737,13 +789,13 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields): Stor
  * of `occ`'s series — so collapse emits it as its own `instances[]` entry with
  * its own `repeat:` block.
  */
-function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields): StoreData {
+function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields, touched?: TouchedKeys): StoreData {
   const { scheduled, repeat } = fields
   const entry = data.entries.get(occ.entryKey)
   if (!entry) return data
   const items = entry.items
   const commit = (next: Entry['items']): StoreData =>
-    ({ ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, next)) })
+    ({ ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, next, touched)) })
   const newDate = scheduled?.date ?? ''
   const baseSeries = findSeries(items, occ)
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
@@ -754,7 +806,7 @@ function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields): StoreDa
       repeat,
       entryKey: occ.entryKey,
       id:       crypto.randomUUID(),
-      metadata: seriesMeta(base, fields),
+      metadata: seriesMeta(base, fields, touched),
     }
     return commit(addItem(items, newSeries))
   }
@@ -765,7 +817,7 @@ function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields): StoreDa
     entryKey: occ.entryKey,
     id:      crypto.randomUUID(),
     ownerId: occ.ownerId,
-    metadata: { ...occMeta(base, fields), done: fields.tracked ? false : undefined },
+    metadata: { ...occMeta(base, fields, touched), done: fields.tracked ? false : undefined },
   }
   return commit(addItem(items, newOcc))
 }
@@ -786,6 +838,17 @@ function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields): StoreDa
  * `target` is consulted only on the `occ == null` leg: an existing occurrence
  * already carries its vault inside its own key, and an edit never moves a file
  * between vaults (that is `moveEntity`'s job, not this one's).
+ *
+ * `touchedKeys` is the set of `EditFields` the caller knows this save actually
+ * changed (from `changedEditFields`) — `undefined` when it has no such
+ * distinction to offer, which strips every registry key out of `extra`
+ * exactly as every caller did before this parameter existed. Only
+ * `editor/save.ts`'s `saveNode` computes a real set, and only when it has a
+ * `base` snapshot to diff against and the scope isn't `add` (a brand-new
+ * occurrence has no "unrelated field" to preserve) — see `touchedFieldsOnly`.
+ * Passed through only to the four scopes below: the `occ == null` and
+ * revived-entry legs above build metadata from an empty base, where stripping
+ * is a no-op regardless of which keys are named.
  */
 export function applyEdit(
   data: StoreData,
@@ -793,6 +856,7 @@ export function applyEdit(
   scope: EditScope,
   fields: EditFields,
   target: NewEntryTarget,
+  touchedKeys?: TouchedKeys,
 ): StoreData {
   if (!occ) return applyNew(data, fields, target.vaultId, target.draftId)
   // The occurrence the editor is holding has no entry behind it any more — its
@@ -810,10 +874,10 @@ export function applyEdit(
     return { ...data, entries: withEntry(data.entries, editedEntry(undefined, occ.entryKey, fields, items)) }
   }
   switch (scope) {
-    case 'all':    return applyAll(data, occ, fields)
-    case 'single': return applySingle(data, occ, fields)
-    case 'future': return applyFuture(data, occ, fields)
-    case 'add':    return applyAdd(data, occ, fields)
+    case 'all':    return applyAll(data, occ, fields, touchedKeys)
+    case 'single': return applySingle(data, occ, fields, touchedKeys)
+    case 'future': return applyFuture(data, occ, fields, touchedKeys)
+    case 'add':    return applyAdd(data, occ, fields, touchedKeys)
     default:       return data
   }
 }

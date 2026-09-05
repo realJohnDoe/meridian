@@ -7,6 +7,7 @@ import { entryKey } from '@/fileIO'
 import { setUnreadableFiles, setVaultListedKeys } from '@/storeBridge'
 import { ENTRY_DEFAULT } from './state'
 import type { StoreItem } from '@/types'
+import { parseToStoreItems, expandRange } from '@/model'
 
 describe('entryFromOccurrence', () => {
   it('derives a note when the item is untracked and unscheduled', () => {
@@ -267,6 +268,41 @@ describe('saveNode — writes only the fields the editor changed', () => {
     saveNode(occ, 'single', { ...base, priority: 'high' }, { base })
 
     expect(storedBody()).toBe('some text')
+  })
+
+  // data-integrity survey, finding #1: `saveNode` used to hand `applyEdit`
+  // no way to tell which fields this particular save touched, so `occMeta`/
+  // `editedEntry` stripped every registry key's raw fallback out of `extra`
+  // on every save regardless — renaming a title alone deleted an unrelated
+  // hand-authored `tags`/`done`/`priority` the model can't type. This is the
+  // end-to-end repro from the results doc, through the real editor entry
+  // point rather than a direct `applyEdit` call.
+  it('renaming the title through the editor keeps a hand-authored tags/done/priority', () => {
+    const OBSIDIAN = `---
+title: Groceries
+tags: shopping
+done: yes
+priority: 1
+date: 2026-04-08
+---
+
+Buy milk.
+`
+    const parsed = parseToStoreItems('groceries.md', OBSIDIAN, TEST_VAULT)
+    seedStore(parsed.items, new Map([[parsed.key, parsed.root]]))
+    const [occ] = expandRange(parsed.items, new Map([[parsed.key, parsed.root]]), new Date(2020, 0, 1), new Date(2030, 0, 1))
+    const base = entryFromOccurrence(occ!, 'all')
+
+    saveNode(occ!, 'all', { ...base, title: 'Groceries (weekly)' }, { base })
+
+    // `tags` is a file-level field (fieldRegistry.ts's FILE_LEVEL_SPECS), so a
+    // malformed value for it lands on the root's extra, not the item's — see
+    // buildRoot/extractFileMetadata. `done`/`priority` are occurrence-level.
+    const item = useStore.getState().items.find(i => i.entryKey === testKey('groceries'))
+    expect(item?.metadata.extra).toMatchObject({ done: 'yes', priority: 1 })
+    const root = useStore.getState().roots.get(testKey('groceries')) as { title?: string; extra?: Record<string, unknown> } | undefined
+    expect(root?.extra).toMatchObject({ tags: 'shopping' })
+    expect(root?.title).toBe('Groceries (weekly)')
   })
 })
 
