@@ -77,7 +77,7 @@ function sanitizeFilename(name: string): string {
  * install would send them somewhere confusing.
  */
 function inviteMessage(owner: string, repo: string): string {
-  return `I'm sharing a calendar/task vault with you in Meridian — plain Markdown files in a GitHub repo, no plugin needed. Once you're added as a collaborator on ${owner}/${repo}, open ${APP_URL}, sign in with GitHub, and pick that repo.`
+  return `I'm sharing a calendar with you in Meridian — tasks and events as plain Markdown files in a GitHub repo, no plugin needed. Once you're added as a collaborator on ${owner}/${repo}, open ${APP_URL}, sign in with GitHub, and pick that repo.`
 }
 
 /**
