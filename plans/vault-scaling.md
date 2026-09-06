@@ -6,8 +6,11 @@ plus 60 000 and 100 000 to find the ceiling. The question: which flows degrade
 first, whether files or expanded occurrences are the unit, and where memory
 runs out._
 
-This is a finished measurement report, like `storage-backend.md` — not a
-runnable survey template, and not a to-do list. The **findings it produced**
+This is a finished measurement report, like `storage-backend.md` beside it —
+not a runnable survey template, and not a to-do list. It lived in
+`plans/surveys/` until 2026-09-06, where its 492 lines were 29% of a directory
+whose README had to carry a paragraph explaining that it wasn't a survey;
+`storage-backend.md` had already been moved out for the same reason. The **findings it produced**
 lived in `plans/vault-scaling-results.md`, a checklist that was deleted as
 they closed out; now that it is gone, "Where the findings went" at the end of
 this file records what happened to each of the six. What stays here otherwise

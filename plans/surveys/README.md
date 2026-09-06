@@ -5,9 +5,10 @@ directory (`health.md`, `performance.md`, `health-ui.md`,
 `data-integrity.md`, `product-niche.md`). Each survey states only what's
 specific to it — its categories, its findings cap, its target
 invariants/flows/niches — and points back here for the rest.
-`storage-backend.md` (now `plans/storage-backend.md`, one level up — it never
-was a runnable survey template) and `vault-scaling.md` are finished research
-reports, not runnable survey templates, so none of this applies to them.
+Finished research reports live one level up in `plans/` rather than here, so
+everything in this directory is a runnable survey and none of it needs an
+exception: `plans/storage-backend.md` and `plans/vault-scaling.md` are both
+that kind of report.
 
 Read this once before running (or editing) any survey.
 
