@@ -88,16 +88,23 @@ export const occRadius = 'rounded-[4px]'
  * DayView item colouring — all-day pills (bordered=false) and timed event
  * blocks (bordered=true) share the same solid fill; bordered blocks add a
  * left accent stripe for a bit of extra visual weight over larger areas.
- * past/done items stay on the neutral bg-muted surface (not solid-colored)
- * so they read as de-emphasized against the now fully-saturated active states,
- * with a line-through reinforcing the "done" meaning.
+ * past/done items recede toward the page background instead of flipping to
+ * a flat neutral fill — the same `--done-overlay` scrim OccurrenceCard/
+ * DimmableCard paint over a card's own background (see index.css). These
+ * surfaces have no separate neutral chrome to layer a scrim over, so it
+ * becomes the block's own background directly; callers (OccurrencePill,
+ * TimedBlock) pair it with `opacity-60` on the title/badges only — not on
+ * this background — via `isDimmedTone`, the same split OccurrenceCard makes
+ * between its scrim (full-opacity) and its content (opacity-60), so the two
+ * don't compound into near-invisibility. A line-through reinforces the
+ * "done" meaning.
  */
 export const dvBlockVariants = cva('', {
   variants: {
     tone: {
       ...TINT_CLASSES,
-      past: 'bg-muted text-foreground line-through hover:bg-muted/90 hover:text-foreground',
-      done: 'bg-muted text-foreground line-through hover:bg-muted/90 hover:text-foreground',
+      past: 'bg-(--done-overlay) text-foreground line-through hover:bg-(--done-overlay) hover:text-foreground',
+      done: 'bg-(--done-overlay) text-foreground line-through hover:bg-(--done-overlay) hover:text-foreground',
     } satisfies Record<OccTone, string>,
     bordered: {
       true:  'border-l-2',
@@ -106,12 +113,19 @@ export const dvBlockVariants = cva('', {
   },
   compoundVariants: [
     // active states are already fully colored, so a same-hue border stripe would be
-    // invisible — only past/done (neutral bg-muted) benefit from one
+    // invisible — only past/done (the translucent overlay) benefit from one
     { tone: 'past', bordered: true, className: 'border-l-surface-raised' },
     { tone: 'done', bordered: true, className: 'border-l-surface-raised' },
   ],
   defaultVariants: { tone: 'done', bordered: false },
 })
+
+/** True for the two de-emphasized tones — pulled out because callers that
+ *  paint with `dvBlockVariants` also need it to gate the `opacity-60` on
+ *  their own title/badge content (see the doc comment above). */
+export function isDimmedTone(tone: OccTone): boolean {
+  return tone === 'past' || tone === 'done'
+}
 
 /**
  * Chip tint per hue — bg-{color}/30 (a tint, not TINT_CLASSES' solid fill)

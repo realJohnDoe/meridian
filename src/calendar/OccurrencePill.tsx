@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import type { OccTone } from '@/occView'
-import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
+import { dvBlockVariants, isDimmedTone, occRadius } from '@/components/primitives/occurrence-variants'
 import { ContinuationChevron } from './ContinuationChevron'
 
 interface OccurrencePillProps {
@@ -51,13 +51,19 @@ export function OccurrencePill({
 }: OccurrencePillProps) {
   const chevronCls = chevronHiddenOnMobile ? 'hidden sm:block' : undefined
 
-  const content = (
+  const row = (
     <>
       {continuesLeft && <ContinuationChevron side="left" className={chevronCls} />}
       <span className="flex-1 truncate min-w-0">{title}</span>
       {continuesRight && <ContinuationChevron side="right" className={chevronCls} />}
     </>
   )
+  // Split from the background per dvBlockVariants' doc comment: only the
+  // content dims, so it doesn't compound with the tone's own --done-overlay
+  // background into near-invisibility.
+  const content = isDimmedTone(tone)
+    ? <span className="flex items-center gap-1 flex-1 min-w-0 opacity-60">{row}</span>
+    : row
 
   const cls = cn(
     dvBlockVariants({ tone }),
