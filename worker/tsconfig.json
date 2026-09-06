@@ -5,6 +5,11 @@
     "module": "es2022",
     "moduleResolution": "bundler",
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
     "skipLibCheck": true,
     "noEmit": true,
     "isolatedModules": true
