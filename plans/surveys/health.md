@@ -12,8 +12,19 @@ file states only what's specific to this survey.
 Per [Running a survey](./README.md#running-a-survey): scan plan first, evaluate
 on merits, verify capability claims by inspection. Version currency in
 particular comes from the registry query in the Budget section below, never
-from training data. One rule is specific to this survey:
+from training data. Two rules are specific to this survey:
 
+- **Check the docs against the tooling, in both directions.** The shared
+  conventions say to treat `CLAUDE.md` and comment claims as hypotheses; the half
+  that gets forgotten is that a doc warning a gap *exists* goes stale exactly as
+  easily as one claiming it doesn't. A paragraph saying "nothing enforces X" or
+  "you have to remember to add Y" is a claim to verify against the scripts, lint
+  config and CI — and when a guard has since been written, the stale warning is
+  its own finding, because it teaches every future reader to distrust a check
+  that works. The 2026-09-06 run found `CLAUDE.md`'s "Route shells" section still
+  warning that a new route escapes the layout checks until someone lists it,
+  when `scripts/layout-smoke.mjs` already carries an `assertRouteCoverage()` that
+  fails the build on exactly that.
 - **Grep the config comments for expiry conditions, and check whether they have been met.** A pin, cap, or disabled rule whose comment says "revisit once X", "until Y lands", or "remove when Z ships" is a decision with a stated trigger and no owner — nothing re-checks it. These are cheap to verify (one registry or issue-tracker query each) and high-yield, because the rationale is already written down for you and the only question is whether it still holds. A met condition is a finding; so is a comment whose stated rationale you can show is no longer true. Check the value against its own comment too — a comment asserting the opposite of the setting beneath it is its own finding.
 
 ## Budget
@@ -36,7 +47,18 @@ from training data. One rule is specific to this survey:
   glob had swallowed 258 lines of route logic, one file of it at 0% coverage).
   `src/coverageConfig.test.ts` now guards both halves for `src/routes/`.
 - **Establish which workspace each gate actually covers, and record it as a matrix.** Give **coverage its own row, separate from `test`** — they are usually different scripts, and the common shape is a `test` script that fans out to every workspace beside a `test:coverage` script that does not, so the suite runs everywhere while coverage is measured and gated in one package only. A sub-package whose own test config has no `coverage` block at all is the same finding seen from the other side. Do not assume a root-level `build`/`test` script reaches a sub-workspace — verify it (e.g. does the root test runner's `include` glob match the sub-package? does the root `tsc -b` reference its tsconfig?) and list the gates on one axis against the workspaces on the other. A package that CI checks in a separate job but the documented local command silently skips is a real finding, and it is invisible unless you build this matrix: every gate is green, and the gap only shows in what each one *ran on*. This is the single cheapest high-yield check in this section for any repo with more than one package.
-- **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
+- **Build the app and look at what shipped, not just at what was written.** Run
+  the production build and rank the emitted chunks by size, then grep the largest
+  one for markers of the heavy dependencies (`cm-content` for CodeMirror, `rdp-`
+  for react-day-picker, `Dexie`, `embla`, …) to establish which chunk each
+  actually landed in. A `React.lazy` or a route-level split can be silently
+  defeated by one static import of a barrel elsewhere — a bug that is invisible
+  to every other item in this budget, because every file involved reads correctly
+  on its own. When a suspect import turns up, **measure rather than argue**:
+  change it, rebuild, and diff the entry chunk's raw and gzip size. On the
+  2026-09-06 run one import line in `routes/__root.tsx` was worth 53% of the
+  entry chunk (465,525 → 218,894 bytes gzip).
+- **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition. **If the repo's history is shorter than your sampling window, say so and stop treating the numbers as comparative** — a squashed history returns the whole log for any window, so per-directory tallies show where the squash landed rather than where development is concentrated. Record the history's true span next to the tallies.
 - **Identify where development is currently concentrated** — sample recent history over a meaningful window (e.g. `git log --since="60 days ago" --name-only`, or recent merged PRs if available) and tally which directories see the most commits/PRs. This is the evidence base for the activity weighting in the Scoring guidance: findings in "hot" directories are worth more to fix than equivalently-scored findings in dormant corners of the codebase, because more code keeps landing on top of the problem in the meantime.
 - Sample the rest. Do not skip a directory entirely without recording it in the coverage statement.
 
