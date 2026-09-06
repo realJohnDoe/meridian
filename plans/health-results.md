@@ -26,11 +26,11 @@ second consumer or a documented cycle-breaking reason (`persistencePort`,
 `autoSaveFlushPort`, `ViewChrome`, the four storage backends), and the
 meta-infrastructure is proportionate to the product it guards (1,256 lines of
 toolchain config against 39,056 lines of non-test source, ~3%). The theme is
-instead **intent that the toolchain doesn't hold up**: coverage floors set
-honestly and then left to drift 10–26 points below reality (#4); a `shadcn` alias pointing at a module
-that does not exist (#7); and a `CLAUDE.md` paragraph still warning about a gap
-that has since been closed (#8). Each is small on its own; together they are one
-pattern — decisions recorded but not wired to anything that re-checks them.
+instead **intent that the toolchain doesn't hold up**: a `shadcn` alias
+pointing at a module that does not exist (#7); and a `CLAUDE.md` paragraph
+still warning about a gap that has since been closed (#8). Each is small on
+its own; together they are one pattern — decisions recorded but not wired to
+anything that re-checks them.
 
 ---
 
@@ -155,9 +155,9 @@ non-test source lines were at least enumerated by directory and line count.
 | 2 | Simplicity & Overengineering | **clean** |
 | 3 | Directory & File Layout | **clean** |
 | 4 | Security | **clean** |
-| 5 | Testing & Error Handling | **findings: #4, #9** |
+| 5 | Testing & Error Handling | **findings: #9** |
 | 6 | Code Health & DRY | **clean** |
-| 7 | Toolchain & Developer Feedback Loops | **findings: #4, #7, #8** |
+| 7 | Toolchain & Developer Feedback Loops | **findings: #7, #8** |
 | 8 | Dependencies & Library Fit | **findings: #7** (plus three keep-verdicts, below) |
 | 9 | Styling & UX | **partially assessed** |
 | 10 | Performance | **clean** |
@@ -200,78 +200,17 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 
 | Rank | # | Title | Category | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|
-| 1 | **#4** | Five coverage floors have drifted 10–26 points below measured | `testing` `toolchain` | 4 | 5 | **Haiku 4.5** | 20.0 |
-| 2 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 3 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
-| 4 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 1 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
+| 2 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 3 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
-**Sequencing note.** No sequencing is needed among what's left — #2, #3, #5
-and #6 have already landed, each in its own file (`worker/tsconfig.json`, the
-20 `strict-type-checked` rules enabled in `eslint.config.js`, the `/ical`
-Worker endpoint, and `vitest.config.ts`'s `thresholds` respectively) with
-nothing left to coordinate. #4, #7 and #8 are independent of everything else
-and of each other.
-
----
-
-### #4 — Five per-file coverage floors have drifted 10–26 points below measured, including the one guarding silent write loss
-
-- **Category:** `testing` `toolchain`
-- **Impact:** 4
-- **Breadth:** 5 threshold entries in `vitest.config.ts`. Established by parsing
-  every per-file threshold out of the config and diffing it against
-  `coverage-summary.json` from a real `--coverage` run.
-- **Recommended model:** **Haiku 4.5**
-- **Evidence:**
-  - `vitest.config.ts` — `        'src/storage/entityWrites.ts': { statements: 72, branches: 62, functions: 75, lines: 72 },`
-  - …sitting directly under a comment that claims it is guarded. That comment is
-    hard-wrapped; its verbatim single-line fragment is
-    ``        // two `catch` arms (a Dexie write failing outright) visible as their``
-  - The config's own standing instruction: `      // storeCommit.ts sat at 30/95/45/35 against a measured 100/100/100/100`
-- **Problem:** `entityWrites.ts` — the module whose comment calls a silently
-  vanishing save "the worst bug this codebase can have" — carries a floor 18/27/25/18
-  points below its measured coverage, so a quarter of its functions could go
-  entirely unexecuted with CI green, which is precisely the failure the config
-  documents having already been burned by on `storeCommit.ts`.
-- **Fix:** Raise the five drifted floors to a few points under measured, per the
-  config's own stated convention. Afterwards `pnpm run test:coverage` should still
-  pass with no other change.
-
-**Task context**
-
-- **Measured 2026-09-06 via `pnpm run test:coverage`. The enumerated work — five
-  entries, with the values they should take** (floor set ~5 points under measured,
-  the convention the surrounding entries already use):
-
-  | Threshold key | Current floor | **Measured** | Gap (s/b/f/l) | Suggested new floor |
-  |---|---|---|---|---|
-  | `src/storage/entityWrites.ts` | 72/62/75/72 | **90.38/88.46/100/89.74** | +18.4/+26.5/+25.0/+17.7 | `85/83/95/85` |
-  | `src/editor/dialogs/RepeatDialog.tsx` | 75/60/65/75 | **86.9/83.05/83.33/90** | +11.9/+23.0/+18.3/+15.0 | `82/78/78/85` |
-  | `src/editor/useEntryEditor.ts` | 68/55/55/70 | **81.57/59.55/78.12/86.77** | +13.6/+4.5/+23.1/+16.8 | `77/55/73/82` |
-  | `src/occurrenceActions.ts` | 85/75/80/88 | **94.5/81.57/100/98.55** | +9.5/+6.6/+20.0/+10.5 | `90/77/95/94` |
-  | `src/model/fieldRegistry.ts` | 90/80/85/90 | **98.48/95.36/100/100** | +8.5/+15.4/+15.0/+10.0 | `94/90/95/95` |
-
-- **What stays untouched — this is the important half.** The other ~45 per-file
-  floors are within the intended 5–10 point headroom and must **not** be raised.
-  A large cluster sits at exactly `92/90/95/92` against a measured `100/100/100/100`;
-  that is a deliberate uniform convention for fully-covered small files, not drift.
-  `src/editor/urlSafety.ts` is at `100/100/100/100` against measured 100 and is
-  correct as-is. Do not touch the global floor (`68/62/59/70` against a measured
-  `79.82/73.97/73.87/82.27`) — headroom there is intentional so ordinary UI work
-  doesn't trip CI.
-- **The `exclude` list is clean — checked in the other direction too.** Every
-  `src/routes/` exclusion resolves to a file under 100 lines (largest:
-  `_app.week.$date.tsx` at 76), and `src/coverageConfig.test.ts` already asserts
-  both halves — that threshold keys resolve, and that excluded route files stay
-  small. No action needed there.
-- **The trap, located.** `useEntryEditor.ts`'s **branches** measure 59.55 against a
-  floor of 55 — only 4.5 points of headroom, unlike its other three metrics. Raise
-  that one to 55 (i.e. leave it) or at most 55–56; pushing it to ~72 in line with
-  the other three columns would make the gate brittle for a file that is actively
-  churning (`editor/` is the repo's third-hottest directory). The suggested value
-  above reflects this.
-- **Confirming the fix:** `pnpm run test:coverage` from the repo root — it fans
-  out to the worker too, so one command covers both workspaces.
+**Sequencing note.** No sequencing is needed among what's left — #2, #3, #4,
+#5 and #6 have already landed, each in its own file (`worker/tsconfig.json`,
+the 20 `strict-type-checked` rules enabled in `eslint.config.js`,
+`vitest.config.ts`'s `thresholds`, the `/ical` Worker endpoint, and
+`vitest.config.ts`'s `thresholds` respectively — #4 and #6 both touch the
+thresholds block, at different entries) with nothing left to coordinate. #7,
+#8 and #9 are independent of everything else and of each other.
 
 ---
 
@@ -458,8 +397,8 @@ just relocking.
   together.** A major across a 164-file suite with per-file coverage thresholds
   in two separate configs; the two packages must move in lockstep. Gating risk:
   the `thresholds` schema and the `coverageConfigDefaults` import in
-  `vitest.config.ts`. Verdict: its own PR, after #4 (so the floors being asserted
-  are the corrected ones).
+  `vitest.config.ts`. Verdict: its own PR — the per-file floors it asserts
+  against are already the corrected ones (#4 has landed).
 - **Custom-vs-library, checked in both directions.** `date-fns` v4 is used
   properly and broadly (23 modules) including inside `model/`, with no
   raw-millisecond date math beside it — the one exception is `expansion.ts`'s
