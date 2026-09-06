@@ -18,9 +18,7 @@ close to perfect (zero hand-written `any`, zero `@ts-ignore`, four non-null
 assertions, every `eslint-disable` carrying a written justification), the
 module boundaries documented in `CLAUDE.md` are genuinely machine-enforced and
 genuinely hold (I searched for cross-module deep imports and found **none**),
-and all eight quality gates pass in both workspaces. The weakest areas are
-**`src/settings/`** (55.98% statements — the add-vault wizard, the only path to
-connecting a GitHub, local or iCal vault, has effectively no tests).
+and all eight quality gates pass in both workspaces.
 
 The single biggest structural theme is **not** overengineering — I looked hard
 for it and did not find it. Every port and abstraction I tested has a real
@@ -158,7 +156,7 @@ non-test source lines were at least enumerated by directory and line count.
 | 2 | Simplicity & Overengineering | **clean** |
 | 3 | Directory & File Layout | **clean** |
 | 4 | Security | **clean** |
-| 5 | Testing & Error Handling | **findings: #4, #6, #9** |
+| 5 | Testing & Error Handling | **findings: #4, #9** |
 | 6 | Code Health & DRY | **clean** |
 | 7 | Toolchain & Developer Feedback Loops | **findings: #3, #4, #7, #8** |
 | 8 | Dependencies & Library Fit | **findings: #7** (plus three keep-verdicts, below) |
@@ -204,16 +202,15 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 | Rank | # | Title | Category | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|
 | 1 | **#4** | Five coverage floors have drifted 10–26 points below measured | `testing` `toolchain` | 4 | 5 | **Haiku 4.5** | 20.0 |
-| 2 | **#6** | Primary vault-onboarding and entry-view screens have ~0% coverage | `testing` | 5 | 6 | **Sonnet 5** | 15.0 |
-| 3 | **#3** | 20 evaluated `strict-type-checked` rules were written up but never enabled | `toolchain` `types` | 4 | 7 | **Sonnet 5** | 14.0 |
-| 4 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 5 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
-| 6 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 2 | **#3** | 20 evaluated `strict-type-checked` rules were written up but never enabled | `toolchain` `types` | 4 | 7 | **Sonnet 5** | 14.0 |
+| 3 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
+| 4 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 5 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
-**Sequencing note.** #4 and #6 both touch `vitest.config.ts`'s `thresholds`
-block. Land **#6 → #4** to avoid rebasing that file twice; #6 adds new floors
-for the files it newly tests, and #4 raises existing ones, so doing #4 last
-folds both into one coherent pass. #3, #7 and #8 are independent of
+**Sequencing note.** No sequencing is needed among what's left — #2, #5 and #6
+have already landed, each in its own file (`worker/tsconfig.json`, the
+`/ical` Worker endpoint, and `vitest.config.ts`'s `thresholds` respectively)
+with nothing left to coordinate. #3, #4, #7 and #8 are independent of
 everything else and of each other.
 
 ---
@@ -276,65 +273,6 @@ everything else and of each other.
   above reflects this.
 - **Confirming the fix:** `pnpm run test:coverage` from the repo root — it fans
   out to the worker too, so one command covers both workspaces.
-
----
-
-### #6 — The only path to connecting a vault, and the route that renders an entry, have ~0% coverage
-
-- **Category:** `testing`
-- **Impact:** 5
-- **Breadth:** 6 files. Established from `coverage-summary.json`, filtering for
-  files under 40% line coverage with ≥40 coverable lines.
-- **Recommended model:** **Sonnet 5**
-- **Evidence:**
-  - `vitest.config.ts` already concedes one of them: `        // deliberately left un-floored — a floor of 0 guards nothing, and the`
-  - Coverage report: `  ...ult.$slug.tsx |       0 |        0 |       0 |       0 | 16-133`
-  - Coverage report: `  ...ultWizard.tsx |     3.5 |        0 |       0 |       4 | 60-249`
-- **Problem:** `AddVaultWizard.tsx` is the sole route by which a user connects a
-  GitHub, local or iCal vault — the app is useless without it — and it, the entry
-  render route, the sidebar and the search bar all sit at effectively zero
-  coverage, absorbed by a global floor loose enough (68 against a measured 79.82)
-  not to notice.
-- **Fix:** Add render-level tests for the six files below and give each a per-file
-  floor, so the global floor is no longer the only thing holding them.
-
-**Task context**
-
-- **The enumerated work — six files, measured 2026-09-06:**
-
-  | File | Lines | Coverage (s/b/f/l) | What is untested |
-  |---|---|---|---|
-  | `src/settings/AddVaultWizard.tsx` | 249 | 3.5/0/0/4 | all three wizard steps, the iCal preview/validate cycle, the folder-picker-unsupported branch, the tutorial-card offer |
-  | `src/routes/-appSidebar.tsx` | 241 | 0/0/0/0 | entire file |
-  | `src/routes/-searchBar.tsx` | 162 | 0/0/0/0 | entire file |
-  | `src/routes/_entry.entry.$vault.$slug.tsx` | 134 | 0/0/0/0 | URL→occurrence resolution, the view-only vs editable branch, the not-found state |
-  | `src/settings/VaultDetail.tsx` | 22 | 0/0/0/0 | entire file |
-  | `src/settings/AppearanceSettings.tsx` | 54 | 0/0/0/0 | entire file |
-
-- **Start with `AddVaultWizard.tsx`** — highest consequence per test written, and
-  it is pure component state with no I/O to stub beyond `@/vaultActions`.
-- **The precedent, named.** `src/settings/VaultSettings.test.tsx` and
-  `src/settings/GeneralSettings.test.tsx` already test sibling screens in this
-  exact directory; copy their setup (they show how the store and `@/vaultActions`
-  are stubbed) rather than inventing one. `src/routes/-pagedTopbar.test.tsx` is
-  the model for a `-`-prefixed route module.
-- **The trap, located.** `AddVaultWizard.tsx:74` reads the store during render
-  (`useStore(s => !s.vaults.some(v => v.kind === 'example'))`) and line 79 probes
-  `isFolderPickerSupported()`, whose own comment explains it is called in the body
-  *specifically* so importing the module isn't a side effect — so a test that
-  stubs it at module scope will not exercise the branch it thinks it does. Stub
-  it per-render.
-- **Second trap.** `src/routes/_entry.entry.$vault.$slug.tsx:16-17` lazy-loads
-  `EntryEditor`/`EntryViewOnly`. Any render test needs to await the `Suspense`
-  boundary, or it will assert against `EntrySkeleton` and pass while testing
-  nothing.
-- **Then add floors** for whatever each file reaches, per #4's convention
-  (~5 points under measured).
-- **Why Sonnet 5 and not lower:** writing a test that renders but asserts nothing
-  meaningful is the classic silent failure here — it turns the floor green while
-  guarding nothing, which is the same class of bug this finding reports. That
-  judgement is not mechanical. It is not Opus-tier either: the files, the traps
-  and the in-repo precedents are all named above.
 
 ---
 
@@ -614,6 +552,6 @@ this run:
 
 **Directory churn measured this run** (whole available history, per the caveat):
 `calendar` 274, `model` 250, `editor` 215, `storage` 205, `components` 177,
-`routes` 146, `settings` 61. Finding #6 lands in `routes/`/`settings/`,
-and #4's drifted floors are concentrated in `editor/` and `storage/` — the four
-hottest areas — so fixing them now is cheaper than after more code accretes.
+`routes` 146, `settings` 61. #4's drifted floors are concentrated in `editor/`
+and `storage/` — two of the four hottest areas — so fixing them now is cheaper
+than after more code accretes.

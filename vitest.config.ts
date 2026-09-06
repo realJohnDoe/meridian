@@ -54,11 +54,8 @@ export default defineConfig({
         // _entry.entry.new.tsx (draft resume keyed on TanStack's __TSR_key),
         // which are logic, not wiring. Un-excluding them measured them for the
         // first time: _entry.entry.new.tsx was already at 95/48/88/92 and is
-        // floored below; _entry.entry.$vault.$slug.tsx is at 0/0/0/0 and is
-        // deliberately left un-floored — a floor of 0 guards nothing, and the
-        // global floor is what holds it. That 0% is a real gap, not a
-        // convention: the file resolves an occurrence from the URL's date/id
-        // and picks the view-only vs editable branch, with no test anywhere.
+        // floored below; _entry.entry.$vault.$slug.tsx was at 0/0/0/0
+        // (health-results.md finding #6) and is now tested and floored below too.
         'src/routes/_entry.tsx',
         'src/routes/_entry.entry.$slug.tsx',
         'src/routeTree.gen.ts',
@@ -202,6 +199,24 @@ export default defineConfig({
         'src/routes/-entryTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         'src/routes/-pagedTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         'src/routes/-topbarEdgePadding.ts': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        // health-results.md finding #6: the URL->occurrence resolution route
+        // (date/id disambiguation, the view-only vs editable branch, the
+        // not-found state) and the app shell's sidebar/search bar, all
+        // previously at ~0%. Measured 2026-09-06 via
+        // _entry.entry.$vault.$slug.test.tsx, -appSidebar.test.tsx and
+        // -searchBar.test.tsx: 97.14/82.35/92.59/95.74,
+        // 92.18/90.47/90/92.5 and 96.77/92.59/100/95.65 respectively.
+        'src/routes/_entry.entry.$vault.$slug.tsx': { statements: 92, branches: 77, functions: 87, lines: 91 },
+        'src/routes/-appSidebar.tsx': { statements: 87, branches: 85, functions: 85, lines: 87 },
+        'src/routes/-searchBar.tsx': { statements: 92, branches: 87, functions: 95, lines: 91 },
+        // health-results.md finding #6: the add-vault wizard (all three steps,
+        // the iCal preview/validate cycle, the folder-picker branch, the
+        // tutorial-card offer) and two settings screens, all previously at
+        // ~0%. Measured 2026-09-06: AddVaultWizard.tsx 100/91.3/100/100;
+        // VaultDetail.tsx and AppearanceSettings.tsx both 100/100/100/100.
+        'src/settings/AddVaultWizard.tsx': { statements: 95, branches: 86, functions: 95, lines: 95 },
+        'src/settings/VaultDetail.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        'src/settings/AppearanceSettings.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
       },
     },
   },
