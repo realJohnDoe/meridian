@@ -29,17 +29,17 @@ Findings must be anchored to one or more of these flows — an issue that no com
   - **Baseline:** the measured cost (ms of handler time, render count, chunk kB, time-to-interactive) on the test vault.
   - **Measurement recipe:** the exact, re-runnable steps that produced the number — the instrumentation snippet (`performance.mark`/`performance.measure` pairs, a render counter, `why-did-you-render`-style logging), where it was patched in, the interaction performed, and how the number was read out. This recipe is the acceptance test for the fix: after the fix, rerun it and compare.
   - Instrumentation is temporary — patch it in, measure, and revert; do not leave measurement code in the working tree.
-- **How to measure in this environment:** start the dev server via the preview tools (follow the preview gotchas in CLAUDE.md — worktree-specific launch config, unique port, SPA-navigate instead of hard-navigating to `?editor=`), drive the flows via the browser tools, and read numbers via `javascript_tool` (e.g. `performance.getEntriesByType('measure')`, patched-in counters on `window`). For render counts, a module-level counter incremented in the component body and read from the console is fine. For bundle findings, `pnpm run build` output is the measurement.
+- **How to measure in this environment:** start the dev server via the preview tools (follow the preview gotchas in CLAUDE.md — worktree-specific launch config, unique port, SPA-navigate instead of hard-navigating to an entry URL), drive the flows via the browser tools, and read numbers via `javascript_tool` (e.g. `performance.getEntriesByType('measure')`, patched-in counters on `window`). For render counts, a module-level counter incremented in the component body and read from the console is fine. For bundle findings, `pnpm run build` output is the measurement.
 - **React Compiler is enabled** (`vite.config.ts` applies `reactCompilerPreset`; components and hooks are auto-memoized at build time). Static "missing `memo`" / "unstable props defeat memoization" reasoning does not transfer to this codebase — memoization findings must be backed by runtime render counts, never by code inspection alone.
 - **Dev-mode numbers are relative, not absolute.** The dev server runs unminified dev-mode React, which overstates ms costs. Treat dev-server measurements as baselines for before/after comparison, not as absolute latency claims. Measure flow 6 (cold start, first paint, service-worker behavior) and all bundle findings against the production build (`pnpm run build` + `vite preview`) — and since the big-vault generator is dev-only, accept the small example vault for prod-build measurements and state that limitation in the coverage statement.
-- **Only the example (Tutorial) backend is measurable in this environment.** The automated browser cannot grant File System Access permissions or complete the GitHub OAuth flow, so the local-FS and GitHub backends can only be traced statically — record them as "traced, not measured" in the coverage statement up front rather than discovering this mid-pass.
+- **Only the example (Tutorial) backend is measurable** — see [what this environment can and cannot do](./README.md#what-this-environment-can-and-cannot-do). Record the other two as "traced, not measured".
 - **Measure amplification, not vibes.** "Missing `memo`" is not a finding by itself. A finding must show _amplification with a number attached_: this click re-renders N components (counted), this handler runs X ms of synchronous work before paint (measured), this module adds Y kB to the entry chunk (from build output). Count subscribers via grep where relevant, but the headline evidence is runtime measurement.
 - **Perceived performance counts as performance.** A toggle that persists in 300 ms but paints the checkmark optimistically in 16 ms is _fast_; one that paints after persistence is _slow_ even if total work is identical. Measure when pixels change (mark in the handler, measure in a `requestAnimationFrame`-after-commit or paint-adjacent callback), not just how much work runs.
-- Evaluate the code on its merits. Treat claims in CLAUDE.md or comments (e.g. "this is debounced", "this is cached") as hypotheses to verify against the code and the measurements, not settled facts.
+- Evaluate the code on its merits, per [Running a survey](./README.md#running-a-survey) — here "this is debounced" and "this is cached" are the claims to verify, against the measurements as well as the code.
 
 ## Budget
 
-- **Use the existing big-vault generator — do not write a new one.** The example vault is too small to expose scaling problems. A deterministic large-vault generator already exists at `src/storage/devFixtures/testVaultGen.ts`, wired into the example backend: run `localStorage.setItem('meridian_bigvault', '300')` in the browser console, then (re)load the Tutorial vault. Run all measurements against this vault and note its size (the number you passed) in the coverage statement. It is dev-only (`import.meta.env.DEV`) and dead-code-eliminated from production builds, so it cannot be used against a prod build.
+- **Use the existing big-vault generator — do not write a new one** ([recipe](./README.md#what-this-environment-can-and-cannot-do)). The example vault is too small to expose scaling problems; run all measurements against the generated one and note its size in the coverage statement.
 - Skim the full directory tree so nothing is invisible to you.
 - Read closely: the store (`store.ts`, `storeBridge.ts`) and every selector/subscription pattern it exposes; the components rendered per occurrence/row in agenda view (these multiply — a small waste per row is a big waste per screen); the toggle/save/commit path (`occurrenceActions.ts`, `storeCommit.ts`, `persistencePort.ts`); the search implementation (`search/`) end to end from keystroke to result click; the editor's update/decoration path; the route definitions and what each view mounts.
 - **Read the build and loading story, not just the source:** the Vite config, route-level lazy loading (or its absence), the service worker / PWA caching setup, and the dependency list for heavyweight imports reachable from the entry point. Run the production build and record chunk sizes.
@@ -63,31 +63,36 @@ Plain-language summary: overall, where does the app do unnecessary or badly-time
 
 ### 3. Findings — top 5
 
-For each finding:
+`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are the
+[shared finding fields](./README.md#finding-fields), with two notes: `Breadth`
+may be counted in components-per-screen where the multiplication is the point,
+and `Fix` must state the **expected effect on the baseline number** (e.g.
+"render count per toggle should drop from ~180 to ~2"). This survey adds:
 
-- **Title** — short label
 - **Flows affected** — which of the numbered flows above, and roughly how often a user hits it (every keystroke / every toggle / every view switch / once per launch)
 - **Category** — one or more of: `render-amplification` `critical-path-work` `perceived-latency` `bundle-and-startup` `data-and-persistence` `search-latency` `editor-latency` `memory-and-leak`
 - **Impact** — 1–10, where impact = _perceived cost per occurrence × frequency of the flow_ (10 = visible jank on an every-interaction path; 5 = noticeable delay on a daily-but-not-constant action; 1 = measurable but imperceptible)
 - **Baseline measurement** — the number(s) captured on the test vault (ms, render count, kB, …), stated with the conditions (vault size, view, interaction)
 - **Measurement recipe** — the exact re-runnable steps and instrumentation that produced the baseline, precise enough that a later session can rerun it unchanged to verify a fix
-- **Breadth** — number of files (or components-per-screen, where multiplication is the point) affected; counts from an actual search or build output — name the search/command; write "est." if estimated
-- **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is the tell: a wrong-but-plausible change that breaks the build or a test is far safer to hand down-tier than one that fails silently (stale state, wrong ordering, misplaced pixels, or a bundle change that doesn't actually move the number). Reserve plan mode + multi-PR for findings that need an architecture change **or** a product decision the user should make (e.g. "cap the list" vs "restructure the virtualizer"). Example hazard note: "Sonnet 5 if the cache key is specified in the task; else Opus 5."
-- **Evidence** — at least one file path plus a short **verbatim code quote** (copy-pasted, not paraphrased — I will spot-check by grepping) identifying the code responsible for the measured cost
-- **Problem** — one sentence: what work is unnecessary, too frequent, or wrongly timed — and what the user feels as a result
-- **Fix** — one sentence: the concrete change, plus the **expected effect on the baseline number** (e.g. "render count per toggle should drop from ~180 to ~2")
+
+**Fails silently here** (what sets the tier): stale state, wrong ordering,
+misplaced pixels, or a bundle change that doesn't actually move the number.
+Reserve plan mode + multi-PR for an architecture change **or** a product
+decision (e.g. "cap the list" vs "restructure the virtualizer"). Example hazard
+note: "Sonnet 5 if the cache key is specified in the task; else Opus 5."
 
 Rank and report findings per the [shared convention](./README.md#ranking-findings). Here, "confirming" a fix means re-running the measurement recipe.
 
-**Strongly prefer structural findings over isolated ones.** "Every occurrence row subscribes to the whole store" beats "this one component lacks `useCallback`." Cite real code and real numbers — no generic React-performance boilerplate.
-
-Do not pad to 5 — if fewer clear issues exist, stop there.
+Per [Don't pad the findings list](./README.md#dont-pad-the-findings-list) and
+[prefer systemic findings](./README.md#finding-fields): "every occurrence row
+subscribes to the whole store" beats "this one component lacks `useCallback`",
+and real numbers beat generic React-performance boilerplate.
 
 ---
 
 ## Categories to scan — ranked by priority
 
-The ranking is a tiebreaker, not a filter — a severe finding in any category outranks a minor one in a higher category. Bullets are illustrative examples, not the category's boundary.
+Ranking and bullets: see [Running a survey](./README.md#running-a-survey).
 
 ### 1. Render amplification _(highest weight)_
 

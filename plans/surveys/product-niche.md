@@ -48,7 +48,7 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
 
 - **Derive, then judge, then write.** Phase 0 first and in writing, then the walk, then the findings. Do not decide the niche you _expect_ and collect quotes for it — derive the revealed niche from product evidence before re-reading the copy, so the copy can't anchor you.
 - **Read the README cold, once, before anything else,** and record your honest first-pass answers to: what is this, who is it for, what would I use it instead of, and would I keep reading? That first read is unrepeatable — capture it before the code teaches you what the product means. It is the closest thing available to a real visitor's experience.
-- **Every finding needs a verbatim quote** from a real surface — README, in-app string, tutorial entry, blog, or code — copy-pasted, not paraphrased. I will spot-check by grepping, so **quotes must be grep-safe**: quote a span that lives on one line, or, where the source is hard-wrapped prose (the blog is wrapped at ~90 characters), say so and give the line range. A quote that silently spans a line break reads as fabricated when the spot-check fails. Fit findings additionally need the product evidence: the feature, constraint, or code that creates the gap.
+- **Every finding needs a verbatim quote** from a real surface — README, in-app string, tutorial entry, blog, or code — per the [shared Evidence rule](./README.md#finding-fields). The blog is hard-wrapped at ~90 characters, so give a line range there rather than a quote that silently spans a break. Fit findings additionally need the product evidence: the feature, constraint, or code that creates the gap.
 - **Verify this plan's own quotes before relying on them.** The plan quotes copy that the product keeps changing, and a stale example here is exactly the kind of error the survey exists to catch. Where a quotation in this document no longer matches the live surface, use the live surface and note the drift in the coverage statement.
 - **Time-box the recognition test.** Judge the surfaces by what a visitor learns in the first ~30 seconds — headline, first screen, first paragraph, the app's first view — and say explicitly at which line or screen the niche becomes unambiguous, or that it never does.
 - **Make positioning measurable rather than a matter of taste:**
@@ -60,13 +60,13 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
   - **Adjacency test.** Put the product's look mentally beside the alternatives the README names. Does it read as belonging to that set, as belonging to a _different_ set, or as generic? Any of the three can be right — a deliberate outlier is a positioning choice — but it should be deliberate, and the report should say which it is.
 - **Distinguish "doesn't fit the niche" from "isn't finished."** An immature feature that clearly serves the target job is execution debt, not a positioning problem. Call something a fit finding only when the product's _direction_ and the target's _needs_ diverge.
 - **Say when the status quo is right.** A deliberately narrow niche, a feature deliberately not built, an audience deliberately turned away — these are strategy, and the report should confirm them as such when the evidence supports it, rather than reflexively recommending expansion. `Meridian supports notes, but it doesn't try to be a better note-taking app than Obsidian` is exactly this kind of decision: test whether the product honours it, don't second-guess it.
-- Treat every copy claim as a hypothesis to verify against the code and the product.
+- Treat every copy claim as a hypothesis to verify against the code and the product, per [Running a survey](./README.md#running-a-survey).
 
 ## Budget
 
 - **Read completely** (they are the positioning): `README.md` end to end; the prose in `blog/` — currently the three numbered post directories, of which `1-…/meridian-why-i-built-a-markdown-first-calendar.md` is the positioning post, `1-…/interview.md` and `3-…/interview.md` are prose, and `2-how-meridian-was-built/` is a generated explorer (`explorer.html`, `iterations.json`) that should be skimmed for framing only, not read; the coach tour (`src/onboarding/CoachTour.tsx`); and the tutorial entries themselves, which live in `src/storage/devFixtures/tutorialVault.ts` (`exampleBackend.ts` is only the ~66-line backend shim that serves them) — the Tutorial vault is the product's argument for itself, made in content.
 - **Derive the revealed niche from the product, not the docs:** the feature surface (which capabilities are deep — recurrence, wikilinks, participants, search — and which are thin; line counts per `src/` directory are a fast first cut), the storage options and what each demands of a user (`src/storage/`, plus the trade-offs already recorded in [storage-backend.md](../storage-backend.md)), platform and browser constraints, the entry-format surface area in `src/model/fieldRegistry.ts` (`INLINE_FIELDS`, `STRUCTURAL_KEYS`) and the rest of `src/model/`, and what the default first-run path optimises for.
-- **Walk the first-run experience** on the example vault via the preview tools (follow the preview gotchas in `CLAUDE.md`: worktree-specific launch config, unique port, base path `/meridian/`). Judge it as a visitor deciding whether this product is for them. Note honestly that the automated browser **cannot complete GitHub OAuth or grant File System Access permissions**, so the real setup path can only be assessed from code and copy — state that limitation up front rather than discovering it mid-pass.
+- **Walk the first-run experience** on the example vault via the preview tools (follow the preview gotchas in `CLAUDE.md`: worktree-specific launch config, unique port, base path `/meridian/`). Judge it as a visitor deciding whether this product is for them. The real setup path can only be assessed from code and copy — see [what this environment can and cannot do](./README.md#what-this-environment-can-and-cannot-do) — so state that up front.
 - **If no preview tooling is available in the session at all** — check before planning around it — the fallback is not the first resort. The repo already carries `playwright-core` as a devDependency (it is what `scripts/layout-smoke.mjs` drives), so a session with Bash and a Chromium binary can still take real screenshots: start the server yourself (`pnpm exec vite --port <unique> --strictPort`), then drive it from a scratch script — importing `playwright-core` by absolute path if the script lives outside the repo — at 390×844 and 1440×900, setting `localStorage['meridian_theme']` in an init script to reach each palette. That path was taken on the last run and category 3 came back fully assessed. Only if that is also unavailable: do not silently skip the visual work or quietly substitute a guess for it. Say so in the coverage statement, fall back to assessing visual identity from `src/index.css` tokens, the dependency set, and layout source, mark category 3 **partially assessed**, and flag any finding that rests on the un-taken screenshots as needing confirmation before it is acted on. An impression invented from tokens is worse than an admitted gap.
 - **Check the app's own front door**: `index.html`, the PWA manifest, the app name, and the icons (`public/icon*.png`). The install prompt and the home-screen icon are positioning surfaces too, and often the only ones a returning user sees.
 - **Read the visual identity as evidence, not decoration:** the theme tokens and their comments in `src/index.css` (colour, radius, density), the typography, the icon set (`lucide-react` — one family, consistently used?), the interaction vocabulary the dependencies imply (`vaul` drawers signal a mobile-native product; heavy dialog use would signal a desktop one), and the app icons. Capture screenshots at mobile and desktop width in every theme the app ships — the blind visual read above depends on them, so take them before analysing anything else.
@@ -102,19 +102,30 @@ This section is also where the status quo gets confirmed. If a category's walk f
 
 ### 4. Findings — top 5
 
-For each finding:
+`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are the
+[shared finding fields](./README.md#finding-fields), with three notes: `Breadth`
+counts **surfaces** rather than files; `Problem` is what the target user
+misunderstands, misses or walks away from; and `Fix` must present options rather
+than assert one for anything touching the niche itself. `Evidence` additionally
+needs, for fit findings, the product evidence (feature, constraint, or code)
+that creates the gap. This survey adds:
 
-- **Title** — short label
 - **Gap** — which of the three: `declared-vs-revealed` (strategy), `revealed-vs-served` (execution), or `declared-vs-served` (credibility). One case recurs that none of the three names cleanly: the product **serves better than it declares** — a real strength the copy asserts but never evidences. Label it `declared-vs-served (inverted)` and say so in one clause, rather than forcing it into a label that reads backwards.
 - **Question** — `fit` or `communication` (or both)
 - **Category** — one or more of: `niche-definition` `differentiation` `recognition` `visual-language` `aesthetic-fit` `audience-selection` `feature-fit` `adoption-gate` `proof` `identity`
 - **Who it costs us** — the person who bounces, misjudges, or churns because of it, and roughly what share of arrivals are that person. **"Unknown" is a permitted and often correct answer**: this field must not become the back door through which invented demand claims re-enter the report. Where the share is knowable from an artifact (which surface carries it, how far down the page it sits, whether it is on the default path), say so and how you know; where it isn't, write "unknown" and add it to the bet list in section 5 instead of estimating
 - **Impact** — 1–10, where 10 = the product targets a niche it cannot serve, or the right visitor cannot tell the product is for them; 5 = a real differentiator goes unrecognised, or a segment is attracted and then disappointed; 1 = a wording nit with no selection consequence
-- **Evidence** — verbatim quote(s) with file paths; for fit findings, also the product evidence (feature, constraint, or code) that creates the gap
-- **Breadth** — how many surfaces carry it; from an actual search — name it; "est." if estimated
-- **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is the tell: the dangerous failure is a confident rewrite that sounds better and positions worse — copy broadened until it selects nobody, a differentiator sharpened into a claim the product can't back, a term unified on one surface so the vocabulary fractures further, a comparison row "corrected" without checking the competitor. Reserve plan mode + multi-PR for anything that changes **what the product is or who it's for** — the niche itself, the headline, the lead differentiator, whether to chase an emerging audience. Those are the user's decisions: the plan lays out options and consequences, it does not pick. Example hazard note: "Haiku 4.5 if the approved headline text is given in the task; else Opus 5 in plan mode."
-- **Problem** — one sentence: what the target user misunderstands, misses, or walks away from
-- **Fix** — one sentence: the concrete change; for anything touching the niche itself, present options rather than asserting one
+
+**Fails silently here** (what sets the tier): a confident rewrite that sounds
+better and positions worse — copy broadened until it selects nobody, a
+differentiator sharpened into a claim the product can't back, a term unified on
+one surface so the vocabulary fractures further, a comparison row "corrected"
+without checking the competitor. Reserve plan mode + multi-PR for anything that
+changes **what the product is or who it's for** — the niche, the headline, the
+lead differentiator, whether to chase an emerging audience. Those are the user's
+decisions: the plan lays out options and consequences, it does not pick. Example
+hazard note: "Haiku 4.5 if the approved headline text is given in the task; else
+Opus 5 in plan mode."
 
 Rank and report findings per the [shared convention](./README.md#ranking-findings) — here the summary table adds `gap` and `question` columns (finding → gap → question → recommended model).
 
@@ -132,13 +143,11 @@ Findings do **not** live here: nothing in this section is ranked, scored, or giv
 
 Close with a short, explicit list of the **strategy questions this survey surfaces but must not answer** — what the niche is, who the beachhead user is, which differentiator leads, whether the notes category stays in the pitch (it has already left the three shortest surfaces — the README headline, the `index.html` meta description, and the PWA manifest — but survives in the README feature list and philosophy, the blog's self-description, and the coach tour's opening sentence; check where it currently lives before framing the question), whether the LLM-friendly audience is worth targeting, and which feedback channel (if any) fits a product built on not running a server. State the options and the consequence of each, then stop. Everything outside this list should be actionable without further input.
 
-Do not pad to 8 — a short report grounded in real quotes beats a long one built on speculation.
-
 ---
 
 ## Categories to walk — ranked by priority
 
-The ranking is a tiebreaker, not a filter. Bullets are illustrative, not the boundary.
+Ranking and bullets: see [Running a survey](./README.md#running-a-survey).
 
 ### 1. Niche fit — does the product serve the job it targets? _(highest weight)_
 

@@ -17,10 +17,13 @@ Start by identifying which directories constitute the UI layer and state that li
 
 ## Process
 
-- **Scan first, write second.** State your scan plan before you start, complete the full scan, and only then write the report. In the scan plan, for each category, state what you'll look for beyond the listed examples — the bullets are illustrations, not your search space. Do not draft the verdict early and select findings to confirm it.
-- Evaluate the code on its merits. Treat claims in CLAUDE.md, READMEs, or architecture docs (e.g. "this exception is deliberate") as hypotheses to verify against the code, not as settled exceptions — if a documented rationale no longer holds, that is a finding.
-- **Verify capability claims by inspection, not memory.** For toolchain findings, check the _installed_ version of a plugin/library (its actual rule set, exports, or API) against what the config enables — do not assume from the version number. Where cheap, verify by dry-run: e.g. run the linter with a candidate preset via a temporary config and report the real finding count and distribution (clean up temp files afterwards). The same applies to component libraries: check what the installed shadcn/radix components actually ship before claiming a custom implementation duplicates one.
-- **This extends to build-time tooling, not just linters.** Compilers and transforms (React Compiler/`babel-plugin-react-compiler`, SWC/Babel plugins, CSS transforms) make claims a lint run never checks. Where a source comment asserts build-time behaviour ("this shape makes the compiler bail out", "this is memoized"), reproduce it: run the repo's own preset over a two-case fixture and diff the output. This is often the highest-yield check in the whole survey, because a build-time regression is invisible to build, lint, and tests alike.
+Per [Running a survey](./README.md#running-a-survey): scan plan first, evaluate
+on merits, verify capability claims by inspection. That last one extends to
+component libraries here — check what the installed shadcn/radix components
+actually ship before claiming a custom implementation duplicates one. Two rules
+are specific to this survey:
+
+- **Verification extends to build-time tooling, not just linters.** Compilers and transforms (React Compiler/`babel-plugin-react-compiler`, SWC/Babel plugins, CSS transforms) make claims a lint run never checks. Where a source comment asserts build-time behaviour ("this shape makes the compiler bail out", "this is memoized"), reproduce it: run the repo's own preset over a two-case fixture and diff the output. This is often the highest-yield check in the whole survey, because a build-time regression is invisible to build, lint, and tests alike.
 
   **The recipe, for this repo specifically** — it took several dead ends to find, and a run that loses its budget to setup will skip the check entirely. Put a driver script in the **repo root** (Node resolves `@babel/core` by walking up from the script, so one under a temp directory cannot see `node_modules`), and note that `reactCompilerPreset()` returns `{ preset, rolldown }` — Babel rejects the wrapper object and wants `.preset`:
 
@@ -42,7 +45,7 @@ Start by identifying which directories constitute the UI layer and state that li
 - Skim the full directory tree once so nothing is invisible, then confine close reading to the UI layer.
 - Read closely: the app shell / root layout, the most-imported components and hooks (measure this — don't guess), the 15 largest component files, every file in the shared-components directory, and at least 2–3 representative components from every feature directory that renders UI.
 - **Read the UI toolchain, not just the source:** Tailwind config, global CSS / theme tokens, the shadcn component inventory (`components/ui/` or equivalent) and its divergence from upstream, lint config for React/JSX/a11y/Tailwind rules, and the component-test setup (or its absence). From `package.json`, inventory the **UI-related** dependencies (React ecosystem, radix/shadcn, styling, icons, animation, forms, a11y) and know where each is used — this feeds the Library Fit category.
-- **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. On a fresh worktree, install dependencies first (`pnpm install`) — a missing `node_modules` makes every gate fail for a reason that is not a finding, and reads exactly like a broken toolchain. Before trusting lint output, generate the gitignored types it depends on (`pnpm run build` regenerates `src/routeTree.gen.ts`; `pnpm --filter meridian-oauth-worker run cf-typegen` regenerates the worker types) — without them the type-aware rules flood with ~150 spurious errors that are **not** a finding.
+- **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. Install and generate the gitignored types first, per [what this environment can and cannot do](./README.md#what-this-environment-can-and-cannot-do).
 - **Audit the gates' own config, not just their exit codes.** A green gate says nothing about whether it is still aimed at the right files. Check every path in the lint, coverage and smoke-test configs against the filesystem: per-file coverage thresholds naming a moved file, exclusion globs whose stated rationale has been outgrown by a file that has since tripled in size, and route lists that a new route does not automatically join. These fail *open* — Vitest, for one, accepts a threshold for a nonexistent path and exits 0 with no warning — so nothing surfaces them but this check.
 - **Sample git history for co-change patterns** among components, hooks, and style files (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest of the UI. Do not skip a UI directory entirely without recording it in the coverage statement. Non-UI directories may be skipped wholesale — record them as "out of scope" rather than "skipped."
@@ -74,32 +77,35 @@ defects, and must not consume a slot in the top-N findings list below.
 
 ### 4. Findings
 
-For each finding, output:
+`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
+the [shared finding fields](./README.md#finding-fields). This survey adds:
 
-- **Title** — short label
 - **Category** — one or more tags from: `component-architecture` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `a11y` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
 - **Impact** — 1–10 (10 = catastrophic/systemic; 5 = e.g. a UI pattern duplicated across ~4 components, or a missing error state on a primary user flow; 1 = trivial/cosmetic)
-- **Breadth** — number of **files** affected. Counts must come from an actual search (grep/glob), and you should be able to name the search you ran; if you estimated instead, write "est." next to the number.
-- **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is the tell: a wrong-but-plausible change that breaks the build, a type-check, or a test is far safer to hand down-tier than one that fails silently (a broken interaction only reachable on touch, a focus trap that still renders but no longer traps, a token swap that looks right in light mode and wrong in dark, a memoization change that quietly stales the rendered state). Reserve plan mode + multi-PR for findings that need a structural change across the UI layer **or** a product decision the user should make (e.g. "extract a shared dialog" vs "restructure the feature's component boundary"). Example hazard note: "Sonnet 5 if the token names to use are listed in the task; else Opus 5."
-- **Evidence** — at least one file path plus a short **verbatim code quote** from that file (line number optional). The quote must be copy-pasted, not paraphrased — I will spot-check by grepping for it. For toolchain findings, the evidence may be a config quote plus a dry-run result.
-- **Problem** — one sentence: what is wrong and why it matters
-- **Fix** — one sentence: what the concrete fix looks like
+
+**Fails silently here** (what sets the tier): a broken interaction only
+reachable on touch, a focus trap that still renders but no longer traps, a
+token swap that looks right in light mode and wrong in dark, a memoization
+change that quietly stales the rendered state. Reserve plan mode + multi-PR for
+a structural change across the UI layer **or** a product decision (e.g.
+"extract a shared dialog" vs "restructure the feature's component boundary").
+Example hazard note: "Sonnet 5 if the token names to use are listed in the
+task; else Opus 5."
 
 Rank and report findings per the [shared convention](./README.md#ranking-findings). Here, "confirming" a fix means re-running the build, lint, or the test suite.
 
 **Breadth-in-files under-ranks concentrated findings — say so rather than inflating it.** A god component is, by construction, one file: the whole defect is that N repetitions of one concern live in the same place. So `(impact × breadth) ÷ effort` scores it below a one-line lint tweak whose guard happens to span 100 files, and the ranking then contradicts this survey's own instruction to prefer systemic and structural issues. Do not fix this by padding the breadth count. Report the honest file count, and where the rank and the impact disagree, add one line under the summary table saying which findings the formula demotes and why. The reader can then re-sort on impact, which is what the separate-fields rule is for.
 
-**Strongly prefer systemic and structural issues over isolated, line-level ones.** A pattern repeated across 10 components beats one misused hook. Cite real code — no generic observations.
-
-List the **top 10 findings**, numbered (the category verdicts above reference these numbers). Include all findings that make the top 10 regardless of their impact score. Do not pad to reach 10 — if fewer than 10 clear issues exist, stop there.
+List the **top 10 findings**, numbered (the category verdicts above reference
+these numbers), per [Don't pad the findings
+list](./README.md#dont-pad-the-findings-list) and [prefer systemic
+findings](./README.md#finding-fields).
 
 ---
 
 ## Categories to scan — ranked by priority
 
-The category ranking is a tiebreaker, not a filter. A serious finding in any category always outranks a minor finding in a higher-priority category — never omit a high-impact issue because its category ranks lower.
-
-**The bullets under each category are illustrative examples, not the category's boundary.** Report any finding that fits the scope line, including issue types not listed.
+Ranking and bullets: see [Running a survey](./README.md#running-a-survey).
 
 ### 1. Component Architecture & Boundaries _(highest weight)_
 
