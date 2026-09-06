@@ -1,6 +1,8 @@
 /**
- * Root-A ratchet — see plans/surveys/data-integrity-results.md §2 ("Root A —
- * the projection isn't required to be total") and the survey's Root B section.
+ * Root-A ratchet. The data-integrity survey's §2 ("Root A — the projection
+ * isn't required to be total") and its Root B section are where this came
+ * from; that run's results file is gone now every finding is closed, so read
+ * them in git history (`git log -- plans/data-integrity-results.md`).
  *
  * Every save regenerates a file from the store, so the store is only as faithful
  * as its ability to round-trip a source file's bytes. Two independent checks catch
@@ -31,7 +33,7 @@
  * Deliberately NOT here: #2 (clearing a field inherited from `defaults:`) is not
  * a load→save case — it only exists relative to an `applyEdit` call — so it falls
  * outside what an unedited-round-trip check can express. #2's own regression test
- * (data-integrity-results.md finding #2) is what pins it instead.
+ * (2026-09-05 run, finding #2) is what pins it instead.
  */
 import { describe, it, expect } from 'vitest'
 import { parseToStoreItems } from '@/model/storeItems'

@@ -9,14 +9,18 @@ import { THEMES } from '@/settings'
 const {
   restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
   resetCalendarOnVaultChange, onVaultChanged, triggerVaultChanged, startCrossTabSync, stopCrossTabSync,
+  flushActiveAutoSave, callOrder,
 } = vi.hoisted(() => {
   const listeners = new Set<(change: { contentReplaced: boolean }) => void>()
   const stopCrossTabSync = vi.fn()
+  const callOrder: string[] = []
   return {
     restoreVaults: vi.fn(),
     autoSyncTick: vi.fn(),
     resetSyncBackoff: vi.fn(),
-    flushPendingPush: vi.fn(),
+    flushPendingPush: vi.fn(() => { callOrder.push('flushPendingPush') }),
+    flushActiveAutoSave: vi.fn(() => { callOrder.push('flushActiveAutoSave') }),
+    callOrder,
     requestScrollToToday: vi.fn(),
     setCurrentDate: vi.fn(),
     resetCalendarOnVaultChange: vi.fn(),
@@ -44,6 +48,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 
 vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync }))
 vi.mock('@/calendar', () => ({ requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange }))
+vi.mock('@/editor', () => ({ flushActiveAutoSave }))
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }))
 
 // The createRootRoute mock hands back the plain options object at runtime; the
@@ -62,6 +67,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   setVisibility('visible')
   vi.clearAllMocks()
+  callOrder.length = 0
 })
 
 afterEach(() => { vi.useRealTimers() })
@@ -162,6 +168,37 @@ describe('__root — going away', () => {
     setVisibility('hidden')
 
     expect(flushPendingPush).not.toHaveBeenCalled()
+  })
+
+  // data-integrity survey, finding #7: a still-pending debounced editor
+  // autosave has to reach the cache before flushPendingPush scans it, on both
+  // teardown signals — otherwise the push races the commit and misses the row.
+  it('flushes a pending editor autosave before pushing, on hide', () => {
+    render(<Root />)
+
+    setVisibility('hidden')
+
+    expect(flushActiveAutoSave).toHaveBeenCalledTimes(1)
+    expect(callOrder).toEqual(['flushActiveAutoSave', 'flushPendingPush'])
+  })
+
+  it('flushes a pending editor autosave before pushing, on pagehide', () => {
+    render(<Root />)
+
+    act(() => { window.dispatchEvent(new Event('pagehide')) })
+
+    expect(flushActiveAutoSave).toHaveBeenCalledTimes(1)
+    expect(callOrder).toEqual(['flushActiveAutoSave', 'flushPendingPush'])
+  })
+
+  it('stops flushing the editor autosave after unmount', () => {
+    const { unmount } = render(<Root />)
+    unmount()
+
+    act(() => { window.dispatchEvent(new Event('pagehide')) })
+    setVisibility('hidden')
+
+    expect(flushActiveAutoSave).not.toHaveBeenCalled()
   })
 })
 

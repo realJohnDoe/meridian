@@ -53,14 +53,15 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 
 ## Known suspects
 
-> **Surveyed 2026-09-05 — verdicts below.** Full report with reproductions:
-> [data-integrity-results.md](../data-integrity-results.md).
+> **Surveyed 2026-09-05 — verdicts below.** Its full report with reproductions
+> is in git history: that run's findings are all fixed, which is why
+> `plans/data-integrity-results.md` is gone (`git log -- plans/`).
 > Each suspect's original hypothesis is kept verbatim, with the verdict appended.
 > Verdicts are re-issued on each run and describe the code as of that run;
-> the finding numbers in them are that run's. (The 2026-07-31 run's verdicts
-> are in git history — its findings are all fixed, which is why its results
-> file is gone. Code comments citing "data-integrity survey, finding #N"
-> refer to that earlier run and have not been renumbered.)
+> the finding numbers in them are that run's — as are the ones in code comments
+> citing "data-integrity survey, finding #N", which span two runs now and have
+> never been renumbered. (The 2026-07-31 run's verdicts are likewise in git
+> history, for the same reason.)
 
 - **The `collapseToYaml` contract is the central claim of the whole model layer.** `src/model/AGENTS.md` describes its output as "the most compact `Record<string, unknown>` that round-trips back to the same store state." Verify that claim adversarially — especially the three hoisting branches (simple, single-series-with-instances, multi-series/container) and the `hoistSharedMetadata` diffing — rather than trusting it.
   - **2026-09-05: still false, but for entirely different reasons.** All three 2026-07 losses are fixed and pinned, and the hoisting remains sound — `computeSharedFields` / `occMetaToYaml` / `emitExtra` were re-read end to end and a no-op-save sweep over all 20 fixtures × 3 scopes × 3 occurrences found no hoisting defect. What still breaks the "round-trips back to the same store state" claim now sits on either side of collapse rather than inside it: a **structural** key in a shape the parser can't type (`date: [...]`, `excluded: "yes"`, `instances: {…}`) has no `extra` home at all and is deleted (finding #4), and a scalar the *parser* already flattened (`zip: 01234`, an ID past 2⁵³, `phone: +49…`) is re-emitted from its JS value and comes back changed (finding #6). Collapse is doing the right thing with what it is handed; it is handed less than the file contained.
