@@ -1,6 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import type { EntryState } from './state'
-import { registerAutoSaveFlush } from './autoSaveFlushPort'
+import { registerAutoSaveFlush } from '@/autoSaveFlushPort'
 
 /**
  * Debounced body autosave for the entry editor. `entryRef` must already hold

@@ -48,7 +48,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 
 vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync }))
 vi.mock('@/calendar', () => ({ requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange }))
-vi.mock('@/editor', () => ({ flushActiveAutoSave }))
+vi.mock('@/autoSaveFlushPort', () => ({ flushActiveAutoSave }))
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }))
 
 // The createRootRoute mock hands back the plain options object at runtime; the

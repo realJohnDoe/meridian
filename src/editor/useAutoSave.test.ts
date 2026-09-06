@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useRef } from 'react'
 import { useAutoSave } from './useAutoSave'
-import { flushActiveAutoSave } from './autoSaveFlushPort'
+import { flushActiveAutoSave } from '@/autoSaveFlushPort'
 import type { EntryState } from './state'
 
 function useTestAutoSave(editScope: EntryState['editScope'] = 'all') {

@@ -6,7 +6,7 @@ import { fmtISO } from '@/model'
 import { useVisibleViewportCssVars } from '@/hooks'
 import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync } from '@/storage'
 import { requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
-import { flushActiveAutoSave } from '@/editor'
+import { flushActiveAutoSave } from '@/autoSaveFlushPort'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
