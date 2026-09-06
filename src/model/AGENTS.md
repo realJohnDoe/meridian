@@ -217,13 +217,47 @@ see `storeOps.ts`. The same applies if `INLINE_FIELDS` ever grows: a new entry
 must be stripped from existing `extra` bags on load, or a stale raw value shadows
 the new typed field forever.
 
-**Deliberate non-goals.** These are normalised away and are *not* bugs: comments,
-key order, quoting style, multiple consecutive blank lines (collapsed to the
-single one `wrapFrontmatter`'s own separator inserts); a key's position when
-collapse relocates it between the root and `defaults:`. Still-open loss, out
-of scope here: absent-vs-empty for required arrays.
+**Authored spelling is preserved, not just the value.** A value is only as good
+as the characters that spell it: `1234567890123456789` re-derived from a
+JavaScript number comes back `1234567890123456800`, `+49123456789` loses its
+sign, `01234` its leading zero, and `"yes"` its quotes — which YAML 1.1 readers
+(PyYAML, Ruby, js-yaml's default schema, Obsidian) then read as boolean `true`.
+So `fileIO.ts` parses those leaves into a `RawScalar` carrying the source text
+and the quoting style beside the parsed value, and `rawScalarTag` writes them
+back out as themselves (data-integrity survey, finding #6).
 
-(Three items used to be in this list and no longer are:
+`fieldRegistry.ts`'s `yamlKeyRole` draws the line, and the line is **Meridian
+normalises what it writes and preserves what it doesn't**:
+
+- **`date`, `time`, `repeat`, `excluded`** stay normalised. These are the
+  schedule — the model computes them, and an edit moves them — which is also
+  what `roundTripCheck.ts`'s `NORMALISED_KEYS` already promises about them.
+- **Registry fields** keep their authored spelling for as long as nobody edits
+  them. The source rides in `sources` (beside `extra`, not inside it) and
+  `collapse.ts`'s `authoredOrTyped` consults it only while it still agrees with
+  the typed value — so an edited field discards its own spelling with no
+  bookkeeping, and `sources` can never disagree with the data it describes.
+- **Unknown keys** are preserved throughout their subtree, since nothing in
+  them may legitimately be reformatted.
+
+A scalar is boxed **only when the plain value would lose something**
+(`survivesPlainEmission`). `owner: alice` stays a plain string all the way
+through, so a `RawScalar` in a bag always *means* "this cannot be rebuilt from
+what it parsed to". `__tests__/scalar-fidelity.test.ts` sweeps that predicate
+against the real serialiser rather than trusting it.
+
+**Deliberate non-goals.** These are normalised away and are *not* bugs:
+comments, key order, multiple consecutive blank lines (collapsed to the single
+one `wrapFrontmatter`'s own separator inserts); a key's position when collapse
+relocates it between the root and `defaults:`; anchors and aliases (expanded to
+copies — `serializeRawNode` passes `aliasDuplicateObjects: false` so the writer
+never mints one of its own either). Quoting style inside a *typed sequence*
+(`tags:`, `items:`, `participants:`) is normalised too: `yamlKeyRole`'s `leaf`
+role covers scalars, and a sequence is not one. Still-open loss, out of scope
+here: absent-vs-empty for required arrays.
+
+(Four items used to be in this list and no longer are:
+- **Quoting style**, in the cases above — see the section just above this one.
 - **Metadata on an excluded instance** — `serializeChildren` now diffs an
   excluded child against the series metadata like any other override, so
   exclusion only suppresses the occurrence, it no longer erases what was

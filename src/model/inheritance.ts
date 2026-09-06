@@ -8,7 +8,7 @@
  */
 
 import { stringify } from 'yaml'
-import { wrapFrontmatter } from '@/fileIO'
+import { wrapFrontmatter, isRawScalar, rawScalarTag, rawScalarValue } from '@/fileIO'
 import type { FileConvention } from '@/fileIO'
 import type { RawNode } from './nodeSchema'
 
@@ -78,6 +78,12 @@ function mergeObjects(
  */
 function mergeValue(parent: unknown, child: unknown): unknown {
   if (parent === undefined) return child
+  // A `RawScalar` is a scalar wearing an object's clothes: it is `typeof
+  // 'object'` and carries a `style` field, so without this it would fall into
+  // the product-dict branch below and two of them would be merged key-by-key
+  // into a plain object holding neither one's source. A scalar always replaces
+  // a scalar, which is what the final `return child` says for every other one.
+  if (isRawScalar(child) || isRawScalar(parent)) return child
   if (isSumType(child)) {
     return isSumType(parent) && child.type === parent.type
       ? mergeObjects(parent, child)
@@ -148,6 +154,8 @@ export function buildEffectiveTree(
 
 /** Convert an arbitrary field value to a compact, human-readable string. */
 export function displayValue(v: unknown, indent = 0): string {
+  // A preserved scalar displays as the value it stands for, not as its box.
+  if (isRawScalar(v)) return displayValue(rawScalarValue(v), indent)
   if (v === null || v === undefined) return 'null'
   if (typeof v === 'boolean') return String(v)
   if (typeof v === 'number')  return String(v)
@@ -186,6 +194,10 @@ export function displayValue(v: unknown, indent = 0): string {
  */
 function prune(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(prune)
+  // A `RawScalar` is a leaf, not a bag of fields: walking into it would shred
+  // it into a plain `{source, style, value}` mapping and emit *that* — the
+  // same character-explosion shape a mistyped `defaults:` produces.
+  if (isRawScalar(v)) return v
   if (v && typeof v === 'object') {
     const out: Record<string, unknown> = {}
     for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
@@ -218,6 +230,20 @@ function serializeRawNode(node: RawNode): string {
     nullStr: 'null',
     defaultStringType: 'PLAIN',
     defaultKeyType: 'PLAIN',
+    // Teaches the serialiser to write a `RawScalar` back as the characters its
+    // file held. Registered here rather than globally because this is the one
+    // place Meridian turns an object graph into frontmatter.
+    customTags: [rawScalarTag],
+    // Frontmatter this app writes has no anchors — model/AGENTS.md lists them
+    // as a non-goal, and a file that arrives with one has already been expanded
+    // to copies by the time it reaches here. Without this, the serialiser mints
+    // `&a1`/`*a1` for any value it sees the same *reference* to twice, and one
+    // bag of extras spread onto several items (`withAncestorRemainder`) shares
+    // its references — so a plain `[1, 2]` under an unknown key on two
+    // occurrences already emits an anchor pair into the user's file today.
+    // Note this cannot make a circular graph recurse forever: `prune` above
+    // walks the same graph with no cycle guard and would overflow first.
+    aliasDuplicateObjects: false,
   }).trimEnd()
 }
 

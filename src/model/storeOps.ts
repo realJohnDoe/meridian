@@ -10,7 +10,7 @@
 import type { StoreItem, Occurrence, OccurrenceMetadata, Priority, Repeat, Roots, EditScope, OccurrenceEntry, RepeatPattern, Entry, Entries } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
 import { titleToSlug, entryKey as makeEntryKey, parseEntryKey } from '@/fileIO'
-import type { EntryKey } from '@/fileIO'
+import type { EntryKey, RawScalar } from '@/fileIO'
 import { dayBefore } from './dateUtils'
 import { stableOccId } from './expansion'
 import { resolveWikilink, parseWikilinks, unwrapRef } from '../wikilinks'
@@ -324,7 +324,7 @@ function mergeOccMeta(
 }
 
 /** Extract OccurrenceMetadata from expanded AppMetadata (strips file-level fields). */
-export function occFromAppMeta(m: { done?: boolean; participants?: string[]; priority?: Priority; duration?: string; timezone?: string; extra?: Record<string, unknown> }): OccurrenceMetadata {
+export function occFromAppMeta(m: { done?: boolean; participants?: string[]; priority?: Priority; duration?: string; timezone?: string; extra?: Record<string, unknown>; sources?: Record<string, RawScalar> }): OccurrenceMetadata {
   return {
     done:         m.done,
     participants: m.participants ?? [],
@@ -332,6 +332,10 @@ export function occFromAppMeta(m: { done?: boolean; participants?: string[]; pri
     duration:     m.duration,
     timezone:     m.timezone,
     ...(m.extra ? { extra: m.extra } : {}),
+    // Carried for the same reason as `extra`: this rebuilds the metadata field
+    // by field, so anything not named here is dropped — and a dropped source
+    // means the next save silently reformats a field nobody edited.
+    ...(m.sources ? { sources: m.sources } : {}),
   }
 }
 
@@ -417,6 +421,14 @@ function editedEntry(
       items: fields.items,
       body:  fields.body || undefined,
       extra: withoutKeys(prevRoot?.extra, touchedFileKeys(touched)),
+      // Carried forward like `extra` and `fileConvention`, and for the same
+      // reason: not an editable field, so a rebuild that omitted it would
+      // reformat every hand-quoted value at the file root on the first save
+      // made through the app. No `touched` strip needed, unlike `extra` — an
+      // authored source is only ever emitted while it still agrees with the
+      // typed value, so an edited field discards its own (see
+      // `authoredOrTyped` in collapse.ts).
+      sources: prevRoot?.sources,
       // Derived from the key rather than copied from `prev`, which is the same
       // carry-forward as `fileConvention` below but strictly safer: it is also
       // correct when there IS no previous entry (a brand-new file), and it makes

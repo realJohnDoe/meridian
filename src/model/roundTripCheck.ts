@@ -30,30 +30,25 @@
  * quoting style, a flipped sign or a rounded integer is exactly as much a loss
  * as the key vanishing outright, and a value-only comparison can't see it
  * (data-integrity survey, finding #5/#6).
+ *
+ * That split is not restated here. `fieldRegistry.ts`'s `yamlKeyRole` already
+ * has to answer the same question for the parse side — which keys keep their
+ * authored characters — so this reads the roles off it rather than keeping a
+ * second table that agrees by convention. `opaque` is the source half; `plain`
+ * and `leaf` are the value half; `node`/`nodeList` are the two keys that carry
+ * a node rather than a value and are recursed into. A key added to the model's
+ * vocabulary therefore changes how the guard treats it automatically, which is
+ * the only way the guard and the writer cannot drift apart.
  */
 
 import { parseDocument, isMap, isSeq, isScalar, isNode } from 'yaml'
-import { OCCURRENCE_FIELDS, FILE_LEVEL_SPECS } from './fieldRegistry'
+import { yamlKeyRole } from './fieldRegistry'
 import { collapseToYaml } from './collapse'
 import { saveFile } from './inheritance'
 import type { ParseResult } from './storeItems'
 
 /** Same frontmatter fence `fileIO.ts`'s `loadFile` splits on. */
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?[\s\S]*$/
-
-/**
- * Keys compared by parsed value rather than source text: every registry field
- * (`fieldRegistry.ts`'s `INLINE_FIELDS`, at both levels) plus the structural
- * keys the model reads directly (`date`/`time`/`repeat`/`excluded`) — all of
- * which are re-normalised on every save by design. `instances`/`defaults`, the
- * other two `STRUCTURAL_KEYS`, are not listed here because they never reach
- * this check as a value at all — they are always recursed into below.
- */
-const NORMALISED_KEYS: ReadonlySet<string> = new Set([
-  'date', 'time', 'repeat', 'excluded',
-  ...OCCURRENCE_FIELDS.map(s => s.key as string),
-  ...FILE_LEVEL_SPECS.map(s => s.key as string),
-])
 
 /**
  * A leaf-preserving stringification of a YAML node: every `Scalar` contributes
@@ -89,15 +84,26 @@ function collectFromNode(node: unknown): string[] {
   const out: string[] = []
   for (const pair of node.items) {
     const k = String(pair.key)
-    if (k === 'defaults') { out.push(...collectFromNode(pair.value)); continue }
-    if (k === 'instances') {
-      if (isSeq(pair.value)) for (const child of pair.value.items) out.push(...collectFromNode(child))
-      continue
+    switch (yamlKeyRole(k)) {
+      // `defaults:` is another node; `instances:` is a list of them. Recursed
+      // into, so neither ever reaches this check as a value of its own.
+      case 'node':
+        out.push(...collectFromNode(pair.value))
+        continue
+      case 'nodeList':
+        if (isSeq(pair.value)) for (const child of pair.value.items) out.push(...collectFromNode(child))
+        continue
+      // Meridian re-derives these on every save by design, so the source text
+      // it wrote them with is not the user's to keep — compare what they mean.
+      case 'plain':
+      case 'leaf':
+        out.push(`${k}=${JSON.stringify(isNode(pair.value) ? pair.value.toJSON() : pair.value)}`)
+        continue
+      // Nothing here may legitimately be reformatted, so compare the bytes.
+      case 'opaque':
+        out.push(`${k}=${sourceOf(pair.value)}`)
+        continue
     }
-    const rendered = NORMALISED_KEYS.has(k)
-      ? JSON.stringify(isNode(pair.value) ? pair.value.toJSON() : pair.value)
-      : sourceOf(pair.value)
-    out.push(`${k}=${rendered}`)
   }
   return out
 }
