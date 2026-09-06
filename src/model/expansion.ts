@@ -254,13 +254,21 @@ function* iterScheduledDates(
   // and the `to`-side stop below would drop the last one. Which years the rule
   // selects is unchanged either way — `periodsBetween` has always counted them
   // with `getFullYear()`.
+  // Renormalised through `withTime` before returning: `setDate`/`setMonth`
+  // preserve whatever wall-clock hour the input carried, so a step that lands
+  // on a spring-forward gap gets pushed an hour forward by JS's own Date
+  // normalisation and — without this — would carry that drifted hour on every
+  // later step too, since nothing else ever resets it. `withTime` derives the
+  // hour fresh from `anchorTimeStr` off the (unaffected) calendar day each
+  // time, so the drift can never survive past the single gap day it was
+  // forced on. See the data-integrity survey, finding #3.
   function nextBase(d: Date): Date {
     const n = new Date(d)
     if (freq === 'daily')        n.setDate(n.getDate() + interval)
     else if (freq === 'weekly')  n.setDate(n.getDate() + 7 * interval)
     else if (freq === 'monthly') { n.setDate(1); n.setMonth(n.getMonth() + interval) }
     else                         { n.setMonth(0, 1); n.setFullYear(n.getFullYear() + interval) }
-    return n
+    return withTime(n)
   }
 
   // Number of `nextBase` steps from `anchor` to the period boundary at or
@@ -284,7 +292,7 @@ function* iterScheduledDates(
     else if (freq === 'weekly')  n.setDate(n.getDate() + 7 * interval * steps)
     else if (freq === 'monthly') { n.setDate(1); n.setMonth(n.getMonth() + interval * steps) }
     else                         { n.setMonth(0, 1); n.setFullYear(n.getFullYear() + interval * steps) }
-    return n
+    return withTime(n)
   }
 
   /**
@@ -655,7 +663,7 @@ function expandNode<M>(
       }
     }
   } else {
-    const allTimes: Array<{ jsTime: Date; timed: boolean; done?: boolean; overrideId?: string; metadata: M }> = []
+    const allTimes: Array<{ jsTime: Date; timed: boolean; time: string | null; done?: boolean; overrideId?: string; metadata: M }> = []
     const anchorInst = (node.instances ?? []).find(i => {
       const t = nodeDateTime(i) || parseDateString(i.date)
       return t && sameMinute(t, anchor)
@@ -664,6 +672,7 @@ function expandNode<M>(
       allTimes.push({
         jsTime:     anchor,
         timed:      !!node.time,
+        time:       node.time,
         done:       anchorInst?.done ?? node.done,
         overrideId: anchorInst?.id,
         metadata:   anchorInst ? { ...node.metadata, ...anchorInst.metadata } : node.metadata,
@@ -673,7 +682,7 @@ function expandNode<M>(
       const t = nodeDateTime(inst) || parseDateString(inst.date)
       if (!t || inst.excluded) continue
       if (sameMinute(t, anchor)) continue
-      allTimes.push({ jsTime: t, timed: !!inst.time, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } })
+      allTimes.push({ jsTime: t, timed: !!inst.time, time: inst.time ?? node.time, done: inst.done ?? node.done, overrideId: inst.id, metadata: { ...node.metadata, ...inst.metadata } })
     }
     allTimes.sort((a, b) => a.jsTime.getTime() - b.jsTime.getTime())
 
@@ -696,10 +705,14 @@ function expandNode<M>(
 
     for (const entry of allTimes) {
       if (entry.jsTime >= from && entry.jsTime <= to) {
+        // Only the date comes from the resolved instant; the clock time comes
+        // from what was authored (entry.time), not from re-deriving it off a
+        // `Date` that DST may have silently pushed an hour forward. See the
+        // data-integrity survey, finding #3.
         const spec = jsDateToSpec(entry.jsTime)
         occurrences.push({
           date:       spec.date ?? '',
-          time:       spec.time ?? node.time,
+          time:       entry.time ?? spec.time,
           jsTime:     entry.jsTime,
           source:     onNextSlot(entry.jsTime, entry.timed) ? 'generated' : 'explicit',
           done:       entry.done,
@@ -719,7 +732,7 @@ function expandNode<M>(
         const spec = jsDateToSpec(nextJsTime)
         occurrences.push({
           date:     spec.date ?? '',
-          time:     spec.time ?? node.time,
+          time:     node.time ?? spec.time,
           jsTime:   nextJsTime,
           source:   'generated',
           done:     false,
