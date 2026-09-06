@@ -1,5 +1,12 @@
 # Agent guidelines for Meridian
 
+## Before implementing
+
+Before starting work on an issue, feature, or bug fix, check whether an
+architectural issue is making the implementation harder than it needs to be
+(e.g. a misplaced file, a missing abstraction, a boundary violation). Fix
+that first, then implement the requested change on top of it.
+
 ## Implementation decisions
 
 When an implementation decision isn't covered by this doc or explicitly
