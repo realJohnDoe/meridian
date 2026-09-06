@@ -785,7 +785,12 @@ export function joinFileMeta(entryKey: EntryKey, meta: OccurrenceMetadata, roots
   // them blank: a root can legitimately be missing (an item whose file failed to
   // parse, a debug-view synthetic), and an occurrence with no vault would route
   // and resolve links against the wrong one instead of simply having no title.
-  const { extra: _fileExtra, ...file } =
+  // `extra` and `sources` are both dropped rather than spread: an occurrence
+  // carrying none of its own would otherwise inherit the FILE's, and the edit
+  // path would write them back as occurrence-level keys. `AppMetadata` Omits
+  // both from its file half to say so in the types; this is that Omit at
+  // runtime, and the two have to move together.
+  const { extra: _fileExtra, sources: _fileSources, ...file } =
     roots.get(entryKey) ?? { title: '', tags: [], items: [], ...parseEntryKey(entryKey) }
   return { ...file, ...meta }
 }

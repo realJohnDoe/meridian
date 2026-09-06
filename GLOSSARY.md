@@ -144,6 +144,19 @@ The source file's line-ending / trailing-newline convention, captured at parse
 time so a save doesn't rewrite every `\r` because one field changed.
 → `fileIO.ts` · `FileConvention`
 
+### RawScalar
+One frontmatter leaf as its file spelled it — the source characters and quoting
+style beside the value they parse to — so a save reproduces the spelling instead
+of re-deriving it. Only present where the plain value would lose something.
+→ `fileIO.ts` · `RawScalar`, `isRawScalar`, `rawScalarValue`, `rawScalarTag`
+
+### sources
+The authored spelling of a node's *typed* fields, keyed by field name. Read only
+on emission, and only while it still agrees with the typed value — so an edited
+field discards its own. Unknown keys don't appear here; theirs ride in `extra`.
+→ `types.ts` · `FileMetadata`, `OccurrenceMetadata`
+→ `model/collapse.ts` · `authoredOrTyped`
+
 ### archived
 A file-level flag hiding the entry from every calendar surface and search. An
 already-existing pointer to it — a `[[wikilink]]`, its own route, a listed-on

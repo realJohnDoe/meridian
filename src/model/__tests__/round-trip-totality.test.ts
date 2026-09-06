@@ -96,19 +96,41 @@ describe('roundTripLoss — the runtime guard', () => {
     expect(roundTripLoss('qr.md', source, lobotomised)).toEqual(['project=apollo'])
   })
 
-  // Finding #5, fixed: the guard used to compare parsed JS values on both
-  // sides, so anything the YAML parser flattened identically (a big integer
-  // past 2^53, a leading zero, a leading `+`) cancelled out and reported
-  // clean even though the value it wrote back genuinely differs from what the
-  // user typed. It now compares an unknown key's SOURCE text instead.
+  // Findings #5 and #6, both fixed — and these assert the SECOND one, which is
+  // why they read as "reports nothing" rather than "reports a loss".
+  //
+  // #5 taught the guard to compare an unknown key by its source text, so a
+  // value the parser flattened identically (a big integer past 2^53, a leading
+  // zero, a leading `+`) stopped cancelling out and was reported. That made
+  // these three cases *visible*; they were still corrupted on disk. #6 then
+  // fixed the corruption itself — the save now reproduces the characters the
+  // user wrote — so the guard has nothing left to report on them. If one of
+  // these ever fails again, the value is being reformatted on save once more,
+  // and the guard is the thing telling you so.
   it.each([
     ['a big integer',  'discord: 1234567890123456789'],
     ['a leading zero', 'zip: 01234'],
     ['a leading plus', 'phone: +49123456789'],
-  ])('detects a reformatted value behind %s', (_name, line) => {
+  ])('no longer reformats, so reports nothing, behind %s', (_name, line) => {
     const source = `---\ntitle: T\n${line}\n---\n`
     const parsed = parseToStoreItems('n.md', source, TEST_VAULT)
-    expect(roundTripLoss('n.md', source, parsed)).not.toEqual([])
+    expect(roundTripLoss('n.md', source, parsed)).toEqual([])
+  })
+
+  // #5's own machinery still needs a pin, and no real file can provide one any
+  // more: every shape that used to be reformatted now survives. So this stages
+  // the regression instead — it puts back the plain value the pipeline used to
+  // carry, which is exactly what a future change dropping `RawScalar` would do,
+  // and asserts the guard still catches it by source rather than by value.
+  it('still detects a reformat by source when the authored form is dropped', () => {
+    const source = '---\ntitle: T\nzip: 01234\n---\n'
+    const parsed = parseToStoreItems('n.md', source, TEST_VAULT)
+    const [head, ...tail] = parsed.items
+    const flattened: Entry = {
+      ...parsed,
+      items: [{ ...head, metadata: { ...head.metadata, extra: { zip: 1234 } } }, ...tail],
+    }
+    expect(roundTripLoss('n.md', source, flattened)).toEqual(['zip=01234'])
   })
 
   // Finding #5, fixed (the other half): `date`/`time`/`repeat`/`excluded` used

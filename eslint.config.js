@@ -217,7 +217,11 @@ export default [
       // '@/**' imports are exempted here since the zones below now own that.
       'import-x/no-internal-modules': [
         'error',
-        { allow: ['@/**', 'react-dom/client', '@testing-library/jest-dom/vitest'] },
+        // Each entry is a subpath the package PUBLISHES in its own `exports`
+        // map, not a reach past one into `dist/`. `yaml/util` is where the
+        // `yaml` package exposes `stringifyString`, which fileIO.ts needs to
+        // re-emit a preserved scalar in its authored quoting style.
+        { allow: ['@/**', 'react-dom/client', '@testing-library/jest-dom/vitest', 'yaml/util'] },
       ],
 
       'import-x/no-restricted-paths': [

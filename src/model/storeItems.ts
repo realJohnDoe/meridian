@@ -18,7 +18,7 @@ import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
 import type { StoreItem, FileMetadata, FileFields, OccurrenceMetadata, Entry } from '@/types'
-import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from './fieldRegistry'
+import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys, yamlKeyRole, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from './fieldRegistry'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
 
@@ -240,7 +240,11 @@ export type ParseResult = Entry
  * depends on it.
  */
 export function parseToStoreItems(path: string, content: string, vaultId: string): ParseResult {
-  const { rawNode, body, convention } = loadFile(path, content)
+  // `yamlKeyRole` is what makes a save preserve the characters the user wrote
+  // for everything Meridian does not itself compute — see its doc comment for
+  // where that line falls. Every other `loadFile` caller keeps the plain
+  // default, so this is the one path that carries authored sources.
+  const { rawNode, body, convention } = loadFile(path, content, yamlKeyRole)
   const entryKey = pathToKey(vaultId, path)
   const tree = buildEffectiveTree(rawNode)
   const [first, ...rest] = effectiveNodeToStoreItems(tree, entryKey)

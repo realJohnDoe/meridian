@@ -1,6 +1,6 @@
 // ── MERIDIAN DOMAIN TYPES ────────────────────────────────────────────────────
 
-import type { FileConvention, EntryKey } from '@/fileIO'
+import type { FileConvention, EntryKey, RawScalar } from '@/fileIO'
 
 export type Priority = 'high' | 'medium' | 'low'
 
@@ -78,6 +78,24 @@ export interface FileMetadata {
    */
   extra?: Record<string, unknown>
   /**
+   * The exact characters this node's *typed* fields were written with, keyed by
+   * field name — so an untouched `title: "yes"` keeps its quotes instead of
+   * coming back as the bare `yes` a YAML 1.1 reader would call `true`
+   * (data-integrity survey, finding #6).
+   *
+   * Only ever consulted on emission, and only while it still agrees with the
+   * typed value: `collapse.ts`'s `authoredOrTyped` prefers the source when the
+   * two still parse alike, and silently drops it the moment an edit moves the
+   * value. That is what makes this a *formatting* record rather than a second
+   * copy of the data — nothing reads it to learn what a field holds, so it can
+   * never disagree with the field itself.
+   *
+   * Unknown keys are not here: their raw values live in `extra`, which is
+   * carried through the pipeline verbatim to begin with. Carried forward
+   * across edits like `extra` and `fileConvention` — see `editedEntry`.
+   */
+  sources?: Record<string, RawScalar>
+  /**
    * The source file's line-ending / trailing-newline convention, captured at
    * parse time so a save doesn't rewrite every `\r` just because one field
    * changed (data-integrity survey, finding #8). `undefined` for a
@@ -111,6 +129,8 @@ export interface OccurrenceMetadata {
   timezone?:    string
   /** Unknown frontmatter keys for this node — see FileMetadata.extra. */
   extra?:       Record<string, unknown>
+  /** Authored source for this node's typed fields — see FileMetadata.sources. */
+  sources?:     Record<string, RawScalar>
 }
 
 /** Fields never persisted to YAML — computed at runtime or used only by the UI. */
@@ -128,9 +148,10 @@ interface ExtendedMetadata {
  * root under the occurrence metadata, so without this an occurrence carrying no
  * extras of its own would inherit the FILE's extras — and the edit path would
  * then write them back as occurrence-level keys, emitting them twice.
- * AppMetadata.extra is always the occurrence bag.
+ * AppMetadata.extra is always the occurrence bag. `sources` is Omit-ted for
+ * the same reason and reads the same way.
  */
-export type AppMetadata = OccurrenceMetadata & Omit<FileMetadata, 'extra'> & ExtendedMetadata
+export type AppMetadata = OccurrenceMetadata & Omit<FileMetadata, 'extra' | 'sources'> & ExtendedMetadata
 
 // ── Expansion model types ─────────────────────────────────────────────────────
 

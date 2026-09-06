@@ -28,12 +28,12 @@ views and folded back into each one's store, and an open editor adopts what it
 did not touch and reports what both sides moved.)
 
 The single biggest structural theme is that **the round-trip guard checks the
-wrong round trip, and checks it on parsed values rather than bytes**.
-`roundTripLoss` is sound only on an *unedited* file (its own doc comment says
-so), and it compares `key=value` pairs after both sides have been through
-`yamlParse` — so it reports `[]` for every one of findings #4 and #6. Every
-loss this run found is invisible to the one runtime check that exists to find
-the next one.
+wrong round trip**. `roundTripLoss` is sound only on an *unedited* file (its own
+doc comment says so), so an edit's own losses stay invisible to the one runtime
+check that exists to find the next one. Its other half — comparing parsed values
+rather than bytes — is fixed: unknown keys are now compared by source text, and
+finding #6's re-derived scalars, which that change made visible, are now
+preserved rather than merely reported.
 
 ---
 
@@ -150,7 +150,7 @@ end: `fileIO.ts`, `nodeSchema.ts`, `inheritance.ts`, `storeItems.ts`,
 
 | # | Category | Verdict |
 |---|---|---|
-| 1 | Round-trip fidelity & edit locality | **findings: #4, #6** |
+| 1 | Round-trip fidelity & edit locality | **findings: #4** |
 | 2 | Lost updates & conflict handling | **clean** |
 | 3 | Cache coherence & durability | **findings: #7** |
 | 4 | Atomicity & partial failure | **partially assessed** — read end to end (`pushDirty`, `applyRemoteBatch`, `markInFlight`/`clearInFlight`'s refcounting, `moveEntityInCache`'s stage-then-release, `settlePendingMoves`) and nothing wrong was found by inspection, but no interruption was actually injected. The one concrete suspicion is recorded as unverified above. |
@@ -169,20 +169,18 @@ recommended-model ordinal (Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode = 5).
 |---|---|---|---|---|---|---|
 | **#3** | A DST spring-forward truncates bounded series and rewrites clock times | 8 | **silent** | 6 | 2 defects in 1 file; every bounded or `after_completion` series timed inside the gap | Sonnet 5 |
 | **#4** | A malformed *structural* key has nowhere to live and is deleted on save | 1, 7 | **silent** | 7 | all 6 `STRUCTURAL_KEYS`, every node of every file; 6 of 14 probed shapes lose bytes | Opus 5 |
-| **#6** | YAML scalars are re-emitted from JavaScript values, not from source | 1 | **silent** | 5 | every unknown key in every file; 7 of 39 probed shapes change | Opus 5 |
 | **#7** | A pending editor autosave is never flushed at page teardown | 6 | **silent** | 4 | 1 file; every editor session | Sonnet 5 |
 
 Numbers are identity **and** rank for this run — the two coincided, so there is
 no separate rank column to read.
 
-**Sequencing note.** #4 and #6 both land in the parse/emit pipeline. The guard
-over that pipeline (formerly tracked as finding #5 — it compared parsed values
-rather than source text and skipped `date`/`time`/`repeat`/`excluded`
-outright) is now fixed, so `roundTripLoss` will surface each of these two as
-soon as its own fix lands. #4's own widening of `collectKeyValues`'
-`STRUCTURAL_KEYS` skip is already done as part of the guard fix, so #4 only
-has the deletion itself left to fix. #3 and #7 are independent of all of these
-and of each other.
+**Sequencing note.** #4 lands in the parse/emit pipeline. The guard over that
+pipeline (formerly tracked as finding #5 — it compared parsed values rather
+than source text and skipped `date`/`time`/`repeat`/`excluded` outright) is now
+fixed, so `roundTripLoss` will surface it as soon as its own fix lands. #4's own
+widening of `collectKeyValues`' `STRUCTURAL_KEYS` skip is already done as part
+of the guard fix, so #4 only has the deletion itself left to fix. #3 and #7 are
+independent of it and of each other.
 
 ---
 
@@ -557,143 +555,6 @@ either way; afterwards the test above passes for all six cases.
 
 ---
 
-### #6 — YAML scalars are re-emitted from JavaScript values, not from source
-
-- **Invariant violated:** 1 (round-trip fidelity). Fires on **every save** of a
-  file whose frontmatter carries a numeric-looking or explicitly-quoted scalar
-  under a key Meridian does not type.
-- **Category:** `round-trip`
-- **Failure mode:** **Silent for the value itself** — the corruption or
-  reformatting still happens on disk either way. It used to be invisible to
-  `roundTripLoss` too (both sides parsed to the same JS value, so the pair
-  matched); now that finding #5 compares an unknown key by source text, the
-  guard does report most of these rows (a toast fires) even though nothing yet
-  repairs them. The one exception is the `x: "yes"` interop row: the `yaml`
-  package's `Scalar.source` resolves the quote/escape syntax away along with
-  the value, so detecting a dropped quote needs the node's `type` compared
-  too, which is outside what finding #5 covers.
-- **Impact:** **5** — the two genuinely destructive cases (integers past 2⁵³, a
-  leading `+`) lose information that cannot be recovered from the file; the rest
-  is reformatting that changes what *other* tools read. Not higher because the
-  keys involved are ones Meridian does not use, so nothing in Meridian
-  misbehaves — the damage is to the user's own data and to interoperability.
-
-**Repro.** Each row is a file of the form `---\ntitle: T\n<line>\n---\n`, saved
-unedited:
-
-| Starting line | Observed | Expected | Kind |
-|---|---|---|---|
-| `discord: 1234567890123456789` | `discord: 1234567890123456800` | unchanged | **value corrupted** (past 2⁵³) |
-| `phone: +49123456789` | `phone: 49123456789` | unchanged | **value corrupted** (`+` dropped) |
-| `zip: 01234` | `zip: 1234` | unchanged | **value corrupted** (leading zero) |
-| `version: 1.0` | `version: 1` | unchanged | reformatted |
-| `n: 1e3` / `n: 0x1F` / `n: 0o17` | `1000` / `31` / `15` | unchanged | reformatted |
-| `x: "yes"` | `x: yes` | `x: "yes"` | **interop break** — YAML 1.1 readers (PyYAML, Ruby, js-yaml's default schema, Obsidian) read the unquoted form as boolean `true` |
-| `x: &a {k: v}` / `y: *a` | both expanded to full copies | anchors preserved | documented non-goal |
-
-Failing test:
-
-```ts
-import { describe, it, expect } from 'vitest'
-import { parseToStoreItems } from '@/model/storeItems'
-import { serializeEntry } from '@/model/collapse'
-
-describe('scalar fidelity', () => {
-  it.each([
-    ['a snowflake id',   'discord: 1234567890123456789'],
-    ['an E.164 number',  'phone: +49123456789'],
-    ['a zip code',       'zip: 01234'],
-    ['a quoted "yes"',   'x: "yes"'],
-  ])('%s survives an unedited save', (_n, line) => {
-    const content = `---\ntitle: T\n${line}\n---\n`
-    const p = parseToStoreItems('n.md', content, 'v')
-    expect(serializeEntry(p.items, p.root)).toContain(line)  // ← fails today
-  })
-})
-```
-
-**Breadth.** Every unknown key in every file — the whole `extra` mechanism runs
-through it. Search run: 39 adversarial scalar shapes through parse → serialize.
-**7 of 39 are changed**, of which 3 are unrecoverable value corruption and 1 is
-an interop break. Two shapes fail *loudly* and correctly and are worth recording
-as the good outcome: duplicate keys throw (`Map keys must be unique`) and route
-the file to `unreadableFiles`, and `duration: 90` is the one case
-`roundTripLoss` does report.
-
-**Evidence.** The pipeline is plain-object throughout: `fileIO.ts:13-18` parses
-to JS values and discards the document —
-
-```ts
-function yamlParse(text: string): Record<string, unknown> {
-  const parsed: unknown = parseYaml(text)
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? (parsed as Record<string, unknown>)
-    : {}
-}
-```
-
-— and `src/model/inheritance.ts:216-221` re-derives the text from those values,
-with `PLAIN` as the preferred string style, which is what drops the quotes
-around `"yes"`:
-
-```ts
-  return stringify(prune(ordered), {
-    lineWidth: 0,            // never wrap long scalars (e.g. titles, intervals)
-    nullStr: 'null',
-    defaultStringType: 'PLAIN',
-    defaultKeyType: 'PLAIN',
-  }).trimEnd()
-```
-
-**Problem.** Every frontmatter value the user wrote is destroyed and rebuilt from
-a JavaScript primitive on each save, so an ID longer than 15 digits, a
-`+`-prefixed number and a leading zero come back as different values, and an
-explicitly-quoted string comes back unquoted.
-
-**Fix.** Keep the `yaml` document's `Scalar` nodes for unknown keys — parse with
-`parseDocument`, carry the nodes (not their JS values) in the `extra` bag, and
-re-emit them, so their `source` is reproduced verbatim; afterwards all four rows
-of the test above pass.
-
-**Task context**
-
-- **Why this stays at Opus 5, and why the context does not reduce it.** The
-  narrow fixes each solve part of the problem and none solves it:
-  `parse(text, { intAsBigInt: true })` fixes the 2⁵³ case but not `01234`, `+49`
-  or `1.0`; `defaultStringType: 'QUOTE_DOUBLE'` fixes `"yes"` but reformats every
-  title in every file in the vault on the next save, which is a far larger diff
-  than the bug. The real fix changes what flows through the pipeline, and
-  *which* keys it should apply to is a product decision: applying it to typed
-  fields as well would freeze Meridian's own output formatting, which the project
-  has deliberately kept normalised (`AGENTS.md`'s "Deliberate non-goals"). That
-  scope call is the expensive part.
-- **The seam, verified in both directions.** `extra` values are `unknown` all
-  the way through — `OccurrenceMetadata.extra` / `FileMetadata.extra` are
-  `Record<string, unknown>` (`types.ts`), `unknownKeys` (`fieldRegistry.ts`)
-  never inspects them, and `emitExtra` (`collapse.ts:170-180`) copies them
-  through untouched. So a `Scalar` node can ride the whole pipeline without a
-  type change. What *does* inspect them: `deepEqual` (`fieldRegistry.ts`), used
-  by `computeSharedFields` for hoisting and by `emitExtra` for the baseline diff
-  — it would compare node identity rather than value and silently stop hoisting.
-  That is the one place that must be taught about the new representation, and
-  the reason "just carry the nodes" is not a drop-in.
-- **The trap, located.** `prune` (`inheritance.ts`) walks the object graph and
-  rebuilds every nested object to strip `undefined`. A `Scalar`/`YAMLMap` node
-  reaching it would be shredded into a plain object with `value`/`source`/`type`
-  keys and emitted as such — the same character-explosion shape finding #4's
-  `defaults: everything` case shows. Anything carrying nodes must bypass `prune`
-  or `prune` must learn to pass `yaml` nodes through untouched.
-- **The scoping decision, stated so it can be made rather than rediscovered.**
-  The minimum that fixes every corruption row above without touching Meridian's
-  own formatting is: unknown keys only, `extra` bag only, source preserved
-  verbatim; typed fields keep today's normalising behaviour. Whether the
-  `"yes"` interop row also deserves fixing for *typed* fields (a `title: "yes"`
-  becoming `title: yes`) is the separate question — the README's
-  hand-created-files promise argues yes, the "quoting style is a deliberate
-  non-goal" note in `AGENTS.md` argues no. Put that to the user.
-
----
-
 ### #7 — A pending editor autosave is never flushed at page teardown
 
 - **Invariant violated:** 6 (durability of accepted writes). Fires when the tab
@@ -840,5 +701,5 @@ the five "Known suspects" verdicts were re-issued against current `main` (two
 are now settled and one is newly confirmed with a repro), and a handful of
 process improvements this run surfaced were proposed as ordinary diffs on that
 file — chiefly that the survey should require probing the **edited** round trip
-explicitly, not just the unedited one, since that is where three of this run's
-four fidelity findings live and where the repo's own guard does not look.
+explicitly, not just the unedited one, since that is where most of this run's
+fidelity findings live and where the repo's own guard does not look.

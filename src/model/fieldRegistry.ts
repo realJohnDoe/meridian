@@ -7,6 +7,8 @@
 // this is the domain core's internals, not its public surface.
 
 import type { FileMetadata, FileFields, OccurrenceMetadata, Priority } from '@/types'
+import { isRawScalar } from '@/fileIO'
+import type { KeyRole, KeyRoles, RawScalar } from '@/fileIO'
 
 const PRIORITIES: readonly Priority[] = ['high', 'medium', 'low']
 
@@ -59,6 +61,81 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set([
   ...STRUCTURAL_KEYS,
   ...INLINE_FIELDS.map(s => s.key as string),
 ])
+
+/**
+ * How much of each key's authored formatting a save preserves — the policy
+ * behind `fileIO.ts`'s `KeyRoles` mechanism, stated here because this module
+ * owns the vocabulary it is expressed in. `parseToStoreItems` is the one
+ * caller; every other `loadFile` caller keeps the all-`plain` default.
+ *
+ * The line it draws: **Meridian normalises what it writes, and preserves what
+ * it doesn't.**
+ *
+ *  - `defaults`/`instances` are the node structure, so they are recursed into
+ *    and their contents get roles of their own.
+ *  - The remaining `STRUCTURAL_KEYS` (`date`, `time`, `repeat`, `excluded`) are
+ *    the schedule. The model computes these — a date the user typed is one an
+ *    edit may move — so they stay normalised, which is also exactly what
+ *    `roundTripCheck.ts`'s `NORMALISED_KEYS` already promises about them.
+ *  - Every registry key is a `leaf`: its typed value is the model's, but the
+ *    *characters* are the user's for as long as the value is untouched, so a
+ *    hand-written `title: "yes"` keeps its quotes. Only scalars qualify;
+ *    `tags:`/`items:`/`participants:` are sequences and fall back to `plain`,
+ *    so element formatting inside them is still normalised.
+ *  - Everything else is `opaque`: Meridian has no name for it, so no part of
+ *    it may be reformatted.
+ */
+export const yamlKeyRole: KeyRoles = (key): KeyRole =>
+  key === 'defaults'          ? 'node'
+  : key === 'instances'       ? 'nodeList'
+  : STRUCTURAL_KEYS.has(key)  ? 'plain'
+  : RESERVED_KEYS.has(key)    ? 'leaf'
+  : 'opaque'
+
+/**
+ * Split a node's raw fields into the values the registry logic reads and the
+ * sources behind them.
+ *
+ * Only reserved keys are unwrapped: an unknown key's `RawScalar` has to stay
+ * where it is, because `extra` carries it through the pipeline verbatim and
+ * `emitExtra` writes it straight back out. A registry key's does not — its
+ * typed value is what the store holds, so the source is set aside in `sources`
+ * for `collapse.ts` to reach for on emission (see `authoredOrTyped` there).
+ *
+ * Without this split, a wrapped `title` would reach `scalarToString`, come back
+ * `undefined`, and be judged malformed — parking the wrapper in `extra` and
+ * blanking the typed title.
+ */
+function splitSources(fields: Record<string, unknown>): {
+  plain:    Record<string, unknown>
+  sources?: Record<string, RawScalar>
+} {
+  let sources: Record<string, RawScalar> | undefined
+  const plain: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(fields)) {
+    if (isRawScalar(v) && RESERVED_KEYS.has(k)) {
+      plain[k] = v.value
+      ;(sources ??= {})[k] = v
+    } else {
+      plain[k] = v
+    }
+  }
+  return sources ? { plain, sources } : { plain }
+}
+
+/** The subset of `sources` belonging to `specs` — one level's keys only. */
+function sourcesFor(
+  sources: Record<string, RawScalar> | undefined,
+  specs: readonly InlineFieldSpec[],
+): Record<string, RawScalar> | undefined {
+  if (!sources) return undefined
+  const out: Record<string, RawScalar> = {}
+  for (const spec of specs) {
+    const raw = sources[spec.key as string]
+    if (raw) out[spec.key as string] = raw
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
 
 /**
  * Structural equality for arbitrary YAML values. `inlineFieldEqual` is `a === b`
@@ -218,24 +295,30 @@ export function extractFileMetadata(
   // never validated array ELEMENTS, so a malformed `items:` list reached
   // `root.items` — the exact map wikilinks.ts/fileOccurrence.ts iterate —
   // untouched (health survey finding #1).
-  const meta = { body: scalarToString(fields.body) } as unknown as FileFields
+  const { plain, sources } = splitSources(fields)
+  const meta = { body: scalarToString(plain.body) } as unknown as FileFields
   const sink = meta as unknown as Record<string, unknown>
   for (const spec of FILE_LEVEL_SPECS) {
-    sink[spec.key as string] = parseInlineField(spec, fields[spec.key])
+    sink[spec.key as string] = parseInlineField(spec, plain[spec.key])
   }
-  const extra = mergeBags(remainder, malformedKnownFields(fields, FILE_LEVEL_SPECS))
+  const extra = mergeBags(remainder, malformedKnownFields(plain, FILE_LEVEL_SPECS))
   if (extra) meta.extra = extra
+  const own = sourcesFor(sources, FILE_LEVEL_SPECS)
+  if (own) meta.sources = own
   return meta
 }
 
 /** Extract occurrence-level metadata from the raw fields of a node or occurrence. */
 export function extractOccurrenceMetadata(fields: Record<string, unknown>): OccurrenceMetadata {
+  const { plain, sources } = splitSources(fields)
   const meta = {} as OccurrenceMetadata
   const sink = meta as unknown as Record<string, unknown>
   for (const spec of OCCURRENCE_FIELDS) {
-    sink[spec.key] = parseInlineField(spec, fields[spec.key])
+    sink[spec.key] = parseInlineField(spec, plain[spec.key])
   }
-  const extra = mergeBags(unknownKeys(fields), malformedKnownFields(fields, OCCURRENCE_FIELDS))
+  const extra = mergeBags(unknownKeys(plain), malformedKnownFields(plain, OCCURRENCE_FIELDS))
   if (extra) meta.extra = extra
+  const own = sourcesFor(sources, OCCURRENCE_FIELDS)
+  if (own) meta.sources = own
   return meta
 }

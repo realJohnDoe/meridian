@@ -15,6 +15,18 @@ import { saveFile } from '@/model/inheritance'
 import { applyEdit } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
 import { isSeries, isStandaloneOcc } from '@/types'
+import { rawScalarValue } from '@/fileIO'
+
+/**
+ * An `extra` bag with every preserved scalar reduced to the value it stands
+ * for — for assertions about WHAT a bag holds rather than how it was spelled.
+ * A test that cares about the spelling asserts on the saved bytes instead.
+ */
+function rawScalarValues(extra: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!extra) return extra
+  const plain = (v: unknown): unknown => (Array.isArray(v) ? v.map(plain) : rawScalarValue(v))
+  return Object.fromEntries(Object.entries(extra).map(([k, v]) => [k, plain(v)]))
+}
 
 const names = fixtureNames()
 
@@ -65,12 +77,19 @@ describe('unknown keys at the file root (flat file)', () => {
 
   it('keeps scalar types and the markdown body', () => {
     const p = parseFixture('unknown-keys-flat')
-    expect(p.items[0].metadata.extra).toEqual({
+    // `"Q review"` is the one value here whose spelling carries information
+    // the parsed string does not — drop its quotes and a YAML 1.1 reader still
+    // reads the same string, but the rule that keeps `"yes"` from becoming
+    // boolean `true` is the same rule, so it is preserved rather than
+    // special-cased. Everything else spells itself and stays a plain value;
+    // see `survivesPlainEmission` in fileIO.ts and scalar-fidelity.test.ts.
+    expect(rawScalarValues(p.items[0].metadata.extra)).toEqual({
       project: 'apollo',
       url: 'https://example.com/ticket/42',
       estimate: 3,
       aliases: ['QR', 'Q review'],
     })
+    expect(roundTrip('unknown-keys-flat')).toContain('- "Q review"')
     // The root is itself an item here, so the file bag stays empty — otherwise
     // both would emit and the keys would appear twice.
     expect(p.root.extra).toBeUndefined()

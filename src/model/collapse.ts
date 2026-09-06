@@ -1,6 +1,7 @@
 import type { OccurrenceMetadata, FileMetadata, OccurrenceEntry, Entry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
 import { OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, absentFieldValue, deepEqual } from './fieldRegistry'
+import type { RawScalar } from '@/fileIO'
 import { saveFile } from './inheritance'
 
 type AnyOcc = OccurrenceEntry<OccurrenceMetadata>
@@ -179,6 +180,32 @@ function emitExtra(
   }
 }
 
+/**
+ * What to write for a typed field: the characters the file carried, when they
+ * still say what the field now holds; the typed value otherwise.
+ *
+ * The equality check is the whole design. `sources` is a formatting record, not
+ * a second copy of the data, so it may only speak while it still agrees with
+ * the field — the moment an edit moves the value, the authored form stops
+ * describing it and is dropped without anyone having to remember to clear it.
+ * That is what keeps a save from resurrecting a stale `"yes"` over a title the
+ * user has since changed, with no `touched`-key bookkeeping of the kind
+ * `storeOps.ts` needs for the `extra` bag.
+ *
+ * A `stringArray` field never has a source (a sequence is not a scalar, so
+ * `yamlKeyRole`'s `leaf` role falls back to `plain`), and `inlineFieldEqual`
+ * would compare it structurally anyway — so this is a no-op there rather than
+ * a special case.
+ */
+function authoredOrTyped(
+  spec: { key: string | number | symbol; kind: Parameters<typeof inlineFieldEqual>[0] },
+  value: unknown,
+  sources: Record<string, RawScalar> | undefined,
+): unknown {
+  const raw = sources?.[spec.key as string]
+  return raw && inlineFieldEqual(spec.kind, raw.value, value) ? raw : value
+}
+
 /** Emit file-level fields as a YAML-serializable object. */
 function fileMetaToYaml(root: FileMetadata): Record<string, unknown> {
   const out: Record<string, unknown> = {}
@@ -188,7 +215,7 @@ function fileMetaToYaml(root: FileMetadata): Record<string, unknown> {
     // ''/[] fallback, which inlineFieldEmpty does not always suppress).
     if (root.extra && spec.key in root.extra) continue
     const v = (root as unknown as Record<string, unknown>)[spec.key as string]
-    if (!inlineFieldEmpty(spec.kind, v)) out[spec.key] = v
+    if (!inlineFieldEmpty(spec.kind, v)) out[spec.key] = authoredOrTyped(spec, v, root.sources)
   }
   // No baseline: a file has exactly one root, so file-level fields inherit from
   // nothing and every unknown key on it is emitted. Deliberately still using
@@ -244,7 +271,7 @@ function occMetaToYaml(
     // holds something — an override that untracked itself. YAML's word for that
     // is `null`, which this format already uses the same way for unknown keys
     // (see unknown-keys.test.ts's "keeps an explicit null and an empty list").
-    result[spec.key] = v === undefined ? null : v
+    result[spec.key] = v === undefined ? null : authoredOrTyped(spec, v, m.sources)
   }
   emitExtra(m.extra, baseline.extra, result)
   return result
@@ -269,6 +296,19 @@ function computeSharedFields(metas: Partial<OccurrenceMetadata>[]): Partial<Occu
       sharedExtra[key] = first
   }
   if (Object.keys(sharedExtra).length > 0) shared.extra = sharedExtra
+  // A hoisted field is emitted once, from `shared` — so its authored form has
+  // to travel with it or the hoist silently reformats a value nobody touched.
+  // Only when every item agrees on the source as well as the value: two items
+  // spelling the same duration `1h` and `"1h"` still hoist (the values match),
+  // and then neither spelling can claim to be the shared one.
+  const sharedSources: Record<string, RawScalar> = {}
+  for (const spec of OCCURRENCE_FIELDS) {
+    if (!(spec.key in shared)) continue
+    const first = metas[0]?.sources?.[spec.key as string]
+    if (first && metas.every(m => deepEqual(m.sources?.[spec.key as string], first)))
+      sharedSources[spec.key as string] = first
+  }
+  if (Object.keys(sharedSources).length > 0) shared.sources = sharedSources
   return shared
 }
 
