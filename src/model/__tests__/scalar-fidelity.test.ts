@@ -137,3 +137,61 @@ describe('a scalar is only boxed when the plain value would lose something', () 
     expect(isRawScalar(extra.zip)).toBe(true)
   })
 })
+
+describe('hoisting carries the authored form with the value', () => {
+  // `computeSharedFields` emits a shared field once, from the root `defaults:`
+  // block — so a spelling left behind on the items is a spelling lost, on a
+  // field nobody edited.
+  it('hoists the source when every item agrees on it', () => {
+    const content = [
+      '---', 'title: T', 'instances:',
+      '  - date: 2026-04-08', '    timezone: "Europe/Berlin"',
+      '  - date: 2026-04-09', '    timezone: "Europe/Berlin"',
+      '---', '',
+    ].join('\n')
+    const p = parseToStoreItems('n.md', content, TEST_VAULT)
+    const out = serializeEntry(p.items, p.root)
+    expect(out).toContain('timezone: "Europe/Berlin"')
+    // Once, in `defaults:` — the hoist still happened; it just kept the quotes.
+    expect(out.match(/timezone:/g)).toHaveLength(1)
+    expect(out).toMatch(/defaults:\n\s+timezone:/)
+  })
+
+  // The other half of the rule: the values match, so the field still hoists —
+  // but neither spelling can claim to be the shared one, so the hoisted copy
+  // falls back to Meridian's own formatting rather than picking a winner.
+  it('drops the source when two items spell the same value differently', () => {
+    const content = [
+      '---', 'title: T', 'instances:',
+      '  - date: 2026-04-08', '    timezone: "Europe/Berlin"',
+      '  - date: 2026-04-09', '    timezone: Europe/Berlin',
+      '---', '',
+    ].join('\n')
+    const p = parseToStoreItems('n.md', content, TEST_VAULT)
+    const out = serializeEntry(p.items, p.root)
+    expect(out).toContain('timezone: Europe/Berlin')
+    expect(out.match(/timezone:/g)).toHaveLength(1)
+  })
+})
+
+describe('anchors and aliases', () => {
+  // A documented non-goal (model/AGENTS.md): an alias is resolved to a copy
+  // rather than preserved. What matters is that it resolves at all — an
+  // unknown key's subtree is walked node by node, and an `Alias` is the one
+  // node kind there that has no value of its own to read. Getting that wrong
+  // throws or yields `null`, silently emptying the key.
+  it('resolves an alias to a copy instead of dropping the key', () => {
+    const content = '---\ntitle: T\nbase: &a hello\necho: *a\n---\n'
+    const p = parseToStoreItems('n.md', content, TEST_VAULT)
+    expect(p.items[0].metadata.extra).toEqual({ base: 'hello', echo: 'hello' })
+    expect(serializeEntry(p.items, p.root)).toContain('echo: hello')
+  })
+
+  it('resolves an aliased mapping, and writes no anchor of its own', () => {
+    const content = '---\ntitle: T\nbase: &a {k: v}\necho: *a\n---\n'
+    const p = parseToStoreItems('n.md', content, TEST_VAULT)
+    const out = serializeEntry(p.items, p.root)
+    expect(out).not.toMatch(/[&*]a\b/)
+    expect(out.match(/k: v/g)).toHaveLength(2)
+  })
+})

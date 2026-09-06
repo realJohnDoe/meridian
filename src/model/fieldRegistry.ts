@@ -65,8 +65,16 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set([
 /**
  * How much of each key's authored formatting a save preserves — the policy
  * behind `fileIO.ts`'s `KeyRoles` mechanism, stated here because this module
- * owns the vocabulary it is expressed in. `parseToStoreItems` is the one
- * caller; every other `loadFile` caller keeps the all-`plain` default.
+ * owns the vocabulary it is expressed in.
+ *
+ * Two consumers, deliberately: `parseToStoreItems` uses it to decide what to
+ * KEEP, and `roundTripCheck.ts` uses it to decide what to CHECK (`opaque`
+ * compares by source, `plain`/`leaf` by value, `node`/`nodeList` recurse).
+ * Those have to be the same answer — a guard that thought a key was normalised
+ * while the writer preserved it, or the reverse, would be silently wrong in
+ * one direction or noisy in the other — so they read one table rather than
+ * keeping two that agree by convention. Every other `loadFile` caller keeps
+ * the all-`plain` default and is unaffected.
  *
  * The line it draws: **Meridian normalises what it writes, and preserves what
  * it doesn't.**
