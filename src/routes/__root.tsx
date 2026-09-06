@@ -6,6 +6,7 @@ import { fmtISO } from '@/model'
 import { useVisibleViewportCssVars } from '@/hooks'
 import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync } from '@/storage'
 import { requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
+import { flushActiveAutoSave } from '@/editor'
 import { Toaster } from '@/components/ui/sonner'
 
 export const Route = createRootRoute({
@@ -172,6 +173,13 @@ function Root() {
     const stopCrossTabSync = startCrossTabSync()
     const intervalId = setInterval(autoSyncTick, 60_000)
     const onOnline = () => { resetSyncBackoff(); autoSyncTick() }
+    // Commits a still-pending debounced editor autosave, if one exists,
+    // before pushing whatever is now in the cache — in that order, so the
+    // push sees the row it just committed rather than scanning a cache that
+    // is still one edit behind. Both calls happen in this one handler rather
+    // than as two separately registered listeners so the ordering does not
+    // depend on addEventListener's registration order.
+    const flushAll = () => { flushActiveAutoSave(); flushPendingPush() }
     const onVisible = () => {
       if (document.visibilityState !== 'visible') {
         // Best-effort: push anything dirty before the tab is backgrounded (or
@@ -179,7 +187,7 @@ function Root() {
         // The next activation's own syncOnActivate() is the guarantee (its
         // pushDirty leg rescues whatever this missed) — this just narrows the
         // window in the common case.
-        flushPendingPush()
+        flushAll()
         return
       }
       autoSyncTick()
@@ -199,13 +207,13 @@ function Root() {
     // visibilitychange doesn't always fire reliably before a tab/PWA is
     // actually torn down (notably iOS Safari) — pagehide is the more reliable
     // "about to go away" signal, so back it up here too.
-    window.addEventListener('pagehide', flushPendingPush)
+    window.addEventListener('pagehide', flushAll)
     return () => {
       clearInterval(intervalId)
       stopCrossTabSync()
       window.removeEventListener('online', onOnline)
       document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('pagehide', flushPendingPush)
+      window.removeEventListener('pagehide', flushAll)
     }
   }, [])
 

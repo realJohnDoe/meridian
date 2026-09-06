@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react'
 import type { EntryState } from './state'
+import { registerAutoSaveFlush } from './autoSaveFlushPort'
 
 /**
  * Debounced body autosave for the entry editor. `entryRef` must already hold
@@ -42,6 +43,18 @@ export function useAutoSave(commitEntry: (next: EntryState) => void, entryRef: R
   const flushAutoSaveRef = useRef(flushAutoSave)
   useEffect(() => { flushAutoSaveRef.current = flushAutoSave })
   useEffect(() => () => { flushAutoSaveRef.current() }, [])
+
+  // Registers this editor's flush with the app-root teardown port for as long
+  // as it is mounted, so a pagehide/visibilitychange arriving before React
+  // gets to run this hook's own unmount effect (there is no such guarantee —
+  // see autoSaveFlushPort.ts) still reaches it. The wrapper delegates through
+  // the latest-ref above rather than closing over `flushAutoSave` directly, so
+  // it always commits against the current entry/body even though it is
+  // registered once, on mount.
+  useEffect(() => {
+    registerAutoSaveFlush(() => flushAutoSaveRef.current())
+    return () => registerAutoSaveFlush(null)
+  }, [])
 
   const scheduleAutoSave = (body: string) => {
     if (entryRef.current.editScope === 'add') return
