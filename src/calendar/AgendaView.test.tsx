@@ -672,14 +672,21 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
  */
 describe('AgendaView — incremental loading', () => {
   const todayTask = () => makeOcc({ id: 'today-1', date: fmtISO(today), time: '09:00' })
-  // Dense enough (about a occurrence every other day, both directions) that
-  // the initial three-chunk seed already fills more than a screenful — so the
-  // mount effect's own "keep loading until full" pass (see AgendaView's
+  // Dense enough (an occurrence every day, both directions) that the initial
+  // three-chunk seed already fills more than a screenful — so the mount
+  // effect's own "keep loading until full" pass (see AgendaView's
   // maybeGrowForward) has nothing to do, and the chunk count stays exactly
-  // three. A sparser fixture would make this test assert against that pass
-  // instead of against first paint.
-  const upcoming = () => Array.from({ length: 40 }, (_, i) => makeOcc({
-    id: `up-${i}`, date: fmtISO(addDays(today, 1 + i * 2)), time: '14:00', entryKey: testKey('note.md'),
+  // three.
+  //
+  // An occurrence *every other* day used to be "dense enough" here, but isn't:
+  // a day with nothing scheduled gets no row at all unless it's the anchor
+  // (see agendaSections.ts's buildBucket), so halving the density halves the
+  // future side's row count too — which eats most of GROW_FORWARD_ROWS' margin
+  // and makes maybeGrowForward legitimately fire once at first paint. That's a
+  // real growth, not a bug, so a sparser fixture here tests that pass, not
+  // first paint.
+  const upcoming = () => Array.from({ length: 60 }, (_, i) => makeOcc({
+    id: `up-${i}`, date: fmtISO(addDays(today, 1 + i)), time: '14:00', entryKey: testKey('note.md'),
     metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Upcoming ${i}`, tags: [], items: [] },
   }))
   const pastEvents = (n: number) => Array.from({ length: n }, (_, i) => makeOcc({
