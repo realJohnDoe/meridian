@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtT, fmtISO, parseDurationDays, dayRange } from '@/model'
 import { sameDay, fmtShort } from '@/format'
-import { sortOccs } from './occSort'
+import { sortOccs, isDimmed } from './occSort'
 import { OccurrencePill } from './OccurrencePill'
 import { AllDayOverflowToggle, ALL_DAY_THRESHOLD } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
@@ -181,24 +181,29 @@ function LiveWeekAllDayStrip({ weekStart, days, clockValue, onOpen, allDayExpand
   // of that column. That title truncates at this width regardless, and
   // dropping the cue was the whole complaint: the same event shows its
   // chevron in the day view, so a week bar going bare looked like a bug.
-  const renderBar = (b: (typeof bars)[number] & { row: number }) => (
-    <OccurrencePill
-      key={b.occ.id}
-      style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.row + 1 }}
-      tone={painter.tone({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
-      title={b.occ.metadata.title}
-      onClick={() => onOpen(b.occ)}
-      continuesLeft={b.continuesLeft}
-      continuesRight={b.continuesRight}
-      className="px-0.5 sm:px-1.5 text-3xs sm:text-xs"
-    />
-  )
+  const renderBar = (b: (typeof bars)[number] & { row: number }) => {
+    const dayEndOcc = { ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }
+    return (
+      <OccurrencePill
+        key={b.occ.id}
+        style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.row + 1 }}
+        hue={painter.hue(dayEndOcc)}
+        dimmed={isDimmed(dayEndOcc)}
+        title={b.occ.metadata.title}
+        onClick={() => onOpen(b.occ)}
+        continuesLeft={b.continuesLeft}
+        continuesRight={b.continuesRight}
+        className="px-0.5 sm:px-1.5 text-3xs sm:text-xs"
+      />
+    )
+  }
 
   const renderPill = (o: Occurrence, col: number, row: number) => (
     <OccurrencePill
       key={`${o.entryKey}-${o.date}`}
       style={{ gridColumn: col + 1, gridRow: row + 1 }}
-      tone={painter.tone(o)}
+      hue={painter.hue(o)}
+      dimmed={isDimmed(o)}
       title={o.metadata.title}
       onClick={() => onOpen(o)}
       className="px-0.5 sm:px-1.5 text-3xs sm:text-xs w-full"

@@ -1,12 +1,19 @@
 import type { CSSProperties } from 'react'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
-import type { OccTone } from '@/occView'
-import { dvBlockVariants, isDimmedTone, occRadius } from '@/components/primitives/occurrence-variants'
+import type { OccHue } from '@/occView'
+import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
 import { ContinuationChevron } from './ContinuationChevron'
 
 interface OccurrencePillProps {
-  tone: OccTone
+  /** The occurrence's own colour, from `OccPainter.hue` — unlike `.tone`,
+   *  this outlives completion, so a done/past pill still paints with it
+   *  (see `dimmed`) instead of losing its colour to a flat neutral fill. */
+  hue: OccHue
+  /** True for a done task or a past event. Fades the pill toward the page
+   *  background (`opacity-60`, the same fade `OccurrenceCard` gives its own
+   *  content) and strikes the title through, without changing `hue`. */
+  dimmed?: boolean
   title: string
   /** Present -> an interactive SurfaceButton. Absent -> a plain, non-interactive
    * div — for month view's chips/bars, which sit under a pointer-events-none
@@ -46,27 +53,21 @@ interface OccurrencePillProps {
  * width so `truncate` still applies once the title itself is the long side.
  */
 export function OccurrencePill({
-  tone, title, onClick, continuesLeft, continuesRight,
+  hue, dimmed, title, onClick, continuesLeft, continuesRight,
   chevronHiddenOnMobile, style, className,
 }: OccurrencePillProps) {
   const chevronCls = chevronHiddenOnMobile ? 'hidden sm:block' : undefined
 
-  const row = (
+  const content = (
     <>
       {continuesLeft && <ContinuationChevron side="left" className={chevronCls} />}
       <span className="flex-1 truncate min-w-0">{title}</span>
       {continuesRight && <ContinuationChevron side="right" className={chevronCls} />}
     </>
   )
-  // Split from the background per dvBlockVariants' doc comment: only the
-  // content dims, so it doesn't compound with the tone's own --done-overlay
-  // background into near-invisibility.
-  const content = isDimmedTone(tone)
-    ? <span className="flex items-center gap-1 flex-1 min-w-0 opacity-60">{row}</span>
-    : row
 
   const cls = cn(
-    dvBlockVariants({ tone }),
+    dvBlockVariants({ hue, dimmed }),
     occRadius,
     // gap-1 (4px between chevron and title) is also load-bearing as an
     // override: the interactive form below is a shadcn Button, whose base

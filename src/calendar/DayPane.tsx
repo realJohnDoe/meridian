@@ -6,7 +6,7 @@ import type { Occurrence, EditScope } from '@/types'
 import type { OccPainter } from '@/occView'
 import { multidayDisplayTitle, fmtT, parseDateString, parseDurationDays, dayRange } from '@/model'
 import { sameDay, addDays } from '@/format'
-import { sortOccs } from './occSort'
+import { sortOccs, isDimmed } from './occSort'
 import { OccurrencePill } from './OccurrencePill'
 import { AllDayOverflowToggle } from './AllDayOverflowToggle'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
@@ -26,12 +26,12 @@ const ALL_DAY_VISIBLE_ROWS = 2
 
 // ── Sub-components ────────────────────────────────────────────
 
-// painter.tone(o) here intentionally keeps occState's default (true wall
-// clock), not the pane's clockValue — clockValue freezes at `today` midnight for non-today
-// panes (see clockValue's own comment below), which would misclassify a
-// cross-midnight timed duration in this pane's own day. sortOccs (below) has
-// no such fallback available since it runs inside a memo, so it accepts that
-// rare imprecision; painting doesn't need to.
+// painter.hue(o)/isDimmed(o) here intentionally keep occState's default (true
+// wall clock), not the pane's clockValue — clockValue freezes at `today`
+// midnight for non-today panes (see clockValue's own comment below), which
+// would misclassify a cross-midnight timed duration in this pane's own day.
+// sortOccs (below) has no such fallback available since it runs inside a
+// memo, so it accepts that rare imprecision; painting doesn't need to.
 function renderAllDayItem(
   o: Occurrence,
   i: number,
@@ -45,7 +45,8 @@ function renderAllDayItem(
   return (
     <OccurrencePill
       key={`${o.entryKey}-${o.date}-${i}`}
-      tone={painter.tone(o)}
+      hue={painter.hue(o)}
+      dimmed={isDimmed(o)}
       title={multidayDisplayTitle(o, dvMidnight) ?? o.metadata.title}
       onClick={() => onOpen(o)}
       continuesLeft={!!startD && startD < dvMidnight}
