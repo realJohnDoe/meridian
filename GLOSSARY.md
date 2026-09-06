@@ -313,6 +313,17 @@ A cached entry with local edits not yet pushed. Counted per vault for the sync
 indicator.
 → `storage/cache/files.ts` · `cacheDirtyCount`
 
+### unreadable file
+A file whose frontmatter Meridian refuses to parse — a broken YAML document, or
+a structural key (`date`, `time`, `repeat`, `excluded`, `instances`,
+`defaults`) written in a shape the model cannot read. It holds neither a root
+nor items, is named to the user in a toast and in the sync panel, and is never
+written back, so its bytes survive exactly as typed. Refusing is the *safe*
+outcome: the alternative to reading a schedule is guessing one.
+→ `storeBridge.ts` · `getUnreadableFiles`
+→ `storage/parseReport.ts` · `parseFiles`, `reportParseFailures`
+→ `model/fieldRegistry.ts` · `structuralShapeErrors`
+
 ### listed keys
 Every key a vault's backend reported on its last listing, pulled or not — the
 answer to "which slugs does this vault already own", which `entries` (what has

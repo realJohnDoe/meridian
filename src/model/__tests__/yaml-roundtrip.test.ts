@@ -102,21 +102,37 @@ describe('structural expectations', () => {
     expect(dates).toEqual(['2026-04-19', '2026-04-20', '2026-04-21'])
   })
 
-  // Regression test: malformed frontmatter (a nested mapping where a scalar
-  // was expected) must not silently stringify to '[object Object]' — it
-  // should be treated as absent instead.
-  it('malformed non-scalar date/title fields are treated as absent, not "[object Object]"', () => {
+  // Regression test: a nested mapping where a scalar was expected must not
+  // silently stringify to '[object Object]'. The two halves of the original
+  // case now part ways, because a registry field and a structural key have
+  // different homes for a value the model can't type:
+  //
+  //  - `title:` is a registry field, so the raw mapping rides in `extra` and
+  //    wins back on emission (`malformedKnownFields`); the typed field holds
+  //    its '' fallback rather than a stringified object.
+  //  - `date:` is structural and has no such home, so the file is refused
+  //    outright instead of loading without its schedule — data-integrity
+  //    finding #4, and `malformed-structural.test.ts` covers it in full.
+  it('treats a malformed title as absent, not "[object Object]"', () => {
     const parsed = parseToStoreItems('malformed.md', [
       '---',
       'title:',
-      '  nested: yes',
-      'date:',
       '  nested: yes',
       '---',
     ].join('\n'), TEST_VAULT)
 
     expect(parsed.root.title).not.toContain('[object Object]')
-    expect(parsed.items[0].date).not.toContain('[object Object]')
+    expect(parsed.root.extra).toEqual({ title: { nested: 'yes' } })
+  })
+
+  it('refuses a malformed date rather than loading the file without one', () => {
+    expect(() => parseToStoreItems('malformed.md', [
+      '---',
+      'title: T',
+      'date:',
+      '  nested: yes',
+      '---',
+    ].join('\n'), TEST_VAULT)).toThrow("'date' must be a single value")
   })
 })
 

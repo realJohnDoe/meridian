@@ -7,7 +7,7 @@
 // this is the domain core's internals, not its public surface.
 
 import type { FileMetadata, FileFields, OccurrenceMetadata, Priority } from '@/types'
-import { isRawScalar } from '@/fileIO'
+import { isRawScalar, rawScalarValue } from '@/fileIO'
 import type { KeyRole, KeyRoles, RawScalar } from '@/fileIO'
 
 const PRIORITIES: readonly Priority[] = ['high', 'medium', 'low']
@@ -61,6 +61,128 @@ const RESERVED_KEYS: ReadonlySet<string> = new Set([
   ...STRUCTURAL_KEYS,
   ...INLINE_FIELDS.map(s => s.key as string),
 ])
+
+// ── Structural-key shapes ─────────────────────────────────────────────────────
+//
+// The `extra` bag catches a key the model has no name for, and
+// `malformedKnownFields` below catches a registry key written in a shape the
+// registry can't type — but a STRUCTURAL key has neither home. `RESERVED_KEYS`
+// keeps it out of `extra` (an `extra.date` re-emitted beside the model's own
+// would give the file two disagreeing schedules, which is what `emitExtra`'s
+// skip exists to prevent), and `malformedKnownFields` only ever looks at
+// `INLINE_FIELDS`. So a `date:` holding a list, an `excluded:` holding a
+// string, a `defaults:` holding a scalar had nowhere to go and was deleted on
+// the next save — silently, since these are the very keys the model re-derives
+// (data-integrity survey, finding #4).
+//
+// The answer is neither bag: a file whose schedule Meridian cannot read is
+// refused outright, at `parseToStoreItems`, so it lands in `unreadableFiles`
+// where it is named to the user and — the point — never written back. A wrong
+// guess about what the user meant is a rewrite of their file; a refusal is not.
+
+/** What one structural key's value has to be for the model to read it. */
+type StructuralShape = 'scalar' | 'flag' | 'mapping' | 'nodeList'
+
+/**
+ * The shape of every `STRUCTURAL_KEYS` member — the whole set, which
+ * `__tests__/malformed-structural.test.ts` pins so a seventh structural key
+ * cannot be added without saying what shape it holds.
+ *
+ *  - `date`/`time` are read through `scalarToString`, so anything that is not
+ *    a scalar reads back as "absent".
+ *  - `excluded` is read as `=== true`, which quietly calls every other value
+ *    "not excluded" — the case that resurrects an occurrence the user hid.
+ *  - `repeat` is passed to the expansion engine as a `Repeat` without a cast
+ *    check; a scalar there yields a series that generates nothing.
+ *  - `defaults` is spread (`{ ...defaults, ...rawNode }`), so a scalar spreads
+ *    character by character and *adds* `"0": e`, `"1": v`, … to the file.
+ *  - `instances` is `Array.isArray(…) ? … : []`, and each element is walked
+ *    with `Object.entries`, which explodes a non-mapping element the same way.
+ */
+const STRUCTURAL_SHAPES: ReadonlyMap<string, StructuralShape> = new Map([
+  ['date',      'scalar'],
+  ['time',      'scalar'],
+  ['repeat',    'mapping'],
+  ['excluded',  'flag'],
+  ['instances', 'nodeList'],
+  ['defaults',  'mapping'],
+])
+
+/** How each shape reads in a message addressed to someone editing YAML. */
+const SHAPE_WANTED: Record<StructuralShape, string> = {
+  scalar:   'a single value',
+  flag:     'true or false',
+  mapping:  'a block of keys',
+  nodeList: 'a list of entries',
+}
+
+function isMapping(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v) && !isRawScalar(v)
+}
+
+function shapeHolds(shape: StructuralShape, v: unknown): boolean {
+  // An absent key and an explicit YAML `null` are the same "nothing here" for
+  // every structural key — `null` is how a node says it overrides an inherited
+  // value with nothing, exactly as `parseInlineField` reads it for typed
+  // fields — so neither is a malformed shape.
+  if (v === null || v === undefined) return true
+  const value = rawScalarValue(v)
+  switch (shape) {
+    case 'scalar':   return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+    case 'flag':     return typeof value === 'boolean'
+    case 'mapping':  return isMapping(v)
+    case 'nodeList': return Array.isArray(v) && v.every(isMapping)
+  }
+}
+
+/** The value's shape, in the same vocabulary `SHAPE_WANTED` uses. */
+function describeShape(v: unknown): string {
+  if (Array.isArray(v)) return v.every(isMapping) ? 'a list of entries' : 'a list'
+  if (isMapping(v)) return 'a block of keys'
+  const value = rawScalarValue(v)
+  return typeof value === 'boolean' ? String(value)
+    : typeof value === 'number' ? 'a number'
+    : 'text'
+}
+
+const childPath = (at: string, segment: string): string => (at ? `${at}.${segment}` : segment)
+
+/**
+ * Every structural key in this raw node's tree whose value the model cannot
+ * read, described for the person who wrote the file. Empty for any file
+ * Meridian can load — which is every file it has ever written.
+ *
+ * Walks the RAW tree (before `buildEffectiveTree`), because two of the six keys
+ * are the tree: a malformed `defaults:`/`instances:` is gone by the time an
+ * `EffectiveNode` exists. Inheritance cannot introduce a shape that was not
+ * already in the file — `mergeValue` only ever returns one of the two values it
+ * was given — so checking the raw tree checks the effective one too.
+ *
+ * Recursion mirrors `yamlKeyRole`'s `node`/`nodeList` roles: a well-shaped
+ * `defaults:` block and each well-shaped `instances:` element are nodes in
+ * their own right and carry structural keys of their own. A key already
+ * reported is not recursed into — there is nothing trustworthy underneath it.
+ */
+export function structuralShapeErrors(node: Record<string, unknown>, at = ''): string[] {
+  const out: string[] = []
+  const where = at ? ` (at ${at})` : ''
+  for (const [key, value] of Object.entries(node)) {
+    const shape = STRUCTURAL_SHAPES.get(key)
+    if (shape === undefined) continue
+    if (!shapeHolds(shape, value)) {
+      out.push(`'${key}' must be ${SHAPE_WANTED[shape]}, not ${describeShape(value)}${where}`)
+      continue
+    }
+    if (key === 'defaults' && isMapping(value)) {
+      out.push(...structuralShapeErrors(value, childPath(at, 'defaults')))
+    } else if (key === 'instances' && Array.isArray(value)) {
+      value.forEach((child, i) => {
+        if (isMapping(child)) out.push(...structuralShapeErrors(child, childPath(at, `instances[${i}]`)))
+      })
+    }
+  }
+  return out
+}
 
 /**
  * How much of each key's authored formatting a save preserves — the policy

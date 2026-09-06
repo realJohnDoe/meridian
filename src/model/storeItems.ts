@@ -18,7 +18,7 @@ import type { EffectiveNode } from './inheritance'
 import { hasRepeat } from './expansion'
 import type { Repeat } from '@/types'
 import type { StoreItem, FileMetadata, FileFields, OccurrenceMetadata, Entry } from '@/types'
-import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, unknownKeys, yamlKeyRole, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from './fieldRegistry'
+import { extractFileMetadata, extractOccurrenceMetadata, scalarToString, structuralShapeErrors, unknownKeys, yamlKeyRole, FILE_LEVEL_SPECS, STRUCTURAL_KEYS } from './fieldRegistry'
 
 // ── Walker ────────────────────────────────────────────────────────────────────
 
@@ -215,6 +215,16 @@ function effectiveNodeToStoreItems(
   return result
 }
 
+/**
+ * The parse-failure message for a list of problems. Capped: one pathological
+ * file must not produce a toast the user cannot dismiss past, and the first few
+ * are enough to find the file and open it.
+ */
+function summarise(problems: string[]): string {
+  const shown = problems.slice(0, 3).join('; ')
+  return problems.length > 3 ? `${shown} (+${problems.length - 3} more)` : shown
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -238,6 +248,10 @@ export type ParseResult = Entry
  * two documents — and that routes to `unreadableFiles`, which holds neither a
  * root nor items. Keep that throw path as it is: `Entry`'s non-empty `items`
  * depends on it.
+ *
+ * Throws for one other reason, deliberately: a structural key written in a
+ * shape the model cannot read (`structuralShapeErrors`). See the throw site
+ * below for why refusing is the *safe* outcome rather than the harsh one.
  */
 export function parseToStoreItems(path: string, content: string, vaultId: string): ParseResult {
   // `yamlKeyRole` is what makes a save preserve the characters the user wrote
@@ -245,6 +259,25 @@ export function parseToStoreItems(path: string, content: string, vaultId: string
   // where that line falls. Every other `loadFile` caller keeps the plain
   // default, so this is the one path that carries authored sources.
   const { rawNode, body, convention } = loadFile(path, content, yamlKeyRole)
+  // A malformed structural key is refused, not repaired. Every other key in a
+  // file has somewhere to sit when the model can't type it — an unknown key
+  // rides in `extra`, a registry key written wrong rides there too
+  // (`malformedKnownFields`) and wins back on emission. These six have neither
+  // home by construction, so before this they were read as "absent" and the
+  // next save wrote the file back without them: a schedule, an override list,
+  // or a deliberate exclusion deleted with no warning, and in the `defaults:`
+  // case ten garbage keys added (data-integrity survey, finding #4).
+  //
+  // Refusing is what keeps the user's bytes: an unreadable file is named in a
+  // toast and in the sync panel, and — the part that matters — Meridian never
+  // writes to a file it did not load, so the original stays on disk exactly as
+  // typed, fixable in any text editor. The alternative, carrying the value in a
+  // structural remainder, means guessing a schedule from a value the model
+  // could not read and re-emitting it beside the one it computed; a wrong guess
+  // there is a silent rewrite of the user's file, which is the failure this
+  // finding is about.
+  const malformed = structuralShapeErrors(rawNode)
+  if (malformed.length > 0) throw new Error(`malformed frontmatter — ${summarise(malformed)}`)
   const entryKey = pathToKey(vaultId, path)
   const tree = buildEffectiveTree(rawNode)
   const [first, ...rest] = effectiveNodeToStoreItems(tree, entryKey)
