@@ -168,7 +168,7 @@ function installScrollShim(): void {
 function restoreScrollShim(): void {
   const restore = (name: string, d: PropertyDescriptor | undefined) => {
     if (d) Object.defineProperty(Element.prototype, name, d)
-    else delete (Element.prototype as unknown as Record<string, unknown>)[name]
+    else Reflect.deleteProperty(Element.prototype, name)
   }
   restore('scrollTop', scrollTopDescriptor)
   restore('scrollTo', scrollToDescriptor)

@@ -241,7 +241,7 @@ export async function diskWrite(
   await w.close()
   // The token is a hash of content, which is exactly what was just written —
   // no need to re-read the file to report the new version.
-  return await contentHash(content)
+  return contentHash(content)
 }
 
 export async function diskDelete(

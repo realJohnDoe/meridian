@@ -1,5 +1,5 @@
 import { isMap, isNode, isScalar, isSeq, parseDocument, Scalar } from 'yaml'
-import type { Document, ParsedNode, ScalarTag, YAMLMap } from 'yaml'
+import type { Document, ScalarTag, YAMLMap } from 'yaml'
 import { stringifyString } from 'yaml/util'
 
 // ── Authored scalars ───────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ export type KeyRoles = (key: string) => KeyRole
 
 const ALL_PLAIN: KeyRoles = () => 'plain'
 
-type ParsedDoc = Document.Parsed<ParsedNode, true>
+type ParsedDoc = Document.Parsed
 
 /**
  * True when re-emitting `node`'s parsed value on its own would reproduce the
@@ -187,7 +187,7 @@ function byRole(node: unknown, role: KeyRole, roles: KeyRoles, doc: ParsedDoc): 
   }
 }
 
-function mapEntries(node: YAMLMap<unknown, unknown>, roles: KeyRoles, doc: ParsedDoc): Record<string, unknown> {
+function mapEntries(node: YAMLMap, roles: KeyRoles, doc: ParsedDoc): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const pair of node.items) {
     const key = String(pair.key)

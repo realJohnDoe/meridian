@@ -181,7 +181,7 @@ describe('MonthStrip', () => {
     afterEach(() => {
       const restore = (proto: object, name: string, d: PropertyDescriptor | undefined) => {
         if (d) Object.defineProperty(proto, name, d)
-        else delete (proto as Record<string, unknown>)[name]
+        else Reflect.deleteProperty(proto, name)
       }
       restore(HTMLElement.prototype, 'offsetLeft', offsetLeftDescriptor)
       restore(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor)

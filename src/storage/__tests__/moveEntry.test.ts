@@ -127,8 +127,8 @@ function movedContent(content = MEETING): string {
   return serializeEntry(parsed.items, parsed.root)
 }
 
-async function rowsOf(vaultId: string) {
-  return await cacheLoadAll(vaultId)
+function rowsOf(vaultId: string) {
+  return cacheLoadAll(vaultId)
 }
 
 /** The state a move starts from: the source file durable in WORK, the store already re-keyed into HOME. */

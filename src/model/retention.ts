@@ -33,7 +33,7 @@ const FAR_FUTURE_YEARS = 200
 
 /** One occurrence slot: done (tracked) or past its date (untracked, i.e. an event). */
 function isFinishedSlot(done: boolean | undefined, dateStr: string, today: Date): boolean {
-  if (done !== undefined) return done === true
+  if (done !== undefined) return done
   if (!dateStr) return false // undated untracked — a note, deliberately left for later
   const d = parseDateString(dateStr)
   return d !== null && d < startOfDay(today)

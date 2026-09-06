@@ -183,7 +183,7 @@ describe('VaultSettings — invite', () => {
   it('copies an invite message naming the repo, with no install step, and confirms it', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const writeText = vi.fn((_text: string) => Promise.resolve())
-    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    vi.stubGlobal('navigator', { clipboard: { writeText } })
 
     render(<VaultSettings vault={GITHUB_VAULT} />)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Copy invite message/ })); await Promise.resolve() })

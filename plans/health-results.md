@@ -26,9 +26,8 @@ second consumer or a documented cycle-breaking reason (`persistencePort`,
 `autoSaveFlushPort`, `ViewChrome`, the four storage backends), and the
 meta-infrastructure is proportionate to the product it guards (1,256 lines of
 toolchain config against 39,056 lines of non-test source, ~3%). The theme is
-instead **intent that the toolchain doesn't hold up**: a lint tier evaluated, written up,
-and then not switched on (#3); coverage floors set honestly and then left to
-drift 10–26 points below reality (#4); a `shadcn` alias pointing at a module
+instead **intent that the toolchain doesn't hold up**: coverage floors set
+honestly and then left to drift 10–26 points below reality (#4); a `shadcn` alias pointing at a module
 that does not exist (#7); and a `CLAUDE.md` paragraph still warning about a gap
 that has since been closed (#8). Each is small on its own; together they are one
 pattern — decisions recorded but not wired to anything that re-checks them.
@@ -158,7 +157,7 @@ non-test source lines were at least enumerated by directory and line count.
 | 4 | Security | **clean** |
 | 5 | Testing & Error Handling | **findings: #4, #9** |
 | 6 | Code Health & DRY | **clean** |
-| 7 | Toolchain & Developer Feedback Loops | **findings: #3, #4, #7, #8** |
+| 7 | Toolchain & Developer Feedback Loops | **findings: #4, #7, #8** |
 | 8 | Dependencies & Library Fit | **findings: #7** (plus three keep-verdicts, below) |
 | 9 | Styling & UX | **partially assessed** |
 | 10 | Performance | **clean** |
@@ -202,16 +201,16 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 | Rank | # | Title | Category | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|
 | 1 | **#4** | Five coverage floors have drifted 10–26 points below measured | `testing` `toolchain` | 4 | 5 | **Haiku 4.5** | 20.0 |
-| 2 | **#3** | 20 evaluated `strict-type-checked` rules were written up but never enabled | `toolchain` `types` | 4 | 7 | **Sonnet 5** | 14.0 |
-| 3 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 4 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
-| 5 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 2 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
+| 3 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 4 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
-**Sequencing note.** No sequencing is needed among what's left — #2, #5 and #6
-have already landed, each in its own file (`worker/tsconfig.json`, the
-`/ical` Worker endpoint, and `vitest.config.ts`'s `thresholds` respectively)
-with nothing left to coordinate. #3, #4, #7 and #8 are independent of
-everything else and of each other.
+**Sequencing note.** No sequencing is needed among what's left — #2, #3, #5
+and #6 have already landed, each in its own file (`worker/tsconfig.json`, the
+20 `strict-type-checked` rules enabled in `eslint.config.js`, the `/ical`
+Worker endpoint, and `vitest.config.ts`'s `thresholds` respectively) with
+nothing left to coordinate. #4, #7 and #8 are independent of everything else
+and of each other.
 
 ---
 
@@ -273,59 +272,6 @@ everything else and of each other.
   above reflects this.
 - **Confirming the fix:** `pnpm run test:coverage` from the repo root — it fans
   out to the worker too, so one command covers both workspaces.
-
----
-
-### #3 — 20 `strict-type-checked` rules were evaluated, written up in the config, and then never enabled
-
-- **Category:** `toolchain` `types`
-- **Impact:** 4
-- **Breadth:** 7 files carry the 11 violations. Established by dry-run.
-- **Recommended model:** **Sonnet 5**
-- **Evidence:**
-  - `eslint.config.js` — `      // Not enabled yet only because fixing 11 real findings is its own change,`
-  - `eslint.config.js` — `      //   2  no-dynamic-delete            1  no-unnecessary-type-conversion`
-- **Problem:** The config carries a complete, honest evaluation of the 20
-  unassessed `strict-type-checked` rules — including a reproduction recipe — and
-  concludes they are worth having, but none is switched on, so the analysis sits
-  in a comment where nothing acts on it and the 11 real defects stay in the tree.
-- **Fix:** Fix the 11 violations and enable the 20 rules in both the `src/` and
-  `worker/src/` blocks. Afterwards `pnpm run lint` should pass with them on.
-
-**Task context**
-
-- **I re-ran the config's own recipe on 2026-09-06 and it reproduces exactly.**
-  The delta is **25 rules** (matching the comment), 3 enabled, 2 rejected, 20
-  unassessed. Dry-running those 20 over `src` + `worker/src` gives **11 findings
-  across 7 rules**, at these precise locations:
-
-  | Rule | Count | Sites |
-  |---|---|---|
-  | `no-dynamic-delete` | 2 | `src/calendar/AgendaView.test.tsx:171`, `src/calendar/MonthStrip.test.tsx:184` |
-  | `no-unnecessary-type-arguments` | 2 | `src/fileIO.ts:120`, `src/fileIO.ts:190` |
-  | `no-unnecessary-boolean-literal-compare` | 2 | `src/model/retention.ts:36`, `src/storage/conflictError.ts:57` |
-  | `return-await` | 2 | `src/storage/fs.ts:244`, `src/storage/__tests__/moveEntry.test.ts:131` |
-  | `no-unnecessary-type-conversion` | 1 | `src/model/expansion.ts:697` |
-  | `no-unnecessary-type-parameters` | 1 | `src/routes/-viewChrome.test.tsx:73` |
-  | `no-misused-spread` | 1 | `src/settings/VaultSettings.test.tsx:186` |
-
-  13 of the 20 rules are clean. Re-run before starting — the counts move with the
-  code.
-- **The trap, located.** `src/storage/fs.ts:244` is `  return await contentHash(content)`.
-  `return-await`'s default (`in-try-catch`) will want the `await` **removed** if
-  that line is *not* inside a `try` — but removing an `await` from a return
-  changes when a rejection surfaces relative to any enclosing `finally`. Read the
-  enclosing block before applying the autofix; this is the one of the eleven
-  where a mechanical fix can change runtime error semantics. The other ten are
-  safe autofixes.
-- **Both blocks, not one.** `eslint.config.js` has two rule blocks — `src/**`
-  (line 68) and `worker/src/**` (line 284) — and the worker block's comment
-  explicitly points at the src block for this decision. Enabling in only one
-  leaves the other silently unguarded.
-- **Reproduce with** the recipe already in the config at the foot of the
-  `strict-type-checked` comment block; it works as written.
-- **Confirming the fix:** `pnpm run lint` from the repo root (it covers both
-  `src` and `worker/src`, then chains `lint:deps`).
 
 ---
 
