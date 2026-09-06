@@ -1,7 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
-import { handleOAuthToken, type Env } from './oauthToken'
+import { handleOAuthToken } from './oauthToken'
+import type { Env } from './env'
 
-const env: Env = { GITHUB_CLIENT_ID: 'test-client-id', GITHUB_CLIENT_SECRET: 'test-secret' }
+// `/oauth/token` is deliberately not rate limited — a caller must already hold
+// a real code or refresh_token — so this binding is never reached from here.
+const env: Env = {
+  GITHUB_CLIENT_ID: 'test-client-id',
+  GITHUB_CLIENT_SECRET: 'test-secret',
+  ICAL_RATE_LIMIT: { limit: () => Promise.reject(new Error('/oauth/token must not consult the iCal rate limit')) },
+}
 
 function formRequest(fields: Record<string, string>): Request {
   return new Request('https://worker.example/oauth/token', {

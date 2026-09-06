@@ -1,4 +1,5 @@
-import { handleOAuthToken, type Env } from './oauthToken'
+import { handleOAuthToken } from './oauthToken'
+import type { Env } from './env'
 import { handleIcalFetch } from './icalFetch'
 import { corsHeadersFor } from './cors'
 
@@ -26,7 +27,7 @@ export default {
     }
 
     if (url.pathname === '/ical' && request.method === 'GET') {
-      return withCors(await handleIcalFetch(request), origin)
+      return withCors(await handleIcalFetch(request, env), origin)
     }
 
     return withCors(new Response('Not found', { status: 404 }), origin)

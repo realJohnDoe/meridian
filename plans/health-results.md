@@ -18,9 +18,7 @@ close to perfect (zero hand-written `any`, zero `@ts-ignore`, four non-null
 assertions, every `eslint-disable` carrying a written justification), the
 module boundaries documented in `CLAUDE.md` are genuinely machine-enforced and
 genuinely hold (I searched for cross-module deep imports and found **none**),
-and all eight quality gates pass in both workspaces. The weakest areas are
-**`src/settings/`** (55.98% statements — the add-vault wizard, the only path to
-connecting a GitHub, local or iCal vault, has effectively no tests).
+and all eight quality gates pass in both workspaces.
 
 The single biggest structural theme is **not** overengineering — I looked hard
 for it and did not find it. Every port and abstraction I tested has a real
@@ -157,7 +155,7 @@ non-test source lines were at least enumerated by directory and line count.
 | 1 | Architecture & Domain Separation | **clean** |
 | 2 | Simplicity & Overengineering | **clean** |
 | 3 | Directory & File Layout | **clean** |
-| 4 | Security | **findings: #5** |
+| 4 | Security | **clean** |
 | 5 | Testing & Error Handling | **findings: #4, #9** |
 | 6 | Code Health & DRY | **clean** |
 | 7 | Toolchain & Developer Feedback Loops | **findings: #3, #4, #7, #8** |
@@ -206,19 +204,13 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 | 1 | **#4** | Five coverage floors have drifted 10–26 points below measured | `testing` `toolchain` | 4 | 5 | **Haiku 4.5** | 20.0 |
 | 2 | **#3** | 20 evaluated `strict-type-checked` rules were written up but never enabled | `toolchain` `types` | 4 | 7 | **Sonnet 5** | 14.0 |
 | 3 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 4 | **#5** | `/ical` Worker endpoint is an unauthenticated open fetch proxy | `security` | 5 | 2 | **Opus 5** | 3.3 |
-| 5 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
-| 6 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 4 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 5 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
-- **#5 (security, impact 5) falls to 4th purely on the effort divisor**, because
-  it is the one finding here that needs a product decision rather than an edit.
-  It is not less important than the two impact-2 config fixes below it. If you
-  are triaging by consequence rather than by cost, #5 belongs in the top three.
-
-**Sequencing note.** No sequencing is needed among what's left — #2 and #6
-have already landed (each touched its own file, `worker/tsconfig.json` and
-`vitest.config.ts`'s `thresholds` respectively, with nothing left to
-coordinate). #3, #4, #5, #7 and #8 are independent of
+**Sequencing note.** No sequencing is needed among what's left — #2, #5 and #6
+have already landed, each in its own file (`worker/tsconfig.json`, the
+`/ical` Worker endpoint, and `vitest.config.ts`'s `thresholds` respectively)
+with nothing left to coordinate. #3, #4, #7 and #8 are independent of
 everything else and of each other.
 
 ---
@@ -389,65 +381,6 @@ everything else and of each other.
   `.catch(() => 0)`; `handleNext`/`handleAddFeed` reach `add*Vault`, which catch
   internally. `startGitHubSignIn` is genuinely the only gap — do not widen the
   change.
-
----
-
-### #5 — The `/ical` Worker endpoint is an unauthenticated open fetch proxy sharing a quota with sign-in
-
-- **Category:** `security`
-- **Impact:** 5
-- **Breadth:** 2 files (`worker/src/index.ts`, `worker/src/icalFetch.ts`), plus
-  `worker/wrangler.toml` if a rate-limit binding is added. Exposure is a
-  condition: **anyone on the internet, no credential required.** Established by
-  grepping the whole `worker/` tree for `rate.?limit|throttl|quota` — the only
-  hits are in the generated `worker-configuration.d.ts`, i.e. Cloudflare's
-  `RateLimit` binding is available in the runtime and **unused**.
-- **Recommended model:** **Opus 5**
-- **Evidence:**
-  - `worker/src/index.ts:28` — `    if (url.pathname === '/ical' && request.method === 'GET') {` — reached with no auth check of any kind
-  - `worker/src/cors.ts` — `// ambient session/cookie to protect — callers must already possess a real`
-  - `worker/src/icalFetch.ts` — `// URL the caller chooses, which is the classic SSRF shape — hence the host`
-- **Problem:** The CORS module's reasoning for letting disallowed-origin requests
-  execute — that a caller "must already possess a real `code`/`code_verifier`/`refresh_token`"
-  — is sound for `/oauth/token` but does not transfer to `/ical`, which requires
-  no secret at all, so any non-browser client can use the Worker as an
-  origin-masking proxy for arbitrary public HTTPS GETs (5 MB, 10 s each) and can
-  exhaust the free-tier request budget that GitHub sign-in shares.
-- **Fix:** Add a rate limit to `/ical` — Cloudflare's `RateLimit` binding is
-  already in the generated types and needs only a `wrangler.toml` entry — keyed
-  per client IP. Afterwards a burst above the chosen threshold should return 429
-  while a normal 15-minute poll is unaffected.
-
-**Task context**
-
-- **What is already correct, and must not be undone.** The SSRF guard in
-  `icalFetch.ts` is thorough and should be left alone: it blocks loopback,
-  RFC1918, CGNAT, link-local (including `169.254.169.254`), multicast and
-  reserved IPv4; handles compressed and IPv4-embedded IPv6; rejects non-`https`,
-  embedded credentials and non-443 ports; re-validates **every redirect hop**
-  with `redirect: 'manual'`; caps the body at 5 MB by streaming count rather than
-  trusting `Content-Length`; and documents its own residual risk (DNS rebinding)
-  honestly. **This finding is not about SSRF** — the private-network door is
-  shut. It is about unmetered *public* fetches.
-- **Why this stays Opus 5, honestly.** The remaining questions are product
-  decisions that the code cannot answer and that I should not make: what request
-  rate a legitimate user generates (the iCal backend polls every 15 minutes, but
-  one user may hold several subscriptions across several devices); whether to
-  key the limit on IP, on the requested feed host, or both; and whether to
-  additionally reject non-browser callers by `Origin`, which would harden the
-  endpoint but breaks any future non-web client. Adding more context to this
-  finding would not make those calls for the fixer — that is what makes it a
-  genuine Opus-tier item rather than an under-specified one.
-- **The specified half, if you want to split it.** Wiring a `[[ratelimit]]`
-  binding in `worker/wrangler.toml` and calling `env.RATE_LIMITER.limit({ key })`
-  at the top of `handleIcalFetch`, returning 429 on `success: false`, is
-  mechanical once the threshold and key are chosen — that part is **Sonnet 5**
-  with the numbers supplied.
-- **Confirming the fix:** `pnpm --filter meridian-oauth-worker run test` and
-  `… run typecheck`. `worker/src/icalFetch.test.ts` already injects a
-  `CalendarFetcher` double, so a rate-limit test can follow the same seam without
-  touching the network.
-
 ---
 
 ### #7 — `components.json`'s `utils` alias points at a module that does not exist

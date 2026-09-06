@@ -1,7 +1,4 @@
-export interface Env {
-  GITHUB_CLIENT_ID: string
-  GITHUB_CLIENT_SECRET: string
-}
+import type { Env } from './env'
 
 // Injectable so tests can stub GitHub's token endpoint without real network
 // mocking — Request/Response/FormData/URLSearchParams are all standard Fetch
