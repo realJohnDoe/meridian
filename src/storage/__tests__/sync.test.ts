@@ -464,7 +464,13 @@ beforeEach(() => {
 
 describe('pushDirty — a divergence on disjoint fields is merged, not copied', () => {
   const BASE   = '---\ntitle: Essensplan\n---\n'
-  const LOCAL  = '---\ntitle: Essensplan\nrepeat: weekly\n---\n'
+  // The frontmatter side of the divergence is an ordinary field rather than a
+  // structural one: `parseFiles` refuses a file whose `repeat:`/`date:` it
+  // can't read (see model/__tests__/malformed-structural.test.ts), and the
+  // merged result here is parsed back into the store, so a placeholder that is
+  // itself malformed would make these assert the parse failure instead of the
+  // merge. Nothing about the merge depends on which key it is.
+  const LOCAL  = '---\ntitle: Essensplan\ntags: [dinner]\n---\n'
   const REMOTE = '---\ntitle: Essensplan\n---\n\nNudeln am Dienstag\n'
 
   it('keeps both changes at the original path, with no conflict copy and no toast', async () => {
@@ -479,7 +485,7 @@ describe('pushDirty — a divergence on disjoint fields is merged, not copied', 
     await syncToBackend()
 
     const merged = backend.get('essensplan.md')?.content ?? ''
-    expect(merged).toContain('repeat: weekly')
+    expect(merged).toContain('tags:')
     expect(merged).toContain('Nudeln am Dienstag')
 
     // No copy — the whole point.

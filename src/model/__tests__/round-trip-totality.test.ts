@@ -134,14 +134,22 @@ describe('roundTripLoss — the runtime guard', () => {
   })
 
   // Finding #5, fixed (the other half): `date`/`time`/`repeat`/`excluded` used
-  // to be skipped outright, so a save that dropped one of them — finding #4,
-  // still open — was as invisible as the value-level losses above. The guard
-  // now watches these keys too; it is finding #4's own fix that will make the
-  // key survive in the first place.
+  // to be skipped outright, so a save that dropped one of them was as invisible
+  // as the value-level losses above. The guard now watches these keys too.
+  //
+  // No real file can demonstrate that any more. This used to feed it finding
+  // #4's own repro (`date:` holding a list, which parsed cleanly and lost the
+  // key on save); #4's fix refuses that file at the parse boundary instead, so
+  // it never reaches the guard. So this stages the regression the same way the
+  // `RawScalar` case above does — an item whose date the store simply doesn't
+  // have, which is what a collapse that stopped emitting `date:` would produce
+  // — and asserts the guard still names the key.
   it('detects a structural key a save would drop', () => {
-    const source = '---\ntitle: T\ndate:\n  - 2026-04-08\n---\n'
+    const source = '---\ntitle: T\ndate: 2026-04-08\n---\n'
     const parsed = parseToStoreItems('n.md', source, TEST_VAULT)
-    expect(roundTripLoss('n.md', source, parsed)).not.toEqual([])
+    const [head, ...tail] = parsed.items
+    const undated: Entry = { ...parsed, items: [{ ...head, date: '' }, ...tail] }
+    expect(roundTripLoss('n.md', source, undated)).toEqual(['date="2026-04-08"'])
   })
 })
 

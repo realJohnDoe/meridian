@@ -50,7 +50,11 @@ Returns `ParseResult = { items: StoreItem[]; root: FileMetadata }` — items car
 only `OccurrenceMetadata` (no file-level fields); file-level identity is in `root`.
 
 - `parseToStoreItems(path, content): ParseResult` — full parse pipeline:
-  `yamlParse` → `buildEffectiveTree` → `effectiveNodeToStoreItems` + `buildRoot`.
+  `yamlParse` → `structuralShapeErrors` → `buildEffectiveTree` →
+  `effectiveNodeToStoreItems` + `buildRoot`. Throws for a file it cannot
+  represent — an empty frontmatter block, or a structural key in a shape the
+  model can't read — which routes it to `unreadableFiles`; see "A structural key
+  has no bag" under Unknown-key preservation.
 - `effectiveNodeToStoreItems(tree, fileSlug)` — walks an `EffectiveNode` tree and
   emits a flat `StoreItem[]` using `extractOccurrenceMetadata` (no file-level):
   - Series node (`repeat` present) → `RepeatPattern` + child `OccurrenceEntry`
@@ -176,6 +180,47 @@ an `extra` bag on `OccurrenceMetadata` / `FileMetadata` and re-emitted on collap
 both levels. `unknownKeys(fields)` returns everything else, or `undefined` when
 there is nothing to carry (never `{}`, so files without unknown keys keep
 byte-identical metadata).
+
+**A structural key has no bag, so a wrong-shaped one is refused, not carried.**
+The three homes for a value the model can't type cover five of the six key
+classes and none of the structural ones: an unknown key rides in `extra`; a
+registry key written in the wrong shape rides there too (`malformedKnownFields`)
+and wins back on emission; a container's own keys ride down to its items
+(`containerOwnRemainder`). A structural key can use none of them — `RESERVED_KEYS`
+keeps it out of `extra` deliberately, because an `extra.date` re-emitted beside
+the model's own would give the file two disagreeing schedules, which is exactly
+what `emitExtra`'s `STRUCTURAL_KEYS` skip exists to prevent.
+
+So `structuralShapeErrors` checks the shape of all six at every node of the RAW
+tree, and `parseToStoreItems` throws when any of them is wrong: the file lands in
+`unreadableFiles`, is named to the user, and — the point — is never written back,
+so its bytes survive exactly as typed. Before this it parsed cleanly with the key
+read as "absent" and the next save wrote the file without it, deleting a
+schedule, an override list or a deliberate exclusion in silence; a scalar
+`defaults:` was spread character by character and *added* ten garbage keys
+(data-integrity survey, finding #4).
+
+| Key | Must be | Read by |
+|---|---|---|
+| `date`, `time` | a scalar | `scalarToString` — a non-scalar reads back as absent |
+| `excluded` | a boolean | `=== true` — every other value quietly means "not excluded" |
+| `repeat` | a mapping | cast to `Repeat` unchecked; a scalar yields a series that generates nothing |
+| `defaults` | a mapping | spread (`{ ...defaults, ...rawNode }`) — a scalar spreads per character |
+| `instances` | a list of mappings | `Object.entries` per element — a scalar element explodes the same way |
+
+An explicit YAML `null` is a value, not a wrong shape, for all six — the same
+reading `parseInlineField` gives it for typed fields. The rule is checked on the
+raw tree because two of the six *are* the tree (a malformed `defaults:` is gone
+by the time an `EffectiveNode` exists), and that is sufficient: `mergeValue` only
+ever returns one of the two values it was handed, so inheritance cannot mint a
+shape the file did not contain. `__tests__/malformed-structural.test.ts` pins the
+six repro files, the narrowness of the refusal, and that every key in
+`STRUCTURAL_KEYS` has a shape rule at all.
+
+Note what this deliberately is *not*: `roundTripLoss` is not the safety net here
+and cannot be. It reports after the load, and a report the user has to act on
+before their next save is a race they lose. Refusal is the only outcome that
+keeps the bytes.
 
 **Ownership rule — the root is an item, or the file owns it, never both.** The
 remainder is computed **per node**, not per file; a per-file remainder spread back
