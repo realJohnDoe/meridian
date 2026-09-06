@@ -152,7 +152,7 @@ end: `fileIO.ts`, `nodeSchema.ts`, `inheritance.ts`, `storeItems.ts`,
 |---|---|---|
 | 1 | Round-trip fidelity & edit locality | **findings: #4** |
 | 2 | Lost updates & conflict handling | **clean** |
-| 3 | Cache coherence & durability | **findings: #7** |
+| 3 | Cache coherence & durability | **clean** |
 | 4 | Atomicity & partial failure | **partially assessed** — read end to end (`pushDirty`, `applyRemoteBatch`, `markInFlight`/`clearInFlight`'s refcounting, `moveEntityInCache`'s stage-then-release, `settlePendingMoves`) and nothing wrong was found by inspection, but no interruption was actually injected. The one concrete suspicion is recorded as unverified above. |
 | 5 | Destruction & recoverability | **findings: #4** (a hand-written `excluded:` marker in a shape the parser can't type is deleted on save, so a deliberately-hidden occurrence silently returns). Everything else in this category — swipe-delete undo, `deleteFollowing`, the staged cross-vault move, the retention sweep's undo — was probed and is **clean**. |
 | 6 | Temporal correctness | **findings: #3** |
@@ -169,7 +169,6 @@ recommended-model ordinal (Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode = 5).
 |---|---|---|---|---|---|---|
 | **#3** | A DST spring-forward truncates bounded series and rewrites clock times | 8 | **silent** | 6 | 2 defects in 1 file; every bounded or `after_completion` series timed inside the gap | Sonnet 5 |
 | **#4** | A malformed *structural* key has nowhere to live and is deleted on save | 1, 7 | **silent** | 7 | all 6 `STRUCTURAL_KEYS`, every node of every file; 6 of 14 probed shapes lose bytes | Opus 5 |
-| **#7** | A pending editor autosave is never flushed at page teardown | 6 | **silent** | 4 | 1 file; every editor session | Sonnet 5 |
 
 Numbers are identity **and** rank for this run — the two coincided, so there is
 no separate rank column to read.
@@ -179,8 +178,8 @@ pipeline (formerly tracked as finding #5 — it compared parsed values rather
 than source text and skipped `date`/`time`/`repeat`/`excluded` outright) is now
 fixed, so `roundTripLoss` will surface it as soon as its own fix lands. #4's own
 widening of `collectKeyValues`' `STRUCTURAL_KEYS` skip is already done as part
-of the guard fix, so #4 only has the deletion itself left to fix. #3 and #7 are
-independent of it and of each other.
+of the guard fix, so #4 only has the deletion itself left to fix. #3 is
+independent of it.
 
 ---
 
@@ -552,145 +551,6 @@ either way; afterwards the test above passes for all six cases.
   `occMetaToYaml` implement. Read it before designing the structural equivalent;
   the asymmetry is deliberate today only in the sense that nobody has needed the
   other half yet.
-
----
-
-### #7 — A pending editor autosave is never flushed at page teardown
-
-- **Invariant violated:** 6 (durability of accepted writes). Fires when the tab
-  is closed, the browser crashes, or the OS evicts a backgrounded PWA within the
-  1500 ms after the last keystroke.
-- **Category:** `durability`
-- **Failure mode:** **Silent.** The editor showed the text; nothing said it was
-  not saved; on reload it is not there.
-- **Impact:** **4** — bounded to one debounce window of typing, and only the
-  body, but it is content the UI presented as present and nothing anywhere holds
-  a copy of it: it never reached the store, so it never reached Dexie.
-
-**Repro.** Starting state: an entry open in the editor. Operation: type; within
-1.5 s of the last keystroke, close the tab (or background the PWA on iOS and let
-the OS reclaim it).
-
-**Observed:** the typing since the last committed autosave is gone on reload.
-**Expected:** it is committed, exactly as it is on `goBack` and on unmount.
-
-Failing test (`src/editor/`, jsdom):
-
-```ts
-// @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
-import { useRef } from 'react'
-import { useAutoSave } from '@/editor/useAutoSave'
-import type { EntryState } from '@/editor/state'
-
-describe('autosave durability at teardown', () => {
-  it('a pending autosave is committed when the page goes away', () => {
-    vi.useFakeTimers()
-    const commit = vi.fn()
-    const { result } = renderHook(() => {
-      const entryRef = useRef({ editScope: 'all', body: '' } as unknown as EntryState)
-      return useAutoSave(commit, entryRef, '')
-    })
-    act(() => { result.current.scheduleAutoSave('the user just typed this') })
-    expect(commit).not.toHaveBeenCalled()
-
-    // The only two signals the app gets. React unmount effects do NOT run here.
-    act(() => {
-      window.dispatchEvent(new Event('visibilitychange'))
-      window.dispatchEvent(new Event('pagehide'))
-    })
-    expect(commit).toHaveBeenCalled()   // ← fails today
-    vi.useRealTimers()
-  })
-})
-```
-
-**Breadth.** One file to change; every editor session in the app is exposed.
-Search run: `grep -rn "flushAutoSave\|cancelAutoSave" src/` — three call sites,
-all of them in-app navigation (`useEntryEditor.ts:260` `goBack`,
-`useEntryEditor.ts:173` → `useVaultTarget.ts:110` on a vault-target change, and
-the unmount cleanup at `useAutoSave.ts:44`). None of them is a teardown signal.
-
-**Evidence.** `src/editor/useAutoSave.ts:46-55` — a 1500 ms debounce with no
-teardown escape:
-
-```ts
-  const scheduleAutoSave = (body: string) => {
-    if (entryRef.current.editScope === 'add') return
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
-    bodyRef.current = body
-    autosaveTimerRef.current = setTimeout(() => {
-      commitEntry({ ...entryRef.current, body })
-      autosaveTimerRef.current = null
-    }, 1500)
-  }
-```
-
-and `src/routes/__root.tsx:170-197`, where the two teardown signals *are* handled
-— but only for the cache→backend leg, not the editor→store one:
-
-```ts
-    const onVisible = () => {
-      if (document.visibilityState !== 'visible') {
-        flushPendingPush()
-        return
-      }
-```
-
-```ts
-    window.addEventListener('pagehide', flushPendingPush)
-```
-
-`flushPendingPush` pushes what is already in Dexie. The pending autosave is not
-in Dexie; it is in a `setTimeout`.
-
-**Problem.** The editor's debounced body autosave has no teardown flush, so the
-last 1.5 s of typing is lost when the tab closes or a backgrounded PWA is
-evicted — while the two lifecycle events that would catch it are already being
-listened for, one layer away.
-
-**Fix.** Have `useAutoSave` register its own `pagehide` / `visibilitychange`
-listener calling `flushAutoSave`, and ensure it runs before
-`flushPendingPush`; afterwards the test above passes.
-
-**Task context**
-
-- **Sites to change.** `src/editor/useAutoSave.ts` — add an effect registering
-  `pagehide` and `visibilitychange` (the latter guarded on
-  `document.visibilityState !== 'visible'`, matching `__root.tsx:171`) that calls
-  `flushAutoSaveRef.current()`. The latest-ref plumbing already exists at
-  `useAutoSave.ts:41-43` and is there for exactly this reason; reuse it rather
-  than capturing `flushAutoSave` in the listener's closure.
-- **The ordering trap, located.** `flushAutoSave` → `commitEntry` →
-  `commitNext` → `persistEntries` → `writeEntity`, and `writeEntityToCache`
-  (`entityWrites.ts`) reaches its first `await` before `recordLocalEdit` starts.
-  During `pagehide` there is no guarantee a later microtask runs, so the editor
-  flush must be registered such that it runs **before** `__root.tsx`'s
-  `flushPendingPush` — otherwise the push scans a cache that does not yet have
-  the row. Listener order for the same event on the same target is registration
-  order, and `__root.tsx`'s effect runs at app mount, i.e. *first*. Registering
-  from the editor hook therefore puts it second. Two workable answers: register
-  the editor's flush on `__root`'s own handler via a ref (the pattern
-  `flushEditsRef` at `useEntryEditor.ts:91` already establishes), or accept that
-  the next launch's `syncOnActivate` → `pushDirty` rescues the row — which it
-  does, since the Dexie write is what matters and the push is best-effort by
-  design (`__root.tsx:173-177` says so). Prefer the ref: it makes the ordering
-  explicit instead of relying on the rescue.
-- **What stays.** Do not touch `cancelAutoSave` (`useAutoSave.ts:31-34`) or its
-  call site in `handleDelete` (`useEntryEditor.ts:280`) — it deliberately drops a
-  pending save so `goBack`'s flush cannot resurrect an item that is about to be
-  deleted. A teardown listener added without checking that `cancelAutoSave` has
-  already cleared the timer would reintroduce exactly that resurrection.
-- **The `add`-scope guard.** `scheduleAutoSave` returns early for
-  `editScope === 'add'` (`useAutoSave.ts:47`), so a brand-new draft never has a
-  pending timer and the new listener is a no-op there. That is correct and
-  should stay — a teardown flush that created a file from an abandoned draft
-  would be a new bug.
-- **Why Sonnet 5.** One file, one effect, the latest-ref pattern already
-  present, a jsdom repro that fails before and passes after, and the one real
-  hazard (listener ordering against `flushPendingPush`) named with both
-  acceptable resolutions.
 
 ---
 
