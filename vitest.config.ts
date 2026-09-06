@@ -90,7 +90,7 @@ export default defineConfig({
         // rendered `<a href>` (health-ui-results.md finding #8) — a single
         // anchored allowlist regex, fully exercised by urlSafety.test.ts.
         'src/editor/urlSafety.ts': { statements: 100, branches: 100, functions: 100, lines: 100 },
-        'src/model/fieldRegistry.ts': { statements: 90, branches: 80, functions: 85, lines: 90 },
+        'src/model/fieldRegistry.ts': { statements: 94, branches: 90, functions: 95, lines: 95 },
         'src/model/storeOps.ts': { statements: 88, branches: 82, functions: 92, lines: 92 },
         'src/model/expansion.ts': { statements: 87, branches: 76, functions: 94, lines: 92 },
         'src/storage/conflictError.ts': { statements: 90, branches: 85, functions: 95, lines: 95 },
@@ -121,9 +121,9 @@ export default defineConfig({
         'src/storage/ical/rruleToRepeat.ts': { statements: 87, branches: 81, functions: 86, lines: 94 },
         'src/storage/ical/repeatToRrule.ts': { statements: 92, branches: 88, functions: 95, lines: 95 },
         'src/storage/icalBackend.ts':        { statements: 93, branches: 85, functions: 95, lines: 95 },
-        'src/editor/dialogs/RepeatDialog.tsx': { statements: 75, branches: 60, functions: 65, lines: 75 },
-        'src/occurrenceActions.ts': { statements: 85, branches: 75, functions: 80, lines: 88 },
-        'src/editor/useEntryEditor.ts': { statements: 68, branches: 55, functions: 55, lines: 70 },
+        'src/editor/dialogs/RepeatDialog.tsx': { statements: 82, branches: 78, functions: 78, lines: 85 },
+        'src/occurrenceActions.ts': { statements: 90, branches: 77, functions: 95, lines: 94 },
+        'src/editor/useEntryEditor.ts': { statements: 77, branches: 55, functions: 73, lines: 82 },
         'src/editor/useAutoSave.ts': { statements: 85, branches: 70, functions: 80, lines: 90 },
         'src/editor/useVaultTarget.ts': { statements: 88, branches: 72, functions: 90, lines: 95 },
         // The three one-way localStorage migrations (favorites, participant
@@ -153,7 +153,7 @@ export default defineConfig({
         // two `catch` arms (a Dexie write failing outright) visible as their
         // own file rather than diluted across sync.ts. Still floored: a save
         // that vanishes silently is the worst bug this codebase can have.
-        'src/storage/entityWrites.ts': { statements: 72, branches: 62, functions: 75, lines: 72 },
+        'src/storage/entityWrites.ts': { statements: 85, branches: 83, functions: 95, lines: 85 },
         // First-party primitives lifted out of components/ui/, where the
         // coverage exclusion had kept them invisible.
         'src/components/primitives/responsive-modal.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
