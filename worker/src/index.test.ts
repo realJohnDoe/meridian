@@ -1,9 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import worker from './index'
-import type { Env } from './oauthToken'
+import type { Env } from './env'
+import { ALLOWED_ORIGIN } from './cors'
 
-const env: Env = { GITHUB_CLIENT_ID: 'id', GITHUB_CLIENT_SECRET: 'secret' }
-const ALLOWED_ORIGIN = 'https://realjohndoe.github.io'
+const env: Env = {
+  GITHUB_CLIENT_ID: 'id',
+  GITHUB_CLIENT_SECRET: 'secret',
+  ICAL_RATE_LIMIT: { limit: () => Promise.resolve({ success: true }) },
+}
 
 describe('routing + CORS', () => {
   it('returns ok:true on /health', async () => {
@@ -37,6 +41,14 @@ describe('routing + CORS', () => {
     )
     expect(res.status).toBe(204)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED_ORIGIN)
+  })
+
+  it('routes GET /ical to the calendar proxy, with the rate-limit binding attached', async () => {
+    // No Origin header, so the proxy's own gate answers 403 rather than 404 —
+    // which is what shows the route matched and `env` reached the handler. A
+    // 500 here would mean the binding never got passed through.
+    const res = await worker.fetch(new Request('https://worker.example/ical?url=https%3A%2F%2Fcal.example%2Ff.ics'), env)
+    expect(res.status).toBe(403)
   })
 
   it('routes POST /oauth/token to the OAuth handler', async () => {
