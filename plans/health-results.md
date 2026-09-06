@@ -20,9 +20,7 @@ module boundaries documented in `CLAUDE.md` are genuinely machine-enforced and
 genuinely hold (I searched for cross-module deep imports and found **none**),
 and all eight quality gates pass in both workspaces. The weakest areas are
 **`src/settings/`** (55.98% statements — the add-vault wizard, the only path to
-connecting a GitHub, local or iCal vault, has effectively no tests) and the
-**`worker/`** package, which is the repo's most security-sensitive code by its
-own documentation yet is type-checked *less* strictly than the app it serves.
+connecting a GitHub, local or iCal vault, has effectively no tests).
 
 The single biggest structural theme is **not** overengineering — I looked hard
 for it and did not find it. Every port and abstraction I tested has a real
@@ -32,8 +30,7 @@ meta-infrastructure is proportionate to the product it guards (1,256 lines of
 toolchain config against 39,056 lines of non-test source, ~3%). The theme is
 instead **intent that the toolchain doesn't hold up**: a deliberate `React.lazy`
 split of the editor, silently defeated by one static barrel import in the root
-route (#1, and worth 53% of the initial bundle); strictness flags applied to the
-app but never propagated to the worker (#2); a lint tier evaluated, written up,
+route (#1, and worth 53% of the initial bundle); a lint tier evaluated, written up,
 and then not switched on (#3); coverage floors set honestly and then left to
 drift 10–26 points below reality (#4); a `shadcn` alias pointing at a module
 that does not exist (#7); and a `CLAUDE.md` paragraph still warning about a gap
@@ -162,10 +159,10 @@ non-test source lines were at least enumerated by directory and line count.
 | 1 | Architecture & Domain Separation | **findings: #1** |
 | 2 | Simplicity & Overengineering | **clean** |
 | 3 | Directory & File Layout | **findings: #1** |
-| 4 | Security | **findings: #2, #5** |
+| 4 | Security | **findings: #5** |
 | 5 | Testing & Error Handling | **findings: #4, #6, #9** |
 | 6 | Code Health & DRY | **clean** |
-| 7 | Toolchain & Developer Feedback Loops | **findings: #2, #3, #4, #7, #8** |
+| 7 | Toolchain & Developer Feedback Loops | **findings: #3, #4, #7, #8** |
 | 8 | Dependencies & Library Fit | **findings: #7** (plus three keep-verdicts, below) |
 | 9 | Styling & UX | **partially assessed** |
 | 10 | Performance | **findings: #1** |
@@ -208,25 +205,16 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 
 | Rank | # | Title | Category | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|
-| 1 | **#2** | Worker type-checked less strictly than the app it serves | `toolchain` `security` | 5 | 5 | **Haiku 4.5** | 25.0 |
-| 2 | **#1** | Root route's barrel import defeats the editor's own `lazy()` — 53% of the initial bundle | `performance` `architecture` `layout` | 8 | 5 | **Sonnet 5** | 20.0 |
-| 3 | **#4** | Five coverage floors have drifted 10–26 points below measured | `testing` `toolchain` | 4 | 5 | **Haiku 4.5** | 20.0 |
-| 4 | **#6** | Primary vault-onboarding and entry-view screens have ~0% coverage | `testing` | 5 | 6 | **Sonnet 5** | 15.0 |
-| 5 | **#3** | 20 evaluated `strict-type-checked` rules were written up but never enabled | `toolchain` `types` | 4 | 7 | **Sonnet 5** | 14.0 |
-| 6 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 7 | **#5** | `/ical` Worker endpoint is an unauthenticated open fetch proxy | `security` | 5 | 2 | **Opus 5** | 3.3 |
-| 8 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
-| 9 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 1 | **#1** | Root route's barrel import defeats the editor's own `lazy()` — 53% of the initial bundle | `performance` `architecture` `layout` | 8 | 5 | **Sonnet 5** | 20.0 |
+| 2 | **#4** | Five coverage floors have drifted 10–26 points below measured | `testing` `toolchain` | 4 | 5 | **Haiku 4.5** | 20.0 |
+| 3 | **#6** | Primary vault-onboarding and entry-view screens have ~0% coverage | `testing` | 5 | 6 | **Sonnet 5** | 15.0 |
+| 4 | **#3** | 20 evaluated `strict-type-checked` rules were written up but never enabled | `toolchain` `types` | 4 | 7 | **Sonnet 5** | 14.0 |
+| 5 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
+| 6 | **#5** | `/ical` Worker endpoint is an unauthenticated open fetch proxy | `security` | 5 | 2 | **Opus 5** | 3.3 |
+| 7 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 8 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
-**The formula has inverted the order here, in both directions — read this
-before sorting by the Score column.**
-
-- **A reader sorting by raw impact should start at #1, not #2.** #1 is the only
-  impact-8 finding in this report and the only one a user can feel: it is 53% of
-  what every visitor downloads before the app paints. #2 ranks above it purely
-  because its fix is a five-line config edit that a dry-run proved costs zero
-  code changes. Both are worth doing; #1 is the one that matters.
-- **#5 (security, impact 5) falls to 7th purely on the effort divisor**, because
+- **#5 (security, impact 5) falls to 6th purely on the effort divisor**, because
   it is the one finding here that needs a product decision rather than an edit.
   It is not less important than the two impact-2 config fixes below it. If you
   are triaging by consequence rather than by cost, #5 belongs in the top three.
@@ -234,7 +222,7 @@ before sorting by the Score column.**
 **Sequencing note.** #1 and #6 both touch `src/routes/`, and #4 and #6 both touch
 `vitest.config.ts`'s `thresholds` block. Land **#1 → #6 → #4** to avoid rebasing
 either file twice; #6 adds new floors for the files it newly tests, and #4 raises
-existing ones, so doing #4 last folds both into one coherent pass. #2, #3, #5, #7
+existing ones, so doing #4 last folds both into one coherent pass. #3, #5, #7
 and #8 are independent of everything else and of each other.
 
 ---
@@ -321,66 +309,6 @@ CodeMirror and `react-day-picker` relocate to a separate `editor-*.js`
   `pnpm exec vite build && ls -S dist/assets/*.js | head -3` and
   `gzip -c dist/assets/main-*.js | wc -c`. Re-measure rather than trusting the
   numbers above; they will drift as dependencies move.
-
----
-
-### #2 — The worker is type-checked less strictly than the app, despite being the repo's most security-sensitive package
-
-- **Category:** `toolchain` `security`
-- **Impact:** 5
-- **Breadth:** 1 config file; brings 5 worker source files under checks they
-  currently escape. Established by diffing `worker/tsconfig.json` against
-  `tsconfig.app.json`.
-- **Recommended model:** **Haiku 4.5**
-- **Evidence:**
-  - `worker/tsconfig.json:7` — `    "strict": true,` — and that is the *whole*
-    strictness surface; the file sets no `noUncheckedIndexedAccess`,
-    `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch` or
-    `noImplicitOverride`.
-  - `tsconfig.app.json` sets all five: `    "noUncheckedIndexedAccess": true,`
-  - `eslint.config.js:278` calls this package the most security-sensitive in the
-    repo (the sentence is hard-wrapped; the verbatim single-line fragment is
-    `  // React/DOM) that holds the OAuth token exchange — the most security-`).
-- **Problem:** The five strictness flags the app enforces stop at the workspace
-  boundary, so the package holding the SSRF guard and the OAuth client secret is
-  checked at a lower bar than the UI — and `noUncheckedIndexedAccess` in
-  particular is exactly the check that matters in `icalFetch.ts`, which is dense
-  with array indexing over attacker-supplied host strings.
-- **Fix:** Add the five flags to `worker/tsconfig.json`'s `compilerOptions`. A
-  dry-run proves this costs **zero code changes**; afterwards
-  `pnpm --filter meridian-oauth-worker run typecheck` should still exit 0.
-
-**Task context**
-
-- **The enumerated work** — add exactly these five lines to
-  `worker/tsconfig.json`'s `compilerOptions`, matching `tsconfig.app.json`:
-  ```json
-  "noUnusedLocals": true,
-  "noUnusedParameters": true,
-  "noFallthroughCasesInSwitch": true,
-  "noUncheckedIndexedAccess": true,
-  "noImplicitOverride": true
-  ```
-- **Measured, on this tree, 2026-09-06:** I ran `tsc --noEmit` against a config
-  extending `worker/tsconfig.json` with all five flags on. Result: **0 errors**,
-  with `--listFiles` confirming all 7 files under `worker/src` were actually
-  checked (so the pass is not vacuous). No source change is required. Re-run the
-  dry-run rather than trusting this if the worker has changed since.
-- **Why this is not merely cosmetic, located.** `worker/src/icalFetch.ts:115-118`
-  does `const parts = host.split('.')` then `Number(parts[0])`, `Number(parts[1])`
-  — safe today only because of a `parts.length === 4` guard on the line above.
-  Under `noUncheckedIndexedAccess` that safety becomes type-enforced rather than
-  review-enforced, which is the point for a function whose job is rejecting
-  attacker-chosen hosts.
-- **The trap.** `worker/` is **not** covered by the root `tsc -b` project
-  references — `CLAUDE.md` says so explicitly. Verifying with a root
-  `pnpm run build` alone is not enough to see a worker type error in isolation;
-  it does fan out, but if you want the direct signal run
-  `pnpm --filter meridian-oauth-worker run typecheck`, which also regenerates
-  `worker-configuration.d.ts` via its `pretypecheck` hook.
-- **Why Haiku 4.5 is honest here:** the fix is five known lines in one file, the
-  outcome is already measured at zero errors, and a wrong edit fails loudly at
-  `tsc`. There is no silent failure mode.
 
 ---
 
