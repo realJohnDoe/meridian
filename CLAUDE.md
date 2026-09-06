@@ -102,7 +102,15 @@ look at it.
 
 ## TypeScript pinned to 6.0.x
 
-`typescript` is intentionally pinned below the TS 7 major in both `package.json` (root) and `worker/package.json`. `typescript-eslint` (even at latest, 8.65.0) hard-refuses to run against TS 7: `eslint` exits with `typescript-eslint does not support TS 7.0`. `vite build`/`tsc -b` themselves are fine under TS 7 — only the lint step breaks. Tracked upstream: https://github.com/typescript-eslint/typescript-eslint/issues/10940 (support for TS ≥7.1). Don't attempt the TS 7 bump again until that lands — re-check the issue first.
+`typescript` is intentionally pinned below the TS 7 major in both `package.json` (root) and `worker/package.json`. `typescript-eslint` hard-refuses to run against TS 7: `eslint` exits with `typescript-eslint does not support TS 7.0`. `vite build`/`tsc -b` themselves are fine under TS 7 — only the lint step breaks. Tracked upstream: https://github.com/typescript-eslint/typescript-eslint/issues/10940 (support for TS ≥7.1).
+
+**Re-check with a fact, not a version number.** This paragraph used to say "even at latest, 8.65.0", which stopped being true the moment 8.66 shipped and made the whole rationale look stale. The durable check is the peer range typescript-eslint declares:
+
+```bash
+npm view @typescript-eslint/typescript-estree@latest peerDependencies.typescript
+```
+
+Last checked 2026-09-06: `>=4.8.4 <6.1.0` at both 8.65.0 and 8.69.0 (npm latest), against TypeScript 7.0.2. While that upper bound stays below 7, the pin stands — don't attempt the bump.
 
 ## Domain vocabulary
 
@@ -230,6 +238,13 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 ## Manual browser verification
 
 Don't proactively start the dev server and drive it with `preview_*` tools to verify a change. Only do this when the user explicitly asks for it — they generally test UI changes themselves.
+
+**This does not apply to survey runs.** `plans/surveys/performance.md`,
+`product-niche.md` and `health-ui.md` each specify a measurement or screenshot
+pass as a required phase — dev server, browser, real numbers — and those
+surveys are the explicit ask. Skipping that phase because of the paragraph
+above is a silent failure: it lands as "partially assessed", which the survey
+conventions permit, so nothing surfaces that the run never looked.
 
 ## Preview tools (gotchas — read before using `preview_*`)
 

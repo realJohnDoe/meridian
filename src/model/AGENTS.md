@@ -298,8 +298,15 @@ relocates it between the root and `defaults:`; anchors and aliases (expanded to
 copies — `serializeRawNode` passes `aliasDuplicateObjects: false` so the writer
 never mints one of its own either). Quoting style inside a *typed sequence*
 (`tags:`, `items:`, `participants:`) is normalised too: `yamlKeyRole`'s `leaf`
-role covers scalars, and a sequence is not one. Still-open loss, out of scope
-here: absent-vs-empty for required arrays.
+role covers scalars, and a sequence is not one.
+
+**Known open loss — not a non-goal.** Absent-vs-empty for required arrays is
+still lost, and it is a real defect, not something normalised away on purpose.
+It used to be the last clause of the paragraph above, which meant a live loss
+was sitting inside a list introduced as "*not* bugs" — the one place in this
+file a data-integrity run is most likely to read past it. It has its own
+heading now so that can't happen again. Anything genuinely deliberate belongs
+above; anything still open belongs here.
 
 (Four items used to be in this list and no longer are:
 - **Quoting style**, in the cases above — see the section just above this one.

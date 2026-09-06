@@ -9,9 +9,11 @@ file states only what's specific to this survey.
 
 ## Process
 
-- **Scan first, write second.** State your scan plan before you start, complete the full scan, and only then write the report. In the scan plan, for each category, state what you'll look for beyond the listed examples — the bullets are illustrations, not your search space. Do not draft the verdict early and select findings to confirm it.
-- Evaluate the code on its merits. Treat claims in CLAUDE.md, READMEs, or architecture docs (e.g. "this exception is deliberate", "a refactor is planned") as hypotheses to verify against the code, not as settled exceptions — if a documented rationale no longer holds, that is a finding.
-- **Verify capability claims by inspection, not memory.** For toolchain findings, check the _installed_ version of a plugin/library (its actual rule set, exports, or API) against what the config enables — do not assume from the version number. The same applies to version currency: what "latest" means comes from the registry query in the Budget section, never from your training data. Where cheap, verify by dry-run: e.g. run the linter with a candidate preset via a temporary config and report the real finding count and distribution (clean up temp files afterwards).
+Per [Running a survey](./README.md#running-a-survey): scan plan first, evaluate
+on merits, verify capability claims by inspection. Version currency in
+particular comes from the registry query in the Budget section below, never
+from training data. One rule is specific to this survey:
+
 - **Grep the config comments for expiry conditions, and check whether they have been met.** A pin, cap, or disabled rule whose comment says "revisit once X", "until Y lands", or "remove when Z ships" is a decision with a stated trigger and no owner — nothing re-checks it. These are cheap to verify (one registry or issue-tracker query each) and high-yield, because the rationale is already written down for you and the only question is whether it still holds. A met condition is a finding; so is a comment whose stated rationale you can show is no longer true. Check the value against its own comment too — a comment asserting the opposite of the setting beneath it is its own finding.
 
 ## Budget
@@ -21,6 +23,18 @@ file states only what's specific to this survey.
 - **Read the toolchain, not just the source:** `package.json` (scripts _and_ the full dependency list), lint/formatter configs, CI workflows, test config, and any `.npmrc`/tsconfig strictness settings. For each dependency, know roughly what it's for and where it's used — this feeds the Library Fit category.
 - **Measure dependency currency against the registry, not memory:** run the package manager's outdated report (`pnpm outdated` / `npm outdated` / `cargo outdated` / …) in **every workspace**, including sub-workspaces like workers or serverless functions. Your knowledge of "the latest version" is stale by definition; only the registry answer counts. This is the evidence base for the version-currency bullets in category 8.
 - **Run the existing quality gates once** — build, lint, test (plus coverage, if configured), any dead-code check, and the dependency **audit** — and report each gate's pass/fail status in the coverage statement. A failing gate is itself a finding (usually a high-impact one), and the dry-run comparisons above need this green baseline to diff against. Run the audit **from inside each workspace directory** — `pnpm audit` takes no `--filter`, and reaching for one fails with an unrelated `Unknown option: 'recursive'` that reads like a broken tool rather than the wrong invocation. Run it at a **lower severity threshold than CI gates on**: advisories sitting just under the CI threshold are invisible from a green pipeline, and in a repo that already pins vulnerable transitives deliberately, an unpinned one is a gap in an established practice rather than a fresh judgement call.
+- **Re-measure the coverage floors against reality, not just against green.** A
+  per-file threshold passes as long as measured coverage is above it, so a floor
+  drifts further below the file it guards every time a test lands — and nothing
+  ever pulls it back. Run `pnpm run test:coverage` and diff each floor in
+  `vitest.config.ts` against the measured number: a floor more than ~10 points
+  under is guarding nothing, and is a finding. `src/storeCommit.ts` sat at
+  30/95/45/35 against a measured 100/100/100/100 until 2026-09-06 — the
+  persistence commit path, where two of five functions could go unexecuted with
+  CI green. Check the `exclude` list the same way, in the other direction: an
+  exclusion glob keeps matching whatever grows underneath it (an `_entry*.tsx`
+  glob had swallowed 258 lines of route logic, one file of it at 0% coverage).
+  `src/coverageConfig.test.ts` now guards both halves for `src/routes/`.
 - **Establish which workspace each gate actually covers, and record it as a matrix.** Give **coverage its own row, separate from `test`** — they are usually different scripts, and the common shape is a `test` script that fans out to every workspace beside a `test:coverage` script that does not, so the suite runs everywhere while coverage is measured and gated in one package only. A sub-package whose own test config has no `coverage` block at all is the same finding seen from the other side. Do not assume a root-level `build`/`test` script reaches a sub-workspace — verify it (e.g. does the root test runner's `include` glob match the sub-package? does the root `tsc -b` reference its tsconfig?) and list the gates on one axis against the workspaces on the other. A package that CI checks in a separate job but the documented local command silently skips is a real finding, and it is invisible unless you build this matrix: every gate is green, and the gap only shows in what each one *ran on*. This is the single cheapest high-yield check in this section for any repo with more than one package.
 - **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - **Identify where development is currently concentrated** — sample recent history over a meaningful window (e.g. `git log --since="60 days ago" --name-only`, or recent merged PRs if available) and tally which directories see the most commits/PRs. This is the evidence base for the activity weighting in the Scoring guidance: findings in "hot" directories are worth more to fix than equivalently-scored findings in dormant corners of the codebase, because more code keeps landing on top of the problem in the meantime.
@@ -50,35 +64,38 @@ One line per category (1–10). Verdicts follow the
 
 ### 4. Findings
 
-For each finding, output:
+`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
+the [shared finding fields](./README.md#finding-fields). This survey adds:
 
-- **Title** — short label
 - **Category** — one or more tags from: `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
 - **Impact** — 1–10 (10 = catastrophic/systemic; 5 = e.g. a DRY violation duplicated across ~4 files, or a missing error state on a primary user flow; 1 = trivial/cosmetic)
-- **Breadth** — number of **files** affected. Counts must come from an actual search (grep/glob), and you should be able to name the search you ran; if you estimated instead, write "est." next to the number.
-- **Recommended model** — tier per the [shared rubric](./README.md#recommended-model-tiers). Here, **how the fix fails** is the tell: a wrong-but-plausible change that breaks the build, a type-check, or a test is far safer to hand down-tier than one that fails silently (a re-hidden bug class, a lint rule that passes but no longer catches what it should, a "dead" export that's actually reached dynamically, a boundary that still resolves but now leaks). Reserve plan mode + multi-PR for findings that need an architecture change **or** a product decision the user should make (e.g. "narrow the type" vs "restructure the module boundary"). Example hazard note: "Sonnet 5 if the import boundary to preserve is specified in the task; else Opus 5."
-- **Task context** — the block described in [writing findings down to Sonnet 5](./README.md#write-findings-down-to-sonnet-5-where-you-honestly-can): exact locations, the enumerated work, measured numbers, the trap with a file and line, any in-repo precedent, and — for an extraction — the seam verified in both directions. Rate the Recommended model against the finding *with* this block present.
-- **Evidence** — at least one file path plus a short **verbatim code quote** from that file (line number optional). The quote must be copy-pasted, not paraphrased — I will spot-check by grepping for it. For toolchain findings, the evidence may be a config quote plus a dry-run result.
-- **Problem** — one sentence: what is wrong and why it matters
-- **Fix** — one sentence: what the concrete fix looks like
+- **Task context** — the block described in [writing findings down to Sonnet 5](./README.md#write-findings-down-to-sonnet-5-where-you-honestly-can): exact locations, the enumerated work, measured numbers, the trap with a file and line, any in-repo precedent, and — for an extraction — the seam verified in both directions.
+
+**Fails silently here** (what sets the tier): a re-hidden bug class, a lint rule
+that passes but no longer catches what it should, a "dead" export that's
+actually reached dynamically, a boundary that still resolves but now leaks.
+Reserve plan mode + multi-PR for an architecture change **or** a product
+decision (e.g. "narrow the type" vs "restructure the module boundary"). Example
+hazard note: "Sonnet 5 if the import boundary to preserve is specified in the
+task; else Opus 5."
 
 Rank and report findings per the [shared convention](./README.md#ranking-findings). Here, "confirming" a fix means re-running the build, lint, or the test suite — naming the workspace it must be run in, since a root-level command may not cover the package the fix touched.
 
 When the ranking formula puts a low-impact finding above a high-impact one (a wide, cheap toolchain fix outranking a narrow correctness bug, say), **say so in one line under the summary table** and name which finding a reader sorting by raw impact should look at first. The same note covers the other way the formula distorts: when a real finding falls out of the top N purely on effort — the usual case being an architecture finding, which is both the highest-weight category and the most expensive to fix — name it in one line below the findings rather than dropping it silently, so "category 1: clean" never appears when the truth is "category 1's finding didn't survive the divisor". The formula is a default order, not a claim about what matters most, and silently shipping an inverted order makes the table read as the latter.
 
-**Strongly prefer systemic and structural issues over isolated, line-level ones.** A finding that affects 10 files beats one that affects 1 function. Cite real code — no generic observations.
-
-List the **top 10 findings**, numbered (the category verdicts above reference these numbers). Include all findings that make the top 10 regardless of their impact score — if a 1/10 ranks in (high breadth, trivial fix), include it and let its low Impact score speak for itself.
-
-Do not pad to reach 10 — if fewer than 10 clear issues exist, stop there.
+List the **top 10 findings**, numbered (the category verdicts above reference
+these numbers), per [Don't pad the findings
+list](./README.md#dont-pad-the-findings-list) and [prefer systemic
+findings](./README.md#finding-fields).
 
 ---
 
 ## Categories to scan — ranked by priority
 
-The category ranking is a tiebreaker, not a filter. A serious finding in any category always outranks a minor finding in a higher-priority category — never omit a high-impact issue because its category ranks lower.
-
-**The bullets under each category are illustrative examples, not the category's boundary.** Each category is defined by its heading and scope line; report any finding that fits the scope, including issue types not listed. If a finding matches a category's scope but no bullet, that is not a reason to drop it — it may even be more valuable, since it's something the checklist didn't anticipate.
+Ranking and bullets: see [Running a survey](./README.md#running-a-survey). Each
+category is defined by its heading and scope line. A finding that matches a
+scope but no bullet may be *more* valuable, not less: it's what the checklist
+didn't anticipate.
 
 ### 1. Architecture & Domain Separation _(highest weight — prefer findings here)_
 
