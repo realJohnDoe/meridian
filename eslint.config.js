@@ -168,11 +168,31 @@ export default [
       // non-default options.
       ...tsRecommendedTypeCheckedRules,
 
-      // strict-type-checked adds 27 rules beyond recommended-type-checked; a
-      // dry run of the full tier found two (no-non-null-assertion,
-      // no-confusing-void-expression) that are noise for this codebase's
-      // idioms, so only these three are enabled individually rather than
-      // pulling in the whole preset.
+      // strict-type-checked adds 25 rules beyond recommended-type-checked (25,
+      // not the 27 this comment used to claim — recount with the snippet at the
+      // foot of this block after any typescript-eslint bump). Three are enabled
+      // here; two more were dry-run and rejected as noise for this codebase's
+      // idioms: no-non-null-assertion and no-confusing-void-expression.
+      //
+      // That leaves 20 that were neither enabled nor rejected — the comment
+      // read as a completed evaluation when 20 rules had never been assessed at
+      // all. Dry-run over src/ + worker/src on 2026-09-06: **11 findings across
+      // 7 rules**, and 13 of the 20 clean.
+      //
+      //   2  no-dynamic-delete            1  no-unnecessary-type-conversion
+      //   2  no-unnecessary-type-arguments 1  no-unnecessary-type-parameters
+      //   2  no-unnecessary-boolean-literal-compare
+      //   2  return-await                 1  no-misused-spread
+      //
+      // Not enabled yet only because fixing 11 real findings is its own change,
+      // not because the tier was judged noise. Reproduce with:
+      //   pnpm exec eslint src worker/src --config <cfg adding those 20> -f json
+      // Recount what the tier adds:
+      //   node --input-type=module -e "import p from '@typescript-eslint/eslint-plugin';
+      //   const f=n=>Object.assign({},...p.configs[n].filter(b=>b.rules).map(b=>b.rules));
+      //   const on=v=>v!=='off'&&!(Array.isArray(v)&&v[0]==='off');
+      //   const r=new Set(Object.entries(f('flat/recommended-type-checked')).filter(([,v])=>on(v)).map(([k])=>k));
+      //   console.log(Object.entries(f('flat/strict-type-checked')).filter(([k,v])=>on(v)&&!r.has(k)).map(([k])=>k).join('\n'))"
       '@typescript-eslint/no-unnecessary-condition': [
         'error',
         // `while (true) { ... break ... }` is a deliberate idiom (storage/sync.ts's
@@ -277,8 +297,8 @@ export default [
     },
     rules: {
       ...tsRecommendedTypeCheckedRules,
-      // See the matching src/ block above for why only these three
-      // strict-type-checked rules are enabled rather than the whole preset.
+      // See the matching src/ block above for which strict-type-checked rules
+      // are enabled, which were rejected, and which 20 are still unassessed.
       '@typescript-eslint/no-unnecessary-condition': [
         'error',
         { allowConstantLoopConditions: true },

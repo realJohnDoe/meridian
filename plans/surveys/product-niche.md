@@ -20,7 +20,7 @@ Code quality, UI implementation, speed, and data safety belong to the other surv
 
 ## Product/market fit — what this survey can and cannot say
 
-**It cannot assess product/market fit, and it must not pretend to.** PMF is a demand-side claim — do real people adopt this, keep using it, and choose it over what they use today? That is answered with evidence from outside the repository: retention, repeat use, unprompted feedback, people switching. This project currently has none of it. There is no analytics, telemetry, or feedback path in the app, `.github/` holds only workflows, and `plans/next-steps.md` lists only build work — market contact hasn't happened yet. There is no PMF signal here to read.
+**It cannot assess product/market fit, and it must not pretend to.** PMF is a demand-side claim — do real people adopt this, keep using it, and choose it over what they use today? That is answered with evidence from outside the repository: retention, repeat use, unprompted feedback, people switching. This project currently has none of it. There is no analytics, telemetry, or feedback path in the app, and `.github/` holds only workflows — market contact hasn't happened yet. There is no PMF signal here to read. (This sentence used to cite `plans/next-steps.md` as evidence; that file no longer exists. Check what `plans/` actually holds rather than inheriting either claim.)
 
 **Re-verify that premise before relying on it.** If a launch has happened, a feedback channel has shipped, or `next-steps.md` has grown a go-to-market item since this plan was written, then this section's premise has changed and the report should say so rather than repeating the paragraph above.
 

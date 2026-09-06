@@ -275,8 +275,9 @@ scoped to close with the last finding, on the assumption every finding would
 be fixed; three were deferred instead (#4, #5, #6 below), and the "pick it up
 if the symptom shows" plan for each of them *is* a `stress.mjs` invocation.
 Deleting `scripts/perf/` would strand all three. Nothing in CI runs it, so it
-can still rot — treat a re-run that fails to launch as expected maintenance,
-not as a reason to distrust the numbers above. Its build-tooling footprint
+can still rot. A re-run that fails to launch is usually harness bit-rot rather
+than a reason to distrust the numbers above — but diagnose it before concluding
+that; see `scripts/perf/README.md`. Its build-tooling footprint
 stays where it is: the `scripts/perf/results/` line in `.gitignore`, plus the
 two `knip.json` allowances documented in `scripts/perf/README.md`.
 

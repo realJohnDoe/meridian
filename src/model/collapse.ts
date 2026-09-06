@@ -221,8 +221,11 @@ function fileMetaToYaml(root: FileMetadata): Record<string, unknown> {
   // nothing and every unknown key on it is emitted. Deliberately still using
   // `inlineFieldEmpty` above rather than the relational rule occurrence fields
   // now use — switching it would also stop emitting `title: ""` for a
-  // frontmatter-less note, which is finding #8's repro (c) and a separate
-  // product question about whether Meridian should touch such files at all.
+  // frontmatter-less note, which is the data-integrity survey's finding #8
+  // repro (c). Whether Meridian should write frontmatter into a
+  // frontmatter-less note at all is an open *product* question, tracked in
+  // plans/open-product-questions.md — not something to settle by changing this
+  // line.
   emitExtra(root.extra, undefined, out)
   return out
 }

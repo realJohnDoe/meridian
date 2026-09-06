@@ -33,3 +33,35 @@ When a plan (not a survey's findings) lays out the PRs that will implement
 it, split the work into PRs that are as large as possible without becoming
 mega-PRs, and write each one with enough context that Sonnet 5 can carry
 out the implementation from that PR's description alone.
+
+## Citing a survey finding from code
+
+A `finding #N` comment in `src/` outlives the report it points at: results
+files are deleted once their findings close (above), and every survey
+renumbers from #1 on each run. So the number alone identifies nothing.
+
+**Name the survey and the run date whenever you write one:**
+
+```ts
+// data-integrity survey 2026-09-05, finding #4: a structural key in a shape
+// the parser can't type has no `extra` home and is deleted on save.
+```
+
+Never renumber existing citations to match a newer run — `data-integrity.md`
+says why, and the old numbers are still correct for the run they name. The
+convention applies going forward.
+
+As of 2026-09-06 there are 70 such citations in `src/` and 20 of them name
+neither a survey nor a date. They are not mechanically fixable — the repo's
+history was squashed, so `git blame` attributes them all to one commit — and
+guessing wrong is worse than leaving them ambiguous. Qualify them
+opportunistically, when you touch the surrounding code and know the answer.
+
+## Open product questions
+
+A change that turns out to hinge on a product decision goes in
+`plans/open-product-questions.md`, not in a comment beside the code. A comment
+is where such a question goes to be forgotten: the surveys that exist to
+surface these (`product-niche.md` section 6, `data-integrity.md`'s
+normalization-versus-corruption rule) read plans and results files, not
+inline prose.

@@ -65,8 +65,12 @@ one, on the assumption every finding would be fixed. Three were **deferred**
 instead (#4, #5, #6 — see "Where the findings went" in the report), and the
 plan for picking each of them up later *is* a `stress.mjs` invocation, so
 deleting this directory would strand all three. Nothing in CI runs it, so it
-can still rot unnoticed: if a re-run fails to launch, treat that as expected
-maintenance on an unexercised harness rather than as a signal about the app.
+can still rot unnoticed. If a re-run fails to launch, the likeliest cause by
+far is harness bit-rot rather than the app — but diagnose it before concluding
+that, because the earlier wording ("treat that as expected maintenance") told
+you the answer before you looked, and this harness is the only way to settle
+vault-scaling findings #4, #5 and #6. A launch failure that turns out to be the
+app is exactly the case that instruction would have buried.
 
 ## Two things `knip.json` carries for this directory
 

@@ -229,7 +229,7 @@ describe('_app — agenda quick-nav panel: one browse per swipe', () => {
   })
 })
 
-// _app.tsx's remaining, view-agnostic half after the finding #1 decomposition:
+// _app.tsx's remaining, view-agnostic half after the health-ui survey's finding #1 decomposition:
 // the panel's own presentation mechanics. The inline mobile panel isn't
 // Radix-managed, so its Escape handling and focus restore are hand-rolled
 // (see the effect's own doc comment) and had no test of their own.

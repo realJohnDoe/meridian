@@ -46,13 +46,35 @@ export default defineConfig({
         'src/routes/_app.day.$date.tsx',
         'src/routes/_app.week.$date.tsx',
         'src/routes/_app.calendar.$month.tsx',
-        'src/routes/_entry*.tsx',
+        // Entry routes: only the two that really are registration. Listed
+        // individually for the same reason the `_app` routes above are — the
+        // `_entry*.tsx` glob this replaces also swallowed
+        // _entry.entry.$vault.$slug.tsx (occurrence resolution from the URL,
+        // the view-only/editable branch, the not-found state) and
+        // _entry.entry.new.tsx (draft resume keyed on TanStack's __TSR_key),
+        // which are logic, not wiring. Un-excluding them measured them for the
+        // first time: _entry.entry.new.tsx was already at 95/48/88/92 and is
+        // floored below; _entry.entry.$vault.$slug.tsx is at 0/0/0/0 and is
+        // deliberately left un-floored — a floor of 0 guards nothing, and the
+        // global floor is what holds it. That 0% is a real gap, not a
+        // convention: the file resolves an occurrence from the URL's date/id
+        // and picks the view-only vs editable branch, with no test anywhere.
+        'src/routes/_entry.tsx',
+        'src/routes/_entry.entry.$slug.tsx',
         'src/routeTree.gen.ts',
         'src/main.tsx',
       ],
       // Per-file floors for modules already well-covered, so they can't
       // silently regress. Set a few points below measured coverage to leave
-      // headroom for legitimate branches added later.
+      // headroom for legitimate branches added later — and record the measured
+      // value in the comment beside anything non-obvious, because a floor is
+      // only as honest as its distance from reality. That distance grows on its
+      // own: coverage rises as tests land and nothing lowers the floor back
+      // toward it, so a floor left alone drifts into guarding nothing.
+      // storeCommit.ts sat at 30/95/45/35 against a measured 100/100/100/100
+      // until 2026-09-06 for exactly that reason. Re-measure the floors
+      // (`pnpm run test:coverage`) when running the health survey, per
+      // plans/surveys/health.md's Budget.
       thresholds: {
         // Global floor. Per-file thresholds only guard the files they name, so
         // a brand-new untested logic module used to slip through the gate
@@ -112,7 +134,14 @@ export default defineConfig({
         // this floor guards that from regressing without pinning the rest of
         // this cross-cutting file's many untested setters to the same bar.
         'src/store.ts': { statements: 68, branches: 55, functions: 58, lines: 68 },
-        'src/storeCommit.ts': { statements: 30, branches: 95, functions: 45, lines: 35 },
+        // The persistence commit path: every write, delete and cross-vault
+        // move leaves through one of these five functions. Measured
+        // 100/100/100/100 on 2026-09-06; floored just under that. The previous
+        // floor was 30/95/45/35, which let two of the five go entirely
+        // unexecuted with CI green — including commitMove's refusal branch,
+        // the one thing standing between a mis-built `next` and writing an
+        // empty file over the target before tombstoning the source.
+        'src/storeCommit.ts': { statements: 95, branches: 95, functions: 95, lines: 95 },
         'src/storage/sync.ts': { statements: 88, branches: 82, functions: 90, lines: 90 },
         // The three clusters split out of sync.ts (health survey finding #10):
         // the parse/round-trip reporting (part A), and the per-vault sync
@@ -164,6 +193,12 @@ export default defineConfig({
         'src/routes/-listChrome.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
         'src/routes/-agendaChrome.tsx': { statements: 92, branches: 82, functions: 95, lines: 95 },
         'src/entryRoute.ts': { statements: 92, branches: 85, functions: 95, lines: 95 },
+        // Draft resume keyed on TanStack's history `__TSR_key` — without it a
+        // returning user's second save minted `buy-milk-2` beside the first,
+        // carrying none of the edits. Measured 95.12/48.48/88.23/92.59 on
+        // 2026-09-06, its first measurement: the `_entry*.tsx` exclusion glob
+        // had kept it out of the report entirely.
+        'src/routes/_entry.entry.new.tsx': { statements: 92, branches: 44, functions: 85, lines: 90 },
         'src/routes/-entryTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         'src/routes/-pagedTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
         'src/routes/-topbarEdgePadding.ts': { statements: 92, branches: 90, functions: 95, lines: 92 },
