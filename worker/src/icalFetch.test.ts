@@ -1,10 +1,42 @@
 import { describe, it, expect } from 'vitest'
 import { handleIcalFetch, validateFeedUrl, type CalendarFetcher } from './icalFetch'
+import { ALLOWED_ORIGIN } from './cors'
+import type { Env } from './env'
 
 const FEED = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n'
 
+/**
+ * The two headers Cloudflare's edge puts on a request from the real app. Both
+ * gates in `handleIcalFetch` read them, so every test that expects to get past
+ * those gates has to carry them — the ones that don't are the gate's own tests.
+ */
+const EDGE_HEADERS = { Origin: ALLOWED_ORIGIN, 'CF-Connecting-IP': '203.0.113.7' }
+
 function req(url: string, headers: Record<string, string> = {}): Request {
-  return new Request(`https://worker.example/ical?url=${encodeURIComponent(url)}`, { headers })
+  return new Request(`https://worker.example/ical?url=${encodeURIComponent(url)}`, {
+    headers: { ...EDGE_HEADERS, ...headers },
+  })
+}
+
+/**
+ * An `Env` whose rate limiter allows everything and records the keys it was
+ * asked about, so a test can assert the limit is keyed on the client IP rather
+ * than on something spoofable. Pass `allow: false` to stand in for an address
+ * that has spent its budget.
+ */
+function env(allow = true): Env & { keys: string[] } {
+  const keys: string[] = []
+  return {
+    GITHUB_CLIENT_ID: 'test-id',
+    GITHUB_CLIENT_SECRET: 'test-secret',
+    ICAL_RATE_LIMIT: {
+      limit: ({ key }: { key: string }) => {
+        keys.push(key)
+        return Promise.resolve({ success: allow })
+      },
+    },
+    keys,
+  }
 }
 
 /** A fetcher that records what it was asked for and replays canned responses. */
@@ -110,13 +142,13 @@ describe('validateFeedUrl', () => {
 
 describe('handleIcalFetch', () => {
   it('400s without a url parameter', async () => {
-    const res = await handleIcalFetch(new Request('https://worker.example/ical'), stubFetcher([]))
+    const res = await handleIcalFetch(new Request('https://worker.example/ical', { headers: EDGE_HEADERS }), env(), stubFetcher([]))
     expect(res.status).toBe(400)
   })
 
   it('returns the feed as text/calendar', async () => {
     const fetcher = stubFetcher([ok()])
-    const res = await handleIcalFetch(req('https://cal.example/f.ics'), fetcher)
+    const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(), fetcher)
 
     expect(res.status).toBe(200)
     expect(res.headers.get('Content-Type')).toBe('text/calendar; charset=utf-8')
@@ -126,13 +158,13 @@ describe('handleIcalFetch', () => {
 
   it('fetches the https rewrite of a webcal url', async () => {
     const fetcher = stubFetcher([ok()])
-    await handleIcalFetch(req('webcal://cal.example/f.ics'), fetcher)
+    await handleIcalFetch(req('webcal://cal.example/f.ics'), env(), fetcher)
     expect(fetcher.calls[0]?.url).toBe('https://cal.example/f.ics')
   })
 
   it('never fetches a blocked host', async () => {
     const fetcher = stubFetcher([ok()])
-    const res = await handleIcalFetch(req('https://169.254.169.254/latest/meta-data'), fetcher)
+    const res = await handleIcalFetch(req('https://169.254.169.254/latest/meta-data'), env(), fetcher)
 
     expect(res.status).toBe(400)
     expect(fetcher.calls).toHaveLength(0)
@@ -140,7 +172,7 @@ describe('handleIcalFetch', () => {
 
   it('passes If-None-Match through and returns 304 with the ETag', async () => {
     const fetcher = stubFetcher([new Response(null, { status: 304, headers: { ETag: 'W/"v1"' } })])
-    const res = await handleIcalFetch(req('https://cal.example/f.ics', { 'If-None-Match': 'W/"v1"' }), fetcher)
+    const res = await handleIcalFetch(req('https://cal.example/f.ics', { 'If-None-Match': 'W/"v1"' }), env(), fetcher)
 
     expect((fetcher.calls[0]?.init.headers as Record<string, string>)['If-None-Match']).toBe('W/"v1"')
     expect(res.status).toBe(304)
@@ -148,7 +180,7 @@ describe('handleIcalFetch', () => {
   })
 
   it('returns the upstream ETag on a 200', async () => {
-    const res = await handleIcalFetch(req('https://cal.example/f.ics'), stubFetcher([ok(FEED, { ETag: '"abc"' })]))
+    const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(), stubFetcher([ok(FEED, { ETag: '"abc"' })]))
     expect(res.headers.get('ETag')).toBe('"abc"')
   })
 
@@ -157,7 +189,7 @@ describe('handleIcalFetch', () => {
       new Response(null, { status: 302, headers: { Location: 'https://cdn.example/f.ics' } }),
       ok(),
     ])
-    const res = await handleIcalFetch(req('https://cal.example/f.ics'), fetcher)
+    const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(), fetcher)
 
     expect(res.status).toBe(200)
     expect(fetcher.calls.map(c => c.url)).toEqual(['https://cal.example/f.ics', 'https://cdn.example/f.ics'])
@@ -168,7 +200,7 @@ describe('handleIcalFetch', () => {
       new Response(null, { status: 302, headers: { Location: 'http://169.254.169.254/latest/meta-data' } }),
       ok(),
     ])
-    const res = await handleIcalFetch(req('https://cal.example/f.ics'), fetcher)
+    const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(), fetcher)
 
     expect(res.status).toBe(400)
     expect(fetcher.calls).toHaveLength(1) // the second hop never happened
@@ -178,6 +210,7 @@ describe('handleIcalFetch', () => {
     const hop = () => new Response(null, { status: 302, headers: { Location: 'https://cal.example/f.ics' } })
     const res = await handleIcalFetch(
       req('https://cal.example/f.ics'),
+      env(),
       stubFetcher([hop(), hop(), hop(), hop(), hop(), hop(), hop()]),
     )
     expect(res.status).toBe(502)
@@ -186,6 +219,7 @@ describe('handleIcalFetch', () => {
   it('rejects a feed whose Content-Length exceeds the cap', async () => {
     const res = await handleIcalFetch(
       req('https://cal.example/f.ics'),
+      env(),
       stubFetcher([ok(FEED, { 'Content-Length': String(6 * 1024 * 1024) })]),
     )
     expect(res.status).toBe(413)
@@ -202,13 +236,14 @@ describe('handleIcalFetch', () => {
     })
     const res = await handleIcalFetch(
       req('https://cal.example/f.ics'),
+      env(),
       stubFetcher([new Response(body, { status: 200 })]),
     )
     expect(res.status).toBe(413)
   })
 
   it('502s when the calendar server errors', async () => {
-    const res = await handleIcalFetch(req('https://cal.example/f.ics'), stubFetcher([new Response('nope', { status: 403 })]))
+    const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(), stubFetcher([new Response('nope', { status: 403 })]))
     expect(res.status).toBe(502)
   })
 
@@ -218,7 +253,83 @@ describe('handleIcalFetch', () => {
       e.name = 'TimeoutError'
       return Promise.reject(e)
     }
-    const res = await handleIcalFetch(req('https://cal.example/f.ics'), timeout)
+    const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(), timeout)
     expect(res.status).toBe(504)
+  })
+
+  // ── Who may call this, and how often ──────────────────────────────────────
+  // Both gates guard an endpoint that needs no credential at all. The assertion
+  // that matters in each case is not the status code but `fetcher.calls` — that
+  // the upstream request never happened, so a rejected caller costs nothing.
+
+  describe('origin gate', () => {
+    it.each([
+      ['no Origin at all (a non-browser client)', undefined],
+      ['another site’s Origin', 'https://evil.example'],
+      ['a lookalike prefix of the real origin', 'https://realjohndoe.github.io.evil.example'],
+    ])('403s and never fetches upstream for %s', async (_label, origin) => {
+      const fetcher = stubFetcher([ok()])
+      const headers: Record<string, string> = { 'CF-Connecting-IP': '203.0.113.7' }
+      if (origin) headers.Origin = origin
+
+      const res = await handleIcalFetch(
+        new Request(`https://worker.example/ical?url=${encodeURIComponent('https://cal.example/f.ics')}`, { headers }),
+        env(),
+        fetcher,
+      )
+
+      expect(res.status).toBe(403)
+      expect(fetcher.calls).toHaveLength(0)
+    })
+
+    it('lets the app’s own origin through', async () => {
+      const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(), stubFetcher([ok()]))
+      expect(res.status).toBe(200)
+    })
+  })
+
+  describe('rate limit', () => {
+    it('is keyed on the edge-supplied client IP', async () => {
+      const e = env()
+      await handleIcalFetch(req('https://cal.example/f.ics'), e, stubFetcher([ok()]))
+      expect(e.keys).toEqual(['203.0.113.7'])
+    })
+
+    it('429s with Retry-After and never fetches upstream once over budget', async () => {
+      const fetcher = stubFetcher([ok()])
+      const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(false), fetcher)
+
+      expect(res.status).toBe(429)
+      expect(res.headers.get('Retry-After')).toBe('60')
+      expect(fetcher.calls).toHaveLength(0)
+      expect(await res.json()).toMatchObject({ error: 'rate_limited' })
+    })
+
+    it('fails closed when the edge supplied no client IP', async () => {
+      // A missing CF-Connecting-IP means something other than Cloudflare's edge
+      // invoked us. Treating that as "unlimited" would make omitting the header
+      // the way around the budget, so it is refused instead.
+      const fetcher = stubFetcher([ok()])
+      const e = env()
+      const res = await handleIcalFetch(
+        new Request(`https://worker.example/ical?url=${encodeURIComponent('https://cal.example/f.ics')}`, {
+          headers: { Origin: ALLOWED_ORIGIN },
+        }),
+        e,
+        fetcher,
+      )
+
+      expect(res.status).toBe(403)
+      expect(fetcher.calls).toHaveLength(0)
+      expect(e.keys).toEqual([]) // never even consulted, so no budget was spent
+    })
+
+    it('is charged before the feed URL is validated, so garbage costs the sender', async () => {
+      const e = env()
+      const res = await handleIcalFetch(req('https://169.254.169.254/latest/meta-data'), e, stubFetcher([]))
+
+      expect(res.status).toBe(400)
+      expect(e.keys).toEqual(['203.0.113.7'])
+    })
   })
 })

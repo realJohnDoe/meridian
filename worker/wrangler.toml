@@ -9,3 +9,15 @@ account_id = "0c9a990d5cdac68612909eceef590d10"
 [vars]
 # Not secret — GITHUB_CLIENT_SECRET is set separately via `wrangler secret put`.
 GITHUB_CLIENT_ID = "Iv23liMpUq1CUQl4TcaT"
+
+# Per-IP request budget for /ical (health survey 2026-09-06, finding #5). The
+# proxy needs no credential, so without this it is an open fetcher anyone can
+# point at arbitrary public HTTPS — spending a request budget that GitHub
+# sign-in shares. `period` may only be 10 or 60 (wrangler enforces the enum);
+# see RATE_LIMIT_PERIOD_S in src/icalFetch.ts for how the limit was derived and
+# keep the two in step. namespace_id is an arbitrary account-local id, not a
+# secret; it only has to stay stable so the counter isn't reset by a rename.
+[[ratelimits]]
+name = "ICAL_RATE_LIMIT"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }

@@ -10,6 +10,33 @@
 // The privacy trade-off is real and stated in the wizard's copy: the calendar
 // URL and its contents pass through Meridian's Worker. Nothing is logged or
 // stored here; the response is streamed back and the Worker forgets it.
+//
+// ── Who may call this, and how often ─────────────────────────────────────────
+// The host validation answers "where may this fetch go". It does not answer
+// "who may ask, and how much" — and unlike `/oauth/token`, which is naturally
+// gated because a caller must already hold a real `code`/`refresh_token`,
+// `/ical` requires no secret whatsoever. Without the two checks below it is an
+// open fetch proxy: anyone can point it at arbitrary public HTTPS, using
+// Meridian's Worker to mask their origin and spending a request budget that
+// GitHub sign-in shares.
+//
+// Two layers, deliberately not one (health survey 2026-09-06, finding #5):
+//
+//   1. `Origin` must be the app's. Spoofable by any non-browser client, so it
+//      is not a security boundary and is not treated as one — it is the layer
+//      that removes casual and accidental reuse (another site hotlinking the
+//      proxy, a copied fetch snippet) so that layer 2 only has to deal with
+//      deliberate abuse. This costs nothing that was not already lost: `cors.ts`
+//      only returns `Access-Control-Allow-Origin` for this same origin, so a
+//      browser anywhere else already could not read the response — the Worker
+//      was simply doing the upstream fetch first and discarding it.
+//   2. A per-IP rate limit, which is the control that actually binds.
+//
+// `/oauth/token` deliberately keeps neither: it is reachable from any origin by
+// design (see `cors.ts`), and it has its own natural gate.
+
+import type { Env } from './env'
+import { ALLOWED_ORIGIN } from './cors'
 
 /** Injectable so tests can stand in for the network — same pattern as `GitHubTokenExchanger`. */
 export type CalendarFetcher = (url: string, init: RequestInit) => Promise<Response>
@@ -20,6 +47,30 @@ const defaultFetcher: CalendarFetcher = (url, init) => fetch(url, init)
 const MAX_BYTES = 5 * 1024 * 1024
 const TIMEOUT_MS = 10_000
 const MAX_REDIRECTS = 5
+
+/**
+ * The `[[ratelimits]]` window declared in `wrangler.toml`, repeated here only
+ * to fill in `Retry-After`. **Keep the two in step** — nothing checks that they
+ * agree, and the binding is the one that actually enforces.
+ *
+ * The period is 60 rather than a tunable number because Cloudflare's rate-limit
+ * binding accepts only 10 or 60 seconds (enforced by wrangler's own config
+ * schema), so an hourly budget cannot be expressed here at all.
+ *
+ * How the paired limit of 30/minute was chosen, so it can be re-derived rather
+ * than re-guessed. A subscription costs one request per 15-minute poll
+ * (`MIN_SYNC_INTERVAL_MS.ical` in `storage/syncScheduler.ts`) — 0.067/min — and
+ * about two on a cold start, since `ensurePermission` and the first `statAll`
+ * both call `load(force: true)` and so both bypass `IcalBackend`'s 30s memo.
+ * 30/min therefore clears 15 subscriptions opening at once from one address,
+ * roughly 450x a single subscription's steady rate, while capping a determined
+ * single-source abuser well below the point where it could exhaust the day.
+ * Shared egress (household NAT, office, CGNAT) is the case to watch if this
+ * ever needs raising — and it fails softly there: a 429 leaves `ensurePermission`
+ * answering 'unreachable', so the vault still mounts from cache with its events
+ * on screen and the scheduler retries on its own backoff.
+ */
+const RATE_LIMIT_PERIOD_S = 60
 
 // ── Host validation (SSRF) ───────────────────────────────────────────────────
 
@@ -175,8 +226,22 @@ export function validateFeedUrl(raw: string): { url: string } | { error: string 
 
 // ── Fetching ─────────────────────────────────────────────────────────────────
 
-function errorResponse(status: number, description: string): Response {
-  return Response.json({ error: 'invalid_request', error_description: description }, { status })
+/**
+ * The one place this endpoint's error envelope is defined. `IcalBackend`'s
+ * `errorDescription()` reads `error_description` off it to surface the Worker's
+ * own wording in the UI, so the shape is a contract with the client rather than
+ * decoration — which is why the rate-limit case below goes through here too
+ * instead of assembling its own JSON.
+ */
+function errorResponse(
+  status: number,
+  description: string,
+  init?: { code?: string; headers?: HeadersInit },
+): Response {
+  return Response.json(
+    { error: init?.code ?? 'invalid_request', error_description: description },
+    { status, headers: init?.headers },
+  )
 }
 
 /**
@@ -230,8 +295,31 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
  */
 export async function handleIcalFetch(
   request: Request,
+  env: Env,
   fetcher: CalendarFetcher = defaultFetcher,
 ): Promise<Response> {
+  // Both gates run before anything else, including URL validation: their job is
+  // to bound what an unauthenticated caller can make this Worker do, and
+  // validating first would hand out free work (and free probing of the host
+  // rules) to a caller who is over budget or has no business here at all.
+  if (request.headers.get('Origin') !== ALLOWED_ORIGIN) {
+    return errorResponse(403, 'This calendar proxy only serves the Meridian app')
+  }
+
+  // `CF-Connecting-IP` is set by Cloudflare's edge and overwrites anything the
+  // client sent, so it cannot be spoofed to dodge the limit. Absent only when
+  // something other than the edge invoked us; fail *closed* rather than letting
+  // a missing header become the way around the budget.
+  const ip = request.headers.get('CF-Connecting-IP')
+  if (!ip) return errorResponse(403, 'This calendar proxy only serves the Meridian app')
+
+  if (!(await env.ICAL_RATE_LIMIT.limit({ key: ip })).success) {
+    return errorResponse(429, 'Too many calendar requests — try again in a minute.', {
+      code: 'rate_limited',
+      headers: { 'Retry-After': String(RATE_LIMIT_PERIOD_S) },
+    })
+  }
+
   const raw = new URL(request.url).searchParams.get('url')
   if (!raw) return errorResponse(400, 'Missing url parameter')
 
