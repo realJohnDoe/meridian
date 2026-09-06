@@ -28,9 +28,7 @@ second consumer or a documented cycle-breaking reason (`persistencePort`,
 `autoSaveFlushPort`, `ViewChrome`, the four storage backends), and the
 meta-infrastructure is proportionate to the product it guards (1,256 lines of
 toolchain config against 39,056 lines of non-test source, ~3%). The theme is
-instead **intent that the toolchain doesn't hold up**: a deliberate `React.lazy`
-split of the editor, silently defeated by one static barrel import in the root
-route (#1, and worth 53% of the initial bundle); a lint tier evaluated, written up,
+instead **intent that the toolchain doesn't hold up**: a lint tier evaluated, written up,
 and then not switched on (#3); coverage floors set honestly and then left to
 drift 10–26 points below reality (#4); a `shadcn` alias pointing at a module
 that does not exist (#7); and a `CLAUDE.md` paragraph still warning about a gap
@@ -156,16 +154,16 @@ non-test source lines were at least enumerated by directory and line count.
 
 | # | Category | Verdict |
 |---|---|---|
-| 1 | Architecture & Domain Separation | **findings: #1** |
+| 1 | Architecture & Domain Separation | **clean** |
 | 2 | Simplicity & Overengineering | **clean** |
-| 3 | Directory & File Layout | **findings: #1** |
+| 3 | Directory & File Layout | **clean** |
 | 4 | Security | **findings: #5** |
 | 5 | Testing & Error Handling | **findings: #4, #6, #9** |
 | 6 | Code Health & DRY | **clean** |
 | 7 | Toolchain & Developer Feedback Loops | **findings: #3, #4, #7, #8** |
 | 8 | Dependencies & Library Fit | **findings: #7** (plus three keep-verdicts, below) |
 | 9 | Styling & UX | **partially assessed** |
-| 10 | Performance | **findings: #1** |
+| 10 | Performance | **clean** |
 
 **Why category 2 is clean, not unscanned.** I held every abstraction to the
 "does a second real caller exist today?" test by grep, not by reading names:
@@ -205,110 +203,24 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 
 | Rank | # | Title | Category | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|
-| 1 | **#1** | Root route's barrel import defeats the editor's own `lazy()` — 53% of the initial bundle | `performance` `architecture` `layout` | 8 | 5 | **Sonnet 5** | 20.0 |
-| 2 | **#4** | Five coverage floors have drifted 10–26 points below measured | `testing` `toolchain` | 4 | 5 | **Haiku 4.5** | 20.0 |
-| 3 | **#6** | Primary vault-onboarding and entry-view screens have ~0% coverage | `testing` | 5 | 6 | **Sonnet 5** | 15.0 |
-| 4 | **#3** | 20 evaluated `strict-type-checked` rules were written up but never enabled | `toolchain` `types` | 4 | 7 | **Sonnet 5** | 14.0 |
-| 5 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 6 | **#5** | `/ical` Worker endpoint is an unauthenticated open fetch proxy | `security` | 5 | 2 | **Opus 5** | 3.3 |
-| 7 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
-| 8 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 1 | **#4** | Five coverage floors have drifted 10–26 points below measured | `testing` `toolchain` | 4 | 5 | **Haiku 4.5** | 20.0 |
+| 2 | **#6** | Primary vault-onboarding and entry-view screens have ~0% coverage | `testing` | 5 | 6 | **Sonnet 5** | 15.0 |
+| 3 | **#3** | 20 evaluated `strict-type-checked` rules were written up but never enabled | `toolchain` `types` | 4 | 7 | **Sonnet 5** | 14.0 |
+| 4 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
+| 5 | **#5** | `/ical` Worker endpoint is an unauthenticated open fetch proxy | `security` | 5 | 2 | **Opus 5** | 3.3 |
+| 6 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 7 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
-- **#5 (security, impact 5) falls to 6th purely on the effort divisor**, because
+- **#5 (security, impact 5) falls to 5th purely on the effort divisor**, because
   it is the one finding here that needs a product decision rather than an edit.
   It is not less important than the two impact-2 config fixes below it. If you
   are triaging by consequence rather than by cost, #5 belongs in the top three.
 
-**Sequencing note.** #1 and #6 both touch `src/routes/`, and #4 and #6 both touch
-`vitest.config.ts`'s `thresholds` block. Land **#1 → #6 → #4** to avoid rebasing
-either file twice; #6 adds new floors for the files it newly tests, and #4 raises
-existing ones, so doing #4 last folds both into one coherent pass. #3, #5, #7
-and #8 are independent of everything else and of each other.
-
----
-
-### #1 — Root route's barrel import defeats the editor's own `lazy()`, putting CodeMirror in every route's entry chunk
-
-- **Category:** `performance` `architecture` `layout`
-- **Impact:** 8
-- **Breadth:** 5 files to change. Exposure is a *condition*, not a file set:
-  **every route, on every first load** — the app's landing route is the agenda,
-  which never mounts an editor. Established by building the tree and grepping
-  every emitted chunk for `cm-content` / `rdp-`; both markers appear in
-  `main-*.js` and nowhere else.
-- **Recommended model:** **Sonnet 5**
-- **Evidence:**
-  - `src/routes/__root.tsx:9` — `import { flushActiveAutoSave } from '@/editor'`
-  - `src/editor/index.ts:1` — `export { default as EntryEditor } from './EntryEditor'`
-  - `src/routes/_entry.entry.$vault.$slug.tsx:16` — `const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))`
-- **Problem:** `__root.tsx` mounts on every route and statically imports the
-  `@/editor` barrel to reach `flushActiveAutoSave` — a 24-line module with *zero
-  imports of its own* — and the barrel's first line pulls in `EntryEditor`, and
-  with it all of CodeMirror and `react-day-picker`, so the entry route's
-  deliberate `React.lazy()` split is defeated before it can do anything and every
-  visitor downloads the markdown editor to look at a list.
-- **Fix:** Move `src/editor/autoSaveFlushPort.ts` to `src/autoSaveFlushPort.ts`
-  as a root leaf — exactly the shape `src/persistencePort.ts` already has, and
-  for the same reason — so `__root.tsx` reaches it without crossing into the
-  editor module. Afterwards the entry chunk should measure **~677 KB raw /
-  ~219 KB gzip**, down from 1,417 KB / 466 KB.
-
-**Baseline measurement (this run, `pnpm exec vite build`, unmodified tree):**
-
-| | `main-*.js` raw | `main-*.js` gzip |
-|---|---|---|
-| Before | 1,416,571 | 465,525 |
-| After | 676,981 | 218,894 |
-| **Delta** | **−739,590 (−52.2%)** | **−246,631 (−53.0%)** |
-
-CodeMirror and `react-day-picker` relocate to a separate `editor-*.js`
-(734,184 raw / 245,699 gzip) that only the entry routes pull.
-
-**Task context**
-
-- **The move.** `git mv src/editor/autoSaveFlushPort.ts src/autoSaveFlushPort.ts`.
-  The file has **zero imports** — it is a `let flush` plus two functions — so the
-  move cannot break anything on its own side. Verified in both directions:
-  - *What it depends on:* nothing.
-  - *What depends on it:* exactly four sites —
-    `src/editor/useAutoSave.ts:3` (`registerAutoSaveFlush`),
-    `src/editor/useAutoSave.test.ts:6` (`flushActiveAutoSave`),
-    `src/editor/index.ts:14` (the re-export), and
-    `src/routes/__root.tsx:9` (via that re-export).
-- **The four edits, exactly:**
-  1. `src/editor/useAutoSave.ts:3` — `'./autoSaveFlushPort'` → `'@/autoSaveFlushPort'`
-  2. `src/editor/useAutoSave.test.ts:6` — same substitution
-  3. `src/editor/index.ts:14` — **delete** the line
-     `export { flushActiveAutoSave } from './autoSaveFlushPort'`
-  4. `src/routes/__root.tsx:9` — `from '@/editor'` → `from '@/autoSaveFlushPort'`
-- **What stays put:** `useAutoSave.ts` itself, and every other `@/editor` export.
-  Do **not** move `ParticipantsRow` or `save.ts`.
-- **The trap, located.** Deleting `src/editor/index.ts:14` is the step that is
-  easy to skip, and skipping it is silent: leaving the re-export in place while
-  changing `__root.tsx` still works and still builds, but if any *future* file
-  reaches `flushActiveAutoSave` through the barrel the regression returns with no
-  gate to catch it. There is no lint rule guarding this today — `depcruise` checks
-  for cycles, not for chunk weight.
-- **The precedent, named.** `src/persistencePort.ts` is already a root-level leaf
-  for the identical reason (a core module needing a seam into a heavier one
-  without importing it); `CLAUDE.md`'s "Root-level files are intentionally
-  cross-cutting" list documents the pattern and should gain
-  `autoSaveFlushPort.ts` as part of this change.
-- **Boundary check, already done.** I applied this exact change and ran the gates:
-  `pnpm run build` ✅ and `pnpm run lint` ✅ — including `depcruise` (457 modules,
-  1762 dependencies, no violations). The root-leaf placement does **not** trip
-  invariant 2. Note that the naive fix — deep-importing `@/editor/autoSaveFlushPort`
-  from `__root.tsx` — produces the identical bundle win but *does* violate
-  invariant 2; don't take that shortcut.
-- **Secondary site, deliberately out of scope.** `src/settings/VaultSettings.tsx:25`
-  also imports the `@/editor` barrel (`ParticipantsRow`, `archiveEntry`). After
-  this fix that only attaches the editor chunk to the *settings* route, not to
-  every route, and I measured the `__root.tsx` change alone as delivering the
-  entire win above. Leave it; it is a real editor dependency.
-- **Confirming the fix:** rebuild and compare, from the repo root —
-  `pnpm exec vite build && ls -S dist/assets/*.js | head -3` and
-  `gzip -c dist/assets/main-*.js | wc -c`. Re-measure rather than trusting the
-  numbers above; they will drift as dependencies move.
+**Sequencing note.** #4 and #6 both touch `vitest.config.ts`'s `thresholds`
+block. Land **#6 → #4** to avoid rebasing that file twice; #6 adds new floors
+for the files it newly tests, and #4 raises existing ones, so doing #4 last
+folds both into one coherent pass. #3, #5, #7 and #8 are independent of
+everything else and of each other.
 
 ---
 
@@ -423,8 +335,7 @@ CodeMirror and `react-day-picker` relocate to a separate `editor-*.js`
   boundary, or it will assert against `EntrySkeleton` and pass while testing
   nothing.
 - **Then add floors** for whatever each file reaches, per #4's convention
-  (~5 points under measured). Sequence this **after** #1, which moves
-  `autoSaveFlushPort.ts` and touches `src/routes/`.
+  (~5 points under measured).
 - **Why Sonnet 5 and not lower:** writing a test that renders but asserts nothing
   meaningful is the classic silent failure here — it turns the floor green while
   guarding nothing, which is the same class of bug this finding reports. That
@@ -749,10 +660,11 @@ Committed separately on this branch, as the shared conventions require, so they
 arrive as a reviewable diff rather than prose. Three changes, all learned from
 this run:
 
-1. **A bundle-composition item in the Budget.** This run's highest-impact finding
-   (#1) was invisible to every listed budget item — it needed building the app
-   and grepping the emitted chunks for library markers. Nothing in the survey
-   asks for that, so it was found by accident.
+1. **A bundle-composition item in the Budget.** This run's highest-impact
+   finding (the root route's barrel import defeating the editor's own
+   `lazy()`, now fixed) was invisible to every listed budget item — it needed
+   building the app and grepping the emitted chunks for library markers.
+   Nothing in the survey asks for that, so it was found by accident.
 2. **"Verify the docs against the tooling, not just the code."** The Process
    section says to treat `CLAUDE.md` claims as hypotheses about the *code*; two
    findings here (#8, and the framing of #3 and #4) came from checking doc and
@@ -767,6 +679,6 @@ this run:
 
 **Directory churn measured this run** (whole available history, per the caveat):
 `calendar` 274, `model` 250, `editor` 215, `storage` 205, `components` 177,
-`routes` 146, `settings` 61. Findings #1 and #6 both land in `routes/`/`settings/`,
+`routes` 146, `settings` 61. Finding #6 lands in `routes/`/`settings/`,
 and #4's drifted floors are concentrated in `editor/` and `storage/` — the four
 hottest areas — so fixing them now is cheaper than after more code accretes.
