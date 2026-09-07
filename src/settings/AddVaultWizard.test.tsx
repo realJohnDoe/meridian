@@ -187,11 +187,24 @@ describe('AddVaultWizard — GitHub step', () => {
   })
 
   it('starts GitHub sign-in and shows a disabled redirecting state', async () => {
+    // Never resolves, like the real full-page redirect that unmounts the
+    // component before startGitHubSignIn's promise would settle.
+    vi.mocked(startGitHubSignIn).mockReturnValue(new Promise(() => {}))
     goToGitHubStep()
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sign in with GitHub' })); await Promise.resolve() })
 
     expect(startGitHubSignIn).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('button', { name: 'Redirecting to GitHub…' })).toBeDisabled()
+  })
+
+  it('re-enables the button when sign-in fails instead of redirecting', async () => {
+    // startGitHubSignIn catches its own errors and resolves normally instead
+    // of navigating away — the button must not stay disabled forever.
+    vi.mocked(startGitHubSignIn).mockResolvedValue(undefined)
+    goToGitHubStep()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Sign in with GitHub' })); await Promise.resolve() })
+
+    expect(screen.getByRole('button', { name: 'Sign in with GitHub' })).toBeEnabled()
   })
 
   it('goes back to the source step', () => {
