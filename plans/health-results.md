@@ -155,7 +155,7 @@ non-test source lines were at least enumerated by directory and line count.
 | 2 | Simplicity & Overengineering | **clean** |
 | 3 | Directory & File Layout | **clean** |
 | 4 | Security | **clean** |
-| 5 | Testing & Error Handling | **findings: #9** |
+| 5 | Testing & Error Handling | **clean** |
 | 6 | Code Health & DRY | **clean** |
 | 7 | Toolchain & Developer Feedback Loops | **findings: #7, #8** |
 | 8 | Dependencies & Library Fit | **findings: #7** (plus three keep-verdicts, below) |
@@ -200,72 +200,18 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 
 | Rank | # | Title | Category | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|
-| 1 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 2 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
-| 3 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 1 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 2 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
 **Sequencing note.** No sequencing is needed among what's left — #2, #3, #4,
-#5 and #6 have already landed, each in its own file (`worker/tsconfig.json`,
+#5, #6 and #9 have already landed, each in its own file (`worker/tsconfig.json`,
 the 20 `strict-type-checked` rules enabled in `eslint.config.js`,
-`vitest.config.ts`'s `thresholds`, the `/ical` Worker endpoint, and
+`vitest.config.ts`'s `thresholds`, the `/ical` Worker endpoint,
 `vitest.config.ts`'s `thresholds` respectively — #4 and #6 both touch the
-thresholds block, at different entries) with nothing left to coordinate. #7,
-#8 and #9 are independent of everything else and of each other.
+thresholds block, at different entries — and `startGitHubSignIn`'s
+catch-and-notify wrapper) with nothing left to coordinate. #7 and #8 are
+independent of everything else and of each other.
 
----
-
-### #9 — `startGitHubSignIn` is the one vault action that skips the codebase's catch-and-notify convention
-
-- **Category:** `error-handling`
-- **Impact:** 3
-- **Breadth:** 4 files (1 to fix, 3 calling sites that inherit the fix).
-  Established by grepping every caller.
-- **Recommended model:** **Sonnet 5**
-- **Evidence:**
-  - `src/settings/AddVaultWizard.tsx:86` — `    await startGitHubSignIn() // full-page redirect — component unmounts`
-  - `src/components/SyncButton.tsx:83` — `          onClick={() => void startGitHubSignIn({ reconnectVaultId: vault.id })}`
-  - `src/settings/VaultSettings.tsx:304` — the identical `void` call
-  - The convention it breaks, from `src/storage/vaultRegistry.ts`: `    console.error('[vault] addIcalVault failed:', e)`
-- **Problem:** Every other vault entry point in `vaultRegistry.ts` —
-  `addLocalVault`, `addExampleVault`, `addIcalVault`, `addGitHubVaultOAuth`,
-  `reconnectVault`, `removeVault` — wraps its body in `try/catch` and calls
-  `notifyError`, but `startGitHubSignIn` does not, so if `crypto.subtle.digest`
-  or `sessionStorage.setItem` throws, all three call sites drop the rejection on
-  the floor and "Sign in with GitHub" silently does nothing — with
-  `AddVaultWizard`'s button stuck reading "Redirecting to GitHub…" permanently.
-- **Fix:** Wrap `startGitHubSignIn`'s body in the same `try/catch` +
-  `notifyError` shape the sibling actions use, so all three call sites are fixed
-  at once.
-
-**Task context**
-
-- **Where to put the catch:** inside `startGitHubSignIn`
-  (`src/storage/githubOAuth.ts:45`), **not** at the three call sites. That is what makes it one edit instead of three and what
-  matches the sibling precedent.
-- **The precedent to copy, exactly:** `addIcalVault` in
-  `src/storage/vaultRegistry.ts:708-726` — its catch body is
-  `console.error('[vault] addIcalVault failed:', e)` (line 723) followed by
-  `notifyError('Could not add calendar subscription', e)` (line 724). Use the
-  same two lines with a message naming GitHub sign-in.
-- **The trap, located.** The function's last statement is
-  `window.location.href = url.toString()` (line 65). A `catch` must not wrap that
-  assignment in anything that suppresses the navigation, and — more subtly —
-  `AddVaultWizard.tsx:84-87` sets `setSigningIn(true)` *before* the call and never
-  resets it, because the successful path unmounts via full-page redirect. Adding
-  the catch inside `startGitHubSignIn` alone leaves that button disabled forever
-  on the failure path, so `handleSignIn` **also** needs the flag cleared when the
-  call returns without navigating.
-- **Why lint does not catch this.** `eslint.config.js` sets
-  `'@typescript-eslint/no-misused-promises'` with `{ checksVoidReturn: { attributes: false } }`,
-  which is a deliberate and correct exemption for idiomatic async JSX handlers —
-  but it is also why an async handler with an unhandled rejection passes cleanly.
-  Do not change that config option to fix this; fix the function.
-- **Scope check, already done.** I traced the other five async JSX handlers in
-  `src/settings/` and they are all safe: `handleSyncNow` reaches `runSync`, which
-  has a top-level `try/catch/finally`; `handleRemoveClick` uses
-  `.catch(() => 0)`; `handleNext`/`handleAddFeed` reach `add*Vault`, which catch
-  internally. `startGitHubSignIn` is genuinely the only gap — do not widen the
-  change.
 ---
 
 ### #7 — `components.json`'s `utils` alias points at a module that does not exist

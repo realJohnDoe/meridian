@@ -83,7 +83,8 @@ export default function AddVaultWizard() {
 
   async function handleSignIn() {
     setSigningIn(true)
-    await startGitHubSignIn() // full-page redirect — component unmounts
+    await startGitHubSignIn() // full-page redirect on success — component unmounts
+    setSigningIn(false) // only reached if sign-in failed and notified instead of redirecting
   }
 
   async function handleNext() {
