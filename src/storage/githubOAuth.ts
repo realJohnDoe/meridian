@@ -2,6 +2,7 @@ import { tokenLoad, refreshTokenLoad, tokenExpiryLoad, credentialsSave } from '.
 import { TransientSyncError } from './conflictError'
 import { WORKER_ORIGIN } from './workerOrigin'
 import { journal } from './syncJournal'
+import { notifyError } from './notifications'
 
 const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
 export const GITHUB_APP_INSTALL_URL = 'https://github.com/apps/realjohndoe-meridian/installations/new'
@@ -43,26 +44,31 @@ export class OAuthCallbackError extends Error {}
  * and verifier, never before and never as a substitute for that check.
  */
 export async function startGitHubSignIn(opts?: { reconnectVaultId?: string }): Promise<void> {
-  const verifier = randomBase64url(32)
-  const state = randomBase64url(16)
-  const challenge = await codeChallengeFor(verifier)
+  try {
+    const verifier = randomBase64url(32)
+    const state = randomBase64url(16)
+    const challenge = await codeChallengeFor(verifier)
 
-  // sessionStorage survives the redirect to github.com and back (same tab),
-  // but not a new tab — the flow must stay in one tab, which a full-page
-  // redirect naturally does.
-  sessionStorage.setItem(VERIFIER_KEY, verifier)
-  sessionStorage.setItem(STATE_KEY, state)
-  if (opts?.reconnectVaultId) sessionStorage.setItem(RECONNECT_KEY, opts.reconnectVaultId)
-  else sessionStorage.removeItem(RECONNECT_KEY)
+    // sessionStorage survives the redirect to github.com and back (same tab),
+    // but not a new tab — the flow must stay in one tab, which a full-page
+    // redirect naturally does.
+    sessionStorage.setItem(VERIFIER_KEY, verifier)
+    sessionStorage.setItem(STATE_KEY, state)
+    if (opts?.reconnectVaultId) sessionStorage.setItem(RECONNECT_KEY, opts.reconnectVaultId)
+    else sessionStorage.removeItem(RECONNECT_KEY)
 
-  const url = new URL('https://github.com/login/oauth/authorize')
-  url.searchParams.set('client_id', GITHUB_CLIENT_ID)
-  url.searchParams.set('redirect_uri', REDIRECT_URI)
-  url.searchParams.set('code_challenge', challenge)
-  url.searchParams.set('code_challenge_method', 'S256')
-  url.searchParams.set('state', state)
+    const url = new URL('https://github.com/login/oauth/authorize')
+    url.searchParams.set('client_id', GITHUB_CLIENT_ID)
+    url.searchParams.set('redirect_uri', REDIRECT_URI)
+    url.searchParams.set('code_challenge', challenge)
+    url.searchParams.set('code_challenge_method', 'S256')
+    url.searchParams.set('state', state)
 
-  window.location.href = url.toString()
+    window.location.href = url.toString()
+  } catch (e) {
+    console.error('[oauth] startGitHubSignIn failed:', e)
+    notifyError('Could not start GitHub sign-in', e)
+  }
 }
 
 export interface OAuthTokens {
