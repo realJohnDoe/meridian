@@ -21,9 +21,12 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, h
       data-topbar
     >
       <TopbarShell
-        // The back button always leads the left edge, regardless of screen size (the sidebar's own
-        // hamburger stays mobile-only; large screens keep the sidebar docked open, so the back
-        // button is the only way out of the editor there).
+        // The back button always leads the left edge, regardless of screen size. This topbar
+        // never renders the calendar views' hamburger trigger: below `lg` the nav rail (see
+        // _entry.tsx) is off-canvas and unreachable from here, so the back button is the only way
+        // out; at/above `lg` it sits docked open beside the editor, and the back button remains
+        // the deliberate way to leave — the rail is for jumping elsewhere, not for closing this
+        // screen.
         leftHasButton
         left={
           <IconButton variant="ghost" className="text-muted-foreground" onClick={onBack} title="Back" label="Back">

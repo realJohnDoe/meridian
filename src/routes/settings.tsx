@@ -3,6 +3,8 @@ import { createFileRoute, Outlet, useNavigate, useRouter, useRouterState } from 
 import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
 import { IconButton } from '@/components/primitives/icon-button'
+import { SidebarProvider } from '@/components/ui/sidebar'
+import AppSidebar from './-appSidebar'
 import { TopbarShell } from './-topbarShell'
 import { TopbarLabel } from './-topbarLabel'
 import { settingsTopbar } from './-settingsTopbar'
@@ -27,9 +29,15 @@ export const Route = createFileRoute('/settings')({
  * holds none — so rather than being conditioned away, it is simply not part of
  * this chain. Same for the view filter and the Today button.
  *
- * One centred column rather than a nav pane beside the content: list-into-detail
- * through the URL gives the same reach with one column, and with no split
- * between how the screens behave on a phone and on a desktop.
+ * The nav rail is not furniture in the same sense — it's how every other
+ * screen gets around, not something specific to entries — so it docks beside
+ * these screens the same way it does beside the calendar views: off-canvas
+ * below `lg`, fixed open at/above it (see `SidebarProvider` below). Below
+ * `lg` that leaves list-into-detail through the URL as the only way to move
+ * within Settings, exactly as before; the back button (`onBack`) remains the
+ * sole way out at every depth on every screen size — the rail lets you jump
+ * to Agenda/Month/Week/Day/Backlog/Notes, not back up the Settings hierarchy
+ * itself, so it doesn't replace the header's own back control.
  */
 function SettingsLayout() {
   const router   = useRouter()
@@ -71,40 +79,47 @@ function SettingsLayout() {
   }
 
   return (
-    <div className="mx-auto w-full bg-background">
-      <header
-        className="sticky top-0 z-10 h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background shadow-md"
-        data-topbar
-      >
-        <TopbarShell
-          // The back button always leads the left edge: there is no sidebar
-          // docked beside these screens, so it is the only way out.
-          leftHasButton
-          left={
-            <div className="flex flex-1 items-center gap-2 min-w-0">
-              <IconButton variant="ghost" className="text-muted-foreground" onClick={onBack} title="Back" label="Back">
-                <ArrowLeft size={18} />
-              </IconButton>
-              <TopbarLabel
-                long={topbar?.title ?? 'Settings'}
-                short={topbar?.title ?? 'Settings'}
-                className="flex-1 text-base text-foreground"
-              />
-            </div>
-          }
-          right={<div className="shrink-0" />}
-        />
-      </header>
+    <SidebarProvider style={{ '--sidebar-width': '260px' } as React.CSSProperties}>
+      <AppSidebar />
+      <div className="mx-auto w-full min-w-0 flex-1 bg-background">
+        <header
+          className="sticky top-0 z-10 h-topbar pt-[env(safe-area-inset-top)] flex items-center border-b border-border shrink-0 bg-background shadow-md"
+          data-topbar
+        >
+          <TopbarShell
+            // The back button always leads the left edge, on every screen size: it
+            // moves up the Settings hierarchy (or leaves Settings, at the root),
+            // which the docked rail (`lg`+) doesn't do — that jumps to an entirely
+            // different top-level screen instead. No mobile hamburger trigger
+            // either, matching `_entry.tsx` — below `lg` this button stays the
+            // only way to move.
+            leftHasButton
+            left={
+              <div className="flex flex-1 items-center gap-2 min-w-0">
+                <IconButton variant="ghost" className="text-muted-foreground" onClick={onBack} title="Back" label="Back">
+                  <ArrowLeft size={18} />
+                </IconButton>
+                <TopbarLabel
+                  long={topbar?.title ?? 'Settings'}
+                  short={topbar?.title ?? 'Settings'}
+                  className="flex-1 text-base text-foreground"
+                />
+              </div>
+            }
+            right={<div className="shrink-0" />}
+          />
+        </header>
 
-      {/* `data-flow-screen` marks this as a document-flow route's content root
-          — what scripts/layout-smoke.mjs waits on and anchors its growth probe
-          to, the same as the entry routes. */}
-      <div
-        data-flow-screen
-        className="mx-auto flex w-full max-w-2xl flex-col px-4 pt-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6"
-      >
-        <Outlet />
+        {/* `data-flow-screen` marks this as a document-flow route's content root
+            — what scripts/layout-smoke.mjs waits on and anchors its growth probe
+            to, the same as the entry routes. */}
+        <div
+          data-flow-screen
+          className="mx-auto flex w-full max-w-2xl flex-col px-4 pt-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6"
+        >
+          <Outlet />
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   )
 }
