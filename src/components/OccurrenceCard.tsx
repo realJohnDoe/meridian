@@ -120,6 +120,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
   // says kind/priority and the chip names the vault; by vault, they swap.
   const painter  = useOccPainter()
   const tone     = painter.tone(occ, now)
+  const hue      = painter.hue(occ)
   const chip     = painter.chip(occ)
   const isPast   = tone === 'past'
 
@@ -176,7 +177,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
         onClick={onOpen}
       />
 
-      <span className={cn(occBarVariants({ tone }), 'relative z-20')} />
+      <span className={cn(occBarVariants({ hue, dimmed }), 'relative z-20')} />
 
       <div className={cn('relative z-20 flex flex-col flex-1 min-w-0 gap-1 py-0.5 pointer-events-none justify-center', dimmed && 'opacity-60')}>
         <div className="flex items-center gap-1.5">

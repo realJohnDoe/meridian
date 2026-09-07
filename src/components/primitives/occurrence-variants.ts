@@ -1,6 +1,6 @@
 import { cva } from 'class-variance-authority'
 import type { Priority } from '@/types'
-import { VAULT_HUE, type OccHue, type OccTone } from '@/occView'
+import { VAULT_HUE, type OccHue } from '@/occView'
 import type { VaultColor } from '@/vaultRef'
 
 /**
@@ -11,9 +11,8 @@ import type { VaultColor } from '@/vaultRef'
  * `neutral` is `bg-muted-foreground`, not a new token: it is the only
  * colorless fill every theme already guarantees reads against its surfaces
  * (index.css treats muted-foreground-on-background at 4.58:1 as the floor to
- * hold when retuning), and it is plainly distinct from the `bg-muted` /
- * `bg-surface-raised` the past/done treatments use — which is the whole job,
- * since a vault with no color set must not look finished.
+ * hold when retuning) — the fill a vault with no color set gets, active or
+ * dimmed alike (see `occBarVariants`/`dvBlockVariants` below).
  */
 export const HUE_SOLID: Record<OccHue, string> = {
   event:        'bg-event',
@@ -51,19 +50,23 @@ const TINT_CLASSES = {
 } satisfies Record<OccHue, string>
 
 /**
- * 4px accent bar in agenda cards (OccurrenceCard).
+ * 4px accent bar in agenda cards (OccurrenceCard). Coloured by the
+ * occurrence's own hue in every state — same `hue`/`dimmed` split as
+ * `dvBlockVariants` (opacity-60, no line-through here since the bar carries
+ * no text): a done/past card keeps reading as its own kind/priority/vault,
+ * just faded, rather than the bar flipping to a flat neutral that erases it.
  */
 export const occBarVariants = cva(
   'w-1 self-stretch rounded-full shrink-0 min-h-5',
   {
     variants: {
-      tone: {
-        ...HUE_SOLID,
-        past: 'bg-surface-raised',
-        done: 'bg-surface-raised',
-      } satisfies Record<OccTone, string>,
+      hue: HUE_SOLID,
+      dimmed: {
+        true:  'opacity-60',
+        false: '',
+      },
     },
-    defaultVariants: { tone: 'done' },
+    defaultVariants: { hue: 'neutral', dimmed: false },
   },
 )
 

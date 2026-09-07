@@ -196,7 +196,7 @@
   /* ── Derived — not authored per-theme ── */
   --primary-dark:    oklch(0.63 0.20 278);   /* darker shades for gradients (brand button, search bar) */
   --brand-cyan-dark: oklch(0.68 0.14 208);
-  --surface-raised:  oklch(0.33 0.05 252);   /* elevated surface for past/done bars */
+  --surface-raised:  oklch(0.33 0.05 252);   /* elevated surface, one step up from --card */
 }
 
 /* :root-only. Two kinds of token live here rather than in the grouped
