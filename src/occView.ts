@@ -115,11 +115,15 @@ export type OccHue =
   | 'neutral'
 
 /**
- * What a surface is actually painted with: an active hue, or one of the two
- * de-emphasized treatments. `'past'`/`'done'` win over any hue in both color
- * modes — a finished task reads as finished whoever's vault it came from.
+ * What `OccPainter.tone` reports: an active hue, or one of the two
+ * de-emphasized treatments. Not exported — every surface that paints an
+ * occurrence now uses `hue` (which outlives completion) plus a separate
+ * `dimmed` boolean instead (see `dvBlockVariants`/`occBarVariants` in
+ * `components/primitives/occurrence-variants.ts`), so nothing outside this
+ * file names the collapsed type anymore; `tone`/`isPast` in OccurrenceCard.tsx
+ * is the one remaining consumer, structurally typed off `OccPainter` itself.
  */
-export type OccTone = OccHue | 'past' | 'done'
+type OccTone = OccHue | 'past' | 'done'
 
 /** Hue order for anything that has to show several at once (mini-calendar dots). */
 export const HUE_ORDER: OccHue[] = [
