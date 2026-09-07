@@ -96,15 +96,22 @@ const isScrollContainer = (el: HTMLElement) => el.classList.contains('overflow-y
  * these tests build carries a meta row — an overdue group row has `showDate`,
  * and every fixture occurrence carries a `time` — so they all take the
  * meta-height branch (ROW_H_META and OVERDUE_GROUP_H are the same 68).
+ *
+ * A day's *first* occurrence row is DAY_GAP_H taller than the rest (AgendaRow's
+ * `mt-3`), and the row list is what knows which one that is — so this reads it
+ * back off the rendered gutter, whose lone child is the DayBadge that only a
+ * badged row renders. Overdue and empty-day rows never take that branch and
+ * are answered by their own prefixes above.
  */
 function estimatedRowHeight(el: HTMLElement): number {
   const key = el.querySelector('[data-flip-key]')?.getAttribute('data-flip-key') ?? ''
   if (key.startsWith('m|'))  return 60  // MONTH_H
   if (key.startsWith('w|'))  return 36  // WEEK_H
   if (key.startsWith('h|'))  return 40  // HEADER_H
-  if (key.startsWith('e|'))  return 56  // EMPTY_H
+  if (key.startsWith('e|'))  return 62  // EMPTY_H
   if (key.startsWith('og|')) return 68  // OVERDUE_GROUP_H
-  return 68                             // ROW_H_META
+  const dayGap = el.querySelector('.w-9 > div') ? 12 : 0  // DAY_GAP_H
+  return 68 + dayGap                    // ROW_H_META
 }
 
 /**

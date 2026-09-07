@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { Virtualizer, VirtualItem } from '@tanstack/react-virtual'
 import { calendarView } from './viewState'
-import { estimateRow, type AgendaRow } from './agendaSections'
+import { estimateRow, type AgendaRow, type ExtraMetaProbe } from './agendaSections'
 
 type AgendaVirtualizer = Virtualizer<HTMLDivElement, Element>
 
@@ -28,13 +28,18 @@ const TOP_ROW_EPSILON = 12
  * to reach it via `scrollToIndex`'s iterative scroll-measure-correct — see
  * that effect's own comment on why.
  */
-export function offsetOfRow(rows: AgendaRow[], goToRowIndex: number, snapshot: VirtualItem[]): number {
+export function offsetOfRow(
+  rows: AgendaRow[],
+  goToRowIndex: number,
+  snapshot: VirtualItem[],
+  extraMeta: ExtraMetaProbe,
+): number {
   if (goToRowIndex <= 0) return 0
   const measured = snapshot.length > 0 ? new Map(snapshot.map(m => [m.key, m.size])) : null
   let offset = 0
   for (let i = 0; i < goToRowIndex && i < rows.length; i++) {
     const row = rows[i]!  // i < rows.length
-    offset += measured?.get(row.key) ?? estimateRow(row)
+    offset += measured?.get(row.key) ?? estimateRow(row, extraMeta)
   }
   return offset
 }
@@ -67,14 +72,19 @@ export function offsetOfRow(rows: AgendaRow[], goToRowIndex: number, snapshot: V
  * corrective scrollToIndex — but it now starts from a few pixels out instead
  * of a year.
  */
-export function computeAgendaScrollRestore(scrollToToday: boolean, rows: AgendaRow[], goToRowIndex: number): {
+export function computeAgendaScrollRestore(
+  scrollToToday: boolean,
+  rows: AgendaRow[],
+  goToRowIndex: number,
+  extraMeta: ExtraMetaProbe,
+): {
   initialOffset: number
   initialMeasurementsCache: VirtualItem[]
 } {
   const { agendaScrollOffset, agendaScrollMeasurements } = calendarView.getState()
   return {
     initialOffset: scrollToToday
-      ? offsetOfRow(rows, goToRowIndex, agendaScrollMeasurements)
+      ? offsetOfRow(rows, goToRowIndex, agendaScrollMeasurements, extraMeta)
       // Clamped to what the measurement snapshot itself covers: the loaded
       // run agendaScrollOffset was saved against can, in principle, no longer
       // be the one restoring — an offset past the end of what was ever

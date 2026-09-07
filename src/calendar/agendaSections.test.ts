@@ -3,7 +3,7 @@ import type { Occurrence, Priority } from '@/types'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import {
-  computeAgendaSections, estimateRow,
+  computeAgendaSections, estimateRow, type ExtraMetaProbe,
   type AgendaChunkOccs, type AgendaSectionCache, type Section, type AgendaRow,
 } from './agendaSections'
 import type { FilterOccs } from './useCalendarFilter'
@@ -814,6 +814,9 @@ describe('estimateRow', () => {
   const rowFor = (rows: AgendaRow[], id: string) =>
     rows.find(r => r.kind === 'occ' && r.occ.id === id)!
 
+  /** No chip, no backlinks — the two inputs only AgendaView can answer. */
+  const noExtra: ExtraMetaProbe = () => false
+
   it('estimates a plain day row shorter than one carrying a meta row', () => {
     const { rows } = compute(
       null,
@@ -825,31 +828,62 @@ describe('estimateRow', () => {
       noGroups,
     )
 
-    // No badge at all — the card sits on its min-h-11 floor.
-    expect(estimateRow(rowFor(rows, 'untimed'))).toBe(50)
+    // No meta row — the card sits on its min-h-11 floor. This one also opens
+    // the day, so it carries AgendaRow's mt-3 on top (see the gap test below).
+    expect(estimateRow(rowFor(rows, 'untimed'), noExtra)).toBe(50 + 12)
     // A time badge or a duration chip each force the meta row.
-    expect(estimateRow(rowFor(rows, 'timed'))).toBe(68)
-    expect(estimateRow(rowFor(rows, 'with-duration'))).toBe(68)
+    expect(estimateRow(rowFor(rows, 'timed'), noExtra)).toBe(68)
+    expect(estimateRow(rowFor(rows, 'with-duration'), noExtra)).toBe(68)
   })
 
   it('estimates an overdue group row at the meta height — it always shows a date badge', () => {
     const untimed = occ('overdue-untimed', '2026-06-10', { done: false })
     const { rows } = compute(null, [untimed], [group(untimed)])
 
-    expect(estimateRow(rows.find(r => r.kind === 'overdue-group')!)).toBe(68)
+    expect(estimateRow(rows.find(r => r.kind === 'overdue-group')!, noExtra)).toBe(68)
   })
 
   it('estimates the overdue header at its own height', () => {
     const { rows } = compute(null, baseOccs(), baseGroups())
 
-    expect(estimateRow(rows.find(r => r.kind === 'header')!)).toBe(40)
+    expect(estimateRow(rows.find(r => r.kind === 'header')!, noExtra)).toBe(40)
   })
 
   it('estimates month/week dividers and empty-day rows at their own heights', () => {
     const { rows } = compute(null, [], noGroups)
 
-    expect(estimateRow(rows.find(r => r.kind === 'month')!)).toBe(60)
-    expect(estimateRow(rows.find(r => r.kind === 'week')!)).toBe(36)
-    expect(estimateRow(rows.find(r => r.kind === 'day-empty')!)).toBe(56)
+    expect(estimateRow(rows.find(r => r.kind === 'month')!, noExtra)).toBe(60)
+    expect(estimateRow(rows.find(r => r.kind === 'week')!, noExtra)).toBe(36)
+    expect(estimateRow(rows.find(r => r.kind === 'day-empty')!, noExtra)).toBe(62)
+  })
+
+  it('adds the day gap to a day\'s first occurrence row only', () => {
+    const { rows } = compute(
+      null,
+      [occ('first', '2026-06-16'), occ('second', '2026-06-16')],
+      noGroups,
+    )
+
+    const first = rowFor(rows, 'first')
+    const second = rowFor(rows, 'second')
+    // The badge is what carries AgendaRow's mt-3, and only a day's first row
+    // has one — an estimate blind to it is 12px short on every day.
+    expect(first.kind === 'occ' && first.badge).toBeTruthy()
+    expect(second.kind === 'occ' && second.badge).toBeNull()
+    expect(estimateRow(first, noExtra) - estimateRow(second, noExtra)).toBe(12)
+  })
+
+  it('takes the meta height for a row whose only meta content is a chip or a backlink', () => {
+    const { rows } = compute(null, [occ('a-plain', '2026-06-16'), occ('b-plain', '2026-06-16')], noGroups)
+    // Whichever of the two sorts second — the day gap is a separate term, and
+    // this test is only about the meta row.
+    const later = rows.find(r => r.kind === 'occ' && r.badge === null)!
+
+    // Nothing on the row itself says "meta row" — no date badge, no time, no
+    // duration — so without the probe this is the 50px branch. Under the
+    // default colorBy with two visible vaults every card carries a vault chip,
+    // which is what the probe reports.
+    expect(estimateRow(later, () => false)).toBe(50)
+    expect(estimateRow(later, () => true)).toBe(68)
   })
 })
