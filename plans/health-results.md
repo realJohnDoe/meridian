@@ -26,10 +26,9 @@ second consumer or a documented cycle-breaking reason (`persistencePort`,
 `autoSaveFlushPort`, `ViewChrome`, the four storage backends), and the
 meta-infrastructure is proportionate to the product it guards (1,256 lines of
 toolchain config against 39,056 lines of non-test source, ~3%). The theme is
-instead **intent that the toolchain doesn't hold up**: a `CLAUDE.md` paragraph
-still warning about a gap that has since been closed (#8). This is small on
-its own; it is one instance of a pattern — decisions recorded but not wired to
-anything that re-checks them.
+instead **intent that the toolchain doesn't hold up**: decisions recorded in
+`CLAUDE.md` but not wired to anything that re-checks them, so a paragraph can
+keep warning about a gap the tooling has since closed.
 
 ---
 
@@ -156,7 +155,7 @@ non-test source lines were at least enumerated by directory and line count.
 | 4 | Security | **clean** |
 | 5 | Testing & Error Handling | **findings: #9** |
 | 6 | Code Health & DRY | **clean** |
-| 7 | Toolchain & Developer Feedback Loops | **findings: #8** |
+| 7 | Toolchain & Developer Feedback Loops | **clean** |
 | 8 | Dependencies & Library Fit | **clean** (plus three keep-verdicts, below) |
 | 9 | Styling & UX | **partially assessed** |
 | 10 | Performance | **clean** |
@@ -200,16 +199,15 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 | Rank | # | Title | Category | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|
 | 1 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 2 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
-**Sequencing note.** No sequencing is needed among what's left — #2, #3, #4,
-#5, #6 and #7 have already landed, each in its own file (`worker/tsconfig.json`,
+**Sequencing note.** No sequencing is needed among what's left — #2 through
+#8 have already landed, each in its own file (`worker/tsconfig.json`,
 the 20 `strict-type-checked` rules enabled in `eslint.config.js`,
 `vitest.config.ts`'s `thresholds`, the `/ical` Worker endpoint,
-`vitest.config.ts`'s `thresholds` respectively, and `components.json`'s
-`utils` alias — #4 and #6 both touch the thresholds block, at different
-entries) with nothing left to coordinate. #8 and #9 are independent of
-everything else and of each other.
+`vitest.config.ts`'s `thresholds`, `components.json`'s `utils` alias, and
+`CLAUDE.md`'s "Route shells" section respectively — #4 and #6 both touch the
+thresholds block, at different entries) with nothing left to coordinate. #9
+is independent of everything else.
 
 ---
 
@@ -265,54 +263,6 @@ everything else and of each other.
   `.catch(() => 0)`; `handleNext`/`handleAddFeed` reach `add*Vault`, which catch
   internally. `startGitHubSignIn` is genuinely the only gap — do not widen the
   change.
----
-
-### #8 — `CLAUDE.md`'s "Route shells" section warns about a gap that `layout-smoke.mjs` now closes
-
-- **Category:** `toolchain`
-- **Impact:** 2
-- **Breadth:** 1 file (`CLAUDE.md`, lines 175–181).
-- **Recommended model:** **Haiku 4.5**
-- **Evidence:**
-  - `CLAUDE.md:179` — ``\`APP_ROUTES\`/\`FLOW_ROUTES\`. A new route is covered by neither until someone``
-  - `scripts/layout-smoke.mjs` — `function assertRouteCoverage() {` … which walks
-    every leaf route file and exits 1 on any not exercised
-  - `scripts/layout-smoke.mjs` — `const ROUTE_COVERAGE_EXEMPTIONS = {`
-- **Problem:** `CLAUDE.md` tells every agent that a newly added route silently
-  escapes the layout checks until someone remembers to list it, but
-  `assertRouteCoverage()` has since made that a hard build failure — so the
-  contract agents read is more pessimistic than the tooling, which invites
-  redundant hand-rolled guards and, worse, teaches readers that this class of rot
-  is unmonitored when it is not.
-- **Fix:** Update the paragraph to say the route *coverage* gap is now enforced by
-  `assertRouteCoverage()` (with `ROUTE_COVERAGE_EXEMPTIONS` as the documented
-  escape hatch), while keeping the still-true warning that nothing verifies a
-  route is in the *right* shell list.
-
-**Task context**
-
-- **Precisely what changed and what did not** — this distinction is the whole
-  edit, and getting it backwards would make the doc wrong in the other direction:
-  - **No longer true:** "A new route is covered by neither until someone adds it."
-    `assertRouteCoverage()` runs at the top of `layout-smoke.mjs`, walks every
-    leaf file in `src/routes/`, extracts each `createFileRoute(...)` path,
-    normalizes away `/_app` `/_entry` prefixes and `$params`, and `process.exit(1)`s
-    on any route no URL in `APP_ROUTES`/`FLOW_ROUTES`/`ROUTE_COVERAGE_EXEMPTIONS`
-    exercises. CI runs this on every PR.
-  - **Still true, keep it:** "Nothing enforces the placement — the filename is the
-    whole declaration." A text-input route wrongly filed under `_app` would be
-    added to `APP_ROUTES`, pass the app-shell geometry assertions, and its
-    keyboard-avoidance failure would still go uncaught. The doc's core warning
-    survives; only the "silently uncovered" clause is stale.
-- **The one legitimate exemption** currently recorded is `/auth/callback`, with
-  its reason written inline — worth naming in the doc so the escape hatch is
-  discoverable rather than rediscovered.
-- **Verified by reading**, not assumed: I read `assertRouteCoverage()` in full
-  and confirmed `layout-smoke.mjs` calls it unconditionally at module scope
-  before any browser work, and that `pnpm run test:layout` passes on this tree.
-- **Why Haiku 4.5:** a prose edit to one paragraph, with the true and false halves
-  enumerated above. No code changes.
-
 ---
 
 ## Dependencies & Library Fit — verdicts

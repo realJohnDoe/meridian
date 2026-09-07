@@ -173,12 +173,18 @@ which is why keyboard avoidance was hand-rolled across six surfaces before
 `3de767a` addressed the cause rather than the symptom; `/settings` then
 repeated it (PR #840, fixed in #844).
 
-Nothing enforces the placement — the filename is the whole declaration
-(`_app.foo.tsx` vs `foo.tsx`). Two partial guards exist: `routes/-appShell.test.ts`
-pins how `_app`'s cap is expressed, and `scripts/layout-smoke.mjs` checks the
-resulting geometry in a real browser — but only for the routes listed in its
-`APP_ROUTES`/`FLOW_ROUTES`. A new route is covered by neither until someone
-adds it.
+Nothing enforces *placement* — the filename is the whole declaration
+(`_app.foo.tsx` vs `foo.tsx`), and a route wrongly filed under `_app` would
+pass the app-shell geometry assertions and still fail keyboard avoidance
+uncaught. *Coverage* is enforced, though: `scripts/layout-smoke.mjs`'s
+`assertRouteCoverage()` walks every leaf file in `src/routes/`, extracts its
+`createFileRoute(...)` path, and `process.exit(1)`s in CI if it isn't listed
+in `APP_ROUTES`, `FLOW_ROUTES`, or the `ROUTE_COVERAGE_EXEMPTIONS` escape
+hatch (documented inline — e.g. `/auth/callback`, which has no
+`[data-flow-screen]`/`[data-topbar]` host for the check to anchor to). So a
+new route can't silently go unlisted; it can still silently go in the wrong
+list. `routes/-appShell.test.ts` separately pins how `_app`'s cap is
+expressed.
 
 ## Architecture invariants
 
