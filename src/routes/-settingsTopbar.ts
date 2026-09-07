@@ -11,9 +11,11 @@ export interface SettingsTopbar {
   /**
    * Where "up" goes: the settings list from any sub-screen, or `null` at the
    * root — which means there is no parent left *inside* Settings, so back
-   * leaves it entirely. It never means "render no back button": the settings
-   * shell has no sidebar docked beside it, so the back control is the only
-   * way out at every depth.
+   * leaves it entirely. It never means "render no back button": the docked
+   * nav rail (settings.tsx, `lg`+ only) jumps to a different top-level
+   * screen rather than moving within the Settings hierarchy, so the back
+   * control stays the only way to do that, at every depth and every screen
+   * size.
    */
   backTo: '/settings' | null
 }

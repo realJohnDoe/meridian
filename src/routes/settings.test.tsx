@@ -27,6 +27,13 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 
 vi.mock('@/store', () => ({ useStore: (selector: (s: { vaults: never[] }) => unknown) => selector({ vaults: [] }) }))
 
+// The docked nav rail (settings.tsx now renders AppSidebar, see CLAUDE.md's
+// "same responsive rules as the calendar views") is irrelevant to the back
+// button behavior this file tests, and dragging in its real @/store and
+// @/calendar dependencies just to satisfy it would be — stub it out the same
+// way _app.test.tsx does.
+vi.mock('./-appSidebar', () => ({ default: () => null }))
+
 const { Route } = await import('./settings')
 const SettingsLayout = (Route as unknown as { component: () => React.ReactElement }).component
 
