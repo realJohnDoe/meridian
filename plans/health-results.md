@@ -26,10 +26,9 @@ second consumer or a documented cycle-breaking reason (`persistencePort`,
 `autoSaveFlushPort`, `ViewChrome`, the four storage backends), and the
 meta-infrastructure is proportionate to the product it guards (1,256 lines of
 toolchain config against 39,056 lines of non-test source, ~3%). The theme is
-instead **intent that the toolchain doesn't hold up**: a `shadcn` alias
-pointing at a module that does not exist (#7); and a `CLAUDE.md` paragraph
-still warning about a gap that has since been closed (#8). Each is small on
-its own; together they are one pattern — decisions recorded but not wired to
+instead **intent that the toolchain doesn't hold up**: a `CLAUDE.md` paragraph
+still warning about a gap that has since been closed (#8). This is small on
+its own; it is one instance of a pattern — decisions recorded but not wired to
 anything that re-checks them.
 
 ---
@@ -157,8 +156,8 @@ non-test source lines were at least enumerated by directory and line count.
 | 4 | Security | **clean** |
 | 5 | Testing & Error Handling | **findings: #9** |
 | 6 | Code Health & DRY | **clean** |
-| 7 | Toolchain & Developer Feedback Loops | **findings: #7, #8** |
-| 8 | Dependencies & Library Fit | **findings: #7** (plus three keep-verdicts, below) |
+| 7 | Toolchain & Developer Feedback Loops | **findings: #8** |
+| 8 | Dependencies & Library Fit | **clean** (plus three keep-verdicts, below) |
 | 9 | Styling & UX | **partially assessed** |
 | 10 | Performance | **clean** |
 
@@ -201,16 +200,16 @@ no browser, no theme sweep, no keyboard walkthrough. That belongs to
 | Rank | # | Title | Category | Impact | Breadth | Recommended model | Score |
 |---|---|---|---|---|---|---|---|
 | 1 | **#9** | `startGitHubSignIn` is the one vault action that skips the catch-and-notify convention | `error-handling` | 3 | 4 | **Sonnet 5** | 6.0 |
-| 2 | **#7** | `components.json` `utils` alias points at a module that doesn't exist | `toolchain` `library-fit` | 2 | 1 | **Haiku 4.5** | 2.0 |
-| 3 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
+| 2 | **#8** | `CLAUDE.md`'s "Route shells" warning describes a gap that is now closed | `toolchain` | 2 | 1 | **Haiku 4.5** | 2.0 |
 
 **Sequencing note.** No sequencing is needed among what's left — #2, #3, #4,
-#5 and #6 have already landed, each in its own file (`worker/tsconfig.json`,
+#5, #6 and #7 have already landed, each in its own file (`worker/tsconfig.json`,
 the 20 `strict-type-checked` rules enabled in `eslint.config.js`,
-`vitest.config.ts`'s `thresholds`, the `/ical` Worker endpoint, and
-`vitest.config.ts`'s `thresholds` respectively — #4 and #6 both touch the
-thresholds block, at different entries) with nothing left to coordinate. #7,
-#8 and #9 are independent of everything else and of each other.
+`vitest.config.ts`'s `thresholds`, the `/ical` Worker endpoint,
+`vitest.config.ts`'s `thresholds` respectively, and `components.json`'s
+`utils` alias — #4 and #6 both touch the thresholds block, at different
+entries) with nothing left to coordinate. #8 and #9 are independent of
+everything else and of each other.
 
 ---
 
@@ -266,46 +265,6 @@ thresholds block, at different entries) with nothing left to coordinate. #7,
   `.catch(() => 0)`; `handleNext`/`handleAddFeed` reach `add*Vault`, which catch
   internally. `startGitHubSignIn` is genuinely the only gap — do not widen the
   change.
----
-
-### #7 — `components.json`'s `utils` alias points at a module that does not exist
-
-- **Category:** `toolchain` `library-fit`
-- **Impact:** 2
-- **Breadth:** 1 file; affects every future `shadcn add` and every `shadcn diff`.
-  Established by `ls src/lib/utils.*` (no such file) and by checking what the 9
-  registry components actually import.
-- **Recommended model:** **Haiku 4.5**
-- **Evidence:**
-  - `components.json:17` — `    "utils": "@/lib/utils",`
-  - `ls src/lib/utils.*` → `No such file or directory`
-  - All 9 `src/components/ui/*.tsx` files that need it import
-    `import { cn } from '@/lib/cn'` (9/9, no exceptions)
-- **Problem:** The shadcn CLI resolves `aliases.utils` when it writes a component,
-  so the next `shadcn add` will emit `import { cn } from "@/lib/utils"` and fail
-  to build — and `shadcn diff`, which `CLAUDE.md` names as the reason
-  `components/ui/` must stay a faithful mirror, currently reports a spurious
-  difference on the import line of all nine files, which is exactly the noise that
-  trains a reader to stop trusting it.
-- **Fix:** Change `components.json:17` to `"utils": "@/lib/cn"`. Afterwards
-  `shadcn diff` should show no import-line differences.
-
-**Task context**
-
-- **The one-line change:** `"utils": "@/lib/utils"` → `"utils": "@/lib/cn"`.
-  Nothing else in `components.json` is wrong — `"tailwind.config": ""` is correct
-  for Tailwind v4, and `"lib": "@/lib"`, `"ui": "@/components/ui"` and
-  `"hooks": "@/hooks"` all resolve.
-- **What stays.** Do **not** create a `src/lib/utils.ts` re-export to satisfy the
-  stale alias. `@/lib/cn` is the established name (69 importers), it is what all
-  nine registry files already use, and adding a second path to the same helper
-  would be the worse fix.
-- **No source changes.** The nine registry files are already correct; only the
-  CLI's config is out of step with them.
-- **Why Haiku 4.5:** single known-value edit in a JSON file, no behaviour change,
-  and it cannot fail silently — the next `shadcn add` either emits the right
-  import or it doesn't.
-
 ---
 
 ### #8 — `CLAUDE.md`'s "Route shells" section warns about a gap that `layout-smoke.mjs` now closes
