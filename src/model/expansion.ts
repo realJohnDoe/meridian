@@ -694,7 +694,7 @@ function expandNode<M>(
     // re-appears alongside the moved occurrence on the next expansion.
     const lastDone = [...allTimes].reverse().find(e => e.done === true)
     const nextJsTime = lastDone
-      ? addInterval(lastDone.jsTime, String(repeat.interval || '1 day'))
+      ? addInterval(lastDone.jsTime, repeat.interval || '1 day')
       : null
 
     /** Date-only records match the whole day, timed ones the minute — cf. findOverridesAt. */

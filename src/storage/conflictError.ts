@@ -54,6 +54,7 @@ export function isTransientSyncError(e: unknown): boolean {
   if (e instanceof AuthSyncError || e instanceof ConflictError) return false
   // navigator.onLine === false means the browser explicitly reports offline.
   // undefined (e.g. in tests or SSR) means unknown — don't classify.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-boolean-literal-compare -- lib.dom types claim onLine is always a boolean, but Node's own global `navigator` (this file's tests run in the 'node' environment) has no onLine property at all, so it reads as undefined here — the explicit `=== false` is load-bearing to keep that case falling through as unknown rather than misread as offline.
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
   return classifyFailure(e).kind === 'transient'
 }

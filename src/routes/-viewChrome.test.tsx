@@ -70,9 +70,9 @@ const { useQuickNavOpen, toggleQuickNav, closeQuickNav, useCurrentDate } = await
 const TODAY = new Date(2026, 8, 15) // September 15 2026, matching the sibling _app tests
 
 /** The props of whatever element a `quickNav(monthNav)` call returned. */
-function panelProps<P>(node: ReactNode): P {
+function panelProps(node: ReactNode): unknown {
   if (!isValidElement(node)) throw new Error('quickNav did not return an element')
-  return node.props as P
+  return node.props
 }
 
 interface MiniMonthProps {
@@ -131,7 +131,7 @@ describe('useDayChrome', () => {
     dayPreview = '2026-10-04'
     const { result } = renderHook(() => useDayChrome())
 
-    const props = panelProps<MiniMonthProps>(result.current?.quickNav?.('strip'))
+    const props = (panelProps(result.current?.quickNav?.('strip')) as MiniMonthProps)
     expect(fmtISO(props.anchorMonth)).toBe('2026-10-04')
     expect(props.highlightDates.map(fmtISO)).toEqual(['2026-10-04'])
 
@@ -148,7 +148,7 @@ describe('useDayChrome', () => {
     act(() => { toggleQuickNav() })
     expect(result.current.open).toBe(true)
 
-    act(() => { panelProps<MiniMonthProps>(result.current.chrome?.quickNav?.('strip')).onSelectDay('2026-09-02') })
+    act(() => { (panelProps(result.current.chrome?.quickNav?.('strip')) as MiniMonthProps).onSelectDay('2026-09-02') })
     expect(navigateSpy).toHaveBeenCalledWith({ to: '/day/$date', params: { date: '2026-09-02' } })
     expect(result.current.open).toBe(false)
   })
@@ -156,7 +156,7 @@ describe('useDayChrome', () => {
   it('quick-nav: browsing months pages with replace, and previews without navigating at all', () => {
     matches = { '/_app/day/$date': { params: { date: '2026-09-20' } } }
     const { result } = renderHook(() => useDayChrome())
-    const props = panelProps<MiniMonthProps>(result.current?.quickNav?.('strip'))
+    const props = (panelProps(result.current?.quickNav?.('strip')) as MiniMonthProps)
 
     props.onBrowseMonth(new Date(2026, 10, 1))
     expect(navigateSpy).toHaveBeenCalledWith({ to: '/day/$date', params: { date: '2026-11-01' }, replace: true })
@@ -180,7 +180,7 @@ describe('useWeekChrome', () => {
     matches = { '/_app/week/$date': { params: { date: '2026-09-14' } } }
     const { result } = renderHook(() => ({ chrome: useWeekChrome(), current: useCurrentDate() }))
 
-    act(() => { panelProps<MiniMonthProps>(result.current.chrome?.quickNav?.('strip')).onSelectDay('2026-09-02') })
+    act(() => { (panelProps(result.current.chrome?.quickNav?.('strip')) as MiniMonthProps).onSelectDay('2026-09-02') })
     // Without the setCurrentDate first, WeekPage's own effect would run the
     // target through setCurrentWeekKeepingWeekday and land the previously
     // selected weekday instead of the day actually picked.
@@ -196,7 +196,7 @@ describe('useWeekChrome', () => {
     // November 1 2026 is a Sunday, so under a Monday-start locale the raw 1st
     // would round *backward* into October and desync the topbar label from
     // the month just tapped — see onBrowseMonth's own comment.
-    panelProps<MiniMonthProps>(result.current?.quickNav?.('strip')).onBrowseMonth(new Date(2026, 10, 1))
+    ;(panelProps(result.current?.quickNav?.('strip')) as MiniMonthProps).onBrowseMonth(new Date(2026, 10, 1))
 
     const call = navigateSpy.mock.calls.at(-1)?.[0] as { params: { date: string } }
     const landed = parseDateString(call.params.date)
@@ -215,7 +215,7 @@ describe('useMonthChrome', () => {
     matches = { '/_app/calendar/$month': { params: { month: '2026-09' } } }
     const { result } = renderHook(() => useMonthChrome())
 
-    const props = panelProps<MonthStripProps>(result.current?.quickNav?.('strip'))
+    const props = (panelProps(result.current?.quickNav?.('strip')) as MonthStripProps)
     expect(props.activeMonth.getMonth()).toBe(8)
     props.onNavigateMonth(new Date(2026, 11, 1))
     expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$month', params: { month: '2026-12' }, replace: true })
@@ -228,7 +228,7 @@ describe('useAgendaChrome', () => {
     act(() => { toggleQuickNav() })
     expect(result.current.open).toBe(true)
 
-    act(() => { panelProps<MiniMonthProps>(result.current.chrome.quickNav?.('strip')).onSelectDay('2026-11-03') })
+    act(() => { (panelProps(result.current.chrome.quickNav?.('strip')) as MiniMonthProps).onSelectDay('2026-11-03') })
     expect(scrollCalls).toEqual(['2026-11-03'])
     expect(navigateSpy).not.toHaveBeenCalled()
     expect(result.current.open).toBe(false)
@@ -236,7 +236,7 @@ describe('useAgendaChrome', () => {
 
   it('quick-nav: browsing scrolls on commit and offers no preview hook at all', () => {
     const { result } = renderHook(() => useAgendaChrome())
-    const props = panelProps<MiniMonthProps>(result.current.quickNav?.('strip'))
+    const props = (panelProps(result.current.quickNav?.('strip')) as MiniMonthProps)
 
     // Deliberate asymmetry with day/week: requestScrollToDate re-renders the
     // agenda's whole row list, so firing it on preview *and* commit doubles

@@ -170,23 +170,11 @@ export default [
 
       // strict-type-checked adds 25 rules beyond recommended-type-checked (25,
       // not the 27 this comment used to claim — recount with the snippet at the
-      // foot of this block after any typescript-eslint bump). Three are enabled
-      // here; two more were dry-run and rejected as noise for this codebase's
-      // idioms: no-non-null-assertion and no-confusing-void-expression.
+      // foot of this block after any typescript-eslint bump). All 25 are now
+      // assessed: 23 enabled (3 here, 20 more below), 2 rejected as noise for
+      // this codebase's idioms — no-non-null-assertion and
+      // no-confusing-void-expression.
       //
-      // That leaves 20 that were neither enabled nor rejected — the comment
-      // read as a completed evaluation when 20 rules had never been assessed at
-      // all. Dry-run over src/ + worker/src on 2026-09-06: **11 findings across
-      // 7 rules**, and 13 of the 20 clean.
-      //
-      //   2  no-dynamic-delete            1  no-unnecessary-type-conversion
-      //   2  no-unnecessary-type-arguments 1  no-unnecessary-type-parameters
-      //   2  no-unnecessary-boolean-literal-compare
-      //   2  return-await                 1  no-misused-spread
-      //
-      // Not enabled yet only because fixing 11 real findings is its own change,
-      // not because the tier was judged noise. Reproduce with:
-      //   pnpm exec eslint src worker/src --config <cfg adding those 20> -f json
       // Recount what the tier adds:
       //   node --input-type=module -e "import p from '@typescript-eslint/eslint-plugin';
       //   const f=n=>Object.assign({},...p.configs[n].filter(b=>b.rules).map(b=>b.rules));
@@ -201,6 +189,31 @@ export default [
       ],
       '@typescript-eslint/no-deprecated': 'error',
       '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
+
+      // The remaining 20 strict-type-checked rules, evaluated 2026-09-06: a
+      // dry-run over src/ + worker/src found 11 findings across 7 rules (fixed
+      // in the same change that enabled these), 13 of the 20 already clean.
+      // None needed non-default options, so they're a flat block.
+      '@typescript-eslint/no-dynamic-delete': 'error',
+      '@typescript-eslint/no-extraneous-class': 'error',
+      '@typescript-eslint/no-invalid-void-type': 'error',
+      '@typescript-eslint/no-meaningless-void-operator': 'error',
+      '@typescript-eslint/no-misused-spread': 'error',
+      '@typescript-eslint/no-mixed-enums': 'error',
+      '@typescript-eslint/no-non-null-asserted-nullish-coalescing': 'error',
+      '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'error',
+      '@typescript-eslint/no-unnecessary-template-expression': 'error',
+      '@typescript-eslint/no-unnecessary-type-arguments': 'error',
+      '@typescript-eslint/no-unnecessary-type-conversion': 'error',
+      '@typescript-eslint/no-unnecessary-type-parameters': 'error',
+      '@typescript-eslint/no-useless-constructor': 'error',
+      '@typescript-eslint/no-useless-default-assignment': 'error',
+      '@typescript-eslint/prefer-literal-enum-member': 'error',
+      '@typescript-eslint/prefer-reduce-type-parameter': 'error',
+      '@typescript-eslint/prefer-return-this-type': 'error',
+      '@typescript-eslint/related-getter-setter-pairs': 'error',
+      '@typescript-eslint/return-await': 'error',
+      '@typescript-eslint/unified-signatures': 'error',
 
       // Enforce `import type` for type-only imports (auto-fixable)
       '@typescript-eslint/consistent-type-imports': [
@@ -298,13 +311,33 @@ export default [
     rules: {
       ...tsRecommendedTypeCheckedRules,
       // See the matching src/ block above for which strict-type-checked rules
-      // are enabled, which were rejected, and which 20 are still unassessed.
+      // are enabled and which were rejected.
       '@typescript-eslint/no-unnecessary-condition': [
         'error',
         { allowConstantLoopConditions: true },
       ],
       '@typescript-eslint/no-deprecated': 'error',
       '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
+      '@typescript-eslint/no-dynamic-delete': 'error',
+      '@typescript-eslint/no-extraneous-class': 'error',
+      '@typescript-eslint/no-invalid-void-type': 'error',
+      '@typescript-eslint/no-meaningless-void-operator': 'error',
+      '@typescript-eslint/no-misused-spread': 'error',
+      '@typescript-eslint/no-mixed-enums': 'error',
+      '@typescript-eslint/no-non-null-asserted-nullish-coalescing': 'error',
+      '@typescript-eslint/no-unnecessary-boolean-literal-compare': 'error',
+      '@typescript-eslint/no-unnecessary-template-expression': 'error',
+      '@typescript-eslint/no-unnecessary-type-arguments': 'error',
+      '@typescript-eslint/no-unnecessary-type-conversion': 'error',
+      '@typescript-eslint/no-unnecessary-type-parameters': 'error',
+      '@typescript-eslint/no-useless-constructor': 'error',
+      '@typescript-eslint/no-useless-default-assignment': 'error',
+      '@typescript-eslint/prefer-literal-enum-member': 'error',
+      '@typescript-eslint/prefer-reduce-type-parameter': 'error',
+      '@typescript-eslint/prefer-return-this-type': 'error',
+      '@typescript-eslint/related-getter-setter-pairs': 'error',
+      '@typescript-eslint/return-await': 'error',
+      '@typescript-eslint/unified-signatures': 'error',
       '@typescript-eslint/consistent-type-imports': [
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
