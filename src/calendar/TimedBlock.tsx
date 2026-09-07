@@ -4,7 +4,8 @@ import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import type { Occurrence } from '@/types'
 import { useOccPainter } from '@/hooks'
-import { dvBlockVariants, isDimmedTone, occRadius } from '@/components/primitives/occurrence-variants'
+import { dvBlockVariants, occRadius } from '@/components/primitives/occurrence-variants'
+import { isDimmed } from './occSort'
 import { HP, TOP_PAD, blockGeometry } from './timelineGeometry'
 
 // Badges take a second row, so they only render on blocks with an hour of
@@ -40,10 +41,10 @@ interface TimedBlockProps {
    * rather than clipping. Unset (truncate) for the day view's wider blocks. */
   compact?: boolean
 }
-// painter.tone(o) intentionally keeps occState's default (true wall clock),
-// not a pane-frozen clockValue a caller might have on hand — see DayPane's
-// AllDayItem for the fuller rationale (painting doesn't need the same
-// non-live-clock fallback sortOccs relies on).
+// painter.hue(o)/isDimmed(o) intentionally keep occState's default (true wall
+// clock), not a pane-frozen clockValue a caller might have on hand — see
+// DayPane's AllDayItem for the fuller rationale (painting doesn't need the
+// same non-live-clock fallback sortOccs relies on).
 export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact }: TimedBlockProps) {
   const h   = (o.metadata.jsTime?.getHours() ?? 0) + (o.metadata.jsTime?.getMinutes() ?? 0) / 60
   const top = h * HP + TOP_PAD + 1
@@ -64,8 +65,11 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
   // coloring by type, the priority while coloring by vault (see OccPainter).
   const painter = useOccPainter()
   const chip = painter.chip(o)
-  const tone = painter.tone(o)
-  const dimmed = isDimmedTone(tone)
+  // hue (not tone) so a done/past block keeps its own colour, dimmed rather
+  // than lost — see dvBlockVariants' doc comment. isDimmed is called with no
+  // `now` arg, matching the wall-clock default noted above.
+  const hue = painter.hue(o)
+  const dimmed = isDimmed(o)
 
   const showBadges = dh >= EVENT_BADGE_MIN_HOURS
   const badgeWidthGate = durationLabel ? BADGE_WIDTH_GATE : TIME_ONLY_WIDTH_GATE
@@ -74,7 +78,7 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
   return (
     <SurfaceButton
       className={cn(
-        dvBlockVariants({ tone }),
+        dvBlockVariants({ hue, dimmed }),
         // gap-1 both matches the title/meta spacing OccurrenceCard uses and
         // overrides the gap-2 Button's base classes apply — in this flex-col
         // that gap lands between the title and the badge row, and its 8px is
@@ -94,24 +98,19 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
       onClick={() => onOpen(o)}
       aria-label={ariaLabel}
     >
-      {/* Split from the block's own background per dvBlockVariants' doc
-          comment: only this content dims, so it doesn't compound with the
-          tone's own --done-overlay background into near-invisibility. */}
-      <div className={cn('flex flex-col gap-1 w-full', dimmed && 'opacity-60')}>
-        <div className={cn(
-          'w-full shrink-0 font-semibold overflow-hidden',
-          compact ? 'whitespace-normal break-words line-clamp-2' : 'text-ellipsis whitespace-nowrap',
-        )}>
-          {o.metadata.title}
-        </div>
-        {showBadges && (
-          <div className={cn('flex flex-wrap gap-1', badgeWidthGate)}>
-            {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
-            {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
-            {chip && <span className={eventPillCls}>{chip.label}</span>}
-          </div>
-        )}
+      <div className={cn(
+        'w-full shrink-0 font-semibold overflow-hidden',
+        compact ? 'whitespace-normal break-words line-clamp-2' : 'text-ellipsis whitespace-nowrap',
+      )}>
+        {o.metadata.title}
       </div>
+      {showBadges && (
+        <div className={cn('flex flex-wrap gap-1', badgeWidthGate)}>
+          {timeLabel && <span className={eventPillCls}>{timeLabel}</span>}
+          {durationLabel && <span className={eventPillCls}>{durationLabel}</span>}
+          {chip && <span className={eventPillCls}>{chip.label}</span>}
+        </div>
+      )}
     </SurfaceButton>
   )
 }

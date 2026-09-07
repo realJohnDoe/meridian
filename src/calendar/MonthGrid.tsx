@@ -6,7 +6,7 @@ import type { Occurrence } from '@/types'
 
 import { parseDurationDays, parseMonth, dayRange } from '@/model'
 import { sameDay } from '@/format'
-import { sortOccs } from './occSort'
+import { sortOccs, isDimmed } from './occSort'
 import { computeMultidayLanes, compactRowLanes, visibleLaneCount } from './computeMultidayLanes'
 import { maxVisibleFor, ROW_GAP } from './snapCarousel'
 import { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS } from './timelineGeometry'
@@ -81,7 +81,8 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
         {dayOccs.slice(0, shown).map(o => (
           <OccurrencePill
             key={`${o.entryKey}-${o.date}`}
-            tone={painter.tone(o)}
+            hue={painter.hue(o)}
+            dimmed={isDimmed(o)}
             title={o.metadata.title}
             className="px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs w-full"
           />
@@ -258,20 +259,24 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                 className="absolute inset-x-0 pointer-events-none grid grid-cols-7 gap-0.5"
                 style={{ top: barTop, gridAutoRows: rowH || undefined }}
               >
-                {shownBars.map(b => (
-                  <OccurrencePill
-                    key={b.occ.id}
-                    style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
-                    tone={painter.tone({ ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } })}
-                    title={b.occ.metadata.title}
-                    continuesLeft={b.continuesLeft}
-                    continuesRight={b.continuesRight}
-                    chevronHiddenOnMobile
-                    // mx-0.5 mirrors the day cell's 2px horizontal padding so a
-                    // single-column bar aligns exactly with a single-day occurrence row.
-                    className="mx-0.5 px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs"
-                  />
-                ))}
+                {shownBars.map(b => {
+                  const dayEndOcc = { ...b.occ, metadata: { ...b.occ.metadata, jsTime: b.endD } }
+                  return (
+                    <OccurrencePill
+                      key={b.occ.id}
+                      style={{ gridColumn: `${b.startCol + 1} / span ${b.endCol - b.startCol + 1}`, gridRow: b.lane + 1 }}
+                      hue={painter.hue(dayEndOcc)}
+                      dimmed={isDimmed(dayEndOcc)}
+                      title={b.occ.metadata.title}
+                      continuesLeft={b.continuesLeft}
+                      continuesRight={b.continuesRight}
+                      chevronHiddenOnMobile
+                      // mx-0.5 mirrors the day cell's 2px horizontal padding so a
+                      // single-column bar aligns exactly with a single-day occurrence row.
+                      className="mx-0.5 px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs"
+                    />
+                  )
+                })}
               </div>
             )}
           </div>
