@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import type { Occurrence } from '@/types'
-import type { AgendaRow } from './agendaSections'
+import type { AgendaRow, ExtraMetaProbe } from './agendaSections'
 import { calendarView, resetCalendarViewState } from './viewState'
 import { computeAgendaScrollRestore, findAnchorIndex, offsetOfRow } from './computeAgendaScrollRestore'
 import { testKey, TEST_VAULT } from '@/test-utils'
@@ -55,6 +55,9 @@ function agenda(): { rows: AgendaRow[]; goToRowIndex: number } {
   return { rows, goToRowIndex: 2 }
 }
 
+/** No chip, no backlinks — see agendaSections' ExtraMetaProbe. */
+const noExtra: ExtraMetaProbe = () => false
+
 beforeEach(() => {
   resetCalendarViewState()
 })
@@ -68,7 +71,8 @@ beforeEach(() => {
 describe('offsetOfRow', () => {
   it('sums estimated row sizes above the target when nothing is measured yet', () => {
     const { rows, goToRowIndex } = agenda()
-    expect(offsetOfRow(rows, goToRowIndex, [])).toBe(104)
+    // WEEK_H (36) + a badged, timed occurrence row (ROW_H_META 68 + DAY_GAP_H 12).
+    expect(offsetOfRow(rows, goToRowIndex, [], noExtra)).toBe(116)
   })
 
   it('prefers a measured size over the estimate, matched by row key', () => {
@@ -77,13 +81,13 @@ describe('offsetOfRow', () => {
       { index: 0, start: 0, end: 30, size: 30, key: rows[0]!.key, lane: 0 },
       { index: 1, start: 30, end: 85, size: 55, key: rows[1]!.key, lane: 0 },
     ]
-    expect(offsetOfRow(rows, goToRowIndex, snapshot)).toBe(85)
+    expect(offsetOfRow(rows, goToRowIndex, snapshot, noExtra)).toBe(85)
   })
 
   it('is 0 for the first row or an out-of-range index', () => {
     const { rows } = agenda()
-    expect(offsetOfRow(rows, 0, [])).toBe(0)
-    expect(offsetOfRow(rows, -1, [])).toBe(0)
+    expect(offsetOfRow(rows, 0, [], noExtra)).toBe(0)
+    expect(offsetOfRow(rows, -1, [], noExtra)).toBe(0)
   })
 })
 
@@ -92,12 +96,12 @@ describe('computeAgendaScrollRestore', () => {
     const { rows, goToRowIndex } = agenda()
     expect(goToRowIndex).toBe(2)
 
-    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex, noExtra))
 
     // The week divider (36) plus one timed occurrence row (68) above the
     // overdue header. Starting anywhere else means the first painted frame
     // shows the wrong day and has to be corrected by a visible scroll.
-    expect(result.current.initialOffset).toBe(104)
+    expect(result.current.initialOffset).toBe(116)
   })
 
   it('prefers real measured sizes from the snapshot, matched by row key', () => {
@@ -109,7 +113,7 @@ describe('computeAgendaScrollRestore', () => {
       ],
     })
 
-    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex, noExtra))
 
     expect(result.current.initialOffset).toBe(85)
   })
@@ -122,9 +126,9 @@ describe('computeAgendaScrollRestore', () => {
       ],
     })
 
-    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex, noExtra))
 
-    expect(result.current.initialOffset).toBe(30 + 68)
+    expect(result.current.initialOffset).toBe(30 + 80)
   })
 
   // The cold-start regression this whole seeding mechanism exists for: on a
@@ -138,8 +142,8 @@ describe('computeAgendaScrollRestore', () => {
 
     expect(pending).toBe(true)
 
-    const { result } = renderHook(() => computeAgendaScrollRestore(pending, rows, goToRowIndex))
-    expect(result.current.initialOffset).toBe(104)
+    const { result } = renderHook(() => computeAgendaScrollRestore(pending, rows, goToRowIndex, noExtra))
+    expect(result.current.initialOffset).toBe(116)
     expect(result.current.initialOffset).not.toBe(calendarView.getState().agendaScrollOffset)
   })
 
@@ -147,7 +151,7 @@ describe('computeAgendaScrollRestore', () => {
     const { rows, goToRowIndex } = agenda()
     calendarView.setState({ agendaScrollOffset: 1234 })
 
-    const { result } = renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex, noExtra))
 
     expect(result.current.initialOffset).toBe(1234)
   })
@@ -165,7 +169,7 @@ describe('computeAgendaScrollRestore', () => {
       ],
     })
 
-    const { result } = renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex))
+    const { result } = renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex, noExtra))
 
     expect(result.current.initialOffset).toBe(85)
   })
@@ -173,8 +177,8 @@ describe('computeAgendaScrollRestore', () => {
   it('starts at the top when the target is the first row or missing', () => {
     const { rows } = agenda()
 
-    expect(renderHook(() => computeAgendaScrollRestore(true, rows, 0)).result.current.initialOffset).toBe(0)
-    expect(renderHook(() => computeAgendaScrollRestore(true, rows, -1)).result.current.initialOffset).toBe(0)
+    expect(renderHook(() => computeAgendaScrollRestore(true, rows, 0, noExtra)).result.current.initialOffset).toBe(0)
+    expect(renderHook(() => computeAgendaScrollRestore(true, rows, -1, noExtra)).result.current.initialOffset).toBe(0)
   })
 
   it('always passes the measurement snapshot through, seeded or restored', () => {
@@ -182,8 +186,8 @@ describe('computeAgendaScrollRestore', () => {
     const snapshot = [{ index: 0, start: 0, end: 30, size: 30, key: rows[0]!.key, lane: 0 }]
     calendarView.setState({ agendaScrollMeasurements: snapshot })
 
-    expect(renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex)).result.current.initialMeasurementsCache).toBe(snapshot)
-    expect(renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex)).result.current.initialMeasurementsCache).toBe(snapshot)
+    expect(renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex, noExtra)).result.current.initialMeasurementsCache).toBe(snapshot)
+    expect(renderHook(() => computeAgendaScrollRestore(false, rows, goToRowIndex, noExtra)).result.current.initialMeasurementsCache).toBe(snapshot)
   })
 })
 

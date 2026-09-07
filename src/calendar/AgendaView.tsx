@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Occurrence, EditScope } from '@/types'
 
 import { parseDateString } from '@/model'
+import { useStore } from '@/store'
 import { toggleOccDone, beginSwipeDelete } from '@/occurrenceActions'
 import { VirtualRows } from '@/components/primitives/virtual-rows'
 import AgendaHeaderRow from './AgendaHeaderRow'
@@ -12,10 +13,10 @@ import AgendaRow from './AgendaRow'
 import AgendaOverdueGroupRow from './AgendaOverdueGroupRow'
 import AgendaLoadEarlierRow from './AgendaLoadEarlierRow'
 import { computeAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll } from './computeAgendaScrollRestore'
-import { useAgendaSections, estimateRow } from './useAgendaSections'
+import { useAgendaSections, estimateRow, type ExtraMetaProbe } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useScrollabilityWarning } from './agendaScrollability'
-import { useToday } from '@/hooks'
+import { useToday, useOccPainter } from '@/hooks'
 import { useNow } from './useNow'
 import { minLoadableChunk, maxLoadableChunk } from './agendaChunks'
 import { useCalendarWeekStartsOn } from './calendarLocale'
@@ -94,7 +95,20 @@ export default function AgendaView({ onOpen }: Props) {
   // the first painted frame is already in the right place rather than at the
   // top of the list.
   const scRef = useRef<HTMLDivElement>(null)
-  const { initialOffset, initialMeasurementsCache } = computeAgendaScrollRestore(scrollTarget !== null, rows, goToRowIndex)
+
+  // The two things that decide whether a card carries a meta row — and so
+  // whether its row is ~50px or ~68px tall — which the row list itself can't
+  // carry: the painter's chip (a colorBy/vault-list preference) and the file's
+  // backlinks. See agendaSections' ExtraMetaProbe for why this is a probe
+  // rather than a field on the row, and estimateRow for what a miss costs.
+  const painter = useOccPainter()
+  const backlinks = useStore(s => s.backlinks)
+  const extraMeta = useCallback<ExtraMetaProbe>(
+    o => painter.hasChip(o) || (backlinks.get(o.entryKey)?.length ?? 0) > 0,
+    [painter, backlinks],
+  )
+
+  const { initialOffset, initialMeasurementsCache } = computeAgendaScrollRestore(scrollTarget !== null, rows, goToRowIndex, extraMeta)
 
   // Counts *rows*, not sections. Section-granular virtualization mounted every
   // row a section owned the moment it entered the viewport, and the overdue
@@ -106,7 +120,7 @@ export default function AgendaView({ onOpen }: Props) {
     count: rows.length,
     getScrollElement: () => scRef.current,
     // `count` is rows.length, so the virtualizer only ever asks for i in range.
-    estimateSize: i => estimateRow(rows[i]!),
+    estimateSize: i => estimateRow(rows[i]!, extraMeta),
     getItemKey: i => rows[i]!.key,
     overscan: 8,
     initialOffset,

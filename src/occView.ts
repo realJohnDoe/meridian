@@ -200,6 +200,15 @@ export interface OccPainter {
   hue: (o: Occurrence) => OccHue
   /** Vault chip or priority chip, per `colorBy`. */
   chip: (o: Occurrence) => OccChip | null
+  /**
+   * Whether `chip` would return one, without building it.
+   *
+   * The chip is one of the things that decides whether `OccurrenceCard`
+   * renders its meta row at all, so the agenda's row-height estimate has to
+   * ask — for every unmeasured row, every time the virtualizer recomputes its
+   * measurements. See `calendar/agendaSections.ts`'s `estimateRow`.
+   */
+  hasChip: (o: Occurrence) => boolean
 }
 
 export interface OccPainterOptions {
@@ -224,6 +233,20 @@ export function makeOccPainter(
   }
   const hue = colorBy === 'vault' ? vaultHue : typeHue
 
+  // Which chip an occurrence gets, decided without building one. Split out of
+  // `chip` below so `hasChip` can answer from the same rules rather than a
+  // second copy of them: the agenda's row-height estimate asks the question
+  // for every not-yet-measured row on every measurement pass, where allocating
+  // a chip object per ask is real cost — and a paraphrase of these rules is
+  // exactly the kind of drift that made that estimate wrong to begin with.
+  const chipKind = (o: Occurrence): OccChip['kind'] | null => {
+    if (colorBy === 'vault') {
+      return occKind(o) === 'task' && o.metadata.priority ? 'priority' : null
+    }
+    if (!multiVault) return null
+    return byId.has(o.metadata.vaultId) ? 'vault' : null
+  }
+
   return {
     hue,
     tone: (o, now) => {
@@ -233,14 +256,17 @@ export function makeOccPainter(
       return hue(o)
     },
     chip: (o) => {
-      if (colorBy === 'vault') {
-        const p = occKind(o) === 'task' ? o.metadata.priority : undefined
-        return p ? { kind: 'priority', label: PRIORITY_LABELS[p], hue: PRIORITY_HUE[p] } : null
+      const kind = chipKind(o)
+      if (kind === null) return null
+      if (kind === 'priority') {
+        // Non-null: chipKind answers 'priority' only for a task carrying one.
+        const p = o.metadata.priority!
+        return { kind: 'priority', label: PRIORITY_LABELS[p], hue: PRIORITY_HUE[p] }
       }
-      if (!multiVault) return null
-      const v = byId.get(o.metadata.vaultId)
-      if (!v) return null
+      // Non-null: chipKind answers 'vault' only for an id byId holds.
+      const v = byId.get(o.metadata.vaultId)!
       return { kind: 'vault', label: v.name, hue: v.color ? VAULT_HUE[v.color] : undefined }
     },
+    hasChip: (o) => chipKind(o) !== null,
   }
 }
