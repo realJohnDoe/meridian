@@ -1,16 +1,16 @@
 {
  "title": "Meridian development iterations",
- "generated": "2026-07-29",
+ "generated": "2026-09-08",
  "source": {
   "prototype": "Claude conversation export \"Markdown-based note and task management system\" (429 pages, exported 2026-07-23)",
-  "repo": "git history of realJohnDoe/meridian, merged pull requests only"
+  "repo": "git history of realJohnDoe/meridian, merged pull requests only (through PR #998)"
  },
  "notes": [
   "Two eras. \"prototype-plaintext-os\" and \"prototype-meridian\" are artifact versions from the design conversation, before the git repository existed. \"repo\" rows are merged pull requests.",
   "Prototype ids are sequential per artifact update, because the transcript's own version labels are not a clean sequence: versions v1-v4 were unnumbered, v12, v34 and v43 each label two separate updates, and a few numbers (v20, v23, v27, v33) were planned but never presented. The label field preserves what the transcript actually showed.",
   "Prototype rows carry no date or diff metrics: the export has no per-message timestamps and no diffs.",
-  "Repo rows exclude 344 commits pushed straight to main (plan and health-survey updates) and 11 pull requests that were closed without merging.",
-  "Tags are one flat list per row, grouped by axis in tagVocabulary so they can still be faceted. Every row carries at least one kind tag. Most carry an area tag too, but 32 do not: documentation, plans, README and blog work has no area in the app, and inventing one would distort the counts."
+  "Repo rows exclude 347 commits pushed straight to main (plan and health-survey updates) and 13 pull requests that were closed without merging.",
+  "Tags are one flat list per row, grouped by axis in tagVocabulary so they can still be faceted. Every row carries at least one kind tag. Most carry an area tag too, but 88 do not: documentation, plans, README and blog work has no area in the app, and inventing one would distort the counts."
  ],
  "tagVocabulary": {
   "kind": {
@@ -50,43 +50,43 @@
   }
  },
  "tagCounts": {
-  "bugfix": 236,
-  "refactor": 162,
-  "calendar": 131,
-  "editor": 127,
-  "model": 104,
-  "feature": 100,
-  "layout": 92,
-  "storage": 87,
-  "build": 75,
-  "mobile": 70,
-  "architecture": 69,
-  "perf": 60,
-  "chore": 60,
-  "polish": 59,
-  "state": 58,
-  "rework": 49,
-  "colors": 43,
-  "docs": 40,
-  "navigation": 37,
-  "frontmatter": 36,
-  "animation": 36,
-  "sync": 35,
-  "test": 34,
-  "search": 27,
-  "error-handling": 26,
-  "wikilinks": 22,
-  "a11y": 22,
-  "security": 18,
-  "pwa": 11,
-  "revert": 8,
-  "onboarding": 5
+  "bugfix": 348,
+  "calendar": 225,
+  "refactor": 207,
+  "editor": 162,
+  "model": 150,
+  "layout": 149,
+  "storage": 144,
+  "feature": 140,
+  "polish": 117,
+  "build": 103,
+  "docs": 102,
+  "mobile": 100,
+  "architecture": 91,
+  "perf": 86,
+  "chore": 82,
+  "colors": 78,
+  "state": 69,
+  "navigation": 65,
+  "rework": 61,
+  "test": 54,
+  "sync": 52,
+  "frontmatter": 44,
+  "a11y": 43,
+  "animation": 42,
+  "search": 38,
+  "error-handling": 36,
+  "security": 30,
+  "wikilinks": 23,
+  "onboarding": 16,
+  "pwa": 15,
+  "revert": 10
  },
  "counts": {
   "prototypePlaintextOs": 3,
   "prototypeMeridian": 93,
-  "repoPullRequests": 604,
-  "total": 700
+  "repoPullRequests": 985,
+  "total": 1081
  },
  "iterations": [
   {
@@ -11251,6 +11251,6283 @@
    "filesChanged": 10,
    "insertions": 424,
    "deletions": 199
+  },
+  {
+   "era": "repo",
+   "id": 616,
+   "label": "PR #616",
+   "date": "2026-07-29",
+   "summary": "Force a CodeMirror remeasure once the web fonts have finished loading",
+   "tags": [
+    "bugfix",
+    "editor"
+   ],
+   "branch": "claude/cm6-font-swap-cursor-size",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 13,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 617,
+   "label": "PR #617",
+   "date": "2026-07-29",
+   "summary": "Add the iterations dataset and its explorer, and split the blog into numbered article directories",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/meridian-iterations-json-f9c3c0",
+   "commits": 3,
+   "filesChanged": 12,
+   "insertions": 13043,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 618,
+   "label": "PR #618",
+   "date": "2026-08-01",
+   "summary": "Make the time-picker wheels periodic, carrying the hour when the minutes wrap",
+   "tags": [
+    "feature",
+    "editor",
+    "mobile"
+   ],
+   "branch": "claude/periodic-time-picker-wheels-db6565",
+   "commits": 7,
+   "filesChanged": 2,
+   "insertions": 532,
+   "deletions": 84
+  },
+  {
+   "era": "repo",
+   "id": 619,
+   "label": "PR #619",
+   "date": "2026-07-29",
+   "summary": "Revert the ineffective font-loading cursor fix and clamp the empty-line caret for Firefox instead",
+   "tags": [
+    "revert",
+    "bugfix",
+    "editor"
+   ],
+   "branch": "claude/revert-ineffective-cursor-fix",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 151,
+   "deletions": 13
+  },
+  {
+   "era": "repo",
+   "id": 620,
+   "label": "PR #620",
+   "date": "2026-07-30",
+   "summary": "Refresh the participants indicator when a repeat pattern is edited",
+   "tags": [
+    "bugfix",
+    "model",
+    "state"
+   ],
+   "branch": "claude/repeat-participants-agenda-sync-d6e75a",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 79,
+   "deletions": 4
+  },
+  {
+   "era": "repo",
+   "id": 621,
+   "label": "PR #621",
+   "date": "2026-07-31",
+   "summary": "Add the data-integrity and durability survey results",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 731,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 622,
+   "label": "PR #622",
+   "date": "2026-07-31",
+   "summary": "Fold an architectural root-cause analysis into the integrity survey",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 3,
+   "filesChanged": 1,
+   "insertions": 881,
+   "deletions": 714
+  },
+  {
+   "era": "repo",
+   "id": 623,
+   "label": "PR #623",
+   "date": "2026-07-31",
+   "summary": "Fix the oversized empty-line caret on Firefox",
+   "tags": [
+    "bugfix",
+    "editor"
+   ],
+   "branch": "claude/firefox-empty-line-caret-height",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 185,
+   "deletions": 151
+  },
+  {
+   "era": "repo",
+   "id": 624,
+   "label": "PR #624",
+   "date": "2026-07-31",
+   "summary": "Pin the round-trip totality invariant as a failing-test ratchet",
+   "tags": [
+    "test",
+    "model"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 122,
+   "deletions": 8
+  },
+  {
+   "era": "repo",
+   "id": 625,
+   "label": "PR #625",
+   "date": "2026-08-01",
+   "summary": "Stop excluding an occurrence from discarding the metadata it carried",
+   "tags": [
+    "bugfix",
+    "model"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 90,
+   "deletions": 32
+  },
+  {
+   "era": "repo",
+   "id": 626,
+   "label": "PR #626",
+   "date": "2026-08-01",
+   "summary": "Make sync collision resolution a total decision table instead of a chain of guards",
+   "tags": [
+    "bugfix",
+    "sync",
+    "storage"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 284,
+   "deletions": 56
+  },
+  {
+   "era": "repo",
+   "id": 627,
+   "label": "PR #627",
+   "date": "2026-08-01",
+   "summary": "Let an \"all events\" edit reach occurrences that carry their own overrides",
+   "tags": [
+    "bugfix",
+    "model"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 122,
+   "deletions": 11
+  },
+  {
+   "era": "repo",
+   "id": 628,
+   "label": "PR #628",
+   "date": "2026-08-01",
+   "summary": "Preserve frontmatter written on a node that has no item of its own",
+   "tags": [
+    "bugfix",
+    "model",
+    "frontmatter"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 234,
+   "deletions": 35
+  },
+  {
+   "era": "repo",
+   "id": 629,
+   "label": "PR #629",
+   "date": "2026-08-01",
+   "summary": "Preserve each file's own line-ending and trailing-whitespace convention",
+   "tags": [
+    "bugfix",
+    "frontmatter",
+    "model"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 2,
+   "filesChanged": 12,
+   "insertions": 220,
+   "deletions": 70
+  },
+  {
+   "era": "repo",
+   "id": 630,
+   "label": "PR #630",
+   "date": "2026-08-02",
+   "summary": "Make a cleared field expressible on disk with one relational emit rule",
+   "tags": [
+    "bugfix",
+    "model",
+    "frontmatter"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 268,
+   "deletions": 70
+  },
+  {
+   "era": "repo",
+   "id": 631,
+   "label": "PR #631",
+   "date": "2026-08-02",
+   "summary": "Make file deletion report its own blast radius instead of silently taking neighbours",
+   "tags": [
+    "bugfix",
+    "model",
+    "error-handling"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 157,
+   "deletions": 36
+  },
+  {
+   "era": "repo",
+   "id": 632,
+   "label": "PR #632",
+   "date": "2026-08-02",
+   "summary": "Ground the recurrence week on the series anchor rather than the viewer's locale",
+   "tags": [
+    "bugfix",
+    "model"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 9,
+   "insertions": 179,
+   "deletions": 66
+  },
+  {
+   "era": "repo",
+   "id": 633,
+   "label": "PR #633",
+   "date": "2026-08-03",
+   "summary": "Guard the YAML round-trip invariant at runtime, not only in tests",
+   "tags": [
+    "bugfix",
+    "model",
+    "storage",
+    "error-handling"
+   ],
+   "branch": "claude/data-integrity-durability-survey-57d9f7",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 195,
+   "deletions": 46
+  },
+  {
+   "era": "repo",
+   "id": 634,
+   "label": "PR #634",
+   "date": "2026-08-03",
+   "summary": "Add elevation shadows to cards and scroll shadows to the topbars",
+   "tags": [
+    "polish",
+    "colors",
+    "layout"
+   ],
+   "branch": "claude/ui-shadows-depth-b34a16",
+   "commits": 2,
+   "filesChanged": 5,
+   "insertions": 38,
+   "deletions": 32
+  },
+  {
+   "era": "repo",
+   "id": 635,
+   "label": "PR #635",
+   "date": "2026-08-03",
+   "summary": "Use light ink on the yellow priority chip in both Solarized themes",
+   "tags": [
+    "polish",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/solarized-light-yellow-text-a9f89e",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 8,
+   "deletions": 10
+  },
+  {
+   "era": "repo",
+   "id": 636,
+   "label": "PR #636",
+   "date": "2026-08-03",
+   "summary": "Restyle the search sheet's create row as a dashed add-item card",
+   "tags": [
+    "polish",
+    "search"
+   ],
+   "branch": "claude/add-item-button-design-reuse-f69ce4",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 11,
+   "deletions": 10
+  },
+  {
+   "era": "repo",
+   "id": 637,
+   "label": "PR #637",
+   "date": "2026-08-03",
+   "summary": "Snap the time wheel only once the finger is lifted",
+   "tags": [
+    "bugfix",
+    "editor",
+    "mobile"
+   ],
+   "branch": "claude/time-picker-snap-release-976ab1",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 64,
+   "deletions": 6
+  },
+  {
+   "era": "repo",
+   "id": 638,
+   "label": "PR #638",
+   "date": "2026-08-03",
+   "summary": "Drop the elevation shadow on done and past items and groove the type selector",
+   "tags": [
+    "polish",
+    "colors"
+   ],
+   "branch": "claude/ui-shadows-depth-b34a16",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 22,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 639,
+   "label": "PR #639",
+   "date": "2026-08-03",
+   "summary": "Raise the contrast of draft cards, their borders and the search placeholder",
+   "tags": [
+    "polish",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/draft-card-contrast-3c7ed5",
+   "commits": 3,
+   "filesChanged": 3,
+   "insertions": 4,
+   "deletions": 4
+  },
+  {
+   "era": "repo",
+   "id": 640,
+   "label": "PR #640",
+   "date": "2026-08-03",
+   "summary": "Make the card shadows visible on dark themes",
+   "tags": [
+    "polish",
+    "colors"
+   ],
+   "branch": "claude/ui-shadows-depth-b34a16",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 15,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 641,
+   "label": "PR #641",
+   "date": "2026-08-03",
+   "summary": "Stop the shared card shadow being overridden by the shadcn default",
+   "tags": [
+    "bugfix",
+    "colors"
+   ],
+   "branch": "claude/ui-shadows-depth-b34a16",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 7,
+   "deletions": 3
+  },
+  {
+   "era": "repo",
+   "id": 642,
+   "label": "PR #642",
+   "date": "2026-08-03",
+   "summary": "Override brace-expansion to a patched release for a ReDoS advisory",
+   "tags": [
+    "chore",
+    "security",
+    "build"
+   ],
+   "branch": "claude/security-vulnerability-f61320",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 14,
+   "deletions": 12
+  },
+  {
+   "era": "repo",
+   "id": 643,
+   "label": "PR #643",
+   "date": "2026-08-07",
+   "summary": "Track the finger with touch events rather than pointer events",
+   "tags": [
+    "bugfix",
+    "editor",
+    "mobile"
+   ],
+   "branch": "claude/time-picker-snap-release-976ab1",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 41,
+   "deletions": 16
+  },
+  {
+   "era": "repo",
+   "id": 644,
+   "label": "PR #644",
+   "date": "2026-08-07",
+   "summary": "Pin fast-uri and undici past two published advisories",
+   "tags": [
+    "chore",
+    "security",
+    "build"
+   ],
+   "branch": "claude/undici-fast-uri-vulns-705e31",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 25,
+   "deletions": 13
+  },
+  {
+   "era": "repo",
+   "id": 645,
+   "label": "PR #645",
+   "date": "2026-08-08",
+   "summary": "Seed the agenda virtualizer at today instead of scrolling there after paint",
+   "tags": [
+    "perf",
+    "calendar"
+   ],
+   "branch": "claude/agenda-scroll-to-today-seed",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 254,
+   "deletions": 21
+  },
+  {
+   "era": "repo",
+   "id": 646,
+   "label": "PR #646",
+   "date": "2026-08-08",
+   "summary": "Add the product-niche survey findings and drop the known-suspects list",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/meridian-niche-positioning-412441",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 246,
+   "deletions": 16
+  },
+  {
+   "era": "repo",
+   "id": 647,
+   "label": "PR #647",
+   "date": "2026-08-08",
+   "summary": "Plan the cold-start vault parse and the agenda's window",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/plan-cold-start-parse-and-agenda-window",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 244,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 648,
+   "label": "PR #648",
+   "date": "2026-08-08",
+   "summary": "Force nanoid past the indefinite-loop denial of service in custom generators",
+   "tags": [
+    "chore",
+    "security",
+    "build"
+   ],
+   "branch": "claude/nanoid-vulnerability-upgrade-4dd0d5",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 10,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 649,
+   "label": "PR #649",
+   "date": "2026-08-08",
+   "summary": "Add a simplicity and overengineering category to the health survey",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/health-survey-simplicity-21166f",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 33,
+   "deletions": 16
+  },
+  {
+   "era": "repo",
+   "id": 650,
+   "label": "PR #650",
+   "date": "2026-08-08",
+   "summary": "Shrink the occurrence pill's corner radius on large screens",
+   "tags": [
+    "polish",
+    "layout"
+   ],
+   "branch": "claude/corner-radius-month-day-views-7d1e94",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 651,
+   "label": "PR #651",
+   "date": "2026-08-08",
+   "summary": "Fix the topbar's spacing squeeze and give the date label responsive forms",
+   "tags": [
+    "bugfix",
+    "layout",
+    "navigation"
+   ],
+   "branch": "claude/top-bar-spacing-dates-db47ca",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 68,
+   "deletions": 19
+  },
+  {
+   "era": "repo",
+   "id": 652,
+   "label": "PR #652",
+   "date": "2026-08-08",
+   "summary": "Use the shared card shadow on the entry editor's metadata card",
+   "tags": [
+    "polish",
+    "colors",
+    "editor"
+   ],
+   "branch": "claude/metadata-card-shadow-f4puc8",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 653,
+   "label": "PR #653",
+   "date": "2026-08-08",
+   "summary": "Weight health-survey findings by where development is currently active",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/health-survey-simplicity-21166f",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 2,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 654,
+   "label": "PR #654",
+   "date": "2026-08-08",
+   "summary": "Keep the focused date when switching between agenda, month and day",
+   "tags": [
+    "feature",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/calendar-date-persistence-ab18f2",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 88,
+   "deletions": 17
+  },
+  {
+   "era": "repo",
+   "id": 655,
+   "label": "PR #655",
+   "date": "2026-08-08",
+   "summary": "Stop the items list snapping to the bottom instead of folding smoothly",
+   "tags": [
+    "bugfix",
+    "animation",
+    "editor"
+   ],
+   "branch": "claude/entryeditor-scroll-animation-sync-1cc0da",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 44,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 656,
+   "label": "PR #656",
+   "date": "2026-08-08",
+   "summary": "Fix the topbar's label collapse and hide its chevrons on narrow screens",
+   "tags": [
+    "bugfix",
+    "layout",
+    "mobile"
+   ],
+   "branch": "claude/top-bar-spacing-dates-db47ca",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 53,
+   "deletions": 18
+  },
+  {
+   "era": "repo",
+   "id": 657,
+   "label": "PR #657",
+   "date": "2026-08-08",
+   "summary": "Hold the fold open while measuring so the scroller cannot clamp it",
+   "tags": [
+    "bugfix",
+    "animation",
+    "layout"
+   ],
+   "branch": "claude/entryeditor-scroll-animation-sync-1cc0da",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 158,
+   "deletions": 36
+  },
+  {
+   "era": "repo",
+   "id": 658,
+   "label": "PR #658",
+   "date": "2026-08-08",
+   "summary": "Reposition the README and marketing copy around phone-first tasks and calendar",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/communication-findings-product-fit-iaxhll",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 80,
+   "deletions": 129
+  },
+  {
+   "era": "repo",
+   "id": 659,
+   "label": "PR #659",
+   "date": "2026-08-08",
+   "summary": "Re-centre the agenda's window when returning from a far month or day",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/calendar-date-persistence-ab18f2",
+   "commits": 1,
+   "filesChanged": 9,
+   "insertions": 252,
+   "deletions": 81
+  },
+  {
+   "era": "repo",
+   "id": 660,
+   "label": "PR #660",
+   "date": "2026-08-08",
+   "summary": "Seed a new entry from the search bar with the calendar's selected date",
+   "tags": [
+    "feature",
+    "calendar",
+    "search"
+   ],
+   "branch": "claude/calendar-entry-date-selection-7402pt",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 4,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 661,
+   "label": "PR #661",
+   "date": "2026-08-08",
+   "summary": "Remove the known-suspects section from the survey templates",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/remove-known-suspects-surveys-o95bl8",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 0,
+   "deletions": 24
+  },
+  {
+   "era": "repo",
+   "id": 662,
+   "label": "PR #662",
+   "date": "2026-08-09",
+   "summary": "Add the codebase health survey results",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/codebase-health-survey-ldpr9j",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 279,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 663,
+   "label": "PR #663",
+   "date": "2026-08-09",
+   "summary": "Ratchet the lint warning count and report unused eslint-disable directives",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/health-survey-finding-7-y63pr8",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 7,
+   "deletions": 26
+  },
+  {
+   "era": "repo",
+   "id": 664,
+   "label": "PR #664",
+   "date": "2026-08-09",
+   "summary": "Stop malformed YAML arrays, booleans and priorities escaping the parse quarantine",
+   "tags": [
+    "bugfix",
+    "frontmatter",
+    "model"
+   ],
+   "branch": "claude/fix-yaml-array-element-coercion",
+   "commits": 4,
+   "filesChanged": 5,
+   "insertions": 91,
+   "deletions": 83
+  },
+  {
+   "era": "repo",
+   "id": 665,
+   "label": "PR #665",
+   "date": "2026-08-09",
+   "summary": "Correct the local-folder support matrix and default the add-vault wizard to GitHub",
+   "tags": [
+    "bugfix",
+    "storage",
+    "onboarding"
+   ],
+   "branch": "claude/finding-1-niche-fit-8nlety",
+   "commits": 2,
+   "filesChanged": 7,
+   "insertions": 45,
+   "deletions": 37
+  },
+  {
+   "era": "repo",
+   "id": 666,
+   "label": "PR #666",
+   "date": "2026-08-09",
+   "summary": "Dedupe the new-entry seed type between the editor and the route",
+   "tags": [
+    "refactor",
+    "architecture",
+    "editor"
+   ],
+   "branch": "claude/health-survey-finding-8-2f214r",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 3,
+   "deletions": 24
+  },
+  {
+   "era": "repo",
+   "id": 667,
+   "label": "PR #667",
+   "date": "2026-08-09",
+   "summary": "Show every overlapping multiday event in the month view",
+   "tags": [
+    "bugfix",
+    "calendar"
+   ],
+   "branch": "claude/week-view-exploration-qwvoiw",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 96,
+   "deletions": 15
+  },
+  {
+   "era": "repo",
+   "id": 668,
+   "label": "PR #668",
+   "date": "2026-08-09",
+   "summary": "Extract the day view's timeline geometry ahead of the week view",
+   "tags": [
+    "refactor",
+    "calendar"
+   ],
+   "branch": "claude/week-view-exploration-qwvoiw",
+   "commits": 2,
+   "filesChanged": 6,
+   "insertions": 310,
+   "deletions": 164
+  },
+  {
+   "era": "repo",
+   "id": 669,
+   "label": "PR #669",
+   "date": "2026-08-09",
+   "summary": "Turn on the strict type-checked lint rules the codebase already satisfied",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/remove-health-survey-finding-5-ghj5mr",
+   "commits": 1,
+   "filesChanged": 32,
+   "insertions": 102,
+   "deletions": 112
+  },
+  {
+   "era": "repo",
+   "id": 670,
+   "label": "PR #670",
+   "date": "2026-08-09",
+   "summary": "Move the YAML field registry out of types.ts into a model-private registry",
+   "tags": [
+    "refactor",
+    "architecture",
+    "model"
+   ],
+   "branch": "claude/health-survey-finding-2-u1a0kq",
+   "commits": 3,
+   "filesChanged": 28,
+   "insertions": 370,
+   "deletions": 328
+  },
+  {
+   "era": "repo",
+   "id": 671,
+   "label": "PR #671",
+   "date": "2026-08-09",
+   "summary": "Add the week view",
+   "tags": [
+    "feature",
+    "calendar"
+   ],
+   "branch": "claude/week-view-exploration-qwvoiw",
+   "commits": 1,
+   "filesChanged": 15,
+   "insertions": 775,
+   "deletions": 34
+  },
+  {
+   "era": "repo",
+   "id": 672,
+   "label": "PR #672",
+   "date": "2026-08-09",
+   "summary": "Stop the search input's cursor jumping to the end when typing mid-string",
+   "tags": [
+    "bugfix",
+    "search",
+    "mobile"
+   ],
+   "branch": "claude/mobile-search-cursor-bug-4716ny",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 22,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 673,
+   "label": "PR #673",
+   "date": "2026-08-09",
+   "summary": "Remove the fixed field-registry finding from the health survey results",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/health-survey-finding-2-u1a0kq",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 4,
+   "deletions": 22
+  },
+  {
+   "era": "repo",
+   "id": 674,
+   "label": "PR #674",
+   "date": "2026-08-10",
+   "summary": "Clear the demo vault's manufactured backlog so a first run looks lived-in",
+   "tags": [
+    "feature",
+    "onboarding",
+    "calendar"
+   ],
+   "branch": "claude/product-niche-survey-findings-rj11gr",
+   "commits": 1,
+   "filesChanged": 11,
+   "insertions": 341,
+   "deletions": 75
+  },
+  {
+   "era": "repo",
+   "id": 675,
+   "label": "PR #675",
+   "date": "2026-08-10",
+   "summary": "Split the storage cache into per-concern modules",
+   "tags": [
+    "refactor",
+    "storage",
+    "architecture"
+   ],
+   "branch": "claude/remove-health-survey-finding-4-8ce8qp",
+   "commits": 1,
+   "filesChanged": 16,
+   "insertions": 299,
+   "deletions": 287
+  },
+  {
+   "era": "repo",
+   "id": 676,
+   "label": "PR #676",
+   "date": "2026-08-10",
+   "summary": "Align the week view's grid gaps with the month view",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/calendar-grid-spacing-xpczrq",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 22,
+   "deletions": 20
+  },
+  {
+   "era": "repo",
+   "id": 677,
+   "label": "PR #677",
+   "date": "2026-08-10",
+   "summary": "Use light ink on the purple, red and orange chips in the Meridian theme",
+   "tags": [
+    "polish",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/meridian-text-color-tints-1kwy84",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 8,
+   "deletions": 7
+  },
+  {
+   "era": "repo",
+   "id": 678,
+   "label": "PR #678",
+   "date": "2026-08-10",
+   "summary": "Make the week view's all-day strip collapsible like the day view's",
+   "tags": [
+    "feature",
+    "calendar"
+   ],
+   "branch": "claude/week-view-collapsible-all-day-8rubol",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 142,
+   "deletions": 55
+  },
+  {
+   "era": "repo",
+   "id": 679,
+   "label": "PR #679",
+   "date": "2026-08-10",
+   "summary": "Consolidate the calendar's corner radii onto one shared responsive token",
+   "tags": [
+    "refactor",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/consolidate-corner-radii-i2pt27",
+   "commits": 6,
+   "filesChanged": 20,
+   "insertions": 153,
+   "deletions": 119
+  },
+  {
+   "era": "repo",
+   "id": 680,
+   "label": "PR #680",
+   "date": "2026-08-10",
+   "summary": "Let week-view all-day pills reclaim the lanes a multiday bar leaves empty",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/multiday-lane-week-view-b5ldqp",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 25,
+   "deletions": 18
+  },
+  {
+   "era": "repo",
+   "id": 681,
+   "label": "PR #681",
+   "date": "2026-08-10",
+   "summary": "Show the week view's multiday chevrons on narrow viewports",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/multiday-chevrons-week-view-fh7nft",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 5,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 682,
+   "label": "PR #682",
+   "date": "2026-08-11",
+   "summary": "Show all-day overflow as a chevron with per-day counts, and add the week number",
+   "tags": [
+    "feature",
+    "calendar"
+   ],
+   "branch": "claude/week-day-view-chevrons-vqc77j",
+   "commits": 3,
+   "filesChanged": 5,
+   "insertions": 172,
+   "deletions": 72
+  },
+  {
+   "era": "repo",
+   "id": 683,
+   "label": "PR #683",
+   "date": "2026-08-11",
+   "summary": "Show continuation chevrons on one-column multiday bars too",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/multiday-chevrons-week-view-mobile-tnznvh",
+   "commits": 2,
+   "filesChanged": 6,
+   "insertions": 217,
+   "deletions": 75
+  },
+  {
+   "era": "repo",
+   "id": 684,
+   "label": "PR #684",
+   "date": "2026-08-11",
+   "summary": "Move the all-day expand chevron to the bottom of the day and week gutter",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/allday-expand-button-layout-luqlkw",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 37,
+   "deletions": 25
+  },
+  {
+   "era": "repo",
+   "id": 685,
+   "label": "PR #685",
+   "date": "2026-08-11",
+   "summary": "Align the chevron cell with the last all-day row rather than the raw edge",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/allday-expand-button-layout-luqlkw",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 2,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 686,
+   "label": "PR #686",
+   "date": "2026-08-11",
+   "summary": "Fill the overflow label's cell instead of leaving a gap when expanded",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/allday-expand-button-layout-luqlkw",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 27,
+   "deletions": 6
+  },
+  {
+   "era": "repo",
+   "id": 687,
+   "label": "PR #687",
+   "date": "2026-08-11",
+   "summary": "Add a weekday badge and fixed all-day rows to the day view",
+   "tags": [
+    "feature",
+    "calendar"
+   ],
+   "branch": "claude/day-view-header-allday-rows-xxgizt",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 80,
+   "deletions": 56
+  },
+  {
+   "era": "repo",
+   "id": 688,
+   "label": "PR #688",
+   "date": "2026-08-11",
+   "summary": "Cut cold-start time-to-today from about a second to the first painted frame",
+   "tags": [
+    "perf",
+    "calendar",
+    "storage"
+   ],
+   "branch": "claude/agenda-scroll-today-latency-xn5hkh",
+   "commits": 2,
+   "filesChanged": 25,
+   "insertions": 1160,
+   "deletions": 247
+  },
+  {
+   "era": "repo",
+   "id": 689,
+   "label": "PR #689",
+   "date": "2026-08-11",
+   "summary": "Correct the comparison table's recurrence row and retire the findings doc",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/product-niche-findings-cleanup-wwaw6v",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 1,
+   "deletions": 183
+  },
+  {
+   "era": "repo",
+   "id": 690,
+   "label": "PR #690",
+   "date": "2026-08-11",
+   "summary": "Test the storage cache against a real Dexie instead of mocking it away",
+   "tags": [
+    "test",
+    "storage"
+   ],
+   "branch": "claude/remove-health-survey-finding-3-yn6s1c",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 530,
+   "deletions": 32
+  },
+  {
+   "era": "repo",
+   "id": 691,
+   "label": "PR #691",
+   "date": "2026-08-11",
+   "summary": "Drop the redundant \"All day\" label from the day view's strip",
+   "tags": [
+    "polish",
+    "calendar"
+   ],
+   "branch": "claude/day-view-header-allday-rows-xxgizt",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 3
+  },
+  {
+   "era": "repo",
+   "id": 692,
+   "label": "PR #692",
+   "date": "2026-08-11",
+   "summary": "Show a month-only topbar label in day view and stop folding exactly three all-day items",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/day-view-header-allday-rows-xxgizt",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 17,
+   "deletions": 12
+  },
+  {
+   "era": "repo",
+   "id": 693,
+   "label": "PR #693",
+   "date": "2026-08-11",
+   "summary": "Collapse the editor shell's forwarding layer into the entry editor",
+   "tags": [
+    "refactor",
+    "editor",
+    "architecture"
+   ],
+   "branch": "claude/remove-finding-6-health-survey-ku5btl",
+   "commits": 1,
+   "filesChanged": 9,
+   "insertions": 110,
+   "deletions": 154
+  },
+  {
+   "era": "repo",
+   "id": 694,
+   "label": "PR #694",
+   "date": "2026-08-11",
+   "summary": "Collapse the store bridge's single-caller setters into one setter",
+   "tags": [
+    "refactor",
+    "state",
+    "architecture"
+   ],
+   "branch": "claude/health-survey-finding-9-6j0opd",
+   "commits": 3,
+   "filesChanged": 6,
+   "insertions": 24,
+   "deletions": 141
+  },
+  {
+   "era": "repo",
+   "id": 695,
+   "label": "PR #695",
+   "date": "2026-08-11",
+   "summary": "Load the per-vault filters before the cache-first paint",
+   "tags": [
+    "perf",
+    "storage",
+    "calendar"
+   ],
+   "branch": "claude/agenda-scroll-today-latency-xn5hkh",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 113,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 696,
+   "label": "PR #696",
+   "date": "2026-08-12",
+   "summary": "Redesign the agenda header around per-day badges and continuous week rulers",
+   "tags": [
+    "rework",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-view-date-header-3tv7e4",
+   "commits": 3,
+   "filesChanged": 15,
+   "insertions": 536,
+   "deletions": 282
+  },
+  {
+   "era": "repo",
+   "id": 697,
+   "label": "PR #697",
+   "date": "2026-08-12",
+   "summary": "Add the product-niche fit and positioning survey results",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/product-niche-survey-results-pj49js",
+   "commits": 4,
+   "filesChanged": 2,
+   "insertions": 293,
+   "deletions": 8
+  },
+  {
+   "era": "repo",
+   "id": 698,
+   "label": "PR #698",
+   "date": "2026-08-12",
+   "summary": "Give the agenda's day badge its own header row so the card stops stretching",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-card-layout-fix-f4iibs",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 7,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 699,
+   "label": "PR #699",
+   "date": "2026-08-12",
+   "summary": "Decouple the agenda day badge from its row's height",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-card-layout-fix-f4iibs",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 30,
+   "deletions": 12
+  },
+  {
+   "era": "repo",
+   "id": 700,
+   "label": "PR #700",
+   "date": "2026-08-12",
+   "summary": "Drop the agenda min-height guard that re-stretched the card's shadow",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-card-layout-fix-f4iibs",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 22,
+   "deletions": 23
+  },
+  {
+   "era": "repo",
+   "id": 701,
+   "label": "PR #701",
+   "date": "2026-08-12",
+   "summary": "Top-align the agenda day badge with its first item",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-card-layout-fix-f4iibs",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 12,
+   "deletions": 10
+  },
+  {
+   "era": "repo",
+   "id": 702,
+   "label": "PR #702",
+   "date": "2026-08-12",
+   "summary": "Align the local-folder support copy across every surface that mentions it",
+   "tags": [
+    "docs",
+    "storage"
+   ],
+   "branch": "claude/remove-finding-1-survey-6bj6bb",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 8,
+   "deletions": 37
+  },
+  {
+   "era": "repo",
+   "id": 703,
+   "label": "PR #703",
+   "date": "2026-08-12",
+   "summary": "Disclose the tutorial vault as read-only without styling it as an error",
+   "tags": [
+    "bugfix",
+    "storage",
+    "error-handling"
+   ],
+   "branch": "claude/product-niche-survey-finding-frwj47",
+   "commits": 3,
+   "filesChanged": 7,
+   "insertions": 38,
+   "deletions": 46
+  },
+  {
+   "era": "repo",
+   "id": 704,
+   "label": "PR #704",
+   "date": "2026-08-12",
+   "summary": "Balance the spacing around the agenda's day badge",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-card-layout-fix-f4iibs",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 23,
+   "deletions": 10
+  },
+  {
+   "era": "repo",
+   "id": 705,
+   "label": "PR #705",
+   "date": "2026-08-12",
+   "summary": "Add breathing room between the agenda's days",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-card-layout-fix-f4iibs",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 14,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 706,
+   "label": "PR #706",
+   "date": "2026-08-12",
+   "summary": "Align the week and month grids' right edge with their column gap",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/week-view-padding-alignment-004gcm",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 22,
+   "deletions": 6
+  },
+  {
+   "era": "repo",
+   "id": 707,
+   "label": "PR #707",
+   "date": "2026-08-12",
+   "summary": "Rewrite the README's sharing claim to match what the app actually does",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/finding-3-option-b-niche-h5nu7n",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 2,
+   "deletions": 26
+  },
+  {
+   "era": "repo",
+   "id": 708,
+   "label": "PR #708",
+   "date": "2026-08-12",
+   "summary": "Correct the Todoist row in the comparison table",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/remove-survey-finding-5-21yva9",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 5,
+   "deletions": 27
+  },
+  {
+   "era": "repo",
+   "id": 709,
+   "label": "PR #709",
+   "date": "2026-08-12",
+   "summary": "Add a Meridian Light theme and follow the system colour scheme",
+   "tags": [
+    "feature",
+    "colors"
+   ],
+   "branch": "claude/product-niche-survey-results-pj49js",
+   "commits": 4,
+   "filesChanged": 5,
+   "insertions": 184,
+   "deletions": 185
+  },
+  {
+   "era": "repo",
+   "id": 710,
+   "label": "PR #710",
+   "date": "2026-08-13",
+   "summary": "Remove fine-grained personal access token auth for GitHub vaults",
+   "tags": [
+    "rework",
+    "storage",
+    "security"
+   ],
+   "branch": "claude/remove-github-fine-grained-auth-7tfolf",
+   "commits": 1,
+   "filesChanged": 10,
+   "insertions": 37,
+   "deletions": 241
+  },
+  {
+   "era": "repo",
+   "id": 711,
+   "label": "PR #711",
+   "date": "2026-08-13",
+   "summary": "Raise the orange saturation in the light theme",
+   "tags": [
+    "polish",
+    "colors"
+   ],
+   "branch": "claude/meridian-orange-saturation-w7amah",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 712,
+   "label": "PR #712",
+   "date": "2026-08-13",
+   "summary": "Fix backlog and notes card indentation left by an unused badge gutter",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/backlog-notes-indentation-bkbij4",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 31,
+   "deletions": 13
+  },
+  {
+   "era": "repo",
+   "id": 713,
+   "label": "PR #713",
+   "date": "2026-08-13",
+   "summary": "Separate the light theme's orange and red hues",
+   "tags": [
+    "polish",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/meridian-orange-saturation-w7amah",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 714,
+   "label": "PR #714",
+   "date": "2026-08-13",
+   "summary": "Brighten the light theme's orange and switch its chip to dark ink",
+   "tags": [
+    "polish",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/meridian-orange-saturation-w7amah",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 7,
+   "deletions": 6
+  },
+  {
+   "era": "repo",
+   "id": 715,
+   "label": "PR #715",
+   "date": "2026-08-14",
+   "summary": "Plan multi-vault support with iCal subscriptions as a series of pull requests",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/ical-vault-type-edl9cm",
+   "commits": 7,
+   "filesChanged": 1,
+   "insertions": 790,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 716,
+   "label": "PR #716",
+   "date": "2026-08-14",
+   "summary": "Prepare the storage layer for more than one vault",
+   "tags": [
+    "refactor",
+    "storage",
+    "architecture"
+   ],
+   "branch": "claude/pr-0-multi-vault-ical-ar6k9r",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 120,
+   "deletions": 84
+  },
+  {
+   "era": "repo",
+   "id": 717,
+   "label": "PR #717",
+   "date": "2026-08-15",
+   "summary": "Vault-qualify entry identity behind a branded EntryKey",
+   "tags": [
+    "rework",
+    "architecture",
+    "storage"
+   ],
+   "branch": "claude/pr-1-multi-vault-ical-glin49",
+   "commits": 6,
+   "filesChanged": 86,
+   "insertions": 1908,
+   "deletions": 1030
+  },
+  {
+   "era": "repo",
+   "id": 718,
+   "label": "PR #718",
+   "date": "2026-08-15",
+   "summary": "Register and sync several vaults at once",
+   "tags": [
+    "feature",
+    "storage",
+    "sync"
+   ],
+   "branch": "claude/pr-2-multi-vault-ical-qg7ypx",
+   "commits": 2,
+   "filesChanged": 38,
+   "insertions": 2432,
+   "deletions": 1077
+  },
+  {
+   "era": "repo",
+   "id": 719,
+   "label": "PR #719",
+   "date": "2026-08-15",
+   "summary": "Add the iCal vault kind",
+   "tags": [
+    "feature",
+    "storage",
+    "sync"
+   ],
+   "branch": "claude/pr-3-multi-vault-ical-oc1557",
+   "commits": 1,
+   "filesChanged": 37,
+   "insertions": 3504,
+   "deletions": 36
+  },
+  {
+   "era": "repo",
+   "id": 720,
+   "label": "PR #720",
+   "date": "2026-08-15",
+   "summary": "Add the plain view-only entry view for subscribed calendars",
+   "tags": [
+    "feature",
+    "editor",
+    "storage"
+   ],
+   "branch": "claude/multi-vault-ical-pr4-5ywuiu",
+   "commits": 2,
+   "filesChanged": 11,
+   "insertions": 375,
+   "deletions": 19
+  },
+  {
+   "era": "repo",
+   "id": 721,
+   "label": "PR #721",
+   "date": "2026-08-15",
+   "summary": "Add vault renaming and scope captions to settings",
+   "tags": [
+    "feature",
+    "storage"
+   ],
+   "branch": "claude/ical-multi-vault-pr6-d3lbo1",
+   "commits": 1,
+   "filesChanged": 6,
+   "insertions": 99,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 722,
+   "label": "PR #722",
+   "date": "2026-08-15",
+   "summary": "Fix the settings screen's visual hierarchy and drawer overflow scrolling",
+   "tags": [
+    "bugfix",
+    "layout"
+   ],
+   "branch": "claude/ical-multi-vault-pr6-d3lbo1",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 19,
+   "deletions": 6
+  },
+  {
+   "era": "repo",
+   "id": 723,
+   "label": "PR #723",
+   "date": "2026-08-15",
+   "summary": "Give settings a real hierarchy with a scoped vault card and folded theme grid",
+   "tags": [
+    "rework",
+    "layout"
+   ],
+   "branch": "claude/ical-multi-vault-pr6-followup",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 129,
+   "deletions": 89
+  },
+  {
+   "era": "repo",
+   "id": 724,
+   "label": "PR #724",
+   "date": "2026-08-15",
+   "summary": "Stop the agenda drifting when vault content or a filter arrives late",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "state"
+   ],
+   "branch": "claude/multi-vault-time-filter-bugs-q7u2a9",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 169,
+   "deletions": 11
+  },
+  {
+   "era": "repo",
+   "id": 725,
+   "label": "PR #725",
+   "date": "2026-08-15",
+   "summary": "Move entries between vaults",
+   "tags": [
+    "feature",
+    "storage",
+    "model"
+   ],
+   "branch": "claude/ical-multi-vault-pr5-ywjnuw",
+   "commits": 1,
+   "filesChanged": 26,
+   "insertions": 1307,
+   "deletions": 842
+  },
+  {
+   "era": "repo",
+   "id": 726,
+   "label": "PR #726",
+   "date": "2026-08-15",
+   "summary": "Hold the agenda's visible day when its rows are rebuilt without a scroll",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "state"
+   ],
+   "branch": "claude/multi-vault-time-filter-bugs-q7u2a9",
+   "commits": 1,
+   "filesChanged": 10,
+   "insertions": 479,
+   "deletions": 171
+  },
+  {
+   "era": "repo",
+   "id": 727,
+   "label": "PR #727",
+   "date": "2026-08-16",
+   "summary": "Fix agenda startup drift when a vault lands without a network round trip",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "state"
+   ],
+   "branch": "claude/agenda-startup-scroll-drift-followup",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 114,
+   "deletions": 7
+  },
+  {
+   "era": "repo",
+   "id": 728,
+   "label": "PR #728",
+   "date": "2026-08-16",
+   "summary": "Wait for every cached vault before the agenda's first paint",
+   "tags": [
+    "bugfix",
+    "storage",
+    "calendar"
+   ],
+   "branch": "claude/agenda-paint-gate-followup",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 90,
+   "deletions": 12
+  },
+  {
+   "era": "repo",
+   "id": 729,
+   "label": "PR #729",
+   "date": "2026-08-16",
+   "summary": "Stop importing iCal attendees as participants, and fix the filter popover's tri-state",
+   "tags": [
+    "bugfix",
+    "storage",
+    "a11y"
+   ],
+   "branch": "claude/people-calendar-filter-popover-pvaz9d",
+   "commits": 2,
+   "filesChanged": 8,
+   "insertions": 269,
+   "deletions": 33
+  },
+  {
+   "era": "repo",
+   "id": 730,
+   "label": "PR #730",
+   "date": "2026-08-16",
+   "summary": "Fix the participant tree's indentation and drop the disclosure where nothing nests",
+   "tags": [
+    "bugfix",
+    "layout",
+    "a11y"
+   ],
+   "branch": "claude/popover-indentation-hierarchy-elb8vi",
+   "commits": 4,
+   "filesChanged": 3,
+   "insertions": 40,
+   "deletions": 8
+  },
+  {
+   "era": "repo",
+   "id": 731,
+   "label": "PR #731",
+   "date": "2026-08-16",
+   "summary": "Stop the description field looking editable in a sandboxed entry",
+   "tags": [
+    "bugfix",
+    "editor"
+   ],
+   "branch": "claude/entryeditor-description-view-only-maxdpz",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 21,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 732,
+   "label": "PR #732",
+   "date": "2026-08-16",
+   "summary": "Align the filter popover's leaf checkboxes with the chevron column",
+   "tags": [
+    "polish",
+    "layout",
+    "a11y"
+   ],
+   "branch": "claude/popover-alignment-followup-v2",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 11,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 733,
+   "label": "PR #733",
+   "date": "2026-08-16",
+   "summary": "Always show duration units in long form and canonicalize iCal synthesis",
+   "tags": [
+    "polish",
+    "model",
+    "storage"
+   ],
+   "branch": "claude/unit-display-format-3oq7g2",
+   "commits": 1,
+   "filesChanged": 13,
+   "insertions": 84,
+   "deletions": 49
+  },
+  {
+   "era": "repo",
+   "id": 734,
+   "label": "PR #734",
+   "date": "2026-08-16",
+   "summary": "Use the small corner radius for occurrence pills at every screen size",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/colored-components-corner-radius-hcrskt",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 10,
+   "deletions": 10
+  },
+  {
+   "era": "repo",
+   "id": 735,
+   "label": "PR #735",
+   "date": "2026-08-16",
+   "summary": "Make the tutorial vault addable and removable, and retire it on the first real vault",
+   "tags": [
+    "feature",
+    "onboarding",
+    "storage"
+   ],
+   "branch": "claude/tutorial-vault-add-remove-vsxr5a",
+   "commits": 2,
+   "filesChanged": 12,
+   "insertions": 287,
+   "deletions": 94
+  },
+  {
+   "era": "repo",
+   "id": 736,
+   "label": "PR #736",
+   "date": "2026-08-16",
+   "summary": "Disable swipe-to-delete in read-only vaults",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/readonly-vault-swipe-delete-2z4j8b",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 55,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 737,
+   "label": "PR #737",
+   "date": "2026-08-16",
+   "summary": "Replace the view filter's hidden-count label with a plain active dot",
+   "tags": [
+    "polish",
+    "layout"
+   ],
+   "branch": "claude/people-calendar-filter-ux-2nmlch",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 19,
+   "deletions": 12
+  },
+  {
+   "era": "repo",
+   "id": 738,
+   "label": "PR #738",
+   "date": "2026-08-16",
+   "summary": "Stop manufacturing sync conflicts, and record why each real one happened",
+   "tags": [
+    "bugfix",
+    "sync",
+    "storage"
+   ],
+   "branch": "claude/conflict-warnings-debug-omcfow",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 636,
+   "deletions": 19
+  },
+  {
+   "era": "repo",
+   "id": 739,
+   "label": "PR #739",
+   "date": "2026-08-16",
+   "summary": "Tuck the active-filter dot in against the icon's corner",
+   "tags": [
+    "polish",
+    "layout"
+   ],
+   "branch": "claude/people-calendar-filter-ux-2nmlch",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 740,
+   "label": "PR #740",
+   "date": "2026-08-16",
+   "summary": "Size day and week event columns per collision cluster rather than per day",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/event-column-layout-fix-gindwa",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 94,
+   "deletions": 39
+  },
+  {
+   "era": "repo",
+   "id": 741,
+   "label": "PR #741",
+   "date": "2026-08-16",
+   "summary": "Fix the Android status bar going black by normalizing the theme colour",
+   "tags": [
+    "bugfix",
+    "mobile",
+    "pwa"
+   ],
+   "branch": "claude/android-status-bar-color-etr1nh",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 46,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 742,
+   "label": "PR #742",
+   "date": "2026-08-16",
+   "summary": "Move the surveys into their own directory and factor out shared conventions",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/survey-refactor-organize-pinnze",
+   "commits": 2,
+   "filesChanged": 9,
+   "insertions": 178,
+   "deletions": 42
+  },
+  {
+   "era": "repo",
+   "id": 743,
+   "label": "PR #743",
+   "date": "2026-08-16",
+   "summary": "Source the Android status bar from the background token, not the backdrop",
+   "tags": [
+    "bugfix",
+    "mobile",
+    "pwa"
+   ],
+   "branch": "claude/android-status-bar-color-etr1nh",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 139,
+   "deletions": 50
+  },
+  {
+   "era": "repo",
+   "id": 744,
+   "label": "PR #744",
+   "date": "2026-08-17",
+   "summary": "Rebuild status-bar tinting on the HTML standard instead of syncing it in JS",
+   "tags": [
+    "rework",
+    "mobile",
+    "pwa"
+   ],
+   "branch": "claude/android-status-bar-color-etr1nh",
+   "commits": 3,
+   "filesChanged": 4,
+   "insertions": 201,
+   "deletions": 105
+  },
+  {
+   "era": "repo",
+   "id": 745,
+   "label": "PR #745",
+   "date": "2026-08-17",
+   "summary": "Survey the gaps between Meridian's repeat model and iCal's RRULE",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/ical-rrule-gaps-bumg5n",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 588,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 746,
+   "label": "PR #746",
+   "date": "2026-08-17",
+   "summary": "Rename the survey files to drop the directory stutter",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/survey-file-path-rename-r7m8e5",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 20,
+   "deletions": 21
+  },
+  {
+   "era": "repo",
+   "id": 747,
+   "label": "PR #747",
+   "date": "2026-08-17",
+   "summary": "Record the codebase health survey results",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/health-survey-485a0p",
+   "commits": 4,
+   "filesChanged": 2,
+   "insertions": 423,
+   "deletions": 3
+  },
+  {
+   "era": "repo",
+   "id": 748,
+   "label": "PR #748",
+   "date": "2026-08-17",
+   "summary": "Fan the root build and test scripts out to the worker package",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/health-results-finding-1-cgmegg",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 12,
+   "deletions": 43
+  },
+  {
+   "era": "repo",
+   "id": 749,
+   "label": "PR #749",
+   "date": "2026-08-17",
+   "summary": "Move the survey results files into the plans directory",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/survey-results-organization-ub6wat",
+   "commits": 4,
+   "filesChanged": 7,
+   "insertions": 24,
+   "deletions": 24
+  },
+  {
+   "era": "repo",
+   "id": 750,
+   "label": "PR #750",
+   "date": "2026-08-17",
+   "summary": "Fix negative month days and daily BY* limits in the expansion engine",
+   "tags": [
+    "bugfix",
+    "model"
+   ],
+   "branch": "claude/ical-rrule-implementation-bug-0gchxe",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 121,
+   "deletions": 45
+  },
+  {
+   "era": "repo",
+   "id": 751,
+   "label": "PR #751",
+   "date": "2026-08-17",
+   "summary": "Add a machine-checked glossary of the domain's ubiquitous language",
+   "tags": [
+    "docs",
+    "architecture"
+   ],
+   "branch": "claude/glossary-ubiquitous-language",
+   "commits": 3,
+   "filesChanged": 4,
+   "insertions": 427,
+   "deletions": 21
+  },
+  {
+   "era": "repo",
+   "id": 752,
+   "label": "PR #752",
+   "date": "2026-08-17",
+   "summary": "Add a view-layer section to the glossary",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/glossary-view-layer",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 64,
+   "deletions": 4
+  },
+  {
+   "era": "repo",
+   "id": 753,
+   "label": "PR #753",
+   "date": "2026-08-17",
+   "summary": "Apply the default participants when promoting a checklist task",
+   "tags": [
+    "bugfix",
+    "editor",
+    "model"
+   ],
+   "branch": "claude/markdown-promotion-participants-66ijhu",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 9,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 754,
+   "label": "PR #754",
+   "date": "2026-08-17",
+   "summary": "Rename EventBlock to TimedBlock",
+   "tags": [
+    "refactor",
+    "calendar"
+   ],
+   "branch": "claude/rename-eventblock-to-timedblock",
+   "commits": 1,
+   "filesChanged": 6,
+   "insertions": 18,
+   "deletions": 16
+  },
+  {
+   "era": "repo",
+   "id": 755,
+   "label": "PR #755",
+   "date": "2026-08-17",
+   "summary": "Rename the bare slug identifiers that actually hold an entry key",
+   "tags": [
+    "refactor",
+    "architecture"
+   ],
+   "branch": "claude/slug-vs-entrykey-sweep",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 51,
+   "deletions": 51
+  },
+  {
+   "era": "repo",
+   "id": 756,
+   "label": "PR #756",
+   "date": "2026-08-17",
+   "summary": "Fix every lint warning instead of budgeting around them",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/health-results-lint-issues-gqiapy",
+   "commits": 3,
+   "filesChanged": 13,
+   "insertions": 68,
+   "deletions": 95
+  },
+  {
+   "era": "repo",
+   "id": 757,
+   "label": "PR #757",
+   "date": "2026-08-17",
+   "summary": "Resolve count-bounded series to a date bound instead of truncating at 500",
+   "tags": [
+    "bugfix",
+    "model"
+   ],
+   "branch": "claude/pr2-ical-rrule-options-rd2zeu",
+   "commits": 3,
+   "filesChanged": 4,
+   "insertions": 239,
+   "deletions": 67
+  },
+  {
+   "era": "repo",
+   "id": 758,
+   "label": "PR #758",
+   "date": "2026-08-17",
+   "summary": "Make end-date-to-duration conversion use calendar-correct month and year math",
+   "tags": [
+    "bugfix",
+    "model"
+   ],
+   "branch": "claude/remove-finding-3-health-e4a6u6",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 52,
+   "deletions": 58
+  },
+  {
+   "era": "repo",
+   "id": 759,
+   "label": "PR #759",
+   "date": "2026-08-17",
+   "summary": "Keep an RRULE UNTIL bound's time of day",
+   "tags": [
+    "bugfix",
+    "model",
+    "frontmatter"
+   ],
+   "branch": "claude/ical-rrule-pr2-0nkr9s",
+   "commits": 3,
+   "filesChanged": 8,
+   "insertions": 75,
+   "deletions": 51
+  },
+  {
+   "era": "repo",
+   "id": 760,
+   "label": "PR #760",
+   "date": "2026-08-17",
+   "summary": "Raise the coverage floor to the measured level and cover the onboarding module",
+   "tags": [
+    "test",
+    "build"
+   ],
+   "branch": "claude/finding-4-health-results-55lga5",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 130,
+   "deletions": 42
+  },
+  {
+   "era": "repo",
+   "id": 761,
+   "label": "PR #761",
+   "date": "2026-08-17",
+   "summary": "Remove an already-fixed finding from the health results",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/health-results-finding-removal-vujo7k",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 37
+  },
+  {
+   "era": "repo",
+   "id": 762,
+   "label": "PR #762",
+   "date": "2026-08-17",
+   "summary": "Bump jsdom to 30 and drop the undici version cap",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/remove-finding-6-health-results-tu7qef",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 51,
+   "deletions": 92
+  },
+  {
+   "era": "repo",
+   "id": 763,
+   "label": "PR #763",
+   "date": "2026-08-17",
+   "summary": "Pin postcss past a published advisory",
+   "tags": [
+    "chore",
+    "security",
+    "build"
+   ],
+   "branch": "claude/remove-finding-7-health-results-gkdb26",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 12,
+   "deletions": 39
+  },
+  {
+   "era": "repo",
+   "id": 764,
+   "label": "PR #764",
+   "date": "2026-08-17",
+   "summary": "Write the convention for keeping survey results in sync with their fixes",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/survey-findings-cleanup-guide-w5ad4x",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 28,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 765,
+   "label": "PR #765",
+   "date": "2026-08-17",
+   "summary": "Fix the npmrc comment and move a dead icon asset out of the public directory",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/health-results-findings-8-9-qhg8vv",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 4,
+   "deletions": 168
+  },
+  {
+   "era": "repo",
+   "id": 766,
+   "label": "PR #766",
+   "date": "2026-08-17",
+   "summary": "Add the UI health survey results",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/health-ui-surveys-plan-lbo2lf",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 738,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 767,
+   "label": "PR #767",
+   "date": "2026-08-18",
+   "summary": "Fix the React Compiler memoization bailout in six components",
+   "tags": [
+    "perf",
+    "state"
+   ],
+   "branch": "claude/health-ui-results-finding-1-sl9fyh",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 70,
+   "deletions": 130
+  },
+  {
+   "era": "repo",
+   "id": 768,
+   "label": "PR #768",
+   "date": "2026-08-18",
+   "summary": "Reject unsafe URL schemes on the iCal feed link",
+   "tags": [
+    "bugfix",
+    "security",
+    "editor"
+   ],
+   "branch": "claude/finding-5-link-security-2tmzfb",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 31,
+   "deletions": 63
+  },
+  {
+   "era": "repo",
+   "id": 769,
+   "label": "PR #769",
+   "date": "2026-08-18",
+   "summary": "Investigate and plan the misleading GitHub authentication errors",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/github-app-auth-errors-820gk3",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 533,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 770,
+   "label": "PR #770",
+   "date": "2026-08-18",
+   "summary": "Make the primary add affordances real buttons rather than clickable spans",
+   "tags": [
+    "bugfix",
+    "a11y",
+    "editor"
+   ],
+   "branch": "claude/health-ui-results-finding-2-pmy5li",
+   "commits": 1,
+   "filesChanged": 6,
+   "insertions": 43,
+   "deletions": 105
+  },
+  {
+   "era": "repo",
+   "id": 771,
+   "label": "PR #771",
+   "date": "2026-08-18",
+   "summary": "Make the GitHub OAuth credential save atomic",
+   "tags": [
+    "bugfix",
+    "storage",
+    "security"
+   ],
+   "branch": "claude/github-auth-errors-pr-6-2w7q45",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 65,
+   "deletions": 53
+  },
+  {
+   "era": "repo",
+   "id": 772,
+   "label": "PR #772",
+   "date": "2026-08-18",
+   "summary": "Replace the GitHub error handling with one status-based classification table",
+   "tags": [
+    "refactor",
+    "storage",
+    "error-handling"
+   ],
+   "branch": "claude/github-auth-errors-pr1-q0rp6u",
+   "commits": 2,
+   "filesChanged": 6,
+   "insertions": 214,
+   "deletions": 137
+  },
+  {
+   "era": "repo",
+   "id": 773,
+   "label": "PR #773",
+   "date": "2026-08-18",
+   "summary": "Single-flight the GitHub token refresh with typed failures",
+   "tags": [
+    "bugfix",
+    "storage",
+    "security"
+   ],
+   "branch": "claude/pr7-github-auth-errors-qfzt81",
+   "commits": 3,
+   "filesChanged": 9,
+   "insertions": 552,
+   "deletions": 172
+  },
+  {
+   "era": "repo",
+   "id": 774,
+   "label": "PR #774",
+   "date": "2026-08-18",
+   "summary": "Drop the mount-time permission probe for network vault backends",
+   "tags": [
+    "refactor",
+    "storage"
+   ],
+   "branch": "claude/github-auth-errors-pr2-mzurco",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 61,
+   "deletions": 89
+  },
+  {
+   "era": "repo",
+   "id": 775,
+   "label": "PR #775",
+   "date": "2026-08-18",
+   "summary": "Replace the reconnect flag with a typed needs-attention state",
+   "tags": [
+    "refactor",
+    "storage",
+    "state"
+   ],
+   "branch": "claude/github-auth-errors-pr3-lok4u2",
+   "commits": 4,
+   "filesChanged": 10,
+   "insertions": 139,
+   "deletions": 81
+  },
+  {
+   "era": "repo",
+   "id": 776,
+   "label": "PR #776",
+   "date": "2026-08-18",
+   "summary": "Add attention rows and recovery actions for GitHub sync failures",
+   "tags": [
+    "feature",
+    "storage",
+    "error-handling"
+   ],
+   "branch": "claude/github-auth-errors-pr4-h048ee",
+   "commits": 1,
+   "filesChanged": 9,
+   "insertions": 285,
+   "deletions": 49
+  },
+  {
+   "era": "repo",
+   "id": 777,
+   "label": "PR #777",
+   "date": "2026-08-18",
+   "summary": "Replace the token-centric error copy with sign-in language",
+   "tags": [
+    "polish",
+    "storage",
+    "error-handling"
+   ],
+   "branch": "claude/github-auth-errors-pr9-qx3fu4",
+   "commits": 3,
+   "filesChanged": 5,
+   "insertions": 15,
+   "deletions": 222
+  },
+  {
+   "era": "repo",
+   "id": 778,
+   "label": "PR #778",
+   "date": "2026-08-18",
+   "summary": "Record GitHub credential refresh events in the sync journal",
+   "tags": [
+    "feature",
+    "storage",
+    "sync"
+   ],
+   "branch": "claude/github-auth-errors-pr8-gek6fm",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 69,
+   "deletions": 25
+  },
+  {
+   "era": "repo",
+   "id": 779,
+   "label": "PR #779",
+   "date": "2026-08-18",
+   "summary": "Let an existing GitHub vault be re-authenticated in place",
+   "tags": [
+    "feature",
+    "storage",
+    "security"
+   ],
+   "branch": "claude/github-auth-errors-pr5-kk76r8",
+   "commits": 2,
+   "filesChanged": 11,
+   "insertions": 256,
+   "deletions": 75
+  },
+  {
+   "era": "repo",
+   "id": 780,
+   "label": "PR #780",
+   "date": "2026-08-18",
+   "summary": "Stop losing an entry whose root outlives its occurrences",
+   "tags": [
+    "bugfix",
+    "model",
+    "search"
+   ],
+   "branch": "claude/mobile-search-entry-creation-10mtsp",
+   "commits": 1,
+   "filesChanged": 10,
+   "insertions": 313,
+   "deletions": 42
+  },
+  {
+   "era": "repo",
+   "id": 781,
+   "label": "PR #781",
+   "date": "2026-08-18",
+   "summary": "Give the persistence port the entry's content, not just its key",
+   "tags": [
+    "refactor",
+    "architecture",
+    "storage"
+   ],
+   "branch": "claude/mobile-search-entry-creation-10mtsp",
+   "commits": 1,
+   "filesChanged": 17,
+   "insertions": 487,
+   "deletions": 145
+  },
+  {
+   "era": "repo",
+   "id": 782,
+   "label": "PR #782",
+   "date": "2026-08-18",
+   "summary": "Add recommended model tiers to the entry-aggregate plan",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/mobile-search-entry-creation-10mtsp",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 115,
+   "deletions": 17
+  },
+  {
+   "era": "repo",
+   "id": 783,
+   "label": "PR #783",
+   "date": "2026-08-18",
+   "summary": "Split the entry-aggregate plan into six shippable pull requests",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/mobile-search-entry-creation-10mtsp",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 151,
+   "deletions": 103
+  },
+  {
+   "era": "repo",
+   "id": 784,
+   "label": "PR #784",
+   "date": "2026-08-24",
+   "summary": "Reuse the wikilink chip styling for the add-person and add-to-list buttons",
+   "tags": [
+    "polish",
+    "editor"
+   ],
+   "branch": "claude/entry-editor-button-styling-obgfqb",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 32,
+   "deletions": 25
+  },
+  {
+   "era": "repo",
+   "id": 785,
+   "label": "PR #785",
+   "date": "2026-08-24",
+   "summary": "Top-align the desktop search results panel",
+   "tags": [
+    "polish",
+    "search",
+    "layout"
+   ],
+   "branch": "claude/ipad-landscape-filter-alignment-nwid5v",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 15,
+   "deletions": 9
+  },
+  {
+   "era": "repo",
+   "id": 786,
+   "label": "PR #786",
+   "date": "2026-08-24",
+   "summary": "Scroll the item being edited above the on-screen keyboard on phones",
+   "tags": [
+    "bugfix",
+    "mobile",
+    "editor"
+   ],
+   "branch": "claude/markdown-item-scroll-phone-hs7x2x",
+   "commits": 2,
+   "filesChanged": 5,
+   "insertions": 69,
+   "deletions": 10
+  },
+  {
+   "era": "repo",
+   "id": 787,
+   "label": "PR #787",
+   "date": "2026-08-24",
+   "summary": "Fix the add chip's pill shape by dropping a min-height override",
+   "tags": [
+    "bugfix",
+    "layout"
+   ],
+   "branch": "claude/entry-editor-button-styling-obgfqb",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 4,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 788,
+   "label": "PR #788",
+   "date": "2026-08-24",
+   "summary": "Show the entry editor's back arrow on large screens too",
+   "tags": [
+    "polish",
+    "navigation"
+   ],
+   "branch": "claude/entry-editor-back-arrow-c2u7wa",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 10,
+   "deletions": 23
+  },
+  {
+   "era": "repo",
+   "id": 789,
+   "label": "PR #789",
+   "date": "2026-08-24",
+   "summary": "Dock the search bar to the top on non-mobile widths while it is open",
+   "tags": [
+    "polish",
+    "search",
+    "layout"
+   ],
+   "branch": "claude/ipad-landscape-filter-alignment-nwid5v",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 36,
+   "deletions": 10
+  },
+  {
+   "era": "repo",
+   "id": 790,
+   "label": "PR #790",
+   "date": "2026-08-24",
+   "summary": "Fix the entry editor's checkmark showing the wrong occurrence's done state",
+   "tags": [
+    "bugfix",
+    "editor",
+    "model"
+   ],
+   "branch": "claude/entry-editor-checkmark-bugs-pb14zh",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 55,
+   "deletions": 11
+  },
+  {
+   "era": "repo",
+   "id": 791,
+   "label": "PR #791",
+   "date": "2026-08-24",
+   "summary": "Pin the entry topbar's icon buttons to the true screen edges via a shared shell",
+   "tags": [
+    "refactor",
+    "layout",
+    "navigation"
+   ],
+   "branch": "claude/entry-editor-back-arrow-c2u7wa",
+   "commits": 3,
+   "filesChanged": 5,
+   "insertions": 166,
+   "deletions": 104
+  },
+  {
+   "era": "repo",
+   "id": 792,
+   "label": "PR #792",
+   "date": "2026-08-24",
+   "summary": "Right-align the multiday chevron and match the day and week bar padding",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/calendar-chevron-alignment-cw00te",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 8,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 793,
+   "label": "PR #793",
+   "date": "2026-08-24",
+   "summary": "Match the search bar's top clearance to the rest of the app",
+   "tags": [
+    "polish",
+    "search",
+    "layout"
+   ],
+   "branch": "claude/ipad-landscape-filter-alignment-nwid5v",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 32,
+   "deletions": 15
+  },
+  {
+   "era": "repo",
+   "id": 794,
+   "label": "PR #794",
+   "date": "2026-08-24",
+   "summary": "Localize the weekday strings in the date picker and repeat dialog",
+   "tags": [
+    "bugfix",
+    "editor",
+    "a11y"
+   ],
+   "branch": "claude/localize-weekday-strings-e0kij5",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 14,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 795,
+   "label": "PR #795",
+   "date": "2026-08-24",
+   "summary": "Retire the cold-start and time-to-today plans now that they shipped",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/remove-cold-start-plans-6ccptv",
+   "commits": 2,
+   "filesChanged": 7,
+   "insertions": 5,
+   "deletions": 637
+  },
+  {
+   "era": "repo",
+   "id": 796,
+   "label": "PR #796",
+   "date": "2026-08-24",
+   "summary": "Pin the two entry-aggregate invariants as tests before the migration",
+   "tags": [
+    "test",
+    "model"
+   ],
+   "branch": "claude/entry-aggregate-pr1-mk98v4",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 213,
+   "deletions": 31
+  },
+  {
+   "era": "repo",
+   "id": 797,
+   "label": "PR #797",
+   "date": "2026-08-24",
+   "summary": "Make the store's layers a derived view instead of a stored copy",
+   "tags": [
+    "refactor",
+    "state",
+    "model"
+   ],
+   "branch": "claude/pr2-entry-aggregate-xarl66",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 90,
+   "deletions": 129
+  },
+  {
+   "era": "repo",
+   "id": 798,
+   "label": "PR #798",
+   "date": "2026-08-25",
+   "summary": "Give the entry routes a document-flow shell and unify keyboard avoidance",
+   "tags": [
+    "rework",
+    "mobile",
+    "layout"
+   ],
+   "branch": "claude/mobile-keyboard-overlay-87iz6v",
+   "commits": 3,
+   "filesChanged": 17,
+   "insertions": 392,
+   "deletions": 107
+  },
+  {
+   "era": "repo",
+   "id": 799,
+   "label": "PR #799",
+   "date": "2026-08-24",
+   "summary": "Add repeat-to-RRULE conversion and hold the two recurrence engines against each other",
+   "tags": [
+    "test",
+    "model",
+    "storage"
+   ],
+   "branch": "claude/pr3-ical-rrule-pzsno3",
+   "commits": 4,
+   "filesChanged": 5,
+   "insertions": 734,
+   "deletions": 54
+  },
+  {
+   "era": "repo",
+   "id": 800,
+   "label": "PR #800",
+   "date": "2026-08-24",
+   "summary": "Support bysetpos as a list and drop the importer's refusal of deeper offsets",
+   "tags": [
+    "feature",
+    "model",
+    "storage"
+   ],
+   "branch": "claude/pr5-ical-rrule-9ribeu",
+   "commits": 1,
+   "filesChanged": 10,
+   "insertions": 143,
+   "deletions": 49
+  },
+  {
+   "era": "repo",
+   "id": 801,
+   "label": "PR #801",
+   "date": "2026-08-24",
+   "summary": "Fix the error and warning toast contrast without hardcoding ink",
+   "tags": [
+    "bugfix",
+    "colors",
+    "error-handling"
+   ],
+   "branch": "claude/error-warning-message-styling-kgiqec",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 25,
+   "deletions": 81
+  },
+  {
+   "era": "repo",
+   "id": 802,
+   "label": "PR #802",
+   "date": "2026-08-24",
+   "summary": "Rework the store around one entry aggregate instead of two collections",
+   "tags": [
+    "rework",
+    "model",
+    "architecture"
+   ],
+   "branch": "claude/entry-aggregation-pr-combine-ut1go4",
+   "commits": 4,
+   "filesChanged": 43,
+   "insertions": 1455,
+   "deletions": 1030
+  },
+  {
+   "era": "repo",
+   "id": 803,
+   "label": "PR #803",
+   "date": "2026-08-24",
+   "summary": "Dedupe the root and theme token blocks in the stylesheet",
+   "tags": [
+    "refactor",
+    "colors"
+   ],
+   "branch": "claude/health-ui-results-finding-7-wwa0qs",
+   "commits": 3,
+   "filesChanged": 2,
+   "insertions": 24,
+   "deletions": 122
+  },
+  {
+   "era": "repo",
+   "id": 804,
+   "label": "PR #804",
+   "date": "2026-08-24",
+   "summary": "Read entries directly when building the file-occurrence map",
+   "tags": [
+    "refactor",
+    "model",
+    "state"
+   ],
+   "branch": "claude/pr6-entry-aggregates-ho36w5",
+   "commits": 1,
+   "filesChanged": 9,
+   "insertions": 124,
+   "deletions": 210
+  },
+  {
+   "era": "repo",
+   "id": 805,
+   "label": "PR #805",
+   "date": "2026-08-24",
+   "summary": "Give every raw button an explicit type and enforce it with a lint rule",
+   "tags": [
+    "bugfix",
+    "a11y",
+    "build"
+   ],
+   "branch": "claude/health-ui-results-finding-8-ej07ni",
+   "commits": 1,
+   "filesChanged": 16,
+   "insertions": 37,
+   "deletions": 63
+  },
+  {
+   "era": "repo",
+   "id": 806,
+   "label": "PR #806",
+   "date": "2026-08-25",
+   "summary": "Pin the create-item row to the top of the search results and tint it",
+   "tags": [
+    "polish",
+    "search"
+   ],
+   "branch": "claude/search-add-item-button-position-gozibx",
+   "commits": 3,
+   "filesChanged": 1,
+   "insertions": 2,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 807,
+   "label": "PR #807",
+   "date": "2026-08-25",
+   "summary": "Give the top-pinned search bar a symmetric OS-chrome margin",
+   "tags": [
+    "polish",
+    "search",
+    "mobile"
+   ],
+   "branch": "claude/ipad-landscape-filter-alignment-nwid5v",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 24,
+   "deletions": 14
+  },
+  {
+   "era": "repo",
+   "id": 808,
+   "label": "PR #808",
+   "date": "2026-08-25",
+   "summary": "Release the flow shell's panes per axis instead of with one blanket rule",
+   "tags": [
+    "bugfix",
+    "layout",
+    "mobile"
+   ],
+   "branch": "claude/mobile-keyboard-overlay-87iz6v",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 97,
+   "deletions": 15
+  },
+  {
+   "era": "repo",
+   "id": 809,
+   "label": "PR #809",
+   "date": "2026-08-25",
+   "summary": "Stop unscheduled tasks outranking scheduled ones in the file-occurrence map",
+   "tags": [
+    "bugfix",
+    "model"
+   ],
+   "branch": "claude/undated-task-priority-bug-mtxjiz",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 30,
+   "deletions": 8
+  },
+  {
+   "era": "repo",
+   "id": 810,
+   "label": "PR #810",
+   "date": "2026-08-25",
+   "summary": "Scope the participant suggestions to the current vault",
+   "tags": [
+    "bugfix",
+    "editor",
+    "storage"
+   ],
+   "branch": "claude/vault-specific-participants-jbs6k8",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 8,
+   "deletions": 4
+  },
+  {
+   "era": "repo",
+   "id": 811,
+   "label": "PR #811",
+   "date": "2026-08-25",
+   "summary": "Contain the card's stacking context so it cannot paint over the topbar",
+   "tags": [
+    "bugfix",
+    "layout"
+   ],
+   "branch": "claude/card-isolate-topbar-bleed",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 9,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 812,
+   "label": "PR #812",
+   "date": "2026-08-25",
+   "summary": "Fit floating panels to the room there is, and plan the entry-routes layout refactor",
+   "tags": [
+    "bugfix",
+    "layout",
+    "docs"
+   ],
+   "branch": "claude/plan-entry-layout-route",
+   "commits": 4,
+   "filesChanged": 7,
+   "insertions": 486,
+   "deletions": 9
+  },
+  {
+   "era": "repo",
+   "id": 813,
+   "label": "PR #813",
+   "date": "2026-08-25",
+   "summary": "Move the vault-changed subscription up to the root route",
+   "tags": [
+    "refactor",
+    "navigation",
+    "state"
+   ],
+   "branch": "claude/entry-layout-route-pr1-u9pjyy",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 85,
+   "deletions": 94
+  },
+  {
+   "era": "repo",
+   "id": 814,
+   "label": "PR #814",
+   "date": "2026-08-25",
+   "summary": "Give the entry routes their own layout route",
+   "tags": [
+    "refactor",
+    "navigation",
+    "architecture"
+   ],
+   "branch": "claude/entry-route-pr2-llt3vi",
+   "commits": 1,
+   "filesChanged": 12,
+   "insertions": 175,
+   "deletions": 285
+  },
+  {
+   "era": "repo",
+   "id": 815,
+   "label": "PR #815",
+   "date": "2026-08-25",
+   "summary": "Delete the two-mode shell",
+   "tags": [
+    "refactor",
+    "navigation",
+    "architecture"
+   ],
+   "branch": "claude/pr3-entry-route-j0v38b",
+   "commits": 1,
+   "filesChanged": 16,
+   "insertions": 64,
+   "deletions": 321
+  },
+  {
+   "era": "repo",
+   "id": 816,
+   "label": "PR #816",
+   "date": "2026-08-25",
+   "summary": "Merge disjoint frontmatter and body edits instead of only copying them out",
+   "tags": [
+    "feature",
+    "sync",
+    "storage"
+   ],
+   "branch": "claude/sync-conflict-frontmatter-body-3hsrl3",
+   "commits": 1,
+   "filesChanged": 13,
+   "insertions": 987,
+   "deletions": 53
+  },
+  {
+   "era": "repo",
+   "id": 817,
+   "label": "PR #817",
+   "date": "2026-08-25",
+   "summary": "Unify the two scroll-parent lookups on one helper",
+   "tags": [
+    "refactor",
+    "layout"
+   ],
+   "branch": "claude/pr3-entry-route-j0v38b",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 111,
+   "deletions": 159
+  },
+  {
+   "era": "repo",
+   "id": 818,
+   "label": "PR #818",
+   "date": "2026-08-25",
+   "summary": "Record seven open sync-engine findings from the merge review",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/sync-conflict-frontmatter-body-3hsrl3",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 578,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 819,
+   "label": "PR #819",
+   "date": "2026-08-25",
+   "summary": "Teach the engine and importer bymonth and the yearly recurrence shapes",
+   "tags": [
+    "feature",
+    "model",
+    "storage"
+   ],
+   "branch": "claude/ical-rrule-prs-6-7-8lyqgc",
+   "commits": 2,
+   "filesChanged": 13,
+   "insertions": 806,
+   "deletions": 176
+  },
+  {
+   "era": "repo",
+   "id": 820,
+   "label": "PR #820",
+   "date": "2026-08-25",
+   "summary": "Stop every push deferring the next pull by a full interval",
+   "tags": [
+    "bugfix",
+    "sync",
+    "storage"
+   ],
+   "branch": "claude/sync-engine-results-finding-1-4w21p8",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 195,
+   "deletions": 127
+  },
+  {
+   "era": "repo",
+   "id": 821,
+   "label": "PR #821",
+   "date": "2026-08-25",
+   "summary": "Add per-vault ICS export",
+   "tags": [
+    "feature",
+    "storage",
+    "sync"
+   ],
+   "branch": "claude/ical-rrule-pr8-implementation-1lyk40",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 624,
+   "deletions": 156
+  },
+  {
+   "era": "repo",
+   "id": 822,
+   "label": "PR #822",
+   "date": "2026-08-25",
+   "summary": "Trap focus in the two hand-rolled overlays",
+   "tags": [
+    "bugfix",
+    "a11y",
+    "search"
+   ],
+   "branch": "claude/health-ui-results-finding-3-mj596p",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 357,
+   "deletions": 74
+  },
+  {
+   "era": "repo",
+   "id": 823,
+   "label": "PR #823",
+   "date": "2026-08-25",
+   "summary": "Sync the iCal gap document with the gaps already closed",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/ical-rrule-gaps-audit",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 70,
+   "deletions": 187
+  },
+  {
+   "era": "repo",
+   "id": 824,
+   "label": "PR #824",
+   "date": "2026-08-25",
+   "summary": "Replace the local vault's compare-and-swap token with a content hash",
+   "tags": [
+    "refactor",
+    "sync",
+    "storage"
+   ],
+   "branch": "claude/sync-engine-results-finding-2-3yh1gf",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 98,
+   "deletions": 107
+  },
+  {
+   "era": "repo",
+   "id": 825,
+   "label": "PR #825",
+   "date": "2026-08-25",
+   "summary": "Extract the timeline scaffold the day and week panes had copy-pasted",
+   "tags": [
+    "refactor",
+    "calendar"
+   ],
+   "branch": "claude/ui-health-results-finding-4-iypi4h",
+   "commits": 1,
+   "filesChanged": 6,
+   "insertions": 432,
+   "deletions": 486
+  },
+  {
+   "era": "repo",
+   "id": 826,
+   "label": "PR #826",
+   "date": "2026-08-25",
+   "summary": "Record the codebase health survey results from the largest-files run",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/health-survey-largest-files-zc9zk1",
+   "commits": 4,
+   "filesChanged": 3,
+   "insertions": 858,
+   "deletions": 4
+  },
+  {
+   "era": "repo",
+   "id": 827,
+   "label": "PR #827",
+   "date": "2026-08-25",
+   "summary": "Stop a delete comparing a tombstone against a stale SHA cache",
+   "tags": [
+    "bugfix",
+    "sync",
+    "storage"
+   ],
+   "branch": "claude/sync-engine-results-finding-3-f0wlpc",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 57,
+   "deletions": 82
+  },
+  {
+   "era": "repo",
+   "id": 828,
+   "label": "PR #828",
+   "date": "2026-08-25",
+   "summary": "Surface a write or delete refused because its vault is unregistered",
+   "tags": [
+    "bugfix",
+    "storage",
+    "error-handling"
+   ],
+   "branch": "claude/sync-engine-results-finding-4-cghsrw",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 44,
+   "deletions": 58
+  },
+  {
+   "era": "repo",
+   "id": 829,
+   "label": "PR #829",
+   "date": "2026-08-25",
+   "summary": "Add coverage floors for the store-ops and expansion modules",
+   "tags": [
+    "test",
+    "build"
+   ],
+   "branch": "claude/health-results-finding-5-b6h55w",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 9,
+   "deletions": 51
+  },
+  {
+   "era": "repo",
+   "id": 830,
+   "label": "PR #830",
+   "date": "2026-08-26",
+   "summary": "Enable noImplicitOverride and mark the CodeMirror widget overrides",
+   "tags": [
+    "chore",
+    "build",
+    "editor"
+   ],
+   "branch": "claude/health-results-finding-1-0hafi5",
+   "commits": 1,
+   "filesChanged": 6,
+   "insertions": 25,
+   "deletions": 70
+  },
+  {
+   "era": "repo",
+   "id": 831,
+   "label": "PR #831",
+   "date": "2026-08-26",
+   "summary": "Hold a cross-vault move's delete until the target push confirms",
+   "tags": [
+    "bugfix",
+    "sync",
+    "storage"
+   ],
+   "branch": "claude/sync-engine-results-finding-5-5fgp7v",
+   "commits": 1,
+   "filesChanged": 11,
+   "insertions": 601,
+   "deletions": 89
+  },
+  {
+   "era": "repo",
+   "id": 832,
+   "label": "PR #832",
+   "date": "2026-08-26",
+   "summary": "Move the shared cell-chrome tokens out of the month grid into the shared geometry",
+   "tags": [
+    "refactor",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/health-results-finding-2-nyblsq",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 57,
+   "deletions": 85
+  },
+  {
+   "era": "repo",
+   "id": 833,
+   "label": "PR #833",
+   "date": "2026-08-26",
+   "summary": "Persist the sync journal across reloads",
+   "tags": [
+    "feature",
+    "sync",
+    "storage"
+   ],
+   "branch": "claude/sync-engine-results-finding-6-0lrw71",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 72,
+   "deletions": 62
+  },
+  {
+   "era": "repo",
+   "id": 834,
+   "label": "PR #834",
+   "date": "2026-08-26",
+   "summary": "Cap the app shell with a flex-none rather than a percentage basis",
+   "tags": [
+    "bugfix",
+    "layout",
+    "mobile"
+   ],
+   "branch": "claude/agenda-view-empty-android-3zxucj",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 78,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 835,
+   "label": "PR #835",
+   "date": "2026-08-26",
+   "summary": "Document why the pending-push flush bursts vaults in parallel",
+   "tags": [
+    "docs",
+    "sync"
+   ],
+   "branch": "claude/find-7-sync-engine-results-7sl1c6",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 15,
+   "deletions": 166
+  },
+  {
+   "era": "repo",
+   "id": 836,
+   "label": "PR #836",
+   "date": "2026-08-26",
+   "summary": "Own the app shell's height cap and express it as a max-height",
+   "tags": [
+    "refactor",
+    "layout"
+   ],
+   "branch": "claude/app-shell-cap-ownership-4kq2xr",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 70,
+   "deletions": 40
+  },
+  {
+   "era": "repo",
+   "id": 837,
+   "label": "PR #837",
+   "date": "2026-08-26",
+   "summary": "Add layout smoke checks, the one gate jsdom cannot be",
+   "tags": [
+    "test",
+    "build",
+    "layout"
+   ],
+   "branch": "claude/layout-smoke-checks-9tvbn2",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 234,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 838,
+   "label": "PR #838",
+   "date": "2026-08-26",
+   "summary": "Assert that the agenda's scroll element actually scrolls",
+   "tags": [
+    "test",
+    "calendar"
+   ],
+   "branch": "claude/agenda-scroll-invariant-7hm3wq",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 184,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 839,
+   "label": "PR #839",
+   "date": "2026-08-26",
+   "summary": "Measure coverage on the worker package and gate it per file",
+   "tags": [
+    "test",
+    "build"
+   ],
+   "branch": "claude/health-results-finding-3-pxs07j",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 30,
+   "deletions": 63
+  },
+  {
+   "era": "repo",
+   "id": 840,
+   "label": "PR #840",
+   "date": "2026-08-26",
+   "summary": "Move settings out of a modal and onto its own routes",
+   "tags": [
+    "rework",
+    "navigation",
+    "layout"
+   ],
+   "branch": "claude/settings-dialog-layout-t8jho7",
+   "commits": 4,
+   "filesChanged": 35,
+   "insertions": 1349,
+   "deletions": 691
+  },
+  {
+   "era": "repo",
+   "id": 841,
+   "label": "PR #841",
+   "date": "2026-08-26",
+   "summary": "Cover the store's three legacy migrations and add a coverage floor",
+   "tags": [
+    "test",
+    "state"
+   ],
+   "branch": "claude/health-results-finding-4-ba3bqo",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 213,
+   "deletions": 66
+  },
+  {
+   "era": "repo",
+   "id": 842,
+   "label": "PR #842",
+   "date": "2026-08-26",
+   "summary": "Make the entry editor's hook fields required, dropping dev-page optionality",
+   "tags": [
+    "refactor",
+    "editor"
+   ],
+   "branch": "claude/health-results-finding-6-yo2023",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 47,
+   "deletions": 112
+  },
+  {
+   "era": "repo",
+   "id": 843,
+   "label": "PR #843",
+   "date": "2026-08-27",
+   "summary": "Fix the flash and resize when checking off a task in the items list",
+   "tags": [
+    "bugfix",
+    "animation",
+    "editor"
+   ],
+   "branch": "claude/entry-editor-task-toggle-flash-1lci50",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 176,
+   "deletions": 6
+  },
+  {
+   "era": "repo",
+   "id": 844,
+   "label": "PR #844",
+   "date": "2026-08-26",
+   "summary": "Move settings onto the document-flow shell, out of the app shell",
+   "tags": [
+    "bugfix",
+    "layout",
+    "mobile"
+   ],
+   "branch": "claude/settings-dialog-layout-t8jho7",
+   "commits": 2,
+   "filesChanged": 11,
+   "insertions": 162,
+   "deletions": 98
+  },
+  {
+   "era": "repo",
+   "id": 845,
+   "label": "PR #845",
+   "date": "2026-08-26",
+   "summary": "Document which shell a route belongs to, and why",
+   "tags": [
+    "docs",
+    "architecture"
+   ],
+   "branch": "claude/settings-dialog-layout-t8jho7",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 29,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 846,
+   "label": "PR #846",
+   "date": "2026-08-26",
+   "summary": "Move the tutorial vault's content out of the example backend",
+   "tags": [
+    "refactor",
+    "onboarding",
+    "storage"
+   ],
+   "branch": "claude/health-results-finding-7-91me01",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 446,
+   "deletions": 499
+  },
+  {
+   "era": "repo",
+   "id": 847,
+   "label": "PR #847",
+   "date": "2026-08-27",
+   "summary": "Remove the dead multiday-covers-date helper",
+   "tags": [
+    "chore",
+    "model"
+   ],
+   "branch": "claude/remove-multidaycoversdate-dead-code-qkf6im",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 5,
+   "deletions": 36
+  },
+  {
+   "era": "repo",
+   "id": 848,
+   "label": "PR #848",
+   "date": "2026-08-27",
+   "summary": "Extract a shared virtualized-row scaffold out of three lists",
+   "tags": [
+    "refactor",
+    "calendar",
+    "search"
+   ],
+   "branch": "claude/health-results-finding-8-rz36fc",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 148,
+   "deletions": 196
+  },
+  {
+   "era": "repo",
+   "id": 849,
+   "label": "PR #849",
+   "date": "2026-08-27",
+   "summary": "Extract the auto-save hook out of the entry editor hook",
+   "tags": [
+    "refactor",
+    "editor"
+   ],
+   "branch": "claude/health-results-finding-9-7laz00",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 86,
+   "deletions": 111
+  },
+  {
+   "era": "repo",
+   "id": 850,
+   "label": "PR #850",
+   "date": "2026-08-27",
+   "summary": "Pin the ancestor that actually scrolls when the items list folds",
+   "tags": [
+    "bugfix",
+    "animation",
+    "layout"
+   ],
+   "branch": "claude/entry-editor-task-toggle-flash-1lci50",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 86,
+   "deletions": 10
+  },
+  {
+   "era": "repo",
+   "id": 851,
+   "label": "PR #851",
+   "date": "2026-08-27",
+   "summary": "Split parse and round-trip reporting out of the sync module",
+   "tags": [
+    "refactor",
+    "storage",
+    "architecture"
+   ],
+   "branch": "claude/health-results-finding-10a-wjt3s3",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 160,
+   "deletions": 192
+  },
+  {
+   "era": "repo",
+   "id": 852,
+   "label": "PR #852",
+   "date": "2026-08-27",
+   "summary": "Collapse a leaving row in flow instead of animating the list's height",
+   "tags": [
+    "rework",
+    "animation",
+    "layout"
+   ],
+   "branch": "claude/entry-editor-task-toggle-flash-1lci50",
+   "commits": 1,
+   "filesChanged": 15,
+   "insertions": 753,
+   "deletions": 496
+  },
+  {
+   "era": "repo",
+   "id": 853,
+   "label": "PR #853",
+   "date": "2026-08-27",
+   "summary": "Plan the topbar quick-navigation month strip and mini-calendar",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/calendar-month-label-nav-vp8yud",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 227,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 854,
+   "label": "PR #854",
+   "date": "2026-08-27",
+   "summary": "Turn the month view's topbar label into a quick-navigation disclosure",
+   "tags": [
+    "feature",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/calendar-month-label-nav-vp8yud",
+   "commits": 1,
+   "filesChanged": 10,
+   "insertions": 354,
+   "deletions": 69
+  },
+  {
+   "era": "repo",
+   "id": 856,
+   "label": "PR #856",
+   "date": "2026-08-28",
+   "summary": "Slide the quick-nav panel out of the topbar and lead with its chevron",
+   "tags": [
+    "polish",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/quicknav-topbar-slide-fixup",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 137,
+   "deletions": 93
+  },
+  {
+   "era": "repo",
+   "id": 857,
+   "label": "PR #857",
+   "date": "2026-08-28",
+   "summary": "Stop the month strip auto-scrolling as you page through months",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/month-strip-no-autoscroll",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 42,
+   "deletions": 35
+  },
+  {
+   "era": "repo",
+   "id": 858,
+   "label": "PR #858",
+   "date": "2026-08-28",
+   "summary": "Derive the mini-calendar's day dots from the expanded occurrences",
+   "tags": [
+    "feature",
+    "calendar"
+   ],
+   "branch": "claude/topbar-quick-nav-pr2-d2gvb0",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 153,
+   "deletions": 45
+  },
+  {
+   "era": "repo",
+   "id": 859,
+   "label": "PR #859",
+   "date": "2026-08-28",
+   "summary": "Split the sync scheduler and per-vault state into their own modules",
+   "tags": [
+    "refactor",
+    "storage",
+    "architecture"
+   ],
+   "branch": "claude/health-results-implementation-pli456",
+   "commits": 2,
+   "filesChanged": 16,
+   "insertions": 718,
+   "deletions": 725
+  },
+  {
+   "era": "repo",
+   "id": 860,
+   "label": "PR #860",
+   "date": "2026-08-28",
+   "summary": "Add the dotted mini month grid to day, week and agenda",
+   "tags": [
+    "feature",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/topbar-quick-nav-pr3-4qsev8",
+   "commits": 1,
+   "filesChanged": 9,
+   "insertions": 340,
+   "deletions": 72
+  },
+  {
+   "era": "repo",
+   "id": 861,
+   "label": "PR #861",
+   "date": "2026-08-29",
+   "summary": "Add motion, focus handling and a layout guard to the quick-nav panel",
+   "tags": [
+    "polish",
+    "a11y",
+    "animation"
+   ],
+   "branch": "claude/topbar-quick-nav-pr4-aiubkd",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 82,
+   "deletions": 102
+  },
+  {
+   "era": "repo",
+   "id": 862,
+   "label": "PR #862",
+   "date": "2026-08-31",
+   "summary": "Add a vault-scaling stress harness and record its findings",
+   "tags": [
+    "test",
+    "perf"
+   ],
+   "branch": "claude/app-performance-stress-tests-dipdtr",
+   "commits": 7,
+   "filesChanged": 11,
+   "insertions": 1527,
+   "deletions": 15
+  },
+  {
+   "era": "repo",
+   "id": 863,
+   "label": "PR #863",
+   "date": "2026-08-30",
+   "summary": "Bring the shadcn primitives up to the registry's current data-slot convention",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/shadcn-components-upgrade-dol7r5",
+   "commits": 1,
+   "filesChanged": 18,
+   "insertions": 182,
+   "deletions": 36
+  },
+  {
+   "era": "repo",
+   "id": 864,
+   "label": "PR #864",
+   "date": "2026-08-30",
+   "summary": "Unify the topbar's disclosure button and pair the mini month with the month strip",
+   "tags": [
+    "refactor",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/month-quick-nav-calendar-uzd4dw",
+   "commits": 4,
+   "filesChanged": 6,
+   "insertions": 233,
+   "deletions": 171
+  },
+  {
+   "era": "repo",
+   "id": 865,
+   "label": "PR #865",
+   "date": "2026-08-30",
+   "summary": "Add the missing data-slot attributes to the sidebar primitive",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/shadcn-components-upgrade-dol7r5",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 15,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 866,
+   "label": "PR #866",
+   "date": "2026-08-31",
+   "summary": "Size the quick-nav toggle by its rendered chevrons so spacing matches other views",
+   "tags": [
+    "bugfix",
+    "layout",
+    "navigation"
+   ],
+   "branch": "claude/agenda-chevron-spacing-onvnbz",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 17,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 867,
+   "label": "PR #867",
+   "date": "2026-08-31",
+   "summary": "Adopt the current shadcn size, focus-ring and invalid-state conventions",
+   "tags": [
+    "chore",
+    "a11y",
+    "colors"
+   ],
+   "branch": "claude/shadcn-components-upgrade-dol7r5",
+   "commits": 4,
+   "filesChanged": 13,
+   "insertions": 28,
+   "deletions": 22
+  },
+  {
+   "era": "repo",
+   "id": 868,
+   "label": "PR #868",
+   "date": "2026-08-31",
+   "summary": "Avoid a full-array walk on the expansion cache's metadata overlay fast path",
+   "tags": [
+    "perf",
+    "model"
+   ],
+   "branch": "claude/vault-scaling-results-finding-3-ankapo",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 79,
+   "deletions": 64
+  },
+  {
+   "era": "repo",
+   "id": 869,
+   "label": "PR #869",
+   "date": "2026-08-31",
+   "summary": "Stop week view's quick nav marking all seven days as selected",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/week-view-nav-selection-8c4z1d",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 103,
+   "deletions": 36
+  },
+  {
+   "era": "repo",
+   "id": 870,
+   "label": "PR #870",
+   "date": "2026-08-31",
+   "summary": "Highlight the selected day and navigate correctly when browsing months",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/week-view-nav-selection-8c4z1d",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 65,
+   "deletions": 15
+  },
+  {
+   "era": "repo",
+   "id": 871,
+   "label": "PR #871",
+   "date": "2026-08-31",
+   "summary": "Plan the agenda's move to infinite scroll as four sequenced pull requests",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/infinite-scroll-agenda-q9tx5l",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 654,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 872,
+   "label": "PR #872",
+   "date": "2026-08-31",
+   "summary": "Make the quick-nav's selected date read more prominently",
+   "tags": [
+    "polish",
+    "calendar",
+    "colors"
+   ],
+   "branch": "claude/top-bar-date-prominence-oy3kur",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 27,
+   "deletions": 19
+  },
+  {
+   "era": "repo",
+   "id": 873,
+   "label": "PR #873",
+   "date": "2026-08-31",
+   "summary": "Add an expansion item index and an explicit day-range convention",
+   "tags": [
+    "refactor",
+    "model",
+    "calendar"
+   ],
+   "branch": "claude/infinite-scroll-agenda-q9tx5l",
+   "commits": 1,
+   "filesChanged": 12,
+   "insertions": 268,
+   "deletions": 144
+  },
+  {
+   "era": "repo",
+   "id": 874,
+   "label": "PR #874",
+   "date": "2026-08-31",
+   "summary": "Fix the week view's quick nav opening on the wrong month",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/top-bar-date-prominence-oy3kur",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 8,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 875,
+   "label": "PR #875",
+   "date": "2026-08-31",
+   "summary": "Take overdue items off the agenda window and group them by series",
+   "tags": [
+    "rework",
+    "calendar",
+    "model"
+   ],
+   "branch": "claude/agenda-infinite-scroll-pr1-3ufdj0",
+   "commits": 1,
+   "filesChanged": 14,
+   "insertions": 941,
+   "deletions": 495
+  },
+  {
+   "era": "repo",
+   "id": 876,
+   "label": "PR #876",
+   "date": "2026-08-31",
+   "summary": "Reuse the quick-nav's selected-day style for today in the date picker",
+   "tags": [
+    "polish",
+    "calendar",
+    "colors"
+   ],
+   "branch": "claude/date-picker-today-highlight-2n4eji",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 10,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 877,
+   "label": "PR #877",
+   "date": "2026-08-31",
+   "summary": "Expand the agenda over an absolute chunk grid",
+   "tags": [
+    "rework",
+    "calendar",
+    "perf"
+   ],
+   "branch": "claude/agenda-infinite-scroll-pr2-q0ajt0",
+   "commits": 3,
+   "filesChanged": 11,
+   "insertions": 459,
+   "deletions": 194
+  },
+  {
+   "era": "repo",
+   "id": 878,
+   "label": "PR #878",
+   "date": "2026-08-31",
+   "summary": "Add a vertical swipe gesture to toggle the quick-nav panel",
+   "tags": [
+    "feature",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/calendar-quicknav-swipe-a3s7dt",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 137,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 879,
+   "label": "PR #879",
+   "date": "2026-08-31",
+   "summary": "Update the mini month's strip on touch end rather than on settle",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/calendar-month-update-timing-iqrf8a",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 12,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 880,
+   "label": "PR #880",
+   "date": "2026-08-31",
+   "summary": "Report a browsed month on swipe preview so the panes stop lagging the finger",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/calendar-month-update-timing-iqrf8a",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 66,
+   "deletions": 27
+  },
+  {
+   "era": "repo",
+   "id": 881,
+   "label": "PR #881",
+   "date": "2026-08-31",
+   "summary": "Build the agenda's rows per chunk and concatenate them",
+   "tags": [
+    "rework",
+    "calendar",
+    "perf"
+   ],
+   "branch": "claude/agenda-infinite-scroll-pr3-4quyxv",
+   "commits": 1,
+   "filesChanged": 12,
+   "insertions": 1084,
+   "deletions": 588
+  },
+  {
+   "era": "repo",
+   "id": 882,
+   "label": "PR #882",
+   "date": "2026-08-31",
+   "summary": "Clean up the swipe-preview pattern behind the two timing fixes",
+   "tags": [
+    "refactor",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/calendar-month-update-timing-iqrf8a",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 171,
+   "deletions": 55
+  },
+  {
+   "era": "repo",
+   "id": 883,
+   "label": "PR #883",
+   "date": "2026-08-31",
+   "summary": "Defer the mini month's browse navigation to a transition",
+   "tags": [
+    "perf",
+    "calendar"
+   ],
+   "branch": "claude/calendar-month-update-timing-iqrf8a",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 13,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 884,
+   "label": "PR #884",
+   "date": "2026-09-01",
+   "summary": "Load the agenda incrementally, with a Load earlier control",
+   "tags": [
+    "feature",
+    "calendar",
+    "perf"
+   ],
+   "branch": "claude/agenda-infinite-scroll-pr4-6uutn9",
+   "commits": 1,
+   "filesChanged": 19,
+   "insertions": 843,
+   "deletions": 482
+  },
+  {
+   "era": "repo",
+   "id": 885,
+   "label": "PR #885",
+   "date": "2026-09-01",
+   "summary": "Stop the week view's topbar label desyncing from the quick-nav strip",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/header-sync-mini-month-nav-fe639h",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 56,
+   "deletions": 4
+  },
+  {
+   "era": "repo",
+   "id": 886,
+   "label": "PR #886",
+   "date": "2026-09-01",
+   "summary": "Style Load earlier as a top-of-list row and fix the scroll anchor it exposed",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-load-earlier-button-9wdl2o",
+   "commits": 2,
+   "filesChanged": 5,
+   "insertions": 61,
+   "deletions": 6
+  },
+  {
+   "era": "repo",
+   "id": 887,
+   "label": "PR #887",
+   "date": "2026-09-01",
+   "summary": "Wait past the flip glide in the flaky Load earlier layout check",
+   "tags": [
+    "test",
+    "build"
+   ],
+   "branch": "claude/header-sync-mini-month-nav-fe639h",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 7,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 888,
+   "label": "PR #888",
+   "date": "2026-09-01",
+   "summary": "Show the quick nav as a popover on wide screens, with paging chevrons",
+   "tags": [
+    "feature",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/quick-nav-minimonth-layout-lq841n",
+   "commits": 2,
+   "filesChanged": 5,
+   "insertions": 367,
+   "deletions": 242
+  },
+  {
+   "era": "repo",
+   "id": 889,
+   "label": "PR #889",
+   "date": "2026-09-01",
+   "summary": "Defer the mini calendar's navigation to swipe settle to stop the freeze",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/mini-calendar-swipe-freeze-rx2625",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 101,
+   "deletions": 59
+  },
+  {
+   "era": "repo",
+   "id": 890,
+   "label": "PR #890",
+   "date": "2026-09-01",
+   "summary": "Fix the duplicate entry and dropped listing link a new draft could leave behind",
+   "tags": [
+    "bugfix",
+    "editor",
+    "model"
+   ],
+   "branch": "claude/task-duplication-list-bug-ftvbfj",
+   "commits": 3,
+   "filesChanged": 12,
+   "insertions": 483,
+   "deletions": 21
+  },
+  {
+   "era": "repo",
+   "id": 891,
+   "label": "PR #891",
+   "date": "2026-09-01",
+   "summary": "Give the quick-nav panel a real popover focus contract on desktop",
+   "tags": [
+    "bugfix",
+    "a11y",
+    "navigation"
+   ],
+   "branch": "claude/quick-nav-popover-focus-fix",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 44,
+   "deletions": 3
+  },
+  {
+   "era": "repo",
+   "id": 892,
+   "label": "PR #892",
+   "date": "2026-09-01",
+   "summary": "Defer each carousel pane's occurrence expansion to a follow-up render",
+   "tags": [
+    "perf",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/mini-calendar-swipe-freeze-rx2625",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 135,
+   "deletions": 59
+  },
+  {
+   "era": "repo",
+   "id": 893,
+   "label": "PR #893",
+   "date": "2026-09-01",
+   "summary": "Cut the Intl formatting the calendar runs per hour cell and month chip",
+   "tags": [
+    "perf",
+    "calendar"
+   ],
+   "branch": "claude/calendar-swipe-perf-profiling",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 84,
+   "deletions": 8
+  },
+  {
+   "era": "repo",
+   "id": 894,
+   "label": "PR #894",
+   "date": "2026-09-01",
+   "summary": "Plan cheap carousel panes and then unbounded swiping",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/plan-cheap-carousel-panes",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 239,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 895,
+   "label": "PR #895",
+   "date": "2026-09-02",
+   "summary": "Show the actual repeat interval on the entry editor's repeat chip",
+   "tags": [
+    "polish",
+    "editor",
+    "model"
+   ],
+   "branch": "claude/scheduled-chips-intervals-7elj88",
+   "commits": 3,
+   "filesChanged": 3,
+   "insertions": 13,
+   "deletions": 3
+  },
+  {
+   "era": "repo",
+   "id": 896,
+   "label": "PR #896",
+   "date": "2026-09-02",
+   "summary": "Make the day and week carousel panes cheap to mount",
+   "tags": [
+    "perf",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/calendar-swipe-cheap-panes-pr1-1ju08w",
+   "commits": 2,
+   "filesChanged": 10,
+   "insertions": 629,
+   "deletions": 414
+  },
+  {
+   "era": "repo",
+   "id": 897,
+   "label": "PR #897",
+   "date": "2026-09-02",
+   "summary": "Fix the date-collision flake in the agenda's overdue-count test",
+   "tags": [
+    "test",
+    "calendar"
+   ],
+   "branch": "claude/agenda-overdue-count-date-collision",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 8,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 898,
+   "label": "PR #898",
+   "date": "2026-09-02",
+   "summary": "Exclude already-linked files from the item picker and reopen a done file on link",
+   "tags": [
+    "bugfix",
+    "editor",
+    "wikilinks"
+   ],
+   "branch": "claude/entry-editor-combobox-linked-gecc2v",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 67,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 899,
+   "label": "PR #899",
+   "date": "2026-09-02",
+   "summary": "Replace the mini calendar's date-picker dependency with an owned grid",
+   "tags": [
+    "refactor",
+    "calendar",
+    "chore"
+   ],
+   "branch": "claude/minimonth-owned-grid",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 312,
+   "deletions": 120
+  },
+  {
+   "era": "repo",
+   "id": 900,
+   "label": "PR #900",
+   "date": "2026-09-02",
+   "summary": "Queue a save whose vault is registered but not yet mounted",
+   "tags": [
+    "bugfix",
+    "storage",
+    "sync"
+   ],
+   "branch": "claude/item-creation-sync-issue-4ozcvn",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 133,
+   "deletions": 31
+  },
+  {
+   "era": "repo",
+   "id": 901,
+   "label": "PR #901",
+   "date": "2026-09-02",
+   "summary": "Decouple the day and week quick-nav swipe preview from route navigation",
+   "tags": [
+    "refactor",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/minimonth-preview-no-navigate",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 215,
+   "deletions": 53
+  },
+  {
+   "era": "repo",
+   "id": 902,
+   "label": "PR #902",
+   "date": "2026-09-02",
+   "summary": "Reserve the slugs of files the backend listed but that were never pulled",
+   "tags": [
+    "bugfix",
+    "storage",
+    "model"
+   ],
+   "branch": "claude/item-creation-sync-issue-4ozcvn",
+   "commits": 1,
+   "filesChanged": 11,
+   "insertions": 296,
+   "deletions": 20
+  },
+  {
+   "era": "repo",
+   "id": 903,
+   "label": "PR #903",
+   "date": "2026-09-02",
+   "summary": "Place the cursor at the tap point when editing a markdown task inline",
+   "tags": [
+    "bugfix",
+    "editor",
+    "mobile"
+   ],
+   "branch": "claude/markdown-task-cursor-placement-qpj69m",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 161,
+   "deletions": 11
+  },
+  {
+   "era": "repo",
+   "id": 904,
+   "label": "PR #904",
+   "date": "2026-09-02",
+   "summary": "Enlarge the agenda's Load earlier button and even out its padding",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-load-button-style-fncxpt",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 2,
+   "deletions": 2
+  },
+  {
+   "era": "repo",
+   "id": 905,
+   "label": "PR #905",
+   "date": "2026-09-02",
+   "summary": "Replace the swipe-stutter investigation with a sequenced implementation plan",
+   "tags": [
+    "docs",
+    "perf"
+   ],
+   "branch": "claude/minimonth-swipe-perf-xwc68n",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 348,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 906,
+   "label": "PR #906",
+   "date": "2026-09-02",
+   "summary": "Drop the Load earlier row's bottom padding",
+   "tags": [
+    "polish",
+    "calendar",
+    "layout"
+   ],
+   "branch": "claude/agenda-load-button-style-fncxpt",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 907,
+   "label": "PR #907",
+   "date": "2026-09-02",
+   "summary": "Auto-scroll the month strip when the active chip falls out of view",
+   "tags": [
+    "feature",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/calendar-month-autoscroll-fighb0",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 149,
+   "deletions": 11
+  },
+  {
+   "era": "repo",
+   "id": 908,
+   "label": "PR #908",
+   "date": "2026-09-02",
+   "summary": "Stop the agenda's own scroll position steering the quick-nav grid",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "navigation"
+   ],
+   "branch": "claude/minimonth-quicknav-anchor-loop",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 240,
+   "deletions": 85
+  },
+  {
+   "era": "repo",
+   "id": 909,
+   "label": "PR #909",
+   "date": "2026-09-02",
+   "summary": "Drop scroll snapping from the month quick-nav strip",
+   "tags": [
+    "polish",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/calendar-month-autoscroll-fighb0",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 6,
+   "deletions": 5
+  },
+  {
+   "era": "repo",
+   "id": 910,
+   "label": "PR #910",
+   "date": "2026-09-02",
+   "summary": "Give the month strip's edge-scroll target breathing room",
+   "tags": [
+    "polish",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/calendar-month-autoscroll-fighb0",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 19,
+   "deletions": 7
+  },
+  {
+   "era": "repo",
+   "id": 911,
+   "label": "PR #911",
+   "date": "2026-09-02",
+   "summary": "Seed the agenda's scroll offset instead of reconciling to it after paint",
+   "tags": [
+    "perf",
+    "calendar"
+   ],
+   "branch": "claude/agenda-seeded-scroll-offset",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 178,
+   "deletions": 110
+  },
+  {
+   "era": "repo",
+   "id": 912,
+   "label": "PR #912",
+   "date": "2026-09-02",
+   "summary": "Give the chips solid domain-coloured backgrounds instead of same-hue tints",
+   "tags": [
+    "bugfix",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/chips-contrast-styling-etj9i4",
+   "commits": 1,
+   "filesChanged": 6,
+   "insertions": 26,
+   "deletions": 18
+  },
+  {
+   "era": "repo",
+   "id": 913,
+   "label": "PR #913",
+   "date": "2026-09-02",
+   "summary": "Fire one agenda quick-nav browse per swipe rather than two",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/agenda-single-browse-per-swipe",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 42,
+   "deletions": 44
+  },
+  {
+   "era": "repo",
+   "id": 914,
+   "label": "PR #914",
+   "date": "2026-09-02",
+   "summary": "Tone the priority and type chips down to icon-only accents",
+   "tags": [
+    "polish",
+    "colors",
+    "editor"
+   ],
+   "branch": "claude/chips-contrast-styling-etj9i4",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 29,
+   "deletions": 23
+  },
+  {
+   "era": "repo",
+   "id": 915,
+   "label": "PR #915",
+   "date": "2026-09-02",
+   "summary": "Revert the agenda's seeded scroll write, which drifted Today and broke cold start",
+   "tags": [
+    "revert",
+    "calendar"
+   ],
+   "branch": "claude/agenda-scroll-drift-investigation",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 332,
+   "deletions": 157
+  },
+  {
+   "era": "repo",
+   "id": 916,
+   "label": "PR #916",
+   "date": "2026-09-02",
+   "summary": "Raise the fast-uri override floor past a further advisory",
+   "tags": [
+    "chore",
+    "security",
+    "build"
+   ],
+   "branch": "claude/fast-uri-vulnerabilities-byu9c2",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 16,
+   "deletions": 9
+  },
+  {
+   "era": "repo",
+   "id": 917,
+   "label": "PR #917",
+   "date": "2026-09-02",
+   "summary": "Replace the solid chip fills with a verified low-opacity tint",
+   "tags": [
+    "polish",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/chips-contrast-styling-etj9i4",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 79,
+   "deletions": 35
+  },
+  {
+   "era": "repo",
+   "id": 918,
+   "label": "PR #918",
+   "date": "2026-09-03",
+   "summary": "Stop the settings back button diverging from browser back navigation",
+   "tags": [
+    "bugfix",
+    "navigation"
+   ],
+   "branch": "claude/settings-back-button-nav-40xpay",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 101,
+   "deletions": 7
+  },
+  {
+   "era": "repo",
+   "id": 919,
+   "label": "PR #919",
+   "date": "2026-09-03",
+   "summary": "Add a per-vault colour setting, shown on the occurrence card's vault chip",
+   "tags": [
+    "feature",
+    "storage",
+    "colors"
+   ],
+   "branch": "claude/vault-color-settings-9xbzq9",
+   "commits": 1,
+   "filesChanged": 10,
+   "insertions": 236,
+   "deletions": 12
+  },
+  {
+   "era": "repo",
+   "id": 920,
+   "label": "PR #920",
+   "date": "2026-09-03",
+   "summary": "Show the vault chip in day and week timed blocks",
+   "tags": [
+    "feature",
+    "calendar",
+    "colors"
+   ],
+   "branch": "claude/vault-chip-timed-block-94g1mt",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 12,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 921,
+   "label": "PR #921",
+   "date": "2026-09-03",
+   "summary": "Drop the coloured border on the vault chip and keep the tint",
+   "tags": [
+    "polish",
+    "colors"
+   ],
+   "branch": "claude/vault-chip-no-border",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 15,
+   "deletions": 12
+  },
+  {
+   "era": "repo",
+   "id": 922,
+   "label": "PR #922",
+   "date": "2026-09-03",
+   "summary": "Remove the superseded quick-nav swipe plan",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/remove-agenda-quicknav-swipe-lkwois",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 0,
+   "deletions": 357
+  },
+  {
+   "era": "repo",
+   "id": 923,
+   "label": "PR #923",
+   "date": "2026-09-03",
+   "summary": "Defer the two scaling findings whose symptoms self-report",
+   "tags": [
+    "docs",
+    "perf"
+   ],
+   "branch": "claude/vault-scaling-findings-review-b70ed1",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 18,
+   "deletions": 112
+  },
+  {
+   "era": "repo",
+   "id": 924,
+   "label": "PR #924",
+   "date": "2026-09-03",
+   "summary": "Fix the low-contrast text tiers across every theme and consolidate the dim token",
+   "tags": [
+    "bugfix",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/settings-text-contrast-7lkc4f",
+   "commits": 2,
+   "filesChanged": 11,
+   "insertions": 89,
+   "deletions": 57
+  },
+  {
+   "era": "repo",
+   "id": 925,
+   "label": "PR #925",
+   "date": "2026-09-03",
+   "summary": "Let a swipe burst run past the pane window",
+   "tags": [
+    "feature",
+    "calendar",
+    "mobile"
+   ],
+   "branch": "claude/agenda-swipe-outside-panes-rbn8kv",
+   "commits": 3,
+   "filesChanged": 6,
+   "insertions": 32,
+   "deletions": 176
+  },
+  {
+   "era": "repo",
+   "id": 926,
+   "label": "PR #926",
+   "date": "2026-09-03",
+   "summary": "Write the two settled scaling findings down to a cheaper model tier",
+   "tags": [
+    "docs",
+    "perf"
+   ],
+   "branch": "claude/vault-scaling-findings-review-b70ed1",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 276,
+   "deletions": 57
+  },
+  {
+   "era": "repo",
+   "id": 927,
+   "label": "PR #927",
+   "date": "2026-09-03",
+   "summary": "Raise the coloured chip tint from 15% to 30% opacity",
+   "tags": [
+    "polish",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/colored-chip-opacity-29h4ea",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 40,
+   "deletions": 40
+  },
+  {
+   "era": "repo",
+   "id": 928,
+   "label": "PR #928",
+   "date": "2026-09-03",
+   "summary": "Add scroll profiling to the stress harness and guard a no-op cache write",
+   "tags": [
+    "perf",
+    "model",
+    "test"
+   ],
+   "branch": "claude/vault-scaling-profiling-bzs38y",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 170,
+   "deletions": 102
+  },
+  {
+   "era": "repo",
+   "id": 929,
+   "label": "PR #929",
+   "date": "2026-09-03",
+   "summary": "Replace the file-occurrence map's expand-then-filter with a bounded seek",
+   "tags": [
+    "perf",
+    "model",
+    "calendar"
+   ],
+   "branch": "claude/vault-scaling-results-finding-2-qkvy12",
+   "commits": 2,
+   "filesChanged": 8,
+   "insertions": 563,
+   "deletions": 289
+  },
+  {
+   "era": "repo",
+   "id": 930,
+   "label": "PR #930",
+   "date": "2026-09-03",
+   "summary": "Restore the vault chip's border in light themes",
+   "tags": [
+    "bugfix",
+    "colors"
+   ],
+   "branch": "claude/vault-chip-border-light-4mz7qx",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 15,
+   "deletions": 14
+  },
+  {
+   "era": "repo",
+   "id": 931,
+   "label": "PR #931",
+   "date": "2026-09-03",
+   "summary": "Colour occurrences by vault, behind an explicit setting",
+   "tags": [
+    "feature",
+    "calendar",
+    "colors"
+   ],
+   "branch": "claude/vault-color-occurrence-styling-j6ifnc",
+   "commits": 2,
+   "filesChanged": 26,
+   "insertions": 655,
+   "deletions": 244
+  },
+  {
+   "era": "repo",
+   "id": 932,
+   "label": "PR #932",
+   "date": "2026-09-03",
+   "summary": "Fix the file-occurrence map regression found while re-profiling",
+   "tags": [
+    "perf",
+    "model"
+   ],
+   "branch": "claude/vault-scaling-profiling-bzs38y",
+   "commits": 3,
+   "filesChanged": 3,
+   "insertions": 161,
+   "deletions": 97
+  },
+  {
+   "era": "repo",
+   "id": 933,
+   "label": "PR #933",
+   "date": "2026-09-03",
+   "summary": "Add a settle wait to the scroll profile so it isolates steady-state cost",
+   "tags": [
+    "test",
+    "perf"
+   ],
+   "branch": "claude/vault-scaling-profiling-bzs38y",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 205,
+   "deletions": 115
+  },
+  {
+   "era": "repo",
+   "id": 934,
+   "label": "PR #934",
+   "date": "2026-09-03",
+   "summary": "Defer the virtualizer scroll finding, moving its diagnosis into the report",
+   "tags": [
+    "docs",
+    "perf"
+   ],
+   "branch": "claude/session-kdfyi3",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 237,
+   "deletions": 264
+  },
+  {
+   "era": "repo",
+   "id": 935,
+   "label": "PR #935",
+   "date": "2026-09-03",
+   "summary": "Plan archived entries and the retention sweep",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/per-vault-retention-period-7zhd5p",
+   "commits": 3,
+   "filesChanged": 2,
+   "insertions": 373,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 936,
+   "label": "PR #936",
+   "date": "2026-09-03",
+   "summary": "Write down the implementation-decision default and plan-sizing guidance",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/claude-md-docs-notes-8nomcu",
+   "commits": 2,
+   "filesChanged": 5,
+   "insertions": 17,
+   "deletions": 3
+  },
+  {
+   "era": "repo",
+   "id": 937,
+   "label": "PR #937",
+   "date": "2026-09-03",
+   "summary": "Record the product-niche survey results and fold the run's learnings back in",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/product-niche-survey-w4qn09",
+   "commits": 3,
+   "filesChanged": 2,
+   "insertions": 604,
+   "deletions": 4
+  },
+  {
+   "era": "repo",
+   "id": 938,
+   "label": "PR #938",
+   "date": "2026-09-03",
+   "summary": "Add the archived field to an entry and hide archived entries everywhere",
+   "tags": [
+    "feature",
+    "model",
+    "calendar"
+   ],
+   "branch": "claude/per-vault-retention-period-7zhd5p",
+   "commits": 1,
+   "filesChanged": 11,
+   "insertions": 235,
+   "deletions": 72
+  },
+  {
+   "era": "repo",
+   "id": 939,
+   "label": "PR #939",
+   "date": "2026-09-04",
+   "summary": "Add archive and unarchive actions and the archived banner",
+   "tags": [
+    "feature",
+    "editor",
+    "model"
+   ],
+   "branch": "claude/per-vault-retention-period-7zhd5p",
+   "commits": 1,
+   "filesChanged": 18,
+   "insertions": 465,
+   "deletions": 86
+  },
+  {
+   "era": "repo",
+   "id": 940,
+   "label": "PR #940",
+   "date": "2026-09-04",
+   "summary": "Add the archived list to vault settings",
+   "tags": [
+    "feature",
+    "storage"
+   ],
+   "branch": "claude/per-vault-retention-period-7zhd5p",
+   "commits": 1,
+   "filesChanged": 6,
+   "insertions": 183,
+   "deletions": 27
+  },
+  {
+   "era": "repo",
+   "id": 942,
+   "label": "PR #942",
+   "date": "2026-09-04",
+   "summary": "Style the delete dialog's archive button as a warning, and space the stacked buttons",
+   "tags": [
+    "polish",
+    "editor",
+    "mobile"
+   ],
+   "branch": "claude/archive-button-delete-dialog-vu8bzm",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 5,
+   "deletions": 6
+  },
+  {
+   "era": "repo",
+   "id": 943,
+   "label": "PR #943",
+   "date": "2026-09-04",
+   "summary": "Extract the entry route builders to a root leaf, breaking a three-way cycle",
+   "tags": [
+    "refactor",
+    "architecture",
+    "navigation"
+   ],
+   "branch": "claude/import-cycle-cleanup-9k2p7",
+   "commits": 2,
+   "filesChanged": 15,
+   "insertions": 217,
+   "deletions": 56
+  },
+  {
+   "era": "repo",
+   "id": 944,
+   "label": "PR #944",
+   "date": "2026-09-04",
+   "summary": "Link the archived titles and collapse the list past five entries",
+   "tags": [
+    "polish",
+    "storage"
+   ],
+   "branch": "claude/archived-list-links-collapse",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 119,
+   "deletions": 22
+  },
+  {
+   "era": "repo",
+   "id": 945,
+   "label": "PR #945",
+   "date": "2026-09-04",
+   "summary": "Eliminate every import cycle and gate against new ones",
+   "tags": [
+    "refactor",
+    "architecture",
+    "build"
+   ],
+   "branch": "claude/import-cycles-prevention-6iw8ew",
+   "commits": 3,
+   "filesChanged": 21,
+   "insertions": 565,
+   "deletions": 200
+  },
+  {
+   "era": "repo",
+   "id": 946,
+   "label": "PR #946",
+   "date": "2026-09-04",
+   "summary": "Alias the destructive and warning tokens to the priority palette across all themes",
+   "tags": [
+    "refactor",
+    "colors"
+   ],
+   "branch": "claude/delete-dialog-priority-tokens-followup",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 23,
+   "deletions": 51
+  },
+  {
+   "era": "repo",
+   "id": 947,
+   "label": "PR #947",
+   "date": "2026-09-04",
+   "summary": "Plan onboarding for people who do not already have a repository",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/product-niche-survey-w4qn09",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 283,
+   "deletions": 4
+  },
+  {
+   "era": "repo",
+   "id": 948,
+   "label": "PR #948",
+   "date": "2026-09-04",
+   "summary": "Record the model tier per pull request in the onboarding plan",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/product-niche-survey-w4qn09",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 122,
+   "deletions": 41
+  },
+  {
+   "era": "repo",
+   "id": 949,
+   "label": "PR #949",
+   "date": "2026-09-04",
+   "summary": "Add the retention sweep that auto-archives finished, stale entries",
+   "tags": [
+    "feature",
+    "storage",
+    "model"
+   ],
+   "branch": "claude/pr4-archived-entries-ehjl1h",
+   "commits": 1,
+   "filesChanged": 23,
+   "insertions": 810,
+   "deletions": 315
+  },
+  {
+   "era": "repo",
+   "id": 950,
+   "label": "PR #950",
+   "date": "2026-09-04",
+   "summary": "Make the GitHub connect path survivable without a repository",
+   "tags": [
+    "bugfix",
+    "onboarding",
+    "storage"
+   ],
+   "branch": "claude/plans-onboarding-pr1-sm5s7v",
+   "commits": 3,
+   "filesChanged": 4,
+   "insertions": 146,
+   "deletions": 176
+  },
+  {
+   "era": "repo",
+   "id": 951,
+   "label": "PR #951",
+   "date": "2026-09-04",
+   "summary": "Name the API asymmetry behind the onboarding plan's second step",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/product-niche-survey-w4qn09",
+   "commits": 3,
+   "filesChanged": 1,
+   "insertions": 36,
+   "deletions": 67
+  },
+  {
+   "era": "repo",
+   "id": 952,
+   "label": "PR #952",
+   "date": "2026-09-04",
+   "summary": "Remove the odd focus ring on the date picker's day buttons",
+   "tags": [
+    "polish",
+    "a11y",
+    "colors"
+   ],
+   "branch": "claude/entry-editor-date-picker-border-xfhjud",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 953,
+   "label": "PR #953",
+   "date": "2026-09-04",
+   "summary": "Treat an empty GitHub repository as an empty vault, not a sync conflict",
+   "tags": [
+    "bugfix",
+    "sync",
+    "onboarding"
+   ],
+   "branch": "claude/plans-onboarding-pr2-nrd2u3",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 43,
+   "deletions": 62
+  },
+  {
+   "era": "repo",
+   "id": 954,
+   "label": "PR #954",
+   "date": "2026-09-04",
+   "summary": "Fix the low-contrast warning banners and the mismatched unarchive button",
+   "tags": [
+    "bugfix",
+    "colors",
+    "a11y"
+   ],
+   "branch": "claude/entry-editor-archived-warning-v8uwp8",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 10,
+   "deletions": 8
+  },
+  {
+   "era": "repo",
+   "id": 955,
+   "label": "PR #955",
+   "date": "2026-09-04",
+   "summary": "Fix the coach tour's auto-start and the tutorial's closing instructions",
+   "tags": [
+    "bugfix",
+    "onboarding"
+   ],
+   "branch": "claude/plans-onboarding-pr3-b99yue",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 34,
+   "deletions": 109
+  },
+  {
+   "era": "repo",
+   "id": 956,
+   "label": "PR #956",
+   "date": "2026-09-04",
+   "summary": "Deduplicate the identical theme tokens across the stylesheet",
+   "tags": [
+    "refactor",
+    "colors"
+   ],
+   "branch": "claude/css-token-dedup",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 79,
+   "deletions": 96
+  },
+  {
+   "era": "repo",
+   "id": 957,
+   "label": "PR #957",
+   "date": "2026-09-04",
+   "summary": "Give the archived-entry banner the app's standard card shadow",
+   "tags": [
+    "polish",
+    "editor",
+    "colors"
+   ],
+   "branch": "claude/archived-banner-shadow",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 958,
+   "label": "PR #958",
+   "date": "2026-09-04",
+   "summary": "Put a gap between the date picker's touching day cells",
+   "tags": [
+    "polish",
+    "layout",
+    "editor"
+   ],
+   "branch": "claude/date-picker-button-gap-8spj6k",
+   "commits": 2,
+   "filesChanged": 1,
+   "insertions": 1,
+   "deletions": 1
+  },
+  {
+   "era": "repo",
+   "id": 959,
+   "label": "PR #959",
+   "date": "2026-09-04",
+   "summary": "Add an invite path for a shared GitHub vault",
+   "tags": [
+    "feature",
+    "onboarding",
+    "storage"
+   ],
+   "branch": "claude/plans-onboarding-pr4-wpa17h",
+   "commits": 2,
+   "filesChanged": 7,
+   "insertions": 100,
+   "deletions": 133
+  },
+  {
+   "era": "repo",
+   "id": 960,
+   "label": "PR #960",
+   "date": "2026-09-04",
+   "summary": "Narrow the open onboarding finding to what is still outstanding",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/product-niche-finding-5-update",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 58,
+   "deletions": 51
+  },
+  {
+   "era": "repo",
+   "id": 961,
+   "label": "PR #961",
+   "date": "2026-09-04",
+   "summary": "Record the UI-layer health survey run",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/surveys-ui-gu2vpe",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 790,
+   "deletions": 0
+  },
+  {
+   "era": "repo",
+   "id": 962,
+   "label": "PR #962",
+   "date": "2026-09-04",
+   "summary": "Dedupe the day, week and month paged topbar",
+   "tags": [
+    "refactor",
+    "navigation",
+    "layout"
+   ],
+   "branch": "claude/fix-pagedtopbar-dup",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 86,
+   "deletions": 182
+  },
+  {
+   "era": "repo",
+   "id": 963,
+   "label": "PR #963",
+   "date": "2026-09-04",
+   "summary": "Cover all fourteen routes in the layout smoke checks and gate against gaps",
+   "tags": [
+    "test",
+    "build",
+    "layout"
+   ],
+   "branch": "claude/health-ui-results-finding-4-6sngva",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 107,
+   "deletions": 86
+  },
+  {
+   "era": "repo",
+   "id": 964,
+   "label": "PR #964",
+   "date": "2026-09-05",
+   "summary": "Fix the vault versus example-vault naming fracture",
+   "tags": [
+    "docs",
+    "onboarding"
+   ],
+   "branch": "claude/find-product-niche-results-nvqmqb",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 10,
+   "deletions": 60
+  },
+  {
+   "era": "repo",
+   "id": 965,
+   "label": "PR #965",
+   "date": "2026-09-05",
+   "summary": "Broaden the React Compiler bail-out lint rule to arrow functions",
+   "tags": [
+    "chore",
+    "build",
+    "perf"
+   ],
+   "branch": "claude/health-ui-results-finding-5-ncxoda",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 8,
+   "deletions": 71
+  },
+  {
+   "era": "repo",
+   "id": 966,
+   "label": "PR #966",
+   "date": "2026-09-05",
+   "summary": "Fix the stale coverage exclusion and the inert threshold key",
+   "tags": [
+    "chore",
+    "build",
+    "test"
+   ],
+   "branch": "claude/health-ui-findings-6-7-v8sfnd",
+   "commits": 2,
+   "filesChanged": 4,
+   "insertions": 206,
+   "deletions": 132
+  },
+  {
+   "era": "repo",
+   "id": 967,
+   "label": "PR #967",
+   "date": "2026-09-05",
+   "summary": "Add phone screenshot proof to the README, the social image and the manifest",
+   "tags": [
+    "docs",
+    "pwa"
+   ],
+   "branch": "claude/product-niche-results-finding-1-kbrc0a",
+   "commits": 2,
+   "filesChanged": 6,
+   "insertions": 17,
+   "deletions": 56
+  },
+  {
+   "era": "repo",
+   "id": 968,
+   "label": "PR #968",
+   "date": "2026-09-05",
+   "summary": "Claim iCal calendar subscriptions in the README, and guard the blog against edits",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/product-niche-fit-finding-3-3juzr5",
+   "commits": 3,
+   "filesChanged": 3,
+   "insertions": 33,
+   "deletions": 63
+  },
+  {
+   "era": "repo",
+   "id": 969,
+   "label": "PR #969",
+   "date": "2026-09-05",
+   "summary": "Decompose the app's main region into per-view chrome adapters",
+   "tags": [
+    "refactor",
+    "navigation",
+    "architecture"
+   ],
+   "branch": "claude/health-ui-results-architecture-4a1b5r",
+   "commits": 1,
+   "filesChanged": 12,
+   "insertions": 840,
+   "deletions": 431
+  },
+  {
+   "era": "repo",
+   "id": 970,
+   "label": "PR #970",
+   "date": "2026-09-05",
+   "summary": "Drop the internal vault wording from the collaborator invite message",
+   "tags": [
+    "polish",
+    "onboarding"
+   ],
+   "branch": "claude/finding-5-product-niche-t76s63",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 5,
+   "deletions": 68
+  },
+  {
+   "era": "repo",
+   "id": 971,
+   "label": "PR #971",
+   "date": "2026-09-05",
+   "summary": "Wrap the button and separator primitives instead of patching the shadcn mirror",
+   "tags": [
+    "refactor",
+    "architecture",
+    "perf"
+   ],
+   "branch": "claude/ui-health-results-wrapping-rgdhyk",
+   "commits": 2,
+   "filesChanged": 17,
+   "insertions": 64,
+   "deletions": 100
+  },
+  {
+   "era": "repo",
+   "id": 972,
+   "label": "PR #972",
+   "date": "2026-09-05",
+   "summary": "Retire the product-niche results file now that its findings are closed",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/remove-biche-results-plans-y6r4zm",
+   "commits": 1,
+   "filesChanged": 1,
+   "insertions": 0,
+   "deletions": 340
+  },
+  {
+   "era": "repo",
+   "id": 973,
+   "label": "PR #973",
+   "date": "2026-09-05",
+   "summary": "Test the URL safety check, the app's only cross-site scripting gate",
+   "tags": [
+    "test",
+    "security"
+   ],
+   "branch": "claude/ui-health-results-finding-8-54okkx",
+   "commits": 2,
+   "filesChanged": 3,
+   "insertions": 44,
+   "deletions": 258
+  },
+  {
+   "era": "repo",
+   "id": 974,
+   "label": "PR #974",
+   "date": "2026-09-05",
+   "summary": "Record the data-integrity survey run and fold its learnings back in",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/survey-data-integrity-3ui0s4",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 1468,
+   "deletions": 7
+  },
+  {
+   "era": "repo",
+   "id": 975,
+   "label": "PR #975",
+   "date": "2026-09-05",
+   "summary": "Stop an editor save stripping unrelated frontmatter extras",
+   "tags": [
+    "bugfix",
+    "frontmatter",
+    "editor"
+   ],
+   "branch": "claude/fix-data-integrity-finding-1",
+   "commits": 3,
+   "filesChanged": 7,
+   "insertions": 353,
+   "deletions": 284
+  },
+  {
+   "era": "repo",
+   "id": 976,
+   "label": "PR #976",
+   "date": "2026-09-05",
+   "summary": "Compare source text rather than parsed values in the round-trip guard",
+   "tags": [
+    "bugfix",
+    "model",
+    "frontmatter"
+   ],
+   "branch": "claude/data-integrity-results-finding-5-fjzvfo",
+   "commits": 1,
+   "filesChanged": 4,
+   "insertions": 123,
+   "deletions": 180
+  },
+  {
+   "era": "repo",
+   "id": 977,
+   "label": "PR #977",
+   "date": "2026-09-05",
+   "summary": "Make a second view of the same vault coherent instead of silently destructive",
+   "tags": [
+    "bugfix",
+    "storage",
+    "sync"
+   ],
+   "branch": "claude/data-integrity-results-finding-jdx395",
+   "commits": 2,
+   "filesChanged": 17,
+   "insertions": 1079,
+   "deletions": 236
+  },
+  {
+   "era": "repo",
+   "id": 978,
+   "label": "PR #978",
+   "date": "2026-09-06",
+   "summary": "Write down the rule to check for architectural issues before implementing",
+   "tags": [
+    "docs",
+    "architecture"
+   ],
+   "branch": "claude/claude-md-architecture-note-r2r9b7",
+   "commits": 3,
+   "filesChanged": 2,
+   "insertions": 21,
+   "deletions": 7
+  },
+  {
+   "era": "repo",
+   "id": 979,
+   "label": "PR #979",
+   "date": "2026-09-06",
+   "summary": "Save a frontmatter value as the characters it was written with",
+   "tags": [
+    "bugfix",
+    "frontmatter",
+    "model"
+   ],
+   "branch": "claude/data-integrity-results-finding-6-yjsrb0",
+   "commits": 3,
+   "filesChanged": 16,
+   "insertions": 776,
+   "deletions": 219
+  },
+  {
+   "era": "repo",
+   "id": 980,
+   "label": "PR #980",
+   "date": "2026-09-06",
+   "summary": "Stop the spring-forward transition truncating bounded series and rewriting clock times",
+   "tags": [
+    "bugfix",
+    "model"
+   ],
+   "branch": "claude/data-integrity-results-finding-3-p17rgk",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 77,
+   "deletions": 227
+  },
+  {
+   "era": "repo",
+   "id": 981,
+   "label": "PR #981",
+   "date": "2026-09-06",
+   "summary": "Flush a pending editor autosave before pushing at page teardown",
+   "tags": [
+    "bugfix",
+    "editor",
+    "sync"
+   ],
+   "branch": "claude/finding-7-data-integrity-n3frm1",
+   "commits": 2,
+   "filesChanged": 7,
+   "insertions": 174,
+   "deletions": 147
+  },
+  {
+   "era": "repo",
+   "id": 982,
+   "label": "PR #982",
+   "date": "2026-09-06",
+   "summary": "Refuse a file whose structural key has a shape the model cannot read",
+   "tags": [
+    "bugfix",
+    "model",
+    "error-handling"
+   ],
+   "branch": "claude/plans-data-integrity-finding-4-edvw0a",
+   "commits": 2,
+   "filesChanged": 10,
+   "insertions": 411,
+   "deletions": 373
+  },
+  {
+   "era": "repo",
+   "id": 983,
+   "label": "PR #983",
+   "date": "2026-09-06",
+   "summary": "Stop docs and gate config pre-empting survey findings, and consolidate the surveys",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/survey-files-quality-review-yft0er",
+   "commits": 3,
+   "filesChanged": 19,
+   "insertions": 444,
+   "deletions": 111
+  },
+  {
+   "era": "repo",
+   "id": 984,
+   "label": "PR #984",
+   "date": "2026-09-06",
+   "summary": "Record the codebase health survey results",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/health-survey-plan-d16dvb",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 1100,
+   "deletions": 234
+  },
+  {
+   "era": "repo",
+   "id": 985,
+   "label": "PR #985",
+   "date": "2026-09-06",
+   "summary": "Move the autosave flush port to a root leaf so the root route stops pulling in the editor",
+   "tags": [
+    "refactor",
+    "architecture",
+    "perf"
+   ],
+   "branch": "claude/health-results-fix-1-zd2s7v",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 29,
+   "deletions": 122
+  },
+  {
+   "era": "repo",
+   "id": 986,
+   "label": "PR #986",
+   "date": "2026-09-06",
+   "summary": "Enable the app's strictness flags in the worker package too",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/health-results-finding-2-61e5x7",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 19,
+   "deletions": 81
+  },
+  {
+   "era": "repo",
+   "id": 987,
+   "label": "PR #987",
+   "date": "2026-09-06",
+   "summary": "Close the iCal proxy to callers other than the app, and meter it",
+   "tags": [
+    "bugfix",
+    "security"
+   ],
+   "branch": "claude/health-survey-plan-d16dvb",
+   "commits": 1,
+   "filesChanged": 10,
+   "insertions": 295,
+   "deletions": 99
+  },
+  {
+   "era": "repo",
+   "id": 988,
+   "label": "PR #988",
+   "date": "2026-09-06",
+   "summary": "Add render-level tests for onboarding, the entry view and the app shell",
+   "tags": [
+    "test",
+    "onboarding"
+   ],
+   "branch": "claude/health-results-fix-6-j21j3a",
+   "commits": 3,
+   "filesChanged": 8,
+   "insertions": 972,
+   "deletions": 81
+  },
+  {
+   "era": "repo",
+   "id": 989,
+   "label": "PR #989",
+   "date": "2026-09-06",
+   "summary": "Dim done and past pills and blocks instead of graying them out",
+   "tags": [
+    "polish",
+    "calendar",
+    "colors"
+   ],
+   "branch": "claude/done-occurrence-dimming-style-5upy56",
+   "commits": 1,
+   "filesChanged": 3,
+   "insertions": 49,
+   "deletions": 22
+  },
+  {
+   "era": "repo",
+   "id": 990,
+   "label": "PR #990",
+   "date": "2026-09-06",
+   "summary": "Raise five drifted coverage floors",
+   "tags": [
+    "test",
+    "build"
+   ],
+   "branch": "claude/health-finding-4-b7ng88",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 16,
+   "deletions": 77
+  },
+  {
+   "era": "repo",
+   "id": 991,
+   "label": "PR #991",
+   "date": "2026-09-07",
+   "summary": "Enable the twenty strict type-checked lint rules never assessed",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/plans-health-finding-3-awog1g",
+   "commits": 2,
+   "filesChanged": 12,
+   "insertions": 92,
+   "deletions": 112
+  },
+  {
+   "era": "repo",
+   "id": 992,
+   "label": "PR #992",
+   "date": "2026-09-07",
+   "summary": "Keep an occurrence's own colour when dimming past and done displays",
+   "tags": [
+    "polish",
+    "calendar",
+    "colors"
+   ],
+   "branch": "claude/done-occurrence-dimming-style-5upy56",
+   "commits": 1,
+   "filesChanged": 7,
+   "insertions": 110,
+   "deletions": 116
+  },
+  {
+   "era": "repo",
+   "id": 993,
+   "label": "PR #993",
+   "date": "2026-09-07",
+   "summary": "Point the shadcn utils alias at the existing helper module",
+   "tags": [
+    "chore",
+    "build"
+   ],
+   "branch": "claude/finding-7-health-plans-3uqfoz",
+   "commits": 1,
+   "filesChanged": 2,
+   "insertions": 13,
+   "deletions": 54
+  },
+  {
+   "era": "repo",
+   "id": 994,
+   "label": "PR #994",
+   "date": "2026-09-07",
+   "summary": "Wrap the GitHub sign-in start in the catch-and-notify convention",
+   "tags": [
+    "bugfix",
+    "error-handling",
+    "storage"
+   ],
+   "branch": "claude/finding-9-health-plans-27nt75",
+   "commits": 2,
+   "filesChanged": 5,
+   "insertions": 90,
+   "deletions": 85
+  },
+  {
+   "era": "repo",
+   "id": 995,
+   "label": "PR #995",
+   "date": "2026-09-07",
+   "summary": "Correct a stale route-coverage warning in the agent guidelines",
+   "tags": [
+    "docs"
+   ],
+   "branch": "claude/finding-8-health-plans-w92j2s",
+   "commits": 2,
+   "filesChanged": 2,
+   "insertions": 12,
+   "deletions": 352
+  },
+  {
+   "era": "repo",
+   "id": 996,
+   "label": "PR #996",
+   "date": "2026-09-07",
+   "summary": "Show coloured accent bars on done and past cards, and unify the occurrence sort order",
+   "tags": [
+    "polish",
+    "calendar",
+    "colors"
+   ],
+   "branch": "claude/done-occurrence-dimming-style-5upy56",
+   "commits": 2,
+   "filesChanged": 5,
+   "insertions": 42,
+   "deletions": 31
+  },
+  {
+   "era": "repo",
+   "id": 997,
+   "label": "PR #997",
+   "date": "2026-09-07",
+   "summary": "Dock the nav rail beside settings and the entry editor on large screens",
+   "tags": [
+    "feature",
+    "layout",
+    "navigation"
+   ],
+   "branch": "claude/sidebar-responsive-settings-editor-w5d1dl",
+   "commits": 1,
+   "filesChanged": 5,
+   "insertions": 99,
+   "deletions": 50
+  },
+  {
+   "era": "repo",
+   "id": 998,
+   "label": "PR #998",
+   "date": "2026-09-07",
+   "summary": "Fix the agenda's row-height estimates so fewer rows shift when measured",
+   "tags": [
+    "bugfix",
+    "calendar",
+    "perf"
+   ],
+   "branch": "claude/agenda-virtualizer-flicker-y6sp5o",
+   "commits": 1,
+   "filesChanged": 8,
+   "insertions": 180,
+   "deletions": 59
   }
  ]
 }
