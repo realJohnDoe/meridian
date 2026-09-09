@@ -187,6 +187,43 @@ function collectTextElementsInPage() {
 
   const vw = window.innerWidth
   const vh = window.innerHeight
+
+  /**
+   * The element's rect intersected with every clipping ancestor's own rect,
+   * walking up to <html> — NOT just `getBoundingClientRect()` clamped to the
+   * window. A collapsed `grid-template-rows: 0fr` panel (the quick-nav
+   * disclosure — CLAUDE.md's "Route shells" section) or an Embla carousel's
+   * off-screen slide (`MonthStrip.tsx`, the search date picker) both clip a
+   * descendant via an ancestor's `overflow: hidden`, but the descendant's own
+   * `getBoundingClientRect()` keeps reporting its full, real, on-paper
+   * geometry regardless — overflow clipping only changes what gets *painted*,
+   * not the layout box a descendant reports about itself. Without this, a
+   * genuinely invisible element (present in the DOM, zero painted pixels) got
+   * checked anyway, its background sampled from whatever unrelated content
+   * really occupies those screen coordinates — a false positive with no
+   * connection to anything a user would ever see.
+   */
+  function visibleRect(el) {
+    let clip = { left: 0, top: 0, right: vw, bottom: vh }
+    for (let node = el.parentElement; node && node !== document.documentElement; node = node.parentElement) {
+      const ncs = getComputedStyle(node)
+      if (ncs.overflowX === 'visible' && ncs.overflowY === 'visible') continue
+      const r = node.getBoundingClientRect()
+      clip = {
+        left: Math.max(clip.left, r.left), top: Math.max(clip.top, r.top),
+        right: Math.min(clip.right, r.right), bottom: Math.min(clip.bottom, r.bottom),
+      }
+      if (clip.right <= clip.left || clip.bottom <= clip.top) return null
+    }
+    const rect = el.getBoundingClientRect()
+    const x0 = Math.max(rect.left, clip.left)
+    const y0 = Math.max(rect.top, clip.top)
+    const x1 = Math.min(rect.right, clip.right)
+    const y1 = Math.min(rect.bottom, clip.bottom)
+    if (x1 <= x0 || y1 <= y0) return null
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+  }
+
   const out = []
   for (const el of document.body.querySelectorAll('*')) {
     let hasDirectText = false
@@ -198,12 +235,8 @@ function collectTextElementsInPage() {
     const cs = getComputedStyle(el)
     if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) === 0) continue
 
-    const rect = el.getBoundingClientRect()
-    const x0 = Math.max(0, rect.left)
-    const y0 = Math.max(0, rect.top)
-    const x1 = Math.min(vw, rect.right)
-    const y1 = Math.min(vh, rect.bottom)
-    if (x1 <= x0 || y1 <= y0) continue
+    const rect = visibleRect(el)
+    if (rect === null) continue
 
     const { rgb, alpha } = toRGBA(cs.color)
     out.push({
@@ -214,7 +247,7 @@ function collectTextElementsInPage() {
       textAlpha: alpha,
       fontSize: parseFloat(cs.fontSize),
       fontWeight: parseInt(cs.fontWeight, 10) || 400,
-      rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 },
+      rect,
     })
   }
   return out
