@@ -36,7 +36,7 @@ import { syncStateFor, dropSyncState } from '@/storage/syncState'
 import type { VaultRef } from '@/vaultRef'
 
 /** Fixed epoch every seeded run starts from, so `updatedAt` and the journal are reproducible. */
-export const T0 = Date.UTC(2026, 0, 1, 12, 0, 0)
+const T0 = Date.UTC(2026, 0, 1, 12, 0, 0)
 
 const OWNER = 'alice'
 const REPO  = 'notes'
@@ -218,7 +218,7 @@ function resp(body: unknown, status: number) {
  * so the same seeded scenario runs against both this and the real backend and
  * the two outcomes are compared. That comparison is the test.
  */
-export function withLegacyDelete(inner: GitHubBackend): StorageBackend {
+function withLegacyDelete(inner: GitHubBackend): StorageBackend {
   const shas = new Map<string, string>()
   return {
     get id()        { return inner.id },
