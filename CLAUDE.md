@@ -176,9 +176,9 @@ repeated it (PR #840, fixed in #844).
 Nothing enforces *placement* — the filename is the whole declaration
 (`_app.foo.tsx` vs `foo.tsx`), and a route wrongly filed under `_app` would
 pass the app-shell geometry assertions and still fail keyboard avoidance
-uncaught. *Coverage* is enforced, though: `scripts/layout-smoke.mjs`'s
-`assertRouteCoverage()` walks every leaf file in `src/routes/`, extracts its
-`createFileRoute(...)` path, and `process.exit(1)`s in CI if it isn't listed
+uncaught. *Coverage* is enforced, though: `e2e/layout-smoke.spec.ts`'s
+`findUncoveredRoutes()` walks every leaf file in `src/routes/`, extracts its
+`createFileRoute(...)` path, and its own test fails in CI if it isn't listed
 in `APP_ROUTES`, `FLOW_ROUTES`, or the `ROUTE_COVERAGE_EXEMPTIONS` escape
 hatch (documented inline — e.g. `/auth/callback`, which has no
 `[data-flow-screen]`/`[data-topbar]` host for the check to anchor to). So a

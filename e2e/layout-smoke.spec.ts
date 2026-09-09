@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright-core'
-import { BASE, startPreview } from './previewServer.mjs'
+import { test as base, expect, type Page } from '@playwright/test'
+import { BASE_URL } from '../playwright.config'
 
 /**
  * Layout smoke checks — the one class of bug nothing else here can see.
@@ -25,16 +25,26 @@ import { BASE, startPreview } from './previewServer.mjs'
  * but a handful of load-bearing geometric facts, checked at two viewports on
  * every PR.
  *
- * Run with `pnpm run test:layout` (needs `pnpm run build` first — it serves
- * `dist/` through `vite preview`). CI installs the browser with
- * `pnpm dlx playwright install --with-deps chromium`; set CHROMIUM_PATH to
- * point at an already-installed binary instead.
+ * Run with `pnpm run test:e2e` (needs `pnpm run build` first — `playwright.config.ts`'s
+ * `webServer` serves `dist/` through `vite preview`). CI installs the browser
+ * with `pnpm exec playwright install --with-deps chromium`; set CHROMIUM_PATH
+ * to point at an already-installed binary instead (see `playwright.config.ts`).
  */
+
+/** Fails the test on any uncaught page error, not just the checks below. */
+const test = base.extend<{ page: Page }>({
+  page: async ({ page }, use) => {
+    const errors: Error[] = []
+    page.on('pageerror', e => errors.push(e))
+    await use(page)
+    expect(errors, 'no uncaught page errors').toEqual([])
+  },
+})
 
 /** Viewports: a phone (where every one of these bugs was reported) and a laptop. */
 const VIEWPORTS = [
   { name: 'mobile', viewport: { width: 412, height: 915 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
-  { name: 'desktop', viewport: { width: 1440, height: 900 } },
+  { name: 'desktop', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
 ]
 
 /**
@@ -87,12 +97,12 @@ const FLOW_ROUTES = [
 
 /**
  * Route files with no `[data-flow-screen]`/`[data-topbar]` host for this
- * script to check, so `assertRouteCoverage()` below would otherwise flag
+ * check to see, so `findUncoveredRoutes()` below would otherwise flag
  * them as silently unguarded forever. Keyed by the route's registered path
- * (the same shape `assertRouteCoverage` matches against), each with the
+ * (the same shape `findUncoveredRoutes` matches against), each with the
  * reason it can't be covered.
  */
-const ROUTE_COVERAGE_EXEMPTIONS = {
+const ROUTE_COVERAGE_EXEMPTIONS: Record<string, string> = {
   '/auth/callback': 'no [data-flow-screen]/[data-topbar] host in any of its phases (see FLOW_ROUTES comment)',
 }
 
@@ -108,7 +118,7 @@ const ROUTE_COVERAGE_EXEMPTIONS = {
  * (`/_app`, `/_entry`) and `$param` placeholders — neither of which appears
  * in a real URL — so both are normalized away before matching.
  */
-function assertRouteCoverage() {
+function findUncoveredRoutes(): string[] {
   const routesDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'routes')
   const leafFiles = readdirSync(routesDir).filter(f =>
     f.endsWith('.tsx') && !f.startsWith('-') && !f.endsWith('.test.tsx') &&
@@ -116,7 +126,7 @@ function assertRouteCoverage() {
   )
 
   const knownUrls = [...APP_ROUTES.map(r => r.path), ...FLOW_ROUTES, ...Object.keys(ROUTE_COVERAGE_EXEMPTIONS)]
-  const uncovered = []
+  const uncovered: string[] = []
 
   for (const file of leafFiles) {
     const src = readFileSync(join(routesDir, file), 'utf8')
@@ -134,29 +144,30 @@ function assertRouteCoverage() {
       uncovered.push(`${file} (registers ${registered}) — add a matching URL to APP_ROUTES, FLOW_ROUTES, or ROUTE_COVERAGE_EXEMPTIONS`)
     }
   }
-
-  if (uncovered.length) {
-    console.error(`\nRoute coverage check failed (${uncovered.length}):\n`)
-    for (const u of uncovered) console.error(`  ✗ ${u}`)
-    console.error('')
-    process.exit(1)
-  }
+  return uncovered
 }
 
-assertRouteCoverage()
+test('every route file is covered by APP_ROUTES, FLOW_ROUTES, or an exemption', () => {
+  const uncovered = findUncoveredRoutes()
+  expect(uncovered).toEqual([])
+})
 
-const failures = []
-function check(scope, label, ok, detail) {
-  if (ok) return
-  failures.push(`${scope} — ${label}${detail === undefined ? '' : `: ${detail}`}`)
+interface AppShellMetrics {
+  docScrollH: number
+  docClientH: number
+  docScrollW: number
+  docClientW: number
+  topbarTop: number | null
+  searchBar: { top: number; bottom: number } | null
+  innerHeight: number
 }
 
 /**
  * The geometry every `_app` route must hold at every viewport. Read in one
  * evaluate() so the numbers all come from the same frame.
  */
-function readAppShell() {
-  const se = document.scrollingElement
+function readAppShell(): AppShellMetrics {
+  const se = document.scrollingElement!
   const topbar = document.querySelector('[data-topbar]')
   const bar = document.querySelector('.search-bar-wrap')
   return {
@@ -172,8 +183,14 @@ function readAppShell() {
   }
 }
 
+interface AgendaMetrics {
+  scroller: { scrollH: number; clientH: number } | null
+  mountedRows: number
+  onScreenRows: number
+}
+
 /** Agenda-only: the virtualizer's own element has to be the thing that scrolls. */
-function readAgenda() {
+function readAgenda(): AgendaMetrics {
   const row = document.querySelector('[data-index]')
   const scroller = row?.closest('.overflow-y-auto') ?? null
   const rows = [...document.querySelectorAll('[data-index]')]
@@ -188,13 +205,18 @@ function readAgenda() {
   }
 }
 
+interface TopRow {
+  key: string | null
+  top: number
+}
+
 /**
  * Incremental loading: the topmost on-screen row's identity and position,
  * keyed by the same `data-flip-key` useVirtualFlip/getItemKey use — what a
  * prepend teleport would move. jsdom has no layout engine, so this is the one
  * place that can actually see it.
  */
-function readTopRow() {
+function readTopRow(): TopRow | null {
   const rows = [...document.querySelectorAll('[data-flip-key]')]
   const onScreen = rows
     .map(r => ({ el: r, rect: r.getBoundingClientRect() }))
@@ -202,6 +224,13 @@ function readTopRow() {
     .sort((a, b) => a.rect.top - b.rect.top)
   const top = onScreen[0]
   return top ? { key: top.el.getAttribute('data-flip-key'), top: Math.round(top.rect.top) } : null
+}
+
+interface FlowProbe {
+  missing?: boolean
+  before?: number
+  after: number
+  clientH: number
 }
 
 /**
@@ -218,10 +247,10 @@ function readTopRow() {
  * document on *every* route — this check passed on `/backlog` before it was
  * anchored here, which is to say it was asserting nothing at all.
  */
-function probeFlow() {
-  const se = document.scrollingElement
+function probeFlow(): FlowProbe {
+  const se = document.scrollingElement!
   const host = document.querySelector('[data-flow-screen]')
-  if (!host) return { missing: true, clientH: se.clientHeight }
+  if (!host) return { missing: true, after: se.scrollHeight, clientH: se.clientHeight }
   const before = se.scrollHeight
   const probe = document.createElement('div')
   probe.style.cssText = 'height:3000px;width:1px'
@@ -231,127 +260,119 @@ function probeFlow() {
   return { before, after, clientH: se.clientHeight }
 }
 
-const preview = await startPreview()
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || undefined,
-  args: ['--no-sandbox'],
-})
-
-try {
-  for (const { name, ...contextOptions } of VIEWPORTS) {
-    const context = await browser.newContext(contextOptions)
-    const page = await context.newPage()
-    page.on('pageerror', e => failures.push(`${name} — uncaught page error: ${e.message}`))
+for (const vp of VIEWPORTS) {
+  test.describe(vp.name, () => {
+    test.use({
+      viewport: vp.viewport,
+      deviceScaleFactor: vp.deviceScaleFactor,
+      isMobile: vp.isMobile,
+      hasTouch: vp.hasTouch,
+    })
 
     for (const { path: route, ready } of APP_ROUTES) {
-      const scope = `${name} ${route}`
-      await page.goto(`${BASE}${route}`, { waitUntil: 'load' })
-      await page.waitForSelector(ready, { timeout: 30_000 })
-      await page.waitForTimeout(1500) // let the virtualizer measure and settle
+      test(`${route} — app shell`, async ({ page }) => {
+        await page.goto(`${BASE_URL}${route}`, { waitUntil: 'load' })
+        await page.waitForSelector(ready, { timeout: 30_000 })
+        await page.waitForTimeout(1500) // let the virtualizer measure and settle
 
-      const m = await page.evaluate(readAppShell)
-      // The shell clips itself at one screen, so nothing below it can extend
-      // the page. A scrolling document here means the cap is gone.
-      check(scope, 'document must not scroll vertically', m.docScrollH <= m.docClientH, `${m.docScrollH} > ${m.docClientH}`)
-      check(scope, 'document must not scroll horizontally', m.docScrollW <= m.docClientW, `${m.docScrollW} > ${m.docClientW}`)
-      check(scope, 'topbar must sit at the top of the viewport', m.topbarTop === 0, `top=${m.topbarTop}`)
-      check(scope, 'search bar must be on screen', m.searchBar !== null && m.searchBar.top >= 0 && m.searchBar.bottom <= m.innerHeight,
-        m.searchBar ? `top=${m.searchBar.top} bottom=${m.searchBar.bottom} viewport=${m.innerHeight}` : 'not rendered')
+        const m = await page.evaluate(readAppShell)
+        // The shell clips itself at one screen, so nothing below it can extend
+        // the page. A scrolling document here means the cap is gone.
+        expect(m.docScrollH, 'document must not scroll vertically').toBeLessThanOrEqual(m.docClientH)
+        expect(m.docScrollW, 'document must not scroll horizontally').toBeLessThanOrEqual(m.docClientW)
+        expect(m.topbarTop, 'topbar must sit at the top of the viewport').toBe(0)
+        expect(m.searchBar, 'search bar must be rendered').not.toBeNull()
+        if (m.searchBar) {
+          expect(m.searchBar.top, 'search bar must be on screen (top)').toBeGreaterThanOrEqual(0)
+          expect(m.searchBar.bottom, 'search bar must be on screen (bottom)').toBeLessThanOrEqual(m.innerHeight)
+        }
 
-      if (route !== '/') continue
-      const a = await page.evaluate(readAgenda)
-      check(scope, 'the agenda must own a scrollable element', a.scroller !== null && a.scroller.scrollH > a.scroller.clientH,
-        a.scroller ? `scrollHeight=${a.scroller.scrollH} clientHeight=${a.scroller.clientH}` : 'no scroll container found')
-      check(scope, 'agenda rows must be visible', a.onScreenRows > 0, `${a.mountedRows} mounted, none on screen`)
+        if (route !== '/') return
 
-      // Incremental loading: pressing "Load earlier" prepends a chunk above
-      // whatever is on screen. The existing scroll-anchoring machinery is
-      // supposed to hold the same row in place with no visible jump — src/
-      // unit tests cover the mechanism (computeAgendaScrollRestore.test.ts,
-      // AgendaView.test.tsx) against jsdom's estimated row heights, but jsdom
-      // has no layout engine, so whether it actually looks stable in a real
-      // browser is checked here.
-      const loadEarlier = page.getByText('Load earlier', { exact: true })
-      if (await loadEarlier.count()) {
-        const before = await page.evaluate(readTopRow)
-        await loadEarlier.click()
-        // Past both scrollToIndex's rAF reconciliation and useVirtualFlip's own
-        // 350ms glide (see calendar/useVirtualFlip.ts's DURATION): prepending a
-        // chunk changes `rows`' identity, which is exactly what that hook glides
-        // on, so the anchor row itself can still be mid-animation at 300ms — the
-        // wait this replaced, timed only against the former and not the latter.
-        // 2x the glide duration, matching the panel-transition wait below.
-        await page.waitForTimeout(700)
-        const after = await page.evaluate(readTopRow)
-        check(scope, '"Load earlier" must not move the row already on screen',
-          before !== null && after !== null && after.key === before.key && Math.abs(after.top - before.top) <= 2,
-          `before=${JSON.stringify(before)} after=${JSON.stringify(after)}`)
-      }
+        const a = await page.evaluate(readAgenda)
+        expect(a.scroller, 'the agenda must own a scrollable element').not.toBeNull()
+        if (a.scroller) {
+          expect(a.scroller.scrollH, 'the agenda scroller must actually overflow').toBeGreaterThan(a.scroller.clientH)
+        }
+        expect(a.onScreenRows, `agenda rows must be visible (${a.mountedRows} mounted)`).toBeGreaterThan(0)
 
-      // The quick-nav panel (CLAUDE.md's month-label disclosure) grows the
-      // topbar chrome block in place via a grid-template-rows transition —
-      // exactly the kind of height change that cracked _app's one-screen cap
-      // open twice before. Open it here and re-check the same shell geometry,
-      // plus the panel's own focus contract (focus moves in on open, Escape
-      // returns it to the toggle button).
-      await page.click('[aria-controls="quickNavPanel"]')
-      await page.waitForTimeout(400) // past the 200ms open transition
-      const withPanel = await page.evaluate(readAppShell)
-      check(scope, 'document must not scroll vertically with the quick-nav panel open',
-        withPanel.docScrollH <= withPanel.docClientH, `${withPanel.docScrollH} > ${withPanel.docClientH}`)
-      check(scope, 'document must not scroll horizontally with the quick-nav panel open',
-        withPanel.docScrollW <= withPanel.docClientW, `${withPanel.docScrollW} > ${withPanel.docClientW}`)
+        // Incremental loading: pressing "Load earlier" prepends a chunk above
+        // whatever is on screen. The existing scroll-anchoring machinery is
+        // supposed to hold the same row in place with no visible jump — src/
+        // unit tests cover the mechanism (computeAgendaScrollRestore.test.ts,
+        // AgendaView.test.tsx) against jsdom's estimated row heights, but jsdom
+        // has no layout engine, so whether it actually looks stable in a real
+        // browser is checked here.
+        const loadEarlier = page.getByText('Load earlier', { exact: true })
+        if (await loadEarlier.count()) {
+          const before = await page.evaluate(readTopRow)
+          await loadEarlier.click()
+          // Past both scrollToIndex's rAF reconciliation and useVirtualFlip's own
+          // 350ms glide (see calendar/useVirtualFlip.ts's DURATION): prepending a
+          // chunk changes `rows`' identity, which is exactly what that hook glides
+          // on, so the anchor row itself can still be mid-animation at 300ms — the
+          // wait this replaced, timed only against the former and not the latter.
+          // 2x the glide duration, matching the panel-transition wait below.
+          await page.waitForTimeout(700)
+          const after = await page.evaluate(readTopRow)
+          expect(before, '"Load earlier": no row was on screen before the click').not.toBeNull()
+          expect(after, '"Load earlier": no row was on screen after the click').not.toBeNull()
+          if (before && after) {
+            expect(after.key, '"Load earlier" must not move the row already on screen (identity)').toBe(before.key)
+            expect(Math.abs(after.top - before.top), '"Load earlier" must not move the row already on screen (position)').toBeLessThanOrEqual(2)
+          }
+        }
 
-      const focusedInPanel = await page.evaluate(() => {
-        const panel = document.getElementById('quickNavPanel')
-        return !!panel && panel.contains(document.activeElement)
+        // The quick-nav panel (CLAUDE.md's month-label disclosure) grows the
+        // topbar chrome block in place via a grid-template-rows transition —
+        // exactly the kind of height change that cracked _app's one-screen cap
+        // open twice before. Open it here and re-check the same shell geometry,
+        // plus the panel's own focus contract (focus moves in on open, Escape
+        // returns it to the toggle button).
+        await page.click('[aria-controls="quickNavPanel"]')
+        await page.waitForTimeout(400) // past the 200ms open transition
+        const withPanel = await page.evaluate(readAppShell)
+        expect(withPanel.docScrollH, 'document must not scroll vertically with the quick-nav panel open').toBeLessThanOrEqual(withPanel.docClientH)
+        expect(withPanel.docScrollW, 'document must not scroll horizontally with the quick-nav panel open').toBeLessThanOrEqual(withPanel.docClientW)
+
+        const focusedInPanel = await page.evaluate(() => {
+          const panel = document.getElementById('quickNavPanel')
+          return !!panel && panel.contains(document.activeElement)
+        })
+        expect(focusedInPanel, 'focus moves into the quick-nav panel on open').toBe(true)
+
+        await page.keyboard.press('Escape')
+        // On desktop the panel is Radix's PopoverContent, which plays the same
+        // animate-out transition as the open above before it actually unmounts
+        // — and only unmounting runs its FocusScope's restore-focus-to-trigger
+        // effect. The mobile inline panel has no such gate (a plain CSS height
+        // transition, focus restored by _app.tsx's own Escape handler
+        // synchronously), so this wait is a no-op there.
+        await page.waitForTimeout(400) // past the 200ms close transition
+        const focusedBackOnToggle = await page.evaluate(() =>
+          document.activeElement === document.querySelector('[aria-controls="quickNavPanel"]'))
+        expect(focusedBackOnToggle, 'Escape returns focus to the quick-nav toggle button').toBe(true)
       })
-      check(scope, 'focus moves into the quick-nav panel on open', focusedInPanel)
-
-      await page.keyboard.press('Escape')
-      // On desktop the panel is Radix's PopoverContent, which plays the same
-      // animate-out transition as the open above before it actually unmounts
-      // — and only unmounting runs its FocusScope's restore-focus-to-trigger
-      // effect. The mobile inline panel has no such gate (a plain CSS height
-      // transition, focus restored by _app.tsx's own Escape handler
-      // synchronously), so this wait is a no-op there.
-      await page.waitForTimeout(400) // past the 200ms close transition
-      const focusedBackOnToggle = await page.evaluate(() =>
-        document.activeElement === document.querySelector('[aria-controls="quickNavPanel"]'))
-      check(scope, 'Escape returns focus to the quick-nav toggle button', focusedBackOnToggle)
     }
 
     // The routes whose invariant runs the other way.
     for (const route of FLOW_ROUTES) {
-      const scope = `${name} ${route}`
-      await page.goto(`${BASE}${route}`, { waitUntil: 'load' })
-      await page.waitForSelector('[data-flow-screen]', { timeout: 30_000 })
-      await page.waitForTimeout(1500)
+      test(`${route} — flow shell`, async ({ page }) => {
+        await page.goto(`${BASE_URL}${route}`, { waitUntil: 'load' })
+        await page.waitForSelector('[data-flow-screen]', { timeout: 30_000 })
+        await page.waitForTimeout(1500)
 
-      const f = await page.evaluate(probeFlow)
-      check(scope, 'the route content must be able to grow the document past the viewport',
-        !f.missing && f.after > f.clientH,
-        f.missing
-          ? 'no [data-flow-screen] element found'
-          : `scrollHeight stayed at ${f.after} with a 3000px probe appended (viewport ${f.clientH})`)
+        const f = await page.evaluate(probeFlow)
+        expect(f.missing, 'no [data-flow-screen] element found').not.toBe(true)
+        if (!f.missing) {
+          expect(f.after, `the route content must be able to grow the document past the viewport (stayed at ${f.after}, viewport ${f.clientH})`).toBeGreaterThan(f.clientH)
+        }
 
-      // The search bar is `_app` furniture — it searches and creates entries.
-      // A flow route is outside that shell and must not carry it.
-      const bar = await page.evaluate(() => document.querySelector('.search-bar-wrap') !== null)
-      check(scope, 'the app search bar must not render here', bar === false)
+        // The search bar is `_app` furniture — it searches and creates entries.
+        // A flow route is outside that shell and must not carry it.
+        const bar = await page.evaluate(() => document.querySelector('.search-bar-wrap') !== null)
+        expect(bar, 'the app search bar must not render here').toBe(false)
+      })
     }
-
-    await context.close()
-  }
-} finally {
-  await browser.close()
-  preview.kill()
+  })
 }
-
-if (failures.length) {
-  console.error(`\nLayout smoke checks failed (${failures.length}):\n`)
-  for (const f of failures) console.error(`  ✗ ${f}`)
-  console.error('')
-  process.exit(1)
-}
-console.log('Layout smoke checks passed.')

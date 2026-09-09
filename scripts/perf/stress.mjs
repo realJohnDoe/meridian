@@ -20,7 +20,11 @@
  */
 import { spawn } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { chromium } from 'playwright-core'
+// @playwright/test re-exports the same chromium launcher playwright-core does
+// (it's a thin wrapper around it) — using it here rather than adding
+// playwright-core back as its own dependency now that e2e/ is the only other
+// consumer of browser automation in this repo.
+import { chromium } from '@playwright/test'
 import { PROBE } from './probe.mjs'
 
 const HOST = '127.0.0.1'

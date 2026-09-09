@@ -41,19 +41,16 @@ jobs:
       - run: pnpm run knip
       # Layout regressions are invisible to every other gate here: all of src/
       # tests under jsdom, which has no layout engine and therefore no opinion
-      # about heights, scrolling, or where anything lands on screen. This is the
-      # only step that can see them — see scripts/layout-smoke.mjs. It serves the
-      # dist/ that `pnpm run build` produced above.
-      #
-      # The chromium build has to match the installed playwright-core exactly, so
-      # the version is read from it rather than installed bare.
-      - run: pnpm dlx playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
-      - run: pnpm run test:layout
-      # Ratcheted against scripts/contrast-sweep.mjs's own MAX_VIOLATIONS floor
-      # (see its doc comment for why pixel-sampling, and why axe-core alone
-      # can't do this) — fails only if a change pushes the violation count
-      # above that floor. Reuses the browser install above.
-      - run: pnpm run test:contrast
+      # about heights, scrolling, or where anything lands on screen — see
+      # e2e/layout-smoke.spec.ts. Contrast is a second, unrelated thing only a
+      # real browser can see — see e2e/contrast-sweep.spec.ts's doc comment for
+      # why pixel-sampling, and why axe-core alone can't do it; it's ratcheted
+      # per (theme, route) rather than gated as a hard pass/fail, so a
+      # regression in one combo can't hide behind an improvement in another.
+      # Both specs serve the dist/ that `pnpm run build` produced above,
+      # through the same `webServer` in playwright.config.ts.
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm run test:e2e
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist

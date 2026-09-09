@@ -2,26 +2,29 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PNG } from 'pngjs'
-import { chromium } from 'playwright-core'
-import { BASE, startPreview } from './previewServer.mjs'
+import { test, expect } from '@playwright/test'
+import { BASE_URL } from '../playwright.config'
 
 /**
  * Contrast sweep — issue #1005. Samples the *rendered* text/background pixel
  * pair for every text-bearing element, across every theme and a representative
- * set of routes, and reports whatever fails WCAG AA.
+ * set of routes, and asserts each (theme, route) combo against its own ratchet
+ * floor (`FLOOR` below).
  *
- * Ratcheted, not a hard gate: eleven merged PRs (#302, #329, #331, #340,
- * #445, #478, #801, #912, #924, #930, #954) already fixed contrast one
- * finding at a time, with no standing check to catch the next one. Landing
- * this against an unknown number of pre-existing violations and failing the
- * build on day one is how a check gets disabled instead of fixed — see #663
- * before #756 in this repo's own history for the same ratchet shape applied
- * to lint warnings. It ran report-only first (PR #1012) to establish the
- * baseline; `MAX_VIOLATIONS` below is that count. CI now fails only if a
- * change pushes the count *above* the floor — fixing violations is never
- * blocked on fixing all 295 of them in one PR, but a regression is caught
- * immediately. Bring `MAX_VIOLATIONS` down as violations get fixed (the
- * script tells you the new number to use when the count drops below it).
+ * Ratcheted per combo, not a single global count: eleven merged PRs (#302,
+ * #329, #331, #340, #445, #478, #801, #912, #924, #930, #954) already fixed
+ * contrast one finding at a time, with no standing check to catch the next
+ * one. Landing this against an unknown number of pre-existing violations and
+ * failing the build on day one is how a check gets disabled instead of fixed
+ * — see #663 before #756 in this repo's own history for the same ratchet
+ * shape applied to lint warnings. It ran report-only first (PR #1012) to
+ * establish the baseline (4896 samples checked, 295 below WCAG AA), then a
+ * single global `MAX_VIOLATIONS` floor (PR #1013). This file replaces that
+ * one number with a floor *per combo*, so a regression in one (theme, route)
+ * can no longer hide behind an unrelated improvement in another — each combo
+ * is its own `test()`, asserting only against its own count. When a combo's
+ * count drops below its floor, that test logs the new number to ratchet
+ * `FLOOR` down to.
  *
  * ## Why not axe-core
  *
@@ -46,13 +49,14 @@ import { BASE, startPreview } from './previewServer.mjs'
  * ## Shape
  *
  * For each theme (`THEME_IDS`, extracted from `THEME_CLASS` below rather than
- * imported — these are plain Node scripts, no TS loader in this project) ×
- * each route:
+ * imported — parsed at module scope so the (theme, route) pairs can be
+ * generated before the `test()` loop, same as any parameterized Playwright
+ * suite) × each route:
  *
  *   1. Set `localStorage.meridian_theme` before the page's own scripts run
- *      (`context.addInitScript`, persists across `page.goto` navigations in
- *      that context) — the deterministic way into next-themes' `class`
- *      strategy, matching `routes/__root.tsx`'s `storageKey`.
+ *      (`context.addInitScript`, applies to this test's isolated context) —
+ *      the deterministic way into next-themes' `class` strategy, matching
+ *      `routes/__root.tsx`'s `storageKey`.
  *   2. Collect every element with a direct (non-whitespace) text-node child:
  *      its viewport-clipped rect, font-size/weight (for the WCAG large-text
  *      threshold), and its *computed* `color` — resolved to concrete sRGB via
@@ -92,51 +96,41 @@ import { BASE, startPreview } from './previewServer.mjs'
  * contrast doesn't turn on breakpoint geometry the way layout does, and
  * DSF 1 keeps CSS px and screenshot px identical, which is what lets
  * `getBoundingClientRect()` index straight into the decoded PNG with no
- * scaling math).
+ * scaling math). Set globally in `playwright.config.ts`.
  *
- * Run with `pnpm run test:contrast` (needs `pnpm run build` first, same as
- * `test:layout` — it serves the same `dist/` through the same preview
- * server). Takes a few minutes: 9 themes x this file's ROUTES is close to a
- * hundred page loads, each with its own settle wait and two screenshots.
+ * Run with `pnpm run test:e2e` (needs `pnpm run build` first, same as
+ * `layout-smoke.spec.ts` — it serves the same `dist/` through the same
+ * `webServer`).
  */
-
-const VIEWPORT = { width: 1440, height: 900 }
-
-/**
- * The ratchet floor — see the file doc comment. Set from PR #1012's
- * report-only baseline (checked 4896 element/theme/route samples, 295 below
- * WCAG AA), confirmed reproducible across three consecutive runs against the
- * same build before being turned into a gate. Lower this whenever a fix
- * drops the count — the script prints the new number to use.
- */
-const MAX_VIOLATIONS = 295
 
 /**
  * Extracted from `src/routes/__root.tsx`'s `THEME_CLASS` rather than
- * imported (these scripts run under plain Node, no TS loader) — mirrors
- * `THEME_IDS`'s own derivation (every key except the two
+ * imported (Playwright Test files run under esbuild-transpiled ESM, and
+ * pulling in the whole app shell here would be its own kind of coupling) —
+ * mirrors `THEME_IDS`'s own derivation (every key except the two
  * `prefers-color-scheme` resolution aliases) so this can't silently drift
  * from the map it's reading out of. `routes/__root.test.tsx` separately pins
  * `THEME_CLASS` against `THEMES`, so this only has one source to stay
  * in sync with.
  */
-function extractThemeIds() {
+function extractThemeIds(): string[] {
   const rootPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'routes', '__root.tsx')
   const src = readFileSync(rootPath, 'utf8')
   const block = src.match(/export const THEME_CLASS: Record<string, string> = \{([\s\S]*?)\n\}/)?.[1]
   if (!block) throw new Error('extractThemeIds: could not find THEME_CLASS in __root.tsx — this extraction regex is stale')
-  const ids = [...block.matchAll(/^\s*(?:'([^']+)'|([\w-]+)):/gm)].map(m => m[1] ?? m[2])
+  const ids = [...block.matchAll(/^\s*(?:'([^']+)'|([\w-]+)):/gm)].map(m => m[1] ?? m[2]!)
   const themeIds = [...new Set(ids)].filter(id => id !== 'light' && id !== 'dark')
   if (themeIds.length === 0) throw new Error('extractThemeIds: matched zero theme ids — this extraction regex is stale')
   return themeIds
 }
 
 /**
- * A representative route per shell (mirrors `layout-smoke.mjs`'s APP_ROUTES/
- * FLOW_ROUTES route set and `ready` selectors, so both checks exercise the
- * same known-good surface) — not re-imported from there, since that module
- * runs its own route-coverage assertion and preview-server bootstrap as a
- * side effect of being loaded.
+ * A representative route per shell (mirrors `layout-smoke.spec.ts`'s
+ * APP_ROUTES/FLOW_ROUTES route set and `ready` selectors, so both checks
+ * exercise the same known-good surface) — a smaller list than that file's:
+ * `/entry/01-start-here` (a redirect to the same page as
+ * `/entry/example/01-start-here`) and `/settings/vault/new` (a wizard, not
+ * representative additional text) don't earn their own combo here.
  */
 const ROUTES = [
   { path: '/', ready: '[data-testid="entry-card"]' },
@@ -152,6 +146,53 @@ const ROUTES = [
   { path: '/settings/vault/example', ready: '[data-flow-screen]' },
 ]
 
+/**
+ * The ratchet floor, per (theme, route) — see the file doc comment. Set from
+ * PR #1012's report-only baseline, broken out per combo instead of summed
+ * into one number, and confirmed reproducible across three consecutive runs
+ * against the same build before being turned into a gate (PR #1013). Lower
+ * an entry whenever a fix drops that combo's count — the corresponding test
+ * logs the new number to use.
+ */
+const FLOOR: Record<string, Record<string, number>> = {
+  meridian: {
+    '/': 0, '/backlog': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09': 0,
+    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
+  },
+  'meridian-light': {
+    '/': 11, '/backlog': 11, '/notes': 11, '/day/2026-09-04': 11, '/week/2026-09-04': 11, '/calendar/2026-09': 11,
+    '/entry/example/01-start-here': 4, '/entry/new': 2, '/settings': 3, '/settings/appearance': 2, '/settings/vault/example': 3,
+  },
+  'tokyo-night': {
+    '/': 1, '/backlog': 1, '/notes': 1, '/day/2026-09-04': 1, '/week/2026-09-04': 1, '/calendar/2026-09': 1,
+    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
+  },
+  'catppuccin-latte': {
+    '/': 11, '/backlog': 11, '/notes': 11, '/day/2026-09-04': 11, '/week/2026-09-04': 11, '/calendar/2026-09': 11,
+    '/entry/example/01-start-here': 6, '/entry/new': 2, '/settings': 3, '/settings/appearance': 2, '/settings/vault/example': 3,
+  },
+  'catppuccin-mocha': {
+    '/': 0, '/backlog': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09': 0,
+    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
+  },
+  'rose-pine-dawn': {
+    '/': 2, '/backlog': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
+    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
+  },
+  'solarized-light': {
+    '/': 12, '/backlog': 12, '/notes': 12, '/day/2026-09-04': 12, '/week/2026-09-04': 12, '/calendar/2026-09': 12,
+    '/entry/example/01-start-here': 4, '/entry/new': 2, '/settings': 3, '/settings/appearance': 2, '/settings/vault/example': 4,
+  },
+  'solarized-dark': {
+    '/': 2, '/backlog': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
+    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 2,
+  },
+  dracula: {
+    '/': 0, '/backlog': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09': 0,
+    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
+  },
+}
+
 /** Stylesheet injected before the second screenshot — blanks ink, leaves every background untouched. */
 const HIDE_INK_CSS = `
 *, *::before, *::after {
@@ -162,6 +203,17 @@ const HIDE_INK_CSS = `
   text-decoration-color: transparent !important;
 }
 `
+
+interface CollectedElement {
+  text: string
+  tag: string
+  cls: string
+  textRGB: number[]
+  textAlpha: number
+  fontSize: number
+  fontWeight: number
+  rect: { x: number; y: number; w: number; h: number }
+}
 
 /**
  * Runs in-page. Resolves any CSS <color> (rgb/hex/oklch/oklab/lab/color-mix
@@ -175,13 +227,13 @@ const HIDE_INK_CSS = `
  * friends — real in this codebase, see `sidebar.tsx`, `select.tsx`) makes
  * text color here not always fully opaque.
  */
-function collectTextElementsInPage() {
-  function toRGBA(cssColor) {
-    function overBackdrop(hex) {
+function collectTextElementsInPage(): CollectedElement[] {
+  function toRGBA(cssColor: string): { rgb: number[]; alpha: number } {
+    function overBackdrop(hex: string): Uint8ClampedArray {
       const c = document.createElement('canvas')
       c.width = 1
       c.height = 1
-      const ctx = c.getContext('2d')
+      const ctx = c.getContext('2d')!
       ctx.fillStyle = hex
       ctx.fillRect(0, 0, 1, 1)
       ctx.fillStyle = cssColor
@@ -190,11 +242,11 @@ function collectTextElementsInPage() {
     }
     const overBlack = overBackdrop('#000000')
     const overWhite = overBackdrop('#ffffff')
-    const perChannelAlpha = [0, 1, 2].map(i => 1 - (overWhite[i] - overBlack[i]) / 255)
+    const perChannelAlpha = [0, 1, 2].map(i => 1 - (overWhite[i]! - overBlack[i]!) / 255)
     const alpha = Math.min(1, Math.max(0, perChannelAlpha.reduce((a, b) => a + b, 0) / 3))
     const rgb = alpha > 0.001
-      ? [0, 1, 2].map(i => Math.min(255, Math.max(0, Math.round(overBlack[i] / alpha))))
-      : [overBlack[0], overBlack[1], overBlack[2]]
+      ? [0, 1, 2].map(i => Math.min(255, Math.max(0, Math.round(overBlack[i]! / alpha))))
+      : [overBlack[0]!, overBlack[1]!, overBlack[2]!]
     return { rgb, alpha }
   }
 
@@ -216,7 +268,7 @@ function collectTextElementsInPage() {
    * really occupies those screen coordinates — a false positive with no
    * connection to anything a user would ever see.
    */
-  function visibleRect(el) {
+  function visibleRect(el: Element): { x: number; y: number; w: number; h: number } | null {
     let clip = { left: 0, top: 0, right: vw, bottom: vh }
     for (let node = el.parentElement; node && node !== document.documentElement; node = node.parentElement) {
       const ncs = getComputedStyle(node)
@@ -237,11 +289,11 @@ function collectTextElementsInPage() {
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
   }
 
-  const out = []
+  const out: CollectedElement[] = []
   for (const el of document.body.querySelectorAll('*')) {
     let hasDirectText = false
     for (const n of el.childNodes) {
-      if (n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0) { hasDirectText = true; break }
+      if (n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim().length > 0) { hasDirectText = true; break }
     }
     if (!hasDirectText) continue
 
@@ -253,7 +305,7 @@ function collectTextElementsInPage() {
 
     const { rgb, alpha } = toRGBA(cs.color)
     out.push({
-      text: el.textContent.trim().slice(0, 60),
+      text: (el.textContent ?? '').trim().slice(0, 60),
       tag: el.tagName.toLowerCase(),
       cls: el.className && el.className.toString ? el.className.toString().split(/\s+/).slice(0, 3).join(' ') : '',
       textRGB: rgb,
@@ -275,124 +327,108 @@ function collectTextElementsInPage() {
  * anti-aliasing shades collapse into one bucket instead of splitting the
  * vote.
  */
-function sampleModeColor(png, rect) {
+function sampleModeColor(png: PNG, rect: { x: number; y: number; w: number; h: number }): number[] | null {
   const x0 = Math.max(0, Math.floor(rect.x))
   const y0 = Math.max(0, Math.floor(rect.y))
   const x1 = Math.min(png.width, Math.ceil(rect.x + rect.w))
   const y1 = Math.min(png.height, Math.ceil(rect.y + rect.h))
-  const counts = new Map()
+  const counts = new Map<number, number>()
   const STEP = (x1 - x0) * (y1 - y0) > 400 ? 2 : 1 // subsample only once a rect is large enough for it to matter
   for (let y = y0; y < y1; y += STEP) {
     for (let x = x0; x < x1; x += STEP) {
       const idx = (png.width * y + x) * 4
-      const r = png.data[idx] >> 3 << 3
-      const g = png.data[idx + 1] >> 3 << 3
-      const b = png.data[idx + 2] >> 3 << 3
+      const r = png.data[idx]! >> 3 << 3
+      const g = png.data[idx + 1]! >> 3 << 3
+      const b = png.data[idx + 2]! >> 3 << 3
       const key = (r << 16) | (g << 8) | b
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
   }
-  let bestKey = null
+  let bestKey: number | null = null
   let bestCount = -1
   for (const [key, count] of counts) if (count > bestCount) { bestCount = count; bestKey = key }
   if (bestKey === null) return null
   return [(bestKey >> 16) & 0xff, (bestKey >> 8) & 0xff, bestKey & 0xff]
 }
 
-function relLuminance([r, g, b]) {
-  const lin = c => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4 }
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+function relLuminance([r, g, b]: number[]): number {
+  const lin = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4 }
+  return 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!)
 }
 
-function contrastRatio(rgbA, rgbB) {
+function contrastRatio(rgbA: number[], rgbB: number[]): number {
   const lA = relLuminance(rgbA)
   const lB = relLuminance(rgbB)
   const [hi, lo] = lA > lB ? [lA, lB] : [lB, lA]
-  return (hi + 0.05) / (lo + 0.05)
+  return (hi! + 0.05) / (lo! + 0.05)
 }
 
 /** WCAG 2 AA: large text (>=24px, or >=18.66px/14pt at bold weight) needs 3:1; everything else needs 4.5:1. */
-function aaThreshold(fontSizePx, fontWeight) {
+function aaThreshold(fontSizePx: number, fontWeight: number): number {
   const large = fontSizePx >= 24 || (fontWeight >= 700 && fontSizePx >= 18.66)
   return large ? 3.0 : 4.5
 }
 
-const preview = await startPreview()
-const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH || undefined,
-  args: ['--no-sandbox'],
-})
+interface Failure {
+  tag: string
+  cls: string
+  text: string
+  fontSize: number
+  fontWeight: number
+  textRGB: number[]
+  bgRGB: number[]
+  ratio: number
+  threshold: number
+}
 
 const themeIds = extractThemeIds()
-const failures = []
-let checked = 0
 
-try {
-  for (const themeId of themeIds) {
-    const context = await browser.newContext({ viewport: VIEWPORT })
-    await context.addInitScript(id => { localStorage.setItem('meridian_theme', id) }, themeId)
-    const page = await context.newPage()
-
+for (const themeId of themeIds) {
+  test.describe(themeId, () => {
     for (const { path: route, ready } of ROUTES) {
-      const scope = `${themeId} ${route}`
-      await page.goto(`${BASE}${route}`, { waitUntil: 'load' })
-      await page.waitForSelector(ready, { timeout: 30_000 })
-      await page.evaluate(() => document.fonts.ready)
-      await page.waitForTimeout(1500) // let transitions/virtualizer settle, matching layout-smoke.mjs
+      test(route, async ({ page }) => {
+        await page.context().addInitScript(id => { localStorage.setItem('meridian_theme', id) }, themeId)
+        await page.goto(`${BASE_URL}${route}`, { waitUntil: 'load' })
+        await page.waitForSelector(ready, { timeout: 30_000 })
+        await page.evaluate(() => document.fonts.ready)
+        await page.waitForTimeout(1500) // let transitions/virtualizer settle, matching layout-smoke.spec.ts
 
-      const elements = await page.evaluate(collectTextElementsInPage)
+        const elements = await page.evaluate(collectTextElementsInPage)
 
-      // Screenshot 2: same layout, ink blanked — background-only, since color
-      // (unlike display/visibility) never triggers reflow.
-      await page.addStyleTag({ content: HIDE_INK_CSS })
-      const bgBuf = await page.screenshot({ type: 'png' })
-      const bgPng = PNG.sync.read(bgBuf)
+        // Screenshot 2: same layout, ink blanked — background-only, since color
+        // (unlike display/visibility) never triggers reflow.
+        await page.addStyleTag({ content: HIDE_INK_CSS })
+        const bgBuf = await page.screenshot({ type: 'png' })
+        const bgPng = PNG.sync.read(bgBuf)
 
-      for (const el of elements) {
-        const bgRGB = sampleModeColor(bgPng, el.rect)
-        if (bgRGB === null) continue
-        const textRGB = el.textAlpha >= 0.999
-          ? el.textRGB
-          : el.textRGB.map((c, i) => Math.round(el.textAlpha * c + (1 - el.textAlpha) * bgRGB[i]))
-        const ratio = contrastRatio(textRGB, bgRGB)
-        const threshold = aaThreshold(el.fontSize, el.fontWeight)
-        checked++
-        if (ratio < threshold) {
-          failures.push({
-            scope, tag: el.tag, cls: el.cls, text: el.text,
-            fontSize: el.fontSize, fontWeight: el.fontWeight,
-            textRGB, bgRGB, ratio: Math.round(ratio * 100) / 100, threshold,
-          })
+        const failures: Failure[] = []
+        for (const el of elements) {
+          const bgRGB = sampleModeColor(bgPng, el.rect)
+          if (bgRGB === null) continue
+          const textRGB = el.textAlpha >= 0.999
+            ? el.textRGB
+            : el.textRGB.map((c, i) => Math.round(el.textAlpha * c + (1 - el.textAlpha) * bgRGB[i]!))
+          const ratio = contrastRatio(textRGB, bgRGB)
+          const threshold = aaThreshold(el.fontSize, el.fontWeight)
+          if (ratio < threshold) {
+            failures.push({
+              tag: el.tag, cls: el.cls, text: el.text,
+              fontSize: el.fontSize, fontWeight: el.fontWeight,
+              textRGB, bgRGB, ratio: Math.round(ratio * 100) / 100, threshold,
+            })
+          }
         }
-      }
+
+        const floor = FLOOR[themeId]?.[route] ?? 0
+        if (failures.length < floor) {
+          console.log(`${themeId} ${route}: ${failures.length} is below the current floor of ${floor} — ratchet FLOOR[${JSON.stringify(themeId)}][${JSON.stringify(route)}] down to ${failures.length}.`)
+        }
+
+        const detail = failures
+          .map(f => `  ${f.ratio}:1 (needs ${f.threshold}:1) <${f.tag} class="${f.cls}"> "${f.text}" — text rgb(${f.textRGB.join(',')}) on bg rgb(${f.bgRGB.join(',')}), ${f.fontSize}px/${f.fontWeight}`)
+          .join('\n')
+        expect(failures.length, `${failures.length} below WCAG AA, floor is ${floor}:\n${detail}`).toBeLessThanOrEqual(floor)
+      })
     }
-
-    await context.close()
-  }
-} finally {
-  await browser.close()
-  preview.kill()
-}
-
-console.log(`\nContrast sweep: checked ${checked} element/theme/route samples across ${themeIds.length} themes x ${ROUTES.length} routes.`)
-if (failures.length) {
-  console.log(`${failures.length} below WCAG AA:\n`)
-  for (const f of failures) {
-    console.log(`  ✗ ${f.scope} — <${f.tag} class="${f.cls}"> "${f.text}"`)
-    console.log(`      ${f.ratio}:1 (needs ${f.threshold}:1) — text rgb(${f.textRGB.join(',')}) on bg rgb(${f.bgRGB.join(',')}), ${f.fontSize}px/${f.fontWeight}`)
-  }
-} else {
-  console.log('All sampled text cleared WCAG AA.')
-}
-
-// The ratchet (see file doc comment): fails only if the count grows past the
-// known baseline, so fixing violations is never blocked on fixing all of them
-// at once, but a regression is caught immediately.
-if (failures.length > MAX_VIOLATIONS) {
-  console.error(`\n${failures.length} violations exceeds the floor of ${MAX_VIOLATIONS} — this change made contrast worse somewhere.`)
-  process.exit(1)
-} else if (failures.length < MAX_VIOLATIONS) {
-  console.log(`\n${failures.length} is below the current floor of ${MAX_VIOLATIONS} — ratchet MAX_VIOLATIONS down to ${failures.length} in this PR so the improvement can't silently regress.`)
-} else {
-  console.log(`\nAt the floor (${MAX_VIOLATIONS}) — unchanged.`)
+  })
 }
