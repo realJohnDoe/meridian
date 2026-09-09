@@ -40,28 +40,10 @@ import { parseToStoreItems } from '@/model/storeItems'
 import { roundTripLoss } from '@/model/roundTripCheck'
 import { isSeries, isTracked } from '@/types'
 import type { StoreItem, Entry } from '@/types'
-import { fixtureNames, loadFixture, frontmatterOf, normalizeIds, serialize, TEST_VAULT } from './helpers'
-
-/** Check 1 — collapse totality. Store must survive its own serialization. */
-function assertCollapseTotality(slug: string, source: string): void {
-  const original = parseToStoreItems(`${slug}.md`, source, TEST_VAULT)
-  const reparsed = parseToStoreItems(`${slug}.md`, serialize(original.items, original.root), TEST_VAULT)
-  expect(normalizeIds(reparsed.items)).toEqual(normalizeIds(original.items))
-}
-
-/**
- * Check 2 — source fidelity. Every key/value pair the source had must survive an
- * UNEDITED save. Do not call this after an `applyEdit` — an intentional change
- * (e.g. `done: false` → `true`) reads as a "lost" pair and false-positives.
- *
- * Delegates to the *production* guard (`roundTripLoss`, wired into `parseFiles`)
- * rather than reimplementing the comparison, so every case below doubles as a
- * test of the thing that actually runs on a user's vault.
- */
-function assertSourceFidelity(slug: string, source: string): void {
-  const parsed = parseToStoreItems(`${slug}.md`, source, TEST_VAULT)
-  expect(roundTripLoss(`${slug}.md`, source, parsed)).toEqual([])
-}
+import {
+  fixtureNames, loadFixture, frontmatterOf, serialize, TEST_VAULT,
+  assertCollapseTotality, assertSourceFidelity,
+} from './helpers'
 
 // ── The runtime guard itself ────────────────────────────────────────────────
 //
