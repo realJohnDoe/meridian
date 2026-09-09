@@ -32,7 +32,7 @@ export interface OverdueGroup {
    * stays two groups, which is right: they are two separate commitments.
    */
   key: string
-  /** The group's oldest overdue occurrence — what its row renders, opens and toggles. */
+  /** The group's oldest overdue occurrence — what its row renders, opens, toggles and swipe-deletes. */
   occ: Occurrence
   /** How many overdue occurrences the group pools; always ≥ 1. */
   count: number
