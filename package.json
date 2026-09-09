@@ -13,8 +13,7 @@
     "test:coverage": "vitest run --coverage && pnpm --filter meridian-oauth-worker run test:coverage",
     "lint": "eslint src worker/src --max-warnings=0 && pnpm run lint:deps",
     "lint:deps": "depcruise src",
-    "test:layout": "node scripts/layout-smoke.mjs",
-    "test:contrast": "node scripts/contrast-sweep.mjs",
+    "test:e2e": "playwright test",
     "knip": "knip"
   },
   "dependencies": {
@@ -62,6 +61,7 @@
   "devDependencies": {
     "@babel/core": "^8.0.1",
     "@eslint-react/eslint-plugin": "^5.17.3",
+    "@playwright/test": "1.62.1",
     "@rolldown/plugin-babel": "^0.2.3",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/router-plugin": "^1.168.23",
@@ -69,6 +69,7 @@
     "@testing-library/react": "^16.3.2",
     "@types/babel__core": "^7.20.5",
     "@types/node": "^22.20.1",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
@@ -85,7 +86,6 @@
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.0.1",
     "knip": "^6.29.0",
-    "playwright-core": "^1.62.1",
     "pngjs": "^7.0.0",
     "sharp": "^0.35.4",
     "tailwindcss": "^4.3.3",

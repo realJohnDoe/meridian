@@ -8,3 +8,5 @@ src/routeTree.gen.ts
 .dev.vars
 worker/worker-configuration.d.ts
 scripts/perf/results/
+test-results/
+playwright-report/
