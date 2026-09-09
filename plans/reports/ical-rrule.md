@@ -4,11 +4,13 @@ Investigation of "ideally Meridian would support a superset of the iCal / RRule
 standard — where are the gaps?" (2026-08-16).
 
 **Status:** all of Group 1 (the silent-wrongness bugs) and the engine/importer
-half of Group 2's yearly gap have shipped, along with ICS export. What's left:
-a yearly month/weekday-pattern picker in the authoring UI (gap A/B below), and
-`WKST` (gap G), which is recommended to stay deferred — see that gap's own
-entry for why. Every claim marked _observed_ was run against the current
-engine; every claim marked _read_ comes from the code with the line cited.
+half of Group 2's yearly gap have shipped, along with ICS export. The two gaps
+still open are issues, not sections here — #1009 (a yearly month/weekday-pattern
+picker in the authoring UI) and #1010 (`WKST`, deferred with its reasoning). What
+remains below is the survey itself: the inventory, the verdicts, and what
+Meridian already covers. Every claim marked _observed_ was run against the
+current engine; every claim marked _read_ comes from the code with the line
+cited.
 
 ---
 
@@ -66,47 +68,18 @@ migrate: **widening the `Repeat` type costs nothing on the persistence side.**
 
 ## Gap inventory
 
-**A/B. Yearly's `BYMONTH`/weekday-pattern has no authoring UI.**
-_Read._ The format, engine (`expansion.ts`'s `monthCandidates`/yearly branch
-in `matchesInPeriod`) and importer (`rruleToRepeat.ts`'s yearly arm of
-`tryRepresent`) all fully handle `bymonth`, `bymonthday`, and
-`byweekday`+`bysetpos` at `freq: yearly` — a hand-authored or imported
-"fourth Thursday of November" round-trips correctly and keeps meaning that
-indefinitely, not just inside an importer's bounded window.
+**A/B. Yearly's `BYMONTH`/weekday-pattern has no authoring UI.** → **#1009.**
+_Read._ Format, engine and importer all handle `bymonth`, `bymonthday` and
+`byweekday`+`bysetpos` at `freq: yearly`; what is missing is a way to create one
+without hand-editing YAML. Estimated 1–2 days, pure UI/form work. The evidence
+and the shape of the fix are in the issue.
 
-What's missing is a way to *create* one of these without hand-editing YAML.
-`RepeatForm` has no field that can hold a month set or a yearly
-weekday-pattern, and `formToRepeat`'s asymmetry (documented as "asymmetry 6"
-in `model/repeat.ts:99-105`) carries a yearly repeat's `BY*` fields through
-the form unchanged *specifically because* the form cannot rebuild them from
-its own state — opening "the fourth Thursday of November" in the dialog and
-pressing Set must not silently turn it into "November 27th."
-
-Closing this means giving `yearly` the same same-day / weekday-pattern picker
-`monthly` already has (`RepeatDialog.tsx:222-256`), plus month selection.
-`RepeatForm` needs a field that can hold a month set, and `formToRepeat`'s
-monthly-field-rederivation contract (`repeat.ts:82-85`) needs the equivalent
-treatment for yearly without breaking the round-trip guarantees
-`repeatForm.test.ts` pins down. Estimated **1–2 days** — pure UI/form work,
-no engine or format changes.
-
-**G. No `WKST`.**
-_Read._ Meridian pins each weekly window to the *anchor's* weekday
-(`expansion.ts:398`) rather than to `WKST`. This is a deliberate, documented
-choice — the long comment at `expansion.ts:378-397` explains it came out of
-the data-integrity survey, and it makes a file mean the same thing on every
-device. For `INTERVAL: 1` it is provably equivalent to any `WKST`. It diverges
-only for `INTERVAL >= 2` combined with `BYDAY` naming a day earlier in the RFC
-week than the anchor's, which the importer detects exactly
-(`weeklyWindowsAgree`, `rruleToRepeat.ts:305-315`) and routes to fallback.
-
-Closing this means adding `wkst?: Weekday` and threading it through
-`matchesInPeriod`/`periodsBetween`. The code is small; the care is in the
-default, since any existing biweekly file must keep meaning what it means
-today. **Recommend deferring** — it only affects `INTERVAL >= 2` combined with
-`BYDAY`, and that case is already correct-by-fallback on import. Estimated
-**1–2 days**, all in `model/expansion.ts` and its types — it's the one
-remaining item that touches the file format.
+**G. No `WKST`.** → **#1010, deferred.**
+_Read._ Meridian pins each weekly window to the anchor's weekday
+(`expansion.ts:398`) rather than to `WKST` — a deliberate choice out of the
+data-integrity survey, provably equivalent for `INTERVAL: 1`, and diverging only
+for `INTERVAL >= 2` with `BYDAY` naming an earlier day, which the importer
+detects and routes to fallback. The issue carries why it stays deferred.
 
 ### Recommend leaving to the fallback
 

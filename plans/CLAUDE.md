@@ -1,23 +1,37 @@
 # Agent guidelines for plans/
 
-## Findings and plan steps are issues; run reports are files
+## State is an issue; documents are files
 
-Two things used to live in one `plans/<survey-name>-results.md` file, and they
-are different shapes:
+One rule decides where anything in `plans/` belongs:
 
 | | Shape | Where it lives |
 |---|---|---|
-| A survey's **findings**, and the **steps** a plan lays out | a **queue** — each one gets done and leaves | a GitHub issue |
-| A run's **report** — coverage statement, category verdicts, summary table, the reasoning behind a plan | a **record** — nothing to close | a file in `plans/` |
+| A survey **finding**, a plan **step**, a whole **plan**, an open **product question** | **state** — it is open, then it is closed | a GitHub issue |
+| A run **report**, a measurement, a finished survey | a **document** — nothing to close; it gets *edited* | a file in `plans/reports/` |
 
-An issue tracker is built for the first and is a bad container for the second.
-Splitting them is what removed the bookkeeping: no renumbering, no deleting
-entries by hand, no deciding whether a file has become an empty shell.
+Anything with an open/closed state is an issue. Anything maintained as a
+document is a file. That is the whole rule, and it replaces every carve-out
+that used to be listed here.
 
-**Filing.** One issue per finding or step. Label every one — `survey:<name>`
-for a survey's findings (`survey:health`, `survey:data-integrity`, …),
-`plan:<name>` for a plan's steps (`plan:tooling`) — so a run or a plan is one
-label query. Carry the survey's own finding fields into the body
+Two consequences worth stating, because both used to be done by hand:
+
+- **A plan is a parent issue with its steps as sub-issues.** GitHub tracks the
+  hierarchy and the progress; nothing needs a checklist in prose. #1008 is the
+  worked example.
+- **A file that is part state, part document splits.** `ical-rrule-gaps.md` was
+  a finished gap survey carrying two unfinished gaps: the survey became
+  `plans/reports/ical-rrule.md`, the two gaps became #1009 and #1010, and the
+  report points at them.
+
+The bookkeeping this removed: no renumbering, no deleting entries by hand, no
+deciding whether a file has become an empty shell.
+
+**Filing.** One issue per finding, step, plan or question. Label every one —
+`survey:<name>` for a survey's findings (`survey:health`,
+`survey:data-integrity`, …), `plan:<name>` for a plan and its steps
+(`plan:tooling`, `plan:ical-rrule`), `product-question` for a decision that is
+the maintainer's to make and not an agent's — so a run, a plan, or the open
+questions is one label query. Carry the survey's own finding fields into the body
 (`plans/surveys/README.md` defines the shared six) and state the recommended
 model tier in the first line, as the results files used to.
 `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton.
@@ -46,9 +60,9 @@ stale when a finding closes, so it stays.
 Reports live in **`plans/reports/`**, beside `plans/surveys/` — a run's report
 at `plans/reports/<survey-name>-<YYYY-MM-DD>.md`, with its summary table
 pointing at issue numbers, alongside the standing ones (`storage-backend.md`,
-`vault-scaling.md`). `plans/` itself then holds only live plans: files with
-outstanding work, whose steps are issues and whose prose is the reasoning
-behind them.
+`vault-scaling.md`, `ical-rrule.md`). `plans/` itself then holds nothing but
+this file and those two directories: the runnable surveys, and the documents
+they produced. Everything with a state is in the tracker.
 
 ## Sizing PRs when writing a plan
 
@@ -84,13 +98,14 @@ surrounding code and know the answer.
 
 ## Open product questions
 
-A change that turns out to hinge on a product decision goes in
-`plans/open-product-questions.md`, not in a comment beside the code. A comment
-is where such a question goes to be forgotten: the surveys that exist to
-surface these (`product-niche.md` section 6, `data-integrity.md`'s
-normalization-versus-corruption rule) read the plan files and run reports, not
+A change that turns out to hinge on a product decision becomes an issue
+labelled `product-question`, not a comment beside the code. A comment is where
+such a question goes to be forgotten: the surveys that exist to surface these
+(`product-niche.md` section 6, `data-integrity.md`'s
+normalization-versus-corruption rule) read the tracker and the reports, not
 inline prose.
 
-This one stays a file rather than becoming issues, deliberately. It is read as
-prose by whoever is deciding — a standing list of what the product hasn't
-settled — not worked through as a queue, and it is short.
+Give it the evidence, why it matters, and the options as you see them — the
+decision is the maintainer's, so the issue's job is to make deciding cheap.
+Closing it means saying in the closing comment what was decided. #1011 is the
+worked example.
