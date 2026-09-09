@@ -2,7 +2,9 @@ import { memo } from 'react'
 import type { Occurrence } from '@/types'
 import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
+import { useEntryAccess } from '@/hooks'
 import { fmtShort } from '@/format'
+import SwipeToDeleteRow from './SwipeToDeleteRow'
 
 interface Props {
   /** The group's oldest overdue occurrence — see overduePool.ts's OverdueGroup. */
@@ -13,34 +15,40 @@ interface Props {
   oldest: Date
   onOpen: (occ: Occurrence) => void
   onToggleDone: (occ: Occurrence) => void
+  onSwipeDelete: (occ: Occurrence) => (() => void)
 }
 
 /**
  * One row of the grouped overdue section: a single unfinished series, shown as
  * its oldest outstanding occurrence.
  *
- * Deliberately *not* AgendaRow with a different prop. Two behaviours differ in
+ * Deliberately *not* AgendaRow with a different prop. One behaviour differs in
  * kind rather than degree:
  *
- *   - **No swipe-to-delete.** The gesture deletes the occurrence under the
- *     finger, and here that occurrence stands for a whole series. A swipe that
- *     silently means something other than what it shows is worse than no swipe.
  *   - **The gutter carries a count, not a day badge.** A group spans many days,
  *     so it has no single day to badge; the card's own date chip (`showDate`)
  *     says which day the representative is from, and the gutter — the same
  *     width, so cards stay in one column with the day rows above and below —
  *     says how many more there are behind it.
  *
- * The checkbox is kept: completing the oldest occurrence of an overdue task is
- * the single most likely thing to want to do from this row, and it means
- * exactly what it shows (the count drops by one, and the next-oldest becomes
- * the representative). Tapping anywhere else opens that occurrence's entry; the
- * rest of the group is reachable by scrolling back to its own days.
+ * Swipe-to-delete deletes the occurrence under the finger, same as the
+ * checkbox: it means exactly what it shows (the count drops by one, and the
+ * next-oldest becomes the representative), not "delete the whole series" — a
+ * group only pools multiple occurrences for a recurring series, and deleting
+ * one just excludes that date, same as swiping it away from its own day would.
+ * The checkbox is kept alongside it: completing the oldest occurrence of an
+ * overdue task is the single most likely thing to want to do from this row.
+ * Tapping anywhere else opens that occurrence's entry; the rest of the group
+ * is reachable by scrolling back to its own days.
  */
-function AgendaOverdueGroupRow({ occ, count, oldest, onOpen, onToggleDone }: Props) {
+function AgendaOverdueGroupRow({ occ, count, oldest, onOpen, onToggleDone, onSwipeDelete }: Props) {
   const roots     = useStore(s => s.roots)
   const backlinks = useStore(s => s.backlinks)
   const listedOn  = (backlinks.get(occ.entryKey) ?? []).map(key => roots.get(key)?.title ?? key)
+
+  // See AgendaRow's identical check: view-only vaults have no source to write
+  // back to, so the swipe gesture is disabled there.
+  const isViewOnly = useEntryAccess(occ).mode === 'view-only'
 
   return (
     // Mirrors AgendaRow's own outer box: items-start and no min-height, so the
@@ -59,18 +67,21 @@ function AgendaOverdueGroupRow({ occ, count, oldest, onOpen, onToggleDone }: Pro
           </div>
         )}
       </div>
-      {/* No overflow-hidden wrapper here (that exists in AgendaRow only to clip
-          the swipe reveal), so the shadow can sit directly on the card's box. */}
+      {/* See AgendaRow's identical wrapper: the shadow lives on this outer,
+          unclipped box since SwipeToDeleteRow's own overflow-hidden would
+          otherwise clip it. */}
       <div className="relative rounded-lg flex-1 min-w-0 shadow-(--shadow-card)" data-occ-key={occ.id}>
-        <OccurrenceCard
-          occ={occ}
-          leadingIcon="checkbox"
-          onOpen={() => onOpen(occ)}
-          onToggleDone={() => onToggleDone(occ)}
-          showDate
-          listedOn={listedOn}
-          animate={false}
-        />
+        <SwipeToDeleteRow occ={occ} onSwipeDelete={onSwipeDelete} disabled={isViewOnly}>
+          <OccurrenceCard
+            occ={occ}
+            leadingIcon="checkbox"
+            onOpen={() => onOpen(occ)}
+            onToggleDone={() => onToggleDone(occ)}
+            showDate
+            listedOn={listedOn}
+            animate={false}
+          />
+        </SwipeToDeleteRow>
       </div>
     </div>
   )

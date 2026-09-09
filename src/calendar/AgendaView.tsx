@@ -329,6 +329,7 @@ export default function AgendaView({ onOpen }: Props) {
                   oldest={row.oldest}
                   onOpen={onOpen}
                   onToggleDone={handleToggleDone}
+                  onSwipeDelete={handleSwipeDelete}
                 />
               ) : (
                 <AgendaRow
