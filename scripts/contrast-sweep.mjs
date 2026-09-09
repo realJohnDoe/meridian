@@ -10,14 +10,18 @@ import { BASE, startPreview } from './previewServer.mjs'
  * pair for every text-bearing element, across every theme and a representative
  * set of routes, and reports whatever fails WCAG AA.
  *
- * Report-only for now (always exits 0): eleven merged PRs (#302, #329, #331,
- * #340, #445, #478, #801, #912, #924, #930, #954) already fixed contrast one
+ * Ratcheted, not a hard gate: eleven merged PRs (#302, #329, #331, #340,
+ * #445, #478, #801, #912, #924, #930, #954) already fixed contrast one
  * finding at a time, with no standing check to catch the next one. Landing
  * this against an unknown number of pre-existing violations and failing the
  * build on day one is how a check gets disabled instead of fixed — see #663
  * before #756 in this repo's own history for the same ratchet shape applied
- * to lint warnings. A later change turns the summary line below into a floor
- * once the current count is known.
+ * to lint warnings. It ran report-only first (PR #1012) to establish the
+ * baseline; `MAX_VIOLATIONS` below is that count. CI now fails only if a
+ * change pushes the count *above* the floor — fixing violations is never
+ * blocked on fixing all 295 of them in one PR, but a regression is caught
+ * immediately. Bring `MAX_VIOLATIONS` down as violations get fixed (the
+ * script tells you the new number to use when the count drops below it).
  *
  * ## Why not axe-core
  *
@@ -97,6 +101,15 @@ import { BASE, startPreview } from './previewServer.mjs'
  */
 
 const VIEWPORT = { width: 1440, height: 900 }
+
+/**
+ * The ratchet floor — see the file doc comment. Set from PR #1012's
+ * report-only baseline (checked 4896 element/theme/route samples, 295 below
+ * WCAG AA), confirmed reproducible across three consecutive runs against the
+ * same build before being turned into a gate. Lower this whenever a fix
+ * drops the count — the script prints the new number to use.
+ */
+const MAX_VIOLATIONS = 295
 
 /**
  * Extracted from `src/routes/__root.tsx`'s `THEME_CLASS` rather than
@@ -371,5 +384,15 @@ if (failures.length) {
 } else {
   console.log('All sampled text cleared WCAG AA.')
 }
-// Report-only (see file doc comment) — always exits 0 until the current
-// count is known and a follow-up turns this into a floor.
+
+// The ratchet (see file doc comment): fails only if the count grows past the
+// known baseline, so fixing violations is never blocked on fixing all of them
+// at once, but a regression is caught immediately.
+if (failures.length > MAX_VIOLATIONS) {
+  console.error(`\n${failures.length} violations exceeds the floor of ${MAX_VIOLATIONS} — this change made contrast worse somewhere.`)
+  process.exit(1)
+} else if (failures.length < MAX_VIOLATIONS) {
+  console.log(`\n${failures.length} is below the current floor of ${MAX_VIOLATIONS} — ratchet MAX_VIOLATIONS down to ${failures.length} in this PR so the improvement can't silently regress.`)
+} else {
+  console.log(`\nAt the floor (${MAX_VIOLATIONS}) — unchanged.`)
+}
