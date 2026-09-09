@@ -49,6 +49,11 @@ jobs:
       # the version is read from it rather than installed bare.
       - run: pnpm dlx playwright@$(node -p "require('playwright-core/package.json').version") install --with-deps chromium
       - run: pnpm run test:layout
+      # Report-only (see scripts/contrast-sweep.mjs's doc comment for why, and
+      # for why axe-core alone can't do this) — always exits 0 until a
+      # follow-up turns its summary into a floor once the current count of
+      # pre-existing violations is known. Reuses the browser install above.
+      - run: pnpm run test:contrast
       - uses: actions/upload-pages-artifact@v5
         with:
           path: dist
