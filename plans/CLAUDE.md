@@ -41,10 +41,14 @@ This is the one step nothing enforces — it is a judgement call each run.
 last finding closes — existed so no file would mix done with not-done work. A
 run report contains no work at all: it is what was measured, what was
 deliberately not looked at, and what the verdicts were. Nothing about it goes
-stale when a finding closes, so it stays, at
-`plans/<survey-name>-<YYYY-MM-DD>-run.md`, with its summary table pointing at
-issue numbers. A plan file works the same way: it keeps the reasoning, and its
-steps live as issues.
+stale when a finding closes, so it stays.
+
+Reports live in **`plans/reports/`**, beside `plans/surveys/` — a run's report
+at `plans/reports/<survey-name>-<YYYY-MM-DD>.md`, with its summary table
+pointing at issue numbers, alongside the standing ones (`storage-backend.md`,
+`vault-scaling.md`). `plans/` itself then holds only live plans: files with
+outstanding work, whose steps are issues and whose prose is the reasoning
+behind them.
 
 ## Sizing PRs when writing a plan
 

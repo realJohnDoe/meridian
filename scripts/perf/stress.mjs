@@ -142,7 +142,7 @@ async function heapMB(page) {
  * CI breaks with it rather than after it.
  *
  * The numbers those flows did produce are recorded in
- * `plans/vault-scaling.md`; that section of the report cannot be
+ * `plans/reports/vault-scaling.md`; that section of the report cannot be
  * reproduced by re-running this harness.
  */
 async function measureUI(browser, spec) {
@@ -200,7 +200,7 @@ async function measureUI(browser, spec) {
     // __perf.settle() waits out whatever cold-start background work (idle
     // warm-up, Dexie's cache write) is still mid-flight before the timed loop
     // starts — added after finding 4's first profile (finding #4 in
-    // plans/vault-scaling.md) showed every prior reading was
+    // plans/reports/vault-scaling.md) showed every prior reading was
     // dominated by exactly that,
     // not by scrolling. __perf.loafsIn() then reads the frame's attribution
     // from the one page-lifetime LoAF observer __perf itself keeps (see

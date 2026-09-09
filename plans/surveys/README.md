@@ -5,10 +5,9 @@ directory (`health.md`, `performance.md`, `health-ui.md`,
 `data-integrity.md`, `product-niche.md`). Each survey states only what's
 specific to it — its categories, its findings cap, its target
 invariants/flows/niches — and points back here for the rest.
-Finished research reports live one level up in `plans/` rather than here, so
-everything in this directory is a runnable survey and none of it needs an
-exception: `plans/storage-backend.md` and `plans/vault-scaling.md` are both
-that kind of report.
+Finished reports live in `plans/reports/` beside this directory rather than in
+it, so everything here is a runnable survey and none of it needs an exception.
+That is where a run's own report goes too — see **Reporting** below.
 
 Read this once before running (or editing) any survey.
 
@@ -229,7 +228,7 @@ reports are files"); this section states only what a survey run does.
   label first** — a re-run mostly re-derives findings that are already open, and
   those get a comment carrying the new run's evidence rather than a second
   issue.
-- **One report file per run**, at `plans/<survey-name>-<YYYY-MM-DD>-run.md`,
+- **One report file per run**, at `plans/reports/<survey-name>-<YYYY-MM-DD>.md`,
   carrying the coverage statement, the category verdicts and the summary table
   — with the table's rows pointing at issue numbers rather than restating each
   finding. The report is a record of what was measured, so unlike the results
