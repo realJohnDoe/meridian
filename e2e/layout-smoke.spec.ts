@@ -226,6 +226,44 @@ function readTopRow(): TopRow | null {
   return top ? { key: top.el.getAttribute('data-flip-key'), top: Math.round(top.rect.top) } : null
 }
 
+interface TextEntryField {
+  tag: string
+  type: string | null
+  name: string | null
+}
+
+/**
+ * The structural form of CLAUDE.md's "Route shells" rule: "a route whose own
+ * content contains a text-entry field belongs on the document-flow chain,
+ * not under `_app`." This has been got wrong twice — the entry routes
+ * (fixed in `3de767a`) and `/settings` (#840, fixed in #844) — both times
+ * silently, because nothing checked it.
+ *
+ * Scoped to `[data-app-content]`, the per-view content root `_app.tsx` marks
+ * around its `<Outlet />` — NOT `document`, which would also catch the
+ * search bar `_app` itself renders on every route and flag every route
+ * immediately (the same trap probeFlow() below solves for flow routes, with
+ * `[data-flow-screen]`).
+ */
+function readTextEntryFields(): TextEntryField[] {
+  const host = document.querySelector('[data-app-content]')
+  if (!host) return []
+  const excludedInputTypes = new Set(['button', 'checkbox', 'radio', 'submit'])
+  const fields = [...host.querySelectorAll('input, textarea, [contenteditable]')].filter(el => {
+    if (el.tagName === 'INPUT') {
+      const type = (el.getAttribute('type') ?? 'text').toLowerCase()
+      return !excludedInputTypes.has(type)
+    }
+    if (el.hasAttribute('contenteditable')) return el.getAttribute('contenteditable') !== 'false'
+    return true // textarea
+  })
+  return fields.map(el => ({
+    tag: el.tagName.toLowerCase(),
+    type: el.getAttribute('type'),
+    name: el.getAttribute('name') ?? el.getAttribute('aria-label') ?? el.id ?? null,
+  }))
+}
+
 interface FlowProbe {
   missing?: boolean
   before?: number
@@ -286,6 +324,11 @@ for (const vp of VIEWPORTS) {
           expect(m.searchBar.top, 'search bar must be on screen (top)').toBeGreaterThanOrEqual(0)
           expect(m.searchBar.bottom, 'search bar must be on screen (bottom)').toBeLessThanOrEqual(m.innerHeight)
         }
+
+        const fields = await page.evaluate(readTextEntryFields)
+        expect(fields, `${route} is filed under _app but its own content renders a text-entry field ` +
+          `(${fields.map(f => `<${f.tag}${f.type ? ` type=${f.type}` : ''}${f.name ? ` ${f.name}` : ''}>`).join(', ')}) ` +
+          `— move it to the document-flow chain instead (see CLAUDE.md's "Route shells")`).toEqual([])
 
         if (route !== '/') return
 

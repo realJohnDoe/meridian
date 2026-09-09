@@ -290,7 +290,13 @@ function AppMain() {
           </Popover>
         </div>
 
-        <section className="flex flex-1 flex-col overflow-hidden min-h-0">
+        {/* `data-app-content` marks the per-view content root, for
+            e2e/layout-smoke.spec.ts to anchor its wrong-shell check to. It has
+            to be the route's own content and not this shell's wrapper: the
+            topbar and SearchBar below are `_app` furniture rendered on every
+            view, not route content, and a shell-wide query would flag the
+            search bar's own input on every route. */}
+        <section data-app-content className="flex flex-1 flex-col overflow-hidden min-h-0">
           <Outlet />
         </section>
 
