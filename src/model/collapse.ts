@@ -1,6 +1,6 @@
 import type { OccurrenceMetadata, FileMetadata, OccurrenceEntry, Entry } from '@/types'
 import { isSeries, isStandaloneOcc } from '@/types'
-import { OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, inlineFieldEmpty, absentFieldValue, deepEqual } from './fieldRegistry'
+import { OCCURRENCE_FIELDS, FILE_LEVEL_SPECS, STRUCTURAL_KEYS, inlineFieldEqual, absentFieldValue, deepEqual } from './fieldRegistry'
 import type { RawScalar } from '@/fileIO'
 import { saveFile } from './inheritance'
 
@@ -211,20 +211,23 @@ function fileMetaToYaml(root: FileMetadata): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const spec of FILE_LEVEL_SPECS) {
     // A registry key present in `extra` was written in a shape the model can't
-    // represent; the raw value wins so it round-trips (the typed field holds the
-    // ''/[] fallback, which inlineFieldEmpty does not always suppress).
+    // represent; the raw value wins so it round-trips (the typed field holds
+    // the ''/[] fallback, which `inlineFieldEqual` against that same fallback
+    // below would otherwise suppress).
     if (root.extra && spec.key in root.extra) continue
     const v = (root as unknown as Record<string, unknown>)[spec.key as string]
-    if (!inlineFieldEmpty(spec.kind, v)) out[spec.key] = authoredOrTyped(spec, v, root.sources)
+    // No baseline: a file has exactly one root, so file-level fields inherit
+    // from nothing and "what omitting gives back" is exactly `absentFieldValue`
+    // — the same relational rule `occMetaToYaml` uses. This is what makes a
+    // frontmatter-less note stay frontmatter-less: a required field's absent
+    // default (`''`/`[]`) round-trips to itself, so `title: ""` is no longer
+    // written for a note that never had one (#1011). The predicate this
+    // replaced (`inlineFieldEmpty`, gone now) asked "is this empty?" rather
+    // than "would omitting it lose information?" — the same distinction
+    // `occMetaToYaml`'s doc comment already draws for occurrence fields.
+    if (inlineFieldEqual(spec.kind, v, absentFieldValue(spec))) continue
+    out[spec.key] = authoredOrTyped(spec, v, root.sources)
   }
-  // No baseline: a file has exactly one root, so file-level fields inherit from
-  // nothing and every unknown key on it is emitted. Deliberately still using
-  // `inlineFieldEmpty` above rather than the relational rule occurrence fields
-  // now use — switching it would also stop emitting `title: ""` for a
-  // frontmatter-less note, which is the data-integrity survey's finding #8
-  // repro (c). Whether Meridian should write frontmatter into a
-  // frontmatter-less note at all is an open *product* question — see #1011,
-  // not something to settle by changing this line.
   emitExtra(root.extra, undefined, out)
   return out
 }

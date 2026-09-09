@@ -271,6 +271,12 @@ export function wrapFrontmatter(
   convention: FileConvention = DEFAULT_FILE_CONVENTION,
 ): string {
   const nl = convention.crlf ? '\r\n' : '\n'
+  // An empty `yamlFields` means collapse decided there is nothing to say —
+  // every field round-tripped to omission (see `serializeRawNode` in
+  // model/inheritance.ts). Writing an empty `---`/`---` fence around nothing
+  // would still be a frontmatter block this file never asked for (#1011), so
+  // a frontmatter-less note stays frontmatter-less: just the body.
+  if (!yamlFields) return convention.trailingNewline && body ? body + nl : body
   // yamlFields is 100% Meridian-generated (the `yaml` package only ever emits
   // bare `\n`), so a blanket replace here is safe. `body` is never run through
   // this — its own bytes (already whatever convention the source had) are
