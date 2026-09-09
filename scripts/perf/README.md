@@ -22,7 +22,7 @@ node scripts/perf/stress.mjs --skip-pipeline --skip-dexie # UI flows only
 
 Results are printed per size and written to `scripts/perf/results/<iso>.json`,
 which is gitignored: a run is a point-in-time artefact of one machine, and the
-numbers worth keeping live in `plans/vault-scaling.md`.
+numbers worth keeping live in `plans/reports/vault-scaling.md`.
 
 ## What it measures
 
@@ -57,7 +57,7 @@ Three UI flows, deliberately: cold start, toggling a task, and scrolling the
 agenda. The view switches, search, opening an entry and the CodeMirror
 keystroke measurement were removed — the reasoning is on `measureUI` in
 `stress.mjs`. The `pipeline` and `dexie` phases are untouched and are what
-verify five of the six findings recorded in `plans/vault-scaling.md`.
+verify five of the six findings recorded in `plans/reports/vault-scaling.md`.
 
 **This directory outlived its expiry, deliberately.** It existed to verify
 those findings by re-measurement and was scoped to be deleted with the last

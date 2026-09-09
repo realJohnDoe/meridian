@@ -5,10 +5,9 @@ directory (`health.md`, `performance.md`, `health-ui.md`,
 `data-integrity.md`, `product-niche.md`). Each survey states only what's
 specific to it — its categories, its findings cap, its target
 invariants/flows/niches — and points back here for the rest.
-Finished research reports live one level up in `plans/` rather than here, so
-everything in this directory is a runnable survey and none of it needs an
-exception: `plans/storage-backend.md` and `plans/vault-scaling.md` are both
-that kind of report.
+Finished reports live in `plans/reports/` beside this directory rather than in
+it, so everything here is a runnable survey and none of it needs an exception.
+That is where a run's own report goes too — see **Reporting** below.
 
 Read this once before running (or editing) any survey.
 
@@ -133,10 +132,11 @@ Two knock-on effects to handle rather than ignore:
 - **Re-rank after writing the blocks.** `effort` feeds the ranking formula, so
   moving a finding down a tier moves it up the order. Rank the final tiers,
   not the first-draft ones.
-- **Keep finding numbers stable when the order changes.** The category
-  verdicts reference finding numbers and results files get worked through as
-  checklists, so treat `#N` as an identity and add a separate rank column
-  rather than renumbering.
+- **Rank is a column, not an identity.** A finding's identity is its issue
+  number, which never changes; the category verdicts reference it and so does
+  any code comment citing the finding. So carry rank as its own column in the
+  run report's summary table and re-sort that, rather than reordering anything
+  that looks like an id.
 
 ## Ranking findings
 
@@ -218,21 +218,30 @@ long one built on speculation.
 
 ## Reporting
 
-**Write the findings to a file.** After a run, write its findings to
-`../<survey-name>-results.md` — i.e. `plans/<survey-name>-results.md`, one
-level up from this directory (e.g. `health.md` → `plans/health-results.md`)
-— so they survive the session and can be worked from as a checklist. Once
-every finding is fixed or explicitly dropped, delete the results file in the
-same commit/PR that closes the last one out — see `git log -- plans/` for
-the established pattern (results docs get added, then removed once
-resolved). `data-integrity.md`'s "Known suspects" section, which appends a
-verdict to each suspect's hypothesis in-place, is the exception: that survey
-keeps its suspects list live in the survey file itself rather than a
-separate results doc — follow whichever pattern the survey you're running
-already uses.
+**File the findings as issues, and the report as a file.** The split and its
+rationale are in `plans/CLAUDE.md` ("Findings and plan steps are issues; run
+reports are files"); this section states only what a survey run does.
 
-Results files live directly in `plans/`; survey files themselves
-(`health.md`, `performance.md`, etc.) stay in `plans/surveys/`.
+- **One issue per finding**, labelled `survey:<name>` (`survey:health`,
+  `survey:data-integrity`, …), using the fields below.
+  `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton. **Search that
+  label first** — a re-run mostly re-derives findings that are already open, and
+  those get a comment carrying the new run's evidence rather than a second
+  issue.
+- **One report file per run**, at `plans/reports/<survey-name>-<YYYY-MM-DD>.md`,
+  carrying the coverage statement, the category verdicts and the summary table
+  — with the table's rows pointing at issue numbers rather than restating each
+  finding. The report is a record of what was measured, so unlike the results
+  files it replaces it is **not** deleted when its findings close.
+- A finding closes when a PR saying `Fixes #N` merges. Do not edit a file to
+  close one. Dropping one as invalid or won't-fix is a close with `not planned`
+  plus a comment saying why; deferring one is an open issue with a `deferred`
+  label plus a comment.
+
+`data-integrity.md`'s "Known suspects" section, which appends a verdict to each
+suspect's hypothesis in-place, is unchanged: that survey keeps its suspects list
+live in the survey file itself. Survey files (`health.md`, `performance.md`,
+etc.) stay in `plans/surveys/`.
 
 **Suggest improvements to the survey itself, as a diff on the survey file.**
 These survey files are themselves living specs, and a real run is evidence
@@ -241,14 +250,12 @@ surfaces — an ambiguous instruction, a budget item that turned out to be
 unmeasurable, a category boundary that didn't hold, a scoring rule that
 produced a counterintuitive order, a "known suspect" that's now stale. After
 finishing a run, edit the survey `.md` file directly with the proposed
-improvements, as its own commit separate from the results file and from any
+improvements, as its own commit separate from the run report and from any
 fixes to the product itself — that way the suggestion shows up as an
 ordinary reviewable diff in the PR (GitHub's review UI, comments,
 approve/request-changes) instead of prose the user has to re-transcribe by
 hand to apply it. Keep the edit scoped to genuine process learnings, not
-findings that belong in the results file. Still propose rather than
-silently commit past review: open it on the survey's own PR (or as a
-`survey-run/<name>` branch if the results themselves aren't going through a
-PR) so the user reviews and merges it like any other change, and note in the
-results file, in one line, that the survey file was updated and why, so the
-two stay linked.
+findings, which are issues. Still propose rather than silently commit past
+review: open it on a `survey-run/<name>` branch so the user reviews and merges
+it like any other change, and note in the run report, in one line, that the
+survey file was updated and why, so the two stay linked.

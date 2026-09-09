@@ -223,9 +223,8 @@ function fileMetaToYaml(root: FileMetadata): Record<string, unknown> {
   // now use — switching it would also stop emitting `title: ""` for a
   // frontmatter-less note, which is the data-integrity survey's finding #8
   // repro (c). Whether Meridian should write frontmatter into a
-  // frontmatter-less note at all is an open *product* question, tracked in
-  // plans/open-product-questions.md — not something to settle by changing this
-  // line.
+  // frontmatter-less note at all is an open *product* question — see #1011,
+  // not something to settle by changing this line.
   emitExtra(root.extra, undefined, out)
   return out
 }
