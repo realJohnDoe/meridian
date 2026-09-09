@@ -130,14 +130,13 @@ section above (verdicts appended per suspect), plus the full report per the
 the existing pattern. Also append suggested improvements to this survey file
 itself, per the same conventions.
 
-**Finding numbers restart every run, and that is a trap worth naming.** The
-shared convention treats `#N` as an identity *within* a results file, but this
-survey outlives its results files: they are deleted once their last finding
-closes, while the suspect verdicts above — and a dozen `data-integrity survey,
-finding #N` comments in `src/` — keep pointing at numbers whose report no
-longer exists. So: date every verdict you re-issue above, state in the results
-file which run its numbers belong to, and do **not** renumber the old code
-comments.
+**Finding numbers used to restart every run, and the wreckage is still in the
+tree.** Findings are issues now, so a number is permanent and this trap is
+closed going forward. It is not closed backwards: the suspect verdicts above,
+and a dozen `data-integrity survey, finding #N` comments in `src/`, still point
+at per-run numbers whose report no longer exists. So: date every verdict you
+re-issue above, and do **not** renumber the old code comments — per
+`plans/CLAUDE.md`, an old number is correct for the run it names.
 
 ### 1. Integrity verdict (~5 sentences)
 
