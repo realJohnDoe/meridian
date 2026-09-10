@@ -64,6 +64,12 @@ const FREQ_UNIT_LABELS: Record<ScheduleFreq, string> = {
   daily: 'days', weekly: 'weeks', monthly: 'months', yearly: 'years',
 }
 
+// Display labels for `RepeatForm.months` — always January-first; unlike
+// weekday order, no locale starts its calendar year somewhere else.
+const MONTH_LABELS = Array.from({ length: 12 }, (_, i) =>
+  new Date(2025, i, 1).toLocaleDateString(undefined, { month: 'short' })
+)
+
 const COMPLETION_UNITS: readonly DurationUnit[] = ['days', 'weeks', 'months', 'years']
 function completionUnitLabel(unit: DurationUnit, n: number): string {
   return n === 1 ? unit.replace(/s$/, '') : unit
@@ -107,10 +113,11 @@ export default function RepeatDialog({
     { repeat, formCtx },
     ({ repeat, formCtx }) => repeatToForm(repeat, formCtx),
   )
-  const { freq, wdays, monthly, endType, endVal, intervalNum, completionNum, completionUnit } = state
+  const { freq, wdays, monthly, months, endType, endVal, intervalNum, completionNum, completionUnit } = state
   const setFreq           = (freq: RepeatFormFreq) => dispatch({ type: 'set', patch: { freq } })
   const setWdays          = (wdays: boolean[])    => dispatch({ type: 'set', patch: { wdays } })
   const setMonthly        = (monthly: MonthlyMode)=> dispatch({ type: 'set', patch: { monthly } })
+  const setMonths         = (months: boolean[])   => dispatch({ type: 'set', patch: { months } })
   const setEndType        = (endType: RepeatEndType) => dispatch({ type: 'set', patch: { endType } })
   const setEndVal         = (endVal: string)      => dispatch({ type: 'set', patch: { endVal } })
   const setIntervalNum    = (intervalNum: number) => dispatch({ type: 'set', patch: { intervalNum } })
@@ -133,7 +140,7 @@ export default function RepeatDialog({
       : 'Choose how often this scheduled item repeats.'
 
   function handleSet() {
-    onConfirm(formToRepeat(state, scheduled?.date, repeat))
+    onConfirm(formToRepeat(state, scheduled?.date))
     onClose()
   }
 
@@ -218,8 +225,40 @@ export default function RepeatDialog({
                 </ToggleGroup>
               )}
 
-              {/* Monthly: pattern picker (Inferred Same-day and Inferred Weekday options) */}
-              {freq === 'monthly' && (
+              {/* Yearly: month picker (bymonth) */}
+              {freq === 'yearly' && (
+                <div className="flex flex-col gap-1.5 my-1">
+                  <div className="text-2xs font-bold tracking-wider uppercase text-muted-foreground">Months</div>
+                  <ToggleGroup
+                    type="multiple"
+                    value={months.reduce<string[]>((acc, on, i) => on ? [...acc, String(i)] : acc, [])}
+                    onValueChange={(vals) => {
+                      const next = MONTH_LABELS.map(() => false)
+                      vals.forEach(v => { next[parseInt(v)] = true })
+                      setMonths(next)
+                    }}
+                    className="flex-wrap"
+                  >
+                    {MONTH_LABELS.map((label, i) => (
+                      <ToggleGroupItem
+                        key={label}
+                        value={String(i)}
+                        className={cn(badgeVariants({ variant: 'chip' }), 'basis-[15%] grow justify-center')}
+                      >
+                        {label}
+                      </ToggleGroupItem>
+                    ))}
+                  </ToggleGroup>
+                  <p className="text-2xs text-muted-foreground">
+                    {months.some(Boolean)
+                      ? 'Repeats in the selected months every year.'
+                      : 'No months selected — repeats only in the scheduled month each year.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Monthly/Yearly: pattern picker (Inferred Same-day and Inferred Weekday options) */}
+              {(freq === 'monthly' || freq === 'yearly') && (
                 <div className="flex flex-col gap-1.5 my-1">
                   {(() => {
                     const d = parseDateString(scheduled?.date ?? '')
@@ -227,15 +266,22 @@ export default function RepeatDialog({
                     if (d) {
                       const mday = d.getDate()
                       const mdayStr = getOrdinalSuffix(mday)
-                      options.push({ id: 'same-day', label: `Every ${mdayStr} of the month` })
-                      
                       const spec = monthlyWeekdaySpec(d)
-                      options.push({ id: 'weekday-pattern', label: spec.label })
-                    } else {
+                      if (freq === 'monthly') {
+                        options.push({ id: 'same-day', label: `Every ${mdayStr} of the month` })
+                        options.push({ id: 'weekday-pattern', label: spec.label })
+                      } else {
+                        options.push({ id: 'same-day', label: `Every ${mdayStr}` })
+                        options.push({ id: 'weekday-pattern', label: spec.label.replace(' of the month', '') })
+                      }
+                    } else if (freq === 'monthly') {
                       options.push({ id: 'same-day', label: 'Same day of month' })
                       options.push({ id: 'weekday-pattern', label: 'First weekday of month' })
+                    } else {
+                      options.push({ id: 'same-day', label: 'Same day' })
+                      options.push({ id: 'weekday-pattern', label: 'First weekday pattern' })
                     }
-                    
+
                     return options.map(o => (
                       <button
                         key={o.id}

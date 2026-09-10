@@ -14,6 +14,9 @@ const WDAY_CODE_BY_JS_DAY: Weekday[] = ['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa'
 const WDAY_CODES_MON_FIRST: Weekday[] = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su']
 const WDAY_NAME_BY_JS_DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+/** Calendar month numbers in `RepeatForm.months` index order — 0 = January … 11 = December. */
+const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+
 // ── Interval string format: "2 weeks", "1 day", "3 months", … ────────────────
 
 export type IntervalParts = { n: number; unit: DurationUnit }
@@ -83,36 +86,40 @@ export function monthlyWeekdaySpec(jsDate: Date): MonthlyWeekdaySpec {
 // ── Repeat ⇄ form model ───────────────────────────────────────────────────────
 //
 // `RepeatForm` is the editable shape a repeat picker works in: one frequency
-// dropdown, seven weekday toggles, a monthly mode, an end condition. `Repeat`
-// is the flat spec that gets persisted and fed to the expansion engine.
+// dropdown, seven weekday toggles, a month set, a same-day/weekday-pattern
+// mode, an end condition. `Repeat` is the flat spec that gets persisted and
+// fed to the expansion engine.
 //
 // The pair below is DELIBERATELY NOT A BIJECTION, and the asymmetry is load-
 // bearing — vault files in the wild carry `Repeat` values that a naive
 // symmetric round-trip would silently rewrite into different recurrences:
 //
 //  1. `formToRepeat` re-derives `bymonthday`/`byweekday`+`bysetpos` for monthly
-//     repeats from `scheduledDate`, NOT from whatever `repeatToForm` parsed.
-//     The scheduled date is the anchor; a stored `bymonthday` that disagrees
-//     with it is stale and gets corrected on save.
+//     AND yearly repeats from `scheduledDate`, NOT from whatever `repeatToForm`
+//     parsed. The scheduled date is the anchor; a stored `bymonthday` or
+//     weekday-pattern that disagrees with it is stale and gets corrected on
+//     save — "the fourth Thursday of November" only survives unchanged when
+//     the scheduled date actually falls on the fourth Thursday of some named
+//     month; otherwise Set re-anchors it to whatever weekday-pattern the
+//     scheduled date itself represents.
+//  1a. Yearly's 'same-day' mode never writes `bymonthday` at all: with neither
+//     `bymonthday` nor `byweekday` present, every month `bymonth` names (or
+//     the anchor's own month, with no `bymonth`) already falls back to the
+//     anchor's day-of-month — see `monthCandidates` in `expansion.ts`. Writing
+//     it explicitly would just be a redundant field on the single most common
+//     yearly repeat (an anniversary/birthday), so it stays implicit.
 //  2. `repeatToForm` reads `byweekday` into `wdays` only for `freq: 'weekly'`,
-//     because for monthly repeats the same field means "Nth weekday of month"
-//     rather than "these days each week".
+//     because for monthly/yearly repeats the same field means "Nth weekday of
+//     the month" rather than "these days each week".
 //  3. `repeatToForm` infers `monthly: 'weekday-pattern'` only from the pair
 //     (`byweekday` present AND `bysetpos` present) — `bysetpos` alone, or
-//     `byweekday` alone on a monthly repeat, stays 'same-day'.
+//     `byweekday` alone on a monthly/yearly repeat, stays 'same-day'.
 //  4. An `end: { type: 'until' }` carrying a `time` loses it: the form has no
 //     field for time-of-day on an end date, so `repeatToForm` reads only
 //     `date` into `endVal` and `formToRepeat` writes back `date` alone.
-//  5. `after_completion` has no form fields for weekdays, monthly mode or an
-//     end condition, so those are dropped from any `after_completion` repeat
-//     that passes through the form.
-//  6. A yearly repeat's `bymonth`/`bymonthday`/`byweekday`+`bysetpos` are
-//     carried across from the repeat the form was opened on, not rebuilt from
-//     form state. The form has no control for any of them, so rebuilding would
-//     turn "the fourth Thursday of November" into "November 27th" the first
-//     time someone opened the dialog and pressed Set — silently, and on a rule
-//     they never touched. The monthly fields above are the opposite case: the
-//     form *does* express them, so they are re-derived from the anchor.
+//  5. `after_completion` has no form fields for weekdays, months, monthly mode
+//     or an end condition, so those are dropped from any `after_completion`
+//     repeat that passes through the form.
 //
 // Changing any of these changes which vault files survive an open-and-Set
 // cycle unchanged — see `model/__tests__/repeatForm.test.ts`.
@@ -126,7 +133,17 @@ export interface RepeatForm {
   freq: RepeatFormFreq
   /** Monday-first weekday selection: index 0 = Mon … 6 = Sun, regardless of locale. */
   wdays: boolean[]
+  /**
+   * Same-day-of-month vs Nth-weekday-of-month, for `freq: 'monthly'` AND
+   * `freq: 'yearly'` alike — both derive it from `scheduledDate` the same way.
+   */
   monthly: MonthlyMode
+  /**
+   * `freq: 'yearly'` only: which calendar months the repeat spans, January-
+   * first (index 0 = January … 11 = December). All-`false` means "no explicit
+   * `bymonth`" — the repeat spans only the scheduled date's own month.
+   */
+  months: boolean[]
   endType: RepeatEndType
   /** ISO date when `endType` is 'until'; occurrence count as a string when 'count'. */
   endVal: string
@@ -152,6 +169,8 @@ function defaultWdays(scheduledDate?: string | null): boolean[] {
   return wdays
 }
 
+const NO_MONTHS = (): boolean[] => MONTH_NUMBERS.map(() => false)
+
 /** Derive editable form state from an existing Repeat value (or sensible defaults). */
 export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): RepeatForm {
   const { scheduledDate, hasSchedule, hasTracking } = ctx
@@ -165,6 +184,7 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
       freq: repeat ? 'after_completion' : defaultFreq,
       wdays: defaultWdays(scheduledDate),
       monthly: 'same-day',
+      months: NO_MONTHS(),
       endType: 'never',
       endVal: '',
       intervalNum: 1,
@@ -180,12 +200,14 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
     s.byweekday && s.bysetpos !== undefined ? 'weekday-pattern' : 'same-day'
 
   // Only weekly repeats mean "these days each week" by `byweekday`; on a
-  // monthly repeat the same field is half of the Nth-weekday pattern.
+  // monthly/yearly repeat the same field is half of the Nth-weekday pattern.
   const wdays = [false, false, false, false, false, false, false]
   if (s.freq === 'weekly' && s.byweekday) {
     const selected = s.byweekday
     WDAY_CODES_MON_FIRST.forEach((code, i) => { wdays[i] = selected.includes(code) })
   }
+
+  const months = MONTH_NUMBERS.map(m => !!s.bymonth?.includes(m))
 
   let endType: RepeatEndType = 'never'
   let endVal = ''
@@ -202,6 +224,7 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
     freq: s.freq,
     wdays,
     monthly,
+    months,
     endType,
     endVal,
     intervalNum: s.interval ?? 1,
@@ -211,16 +234,12 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
 }
 
 /**
- * Build a Repeat value from form state. `scheduledDate` anchors monthly
- * patterns — with no parseable date, a monthly repeat carries neither
- * `bymonthday` nor `byweekday`/`bysetpos`.
- *
- * `previous` is the repeat the form was opened on, and exists only to carry
- * yearly's BY* fields through a form that cannot show them — see asymmetry 6
- * in the header. Omitting it drops them.
+ * Build a Repeat value from form state. `scheduledDate` anchors monthly and
+ * yearly day-patterns — with no parseable date, neither carries `bymonthday`
+ * nor `byweekday`/`bysetpos`.
  */
-export function formToRepeat(form: RepeatForm, scheduledDate?: string | null, previous?: Repeat | null): Repeat {
-  const { freq, wdays, monthly, endType, endVal } = form
+export function formToRepeat(form: RepeatForm, scheduledDate?: string | null): Repeat {
+  const { freq, wdays, monthly, months, endType, endVal } = form
 
   if (freq === 'after_completion') {
     return {
@@ -239,11 +258,12 @@ export function formToRepeat(form: RepeatForm, scheduledDate?: string | null, pr
     r.byweekday = WDAY_CODES_MON_FIRST.filter((_, i) => wdays[i])
   }
 
-  if (freq === 'monthly') {
+  if (freq === 'monthly' || freq === 'yearly') {
     const d = parseDateString(scheduledDate ?? '')
     if (d) {
       if (monthly === 'same-day') {
-        r.bymonthday = [d.getDate()]
+        // Yearly needs no field here at all — see asymmetry 1a in the header.
+        if (freq === 'monthly') r.bymonthday = [d.getDate()]
       } else {
         const spec = monthlyWeekdaySpec(d)
         r.byweekday = spec.byweekday
@@ -252,15 +272,9 @@ export function formToRepeat(form: RepeatForm, scheduledDate?: string | null, pr
     }
   }
 
-  if (freq === 'yearly' && previous?.type === 'schedule' && previous.freq === 'yearly') {
-    // Only what the form cannot express, and only when the frequency it
-    // belongs to is still the one selected.
-    if (previous.bymonth?.length) r.bymonth = previous.bymonth
-    if (previous.bymonthday?.length) r.bymonthday = previous.bymonthday
-    if (previous.byweekday?.length && previous.bysetpos !== undefined) {
-      r.byweekday = previous.byweekday
-      r.bysetpos = previous.bysetpos
-    }
+  if (freq === 'yearly') {
+    const selected = MONTH_NUMBERS.filter((_, i) => months[i])
+    if (selected.length) r.bymonth = selected
   }
 
   if (endType === 'until' && endVal) r.end = { type: 'until', date: endVal }
