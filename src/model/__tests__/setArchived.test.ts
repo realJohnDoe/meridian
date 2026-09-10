@@ -48,8 +48,9 @@ describe('setArchived', () => {
   })
 
   // The trap: an absent key and archived: false are not the same on save
-  // (inlineFieldEmpty only treats undefined as empty), so unarchiving has to
-  // drop the key entirely — never leave `false` sitting there.
+  // (a non-required boolean's absent-value default is `undefined`, not
+  // `false`), so unarchiving has to drop the key entirely — never leave
+  // `false` sitting there.
   it('clearing drops the key entirely rather than setting archived: false', () => {
     let data = add(dataOf([]), 'project-alpha', ALPHA_YAML)
     data = setArchived(data, k('project-alpha'), true)

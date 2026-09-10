@@ -189,8 +189,9 @@ export function displayValue(v: unknown, indent = 0): string {
  * `null` and `[]` are deliberately NOT dropped: an unknown key holding an
  * explicit `reviewer: null` or `aliases: []` is user-authored data, and by the
  * time this runs it is indistinguishable from a model field. Model fields never
- * reach here empty anyway — `inlineFieldEmpty` suppresses them upstream in
- * collapse.ts.
+ * reach here empty anyway — `fileMetaToYaml`/`occMetaToYaml` in collapse.ts
+ * already omit a field whose value round-trips to what omitting it gives back
+ * (`inlineFieldEqual` against `absentFieldValue`/the inherited baseline).
  */
 function prune(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(prune)
@@ -225,7 +226,16 @@ function serializeRawNode(node: RawNode): string {
   Object.assign(ordered, rootFields)
   if (Array.isArray(instances) && instances.length > 0) ordered.instances = instances
 
-  return stringify(prune(ordered), {
+  const pruned = prune(ordered) as Record<string, unknown>
+  // Nothing left to say: every field round-tripped to omission (see
+  // fieldRegistry.ts's `absentFieldValue`, which is what `fileMetaToYaml`/
+  // `occMetaToYaml` in collapse.ts compare against). `stringify({})` would
+  // otherwise write a literal `{}` — still frontmatter this file never asked
+  // for (#1011). Returning '' here is what lets `wrapFrontmatter` skip the
+  // `---`/`---` fence entirely instead of wrapping an empty mapping in it.
+  if (Object.keys(pruned).length === 0) return ''
+
+  return stringify(pruned, {
     lineWidth: 0,            // never wrap long scalars (e.g. titles, intervals)
     nullStr: 'null',
     defaultStringType: 'PLAIN',

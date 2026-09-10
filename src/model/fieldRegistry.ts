@@ -339,12 +339,6 @@ export function inlineFieldEqual(kind: InlineFieldKind, a: unknown, b: unknown):
   return a === b
 }
 
-/** True when a value should be omitted from serialized YAML (undefined, or empty array). */
-export function inlineFieldEmpty(kind: InlineFieldKind, v: unknown): boolean {
-  if (v === undefined) return true
-  return kind === 'stringArray' ? !Array.isArray(v) || v.length === 0 : false
-}
-
 // ── Metadata extraction ───────────────────────────────────────────────────────
 
 /**

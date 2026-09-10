@@ -49,8 +49,9 @@ export interface FileMetadata {
    * `false` is a legal, hand-written value and must keep round-tripping, so
    * this is never "fixed" to a required field with a `false` default —
    * unarchiving clears the key (`undefined`) rather than writing `false`. See
-   * `inlineFieldEmpty` in `model/fieldRegistry.ts`, which treats only
-   * `undefined` as empty for a boolean field.
+   * `absentFieldValue` in `model/fieldRegistry.ts`: `archived` is not
+   * `required`, so its absent-value default is `undefined`, not `false` —
+   * only an absent key round-trips to omission, a written `false` does not.
    */
   archived?: boolean
   /**

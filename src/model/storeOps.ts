@@ -1039,8 +1039,8 @@ export function deleteByEntryKey(
  *
  * Clearing drops the key entirely rather than writing `archived: false`.
  * `archived` is not `required` in the field registry, so an absent key and a
- * `false` key are NOT the same on save — `inlineFieldEmpty` only treats
- * `undefined` as empty for a boolean field, so leaving `false` here would
+ * `false` key are NOT the same on save — `absentFieldValue` for a non-required
+ * boolean field is `undefined`, not `false`, so leaving `false` here would
  * write `archived: false` into the user's frontmatter forever instead of
  * reading identically to a file that was never archived. See
  * `FileMetadata.archived`'s doc comment.

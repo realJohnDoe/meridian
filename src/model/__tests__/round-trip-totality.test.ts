@@ -312,14 +312,49 @@ describe('Root A totality — closed leaks (regression guards)', () => {
     expect(savedWithoutConvention.includes('\r')).toBe(false)
     expect(savedWithoutConvention.endsWith('\n')).toBe(true)
   })
+
+  // #1011, fixed. `fileMetaToYaml` used to decide what to omit with
+  // `inlineFieldEmpty`, a function of the value alone — `''` is not "empty"
+  // for a `string` kind, so the required `title` field always wrote
+  // `title: ""` for a note with no title, which is every frontmatter-less
+  // note. It now uses the same relational rule `occMetaToYaml` already uses
+  // for occurrence fields: omit a field only when its value round-trips to
+  // what omitting it gives back (`absentFieldValue`). A hand-authored plain
+  // Markdown note therefore keeps no frontmatter at all until a field is
+  // actually set — the README's promise that such a file is picked up
+  // unmodified.
+  it('a hand-authored note with no frontmatter gets none written back', () => {
+    const source = 'Just some body text.\n'
+    const original = parseToStoreItems('plain.md', source, TEST_VAULT)
+    const saved = serialize(original.items, original.root)
+    expect(saved).toBe(source)
+    expect(saved.startsWith('---')).toBe(false)
+  })
+
+  // An entirely empty file (no frontmatter, no body) must not grow an empty
+  // `---`/`---` fence around nothing — `serializeRawNode` returns '' rather
+  // than letting the `yaml` package stringify `{}` into the file.
+  it('an entirely empty file stays empty rather than growing an empty frontmatter fence', () => {
+    const original = parseToStoreItems('empty.md', '', TEST_VAULT)
+    expect(serialize(original.items, original.root)).toBe('')
+  })
+
+  // The other side of the same rule: once the note actually holds a field,
+  // frontmatter appears — carrying only what was set, nothing more.
+  it('a frontmatter-less note that gains a title gets frontmatter carrying only that field', () => {
+    const source = 'Just some body text.\n'
+    const original = parseToStoreItems('plain.md', source, TEST_VAULT)
+    const saved = serialize(original.items, { ...original.root, title: 'My Note' })
+    expect(frontmatterOf(saved)).toEqual({ title: 'My Note' })
+  })
 })
 
 // `archived` (plans/archived-entries.md PR 1) is the first FILE-LEVEL boolean
-// in the registry. `inlineFieldEmpty` treats only `undefined` as empty for a
-// boolean kind, so unlike `done` this field can be written `false` by hand and
-// must keep round-tripping as `false` — never "fixed" into a required field
-// with an empty-array-style default. These three pin the trap PR 2's
-// unarchive action depends on: it must clear the key, not write `false`.
+// in the registry. It is not `required`, so its absent-value default is
+// `undefined`, not `false` — unlike `done` this field can be written `false`
+// by hand and must keep round-tripping as `false`, never "fixed" into a
+// required field with an empty-array-style default. These three pin the trap
+// PR 2's unarchive action depends on: it must clear the key, not write `false`.
 describe('archived field (plans/archived-entries.md PR 1)', () => {
   it('archived: true survives an unedited round trip', () => {
     const source = '---\ntitle: Old Project\narchived: true\n---\n'
@@ -345,9 +380,9 @@ describe('archived field (plans/archived-entries.md PR 1)', () => {
   })
 
   // The trap: unarchiving must clear the key (`undefined`), never write
-  // `false` — `inlineFieldEmpty`'s boolean rule only omits `undefined`, so a
-  // written `false` would round-trip forever as "explicitly not archived"
-  // rather than reading identically to a file that never had the key.
+  // `false` — a non-required boolean's absent-value default is `undefined`,
+  // so a written `false` would round-trip forever as "explicitly not
+  // archived" rather than reading identically to a file that never had the key.
   it('clearing archived (unarchiving) emits no archived key, not archived: false', () => {
     const source = '---\ntitle: Old Project\narchived: true\n---\n'
     const parsed = parseToStoreItems('unarchive.md', source, TEST_VAULT)
