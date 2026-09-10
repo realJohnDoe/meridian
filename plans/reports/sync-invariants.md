@@ -216,18 +216,29 @@ Running the generator against current `main`:
   close, which is a good deal more common than the interleaving #1017 describes.
 
 - **No other violation of the six** in the sweeps run while building this: the
-  pinned CI sweep, and soak runs of several hundred generated interleavings of
-  up to 14 operations each. Everything the soak did surface was a fault in the
-  oracle rather than in the sync engine — the merge false positive and the
-  per-field retirement rule under invariant 1, and the re-judged conflict copy
-  under invariant 3 — each fixed and recorded above. That is a statement about
-  this operation alphabet — two
+  pinned CI sweep (40 interleavings of up to 8 operations), and completed soaks
+  of 400 and 1,200 generated interleavings of up to 14 operations each.
+  Everything else the soaks surfaced was a fault in the oracle rather than in
+  the sync engine — the merge false positive and the per-field retirement rule
+  under invariant 1, and the re-judged conflict copy under invariant 3 — each
+  fixed and recorded above. That is a statement about this operation alphabet — two
   devices, one vault, two slugs, writes/deletes/syncs/reloads, with a page close
   inside the debounce as a staging option — and not a clean bill of health for
   the sync engine. What it does not reach is listed under "What did not make the
   six" above, plus everything below the seam the harness drives: the two
   scenarios in `twoClient.test.ts` that call `backend.delete` directly are there
   because a sync cycle cannot express them.
+
+One limit on how far a single soak can be pushed, found while measuring the
+above and filed as **#1023**: the harness leaks across runs, so cost per run
+climbs with how many have already run in the same process — 400 runs take ~75s,
+1,200 take ~20 minutes, and 4,000 do not finish in half an hour. It is not
+fast-check: a *fixed* four-operation sequence repeated 1,200 times shows the
+same curve, with the timer count flat and the heap climbing. The journal ring,
+`localStorage` and the Dexie tables were each measured across those runs and are
+each flat, so none of them is it. Until #1023 is closed, several soaks of ~400
+runs cover more ground per minute than one long one — and fast-check picks a
+fresh seed each time, so the coverage is at least as good.
 
 Because #1017 is open, a generated run that hits it stops there and the rest of
 its sequence goes unexplored. Closing #1017 deepens every run in the file — the

@@ -26,6 +26,15 @@
  * length. A counterexample found that way is copied into `CORPUS` below as a
  * permanent regression case — the same ratchet `fixtures/` gives the round-trip
  * corpus.
+ *
+ * **Run several soaks rather than one long one.** Cost per run climbs with how
+ * many have already run in the same process — 400 runs take ~75s, 1200 take
+ * ~20min, and 4000 do not finish in half an hour. That is a leak in the harness
+ * rather than anything fast-check does: a *fixed* sequence repeated 1200 times
+ * shows the same curve, with the timer count flat and the heap climbing
+ * (#1023). Until that is fixed, `MERIDIAN_SOAK_RUNS=400` several times over
+ * covers strictly more ground per minute than one long run, and fast-check
+ * picks a fresh seed each time anyway.
  */
 import 'fake-indexeddb/auto'
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
@@ -215,8 +224,12 @@ describe('sync invariants — generated interleavings (#1021)', () => {
       }),
       SOAK ? { numRuns: SOAK_RUNS, endOnFailure: false } : { seed: 20260910, numRuns: 40 },
     )
-    // Vitest's 5s default is per *test*, and this one is a whole sweep. The CI
-    // sweep measures well under a second; the ceiling is for the soak, which
-    // runs an order of magnitude more interleavings and longer ones.
-  }, SOAK ? 30 * 60_000 : 60_000)
+    // Vitest's 5s default is per *test*, and this one is a whole sweep.
+    //
+    // The soak's ceiling is *derived* rather than a round number, because a
+    // fixed one is a trap: a soak that runs into it fails with a timeout, which
+    // reads exactly like a counterexample until you look, and reports nothing
+    // about the runs that did pass. Two seconds a run is well clear of the
+    // measured cost at every length this generates.
+  }, SOAK ? Math.max(60_000, SOAK_RUNS * 2_000) : 60_000)
 })
