@@ -253,14 +253,34 @@ function splitSources(fields: Record<string, unknown>): {
   return sources ? { plain, sources } : { plain }
 }
 
-/** The subset of `sources` belonging to `specs` — one level's keys only. */
+/**
+ * The subset of `sources` belonging to `specs` — one level's keys only, and
+ * never a key that came back in `malformed`.
+ *
+ * `collapse.ts`'s `authoredOrTyped` — the only reader of a field's `sources`
+ * entry — is itself skipped for any key present in `extra` (a malformed key
+ * defers to `emitExtra` instead, see the "written in a shape the model can't
+ * type" comment there), so a malformed key's box is write-side dead weight:
+ * carried in memory, never consulted. Keeping it anyway made a generated
+ * round trip through a malformed registry field's `sources` bag come back
+ * unstable — present on the first parse, silently gone on the second the
+ * moment collapse's own re-quoting decision (the string auto-quoted only when
+ * necessary, same logic that already normalises e.g. an unnecessarily-quoted
+ * `"hello"` title) happened not to need a box that generation. No file content ever
+ * changed either way — `roundTripLoss` stayed empty throughout — but
+ * `assertCollapseTotality` compares the metadata objects themselves, so the
+ * asymmetry was a real (if inert) totality-check failure, caught by
+ * `round-trip-generated.test.ts`.
+ */
 function sourcesFor(
   sources: Record<string, RawScalar> | undefined,
   specs: readonly InlineFieldSpec[],
+  malformed: Record<string, unknown> | undefined,
 ): Record<string, RawScalar> | undefined {
   if (!sources) return undefined
   const out: Record<string, RawScalar> = {}
   for (const spec of specs) {
+    if (malformed && spec.key in malformed) continue
     const raw = sources[spec.key as string]
     if (raw) out[spec.key as string] = raw
   }
@@ -298,9 +318,25 @@ export function unknownKeys(fields: Record<string, unknown>): Record<string, unk
   return Object.keys(out).length > 0 ? out : undefined
 }
 
-/** Value equality for an inline field, comparing array fields structurally. */
+/**
+ * Value equality for an inline field, comparing array fields structurally.
+ *
+ * A `string`-kind field goes through `scalarToString` on the way to its typed
+ * value, so a bare numeric/boolean YAML scalar (`timezone: 0700`) is compared
+ * through the same coercion: `collapse.ts`'s `authoredOrTyped` calls this with
+ * a `RawScalar`'s UNCOERCED `.value` (a number, here) on one side and the
+ * field's already-coerced typed value (a string) on the other, and `a === b`
+ * alone can never see those as equal — discarding the box on every untouched
+ * numeric/boolean-looking `string` field and re-emitting the coerced string
+ * quoted (`0700` -> `"700"`) instead of the characters the file held. Idempotent
+ * on an already-string value, so the `string`-vs-`string` comparisons this
+ * function was already doing (typed value vs. typed value, no raw involved)
+ * are unaffected.
+ */
 export function inlineFieldEqual(kind: InlineFieldKind, a: unknown, b: unknown): boolean {
-  return kind === 'stringArray' ? JSON.stringify(a) === JSON.stringify(b) : a === b
+  if (kind === 'stringArray') return JSON.stringify(a) === JSON.stringify(b)
+  if (kind === 'string') return scalarToString(a) === scalarToString(b)
+  return a === b
 }
 
 /** True when a value should be omitted from serialized YAML (undefined, or empty array). */
@@ -431,9 +467,10 @@ export function extractFileMetadata(
   for (const spec of FILE_LEVEL_SPECS) {
     sink[spec.key as string] = parseInlineField(spec, plain[spec.key])
   }
-  const extra = mergeBags(remainder, malformedKnownFields(plain, FILE_LEVEL_SPECS))
+  const malformed = malformedKnownFields(plain, FILE_LEVEL_SPECS)
+  const extra = mergeBags(remainder, malformed)
   if (extra) meta.extra = extra
-  const own = sourcesFor(sources, FILE_LEVEL_SPECS)
+  const own = sourcesFor(sources, FILE_LEVEL_SPECS, malformed)
   if (own) meta.sources = own
   return meta
 }
@@ -446,9 +483,10 @@ export function extractOccurrenceMetadata(fields: Record<string, unknown>): Occu
   for (const spec of OCCURRENCE_FIELDS) {
     sink[spec.key] = parseInlineField(spec, plain[spec.key])
   }
-  const extra = mergeBags(unknownKeys(plain), malformedKnownFields(plain, OCCURRENCE_FIELDS))
+  const malformed = malformedKnownFields(plain, OCCURRENCE_FIELDS)
+  const extra = mergeBags(unknownKeys(plain), malformed)
   if (extra) meta.extra = extra
-  const own = sourcesFor(sources, OCCURRENCE_FIELDS)
+  const own = sourcesFor(sources, OCCURRENCE_FIELDS, malformed)
   if (own) meta.sources = own
   return meta
 }

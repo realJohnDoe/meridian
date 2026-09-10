@@ -1,3 +1,4 @@
+import { expect } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
@@ -5,6 +6,7 @@ import { parseToStoreItems } from '@/model/storeItems'
 import type { ParseResult } from '@/model/storeItems'
 import { joinFileMeta } from '@/model/expansion'
 import { loadFile } from '@/fileIO'
+import { roundTripLoss } from '@/model/roundTripCheck'
 // Re-exported from production rather than duplicated: this is the exact
 // comparison the runtime round-trip guard uses, and two hand-synced copies of
 // it would be the same 'mock agrees with real code by convention' problem the
@@ -176,4 +178,34 @@ export function normalizeIds(items: StoreItem[]): unknown[] {
       ...(ownerId !== undefined ? { ownerSeries: seriesIndex.get(ownerId) ?? 'unknown' } : {}),
     }
   })
+}
+
+/**
+ * Root-A, check 1 — collapse totality. The store must survive its own
+ * serialization: parse → serialize → reparse must equal the original parse,
+ * modulo random ids (see `normalizeIds`).
+ *
+ * Moved here from `round-trip-totality.test.ts` (issue #1003) so the fixture
+ * sweep in that file and the generated sweep in `round-trip-generated.test.ts`
+ * run the identical assertion rather than two copies that can drift.
+ */
+export function assertCollapseTotality(slug: string, source: string): void {
+  const original = parseToStoreItems(`${slug}.md`, source, TEST_VAULT)
+  const reparsed = parseToStoreItems(`${slug}.md`, serialize(original.items, original.root), TEST_VAULT)
+  expect(normalizeIds(reparsed.items)).toEqual(normalizeIds(original.items))
+}
+
+/**
+ * Root-A, check 2 — source fidelity. Every key/value pair the source had must
+ * survive an UNEDITED save. Do not call this after an `applyEdit` — an
+ * intentional change (e.g. `done: false` → `true`) reads as a "lost" pair and
+ * false-positives.
+ *
+ * Delegates to the *production* guard (`roundTripLoss`, wired into
+ * `parseFiles`) rather than reimplementing the comparison, so every caller
+ * doubles as a test of the thing that actually runs on a user's vault.
+ */
+export function assertSourceFidelity(slug: string, source: string): void {
+  const parsed = parseToStoreItems(`${slug}.md`, source, TEST_VAULT)
+  expect(roundTripLoss(`${slug}.md`, source, parsed)).toEqual([])
 }
