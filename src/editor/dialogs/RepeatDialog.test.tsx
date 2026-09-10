@@ -96,6 +96,49 @@ describe('RepeatDialog', () => {
     })
   })
 
+  it('round-trips a plain yearly repeat unchanged', () => {
+    const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1 }
+    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
+
+    clickSet()
+
+    expect(onConfirm).toHaveBeenCalledWith(repeat)
+  })
+
+  it('selecting months on a yearly repeat encodes bymonth', () => {
+    const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1 }
+    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sep' }))
+    clickSet()
+
+    expect(onConfirm).toHaveBeenCalledWith({ type: 'schedule', freq: 'yearly', interval: 1, bymonth: [3, 9] })
+  })
+
+  it('yearly weekday-pattern round-trips to the recomputed byweekday/bysetpos spec', () => {
+    const spec = monthlyWeekdaySpec(new Date(2026, 5, 15))
+    const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1, byweekday: spec.byweekday, bysetpos: spec.bysetpos }
+    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
+
+    clickSet()
+
+    expect(onConfirm).toHaveBeenCalledWith(repeat)
+  })
+
+  it('switching yearly mode from same-day to weekday-pattern changes the encoded payload', () => {
+    const spec = monthlyWeekdaySpec(new Date(2026, 5, 15))
+    const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1 }
+    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
+
+    fireEvent.click(screen.getByRole('button', { name: spec.label.replace(' of the month', '') }))
+    clickSet()
+
+    expect(onConfirm).toHaveBeenCalledWith({
+      type: 'schedule', freq: 'yearly', interval: 1, byweekday: spec.byweekday, bysetpos: spec.bysetpos,
+    })
+  })
+
   it('round-trips an "until" end condition', () => {
     const repeat: Repeat = { type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'until', date: '2026-12-31' } }
     const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
