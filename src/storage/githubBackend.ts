@@ -404,21 +404,31 @@ export class GitHubBackend implements StorageBackend {
   }
 
   async delete(path: string, expectedVersion?: string): Promise<void> {
-    // Prefer the caller-supplied expectedVersion as the CAS SHA, matching
-    // write()'s policy — never fall back to _shas here, since that cache may
-    // be stale from a prior statAll() call and could mask a genuine remote
-    // edit that happened after the tombstone was staged.
-    let sha = expectedVersion
+    // The CAS precondition is the caller's to supply, and only the caller can
+    // supply it correctly.
+    //
+    // This has now been got wrong twice in the same place. It first fell back
+    // to the `_shas` cache, which a prior `statAll()` could have left stale
+    // (#827); the fix replaced that with a fresh re-read (#1017). Both are the
+    // same mistake in different clothes: a SHA fetched *here* says what is at
+    // the path right now, never whether it is the file this device meant to
+    // delete. A tombstone with no base version is ambiguous — "my file, whose
+    // token was lost mid-flight" or "a draft that never synced, whose path
+    // somebody else's file now occupies" — and nothing reachable from inside
+    // the backend distinguishes them. The re-read supplies a SHA for both, so
+    // the second case deletes a file this device never read, never held a
+    // version for and never acknowledged.
+    //
+    // `pushDirty` *can* tell them apart, because it holds the tombstone's last
+    // known backend content, so it resolves the ambiguity and always passes a
+    // version. With none, the honest answer here is to do nothing: an
+    // unconditional DELETE is the one option guaranteed to be wrong half the
+    // time. Journalled rather than silent, since the only way to reach it is a
+    // caller that has not made the decision it owns.
+    const sha = expectedVersion
     if (!sha) {
-      // No base version to CAS against — a file created and deleted locally
-      // before it ever synced, or a tombstone whose version was lost. Re-read
-      // the current state instead of trusting the stale cache, narrowing the
-      // race window to the gap between this read and the delete call below
-      // (which the CAS delete itself still guards against a conflict).
-      const [fresh] = await this.readFiles([path])
-      journal('delete-reread', this.id, path, { actual: fresh?.version }, this.kind)
-      sha = fresh?.version
-      if (!sha) return // File genuinely doesn't exist on GitHub; nothing to do
+      journal('delete-skipped', this.id, path, { note: 'no base version' }, this.kind)
+      return
     }
     try {
       await this._octokit.request('DELETE /repos/{owner}/{repo}/contents/{path}', {

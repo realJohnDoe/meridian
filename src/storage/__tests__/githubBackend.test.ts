@@ -375,43 +375,21 @@ describe('GitHubBackend', () => {
     expect(body.branch).toBe('main')
   })
 
-  it('delete with no expectedVersion re-reads the current sha rather than trusting a stale _shas cache', async () => {
-    // statAll populates _shas with a sha that a remote edit has since moved past.
-    fetchSpy
-      .mockResolvedValueOnce(makeJsonResp(makeTreeResponse([{ path: 'old.md', sha: 'stale-from-statall' }])))
-      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('old.md', 'newer content', 'fresh-sha')))
-      .mockResolvedValueOnce(makeJsonResp({}))
+  it('delete with no expectedVersion does nothing at all — it will not guess a precondition', async () => {
+    // This branch has been got wrong twice. It first fell back to the `_shas`
+    // cache a prior statAll() could have left stale (#827), then to a fresh
+    // re-read (#1017). Both supply a sha saying what is at the path *now*,
+    // which is not the question — "is this the file the caller meant to
+    // delete?" is, and only the caller's tombstone answers it. So with no
+    // precondition the backend does nothing: no read, no DELETE.
+    fetchSpy.mockResolvedValueOnce(makeJsonResp(makeTreeResponse([{ path: 'old.md', sha: 'stale-from-statall' }])))
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     await backend.statAll()
 
-    await backend.delete('old.md')
+    await expect(backend.delete('old.md')).resolves.toBeUndefined()
 
-    // Call 0 was statAll, call 1 is the re-read, call 2 is the DELETE.
-    const [url, init] = fetchSpy.mock.calls[2] as [string, RequestInit]
-    expect(url).toContain('/repos/alice/notes/contents/old.md')
-    expect((init.method ?? '').toUpperCase()).toBe('DELETE')
-    expect(parseRequestBody(init).sha).toBe('fresh-sha')
-  })
-
-  it('delete with no expectedVersion is a true no-op when a fresh read finds the file genuinely gone', async () => {
-    mockFetch({ message: 'Not Found' }, 404)
-    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
-    await backend.delete('nonexistent.md')
-    // Only the re-read happened; no DELETE was ever sent.
+    // statAll was the only request; nothing followed it.
     expect(fetchSpy).toHaveBeenCalledTimes(1)
-    const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
-    expect(url).toContain('/repos/alice/notes/contents/nonexistent.md')
-    expect((init.method ?? '').toUpperCase()).not.toBe('DELETE')
-  })
-
-  it('delete with no expectedVersion still conflicts if the file diverges again between the re-read and the delete', async () => {
-    // The re-read finds the file present; a further remote edit lands before
-    // the DELETE's own CAS check runs, so the file must survive.
-    fetchSpy
-      .mockResolvedValueOnce(makeJsonResp(makeFileResponse('note.md', 'content', 'read-sha')))
-      .mockResolvedValueOnce(makeJsonResp({ message: 'Conflict' }, 409))
-    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
-    await expect(backend.delete('note.md')).rejects.toBeInstanceOf(ConflictError)
   })
 
   it('delete treats a 404 (already gone on GitHub) as success', async () => {

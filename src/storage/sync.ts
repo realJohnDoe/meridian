@@ -629,6 +629,46 @@ export async function reconcileWithBackend(
  * since the backend's listing API is eventually consistent and may not yet
  * reflect these writes.
  */
+/**
+ * What to do with a tombstone that carries no base version — the ambiguity
+ * #827 and #1017 both resolved in the wrong place.
+ *
+ * Two quite different histories produce a version-less tombstone:
+ *
+ *  - **It is ours, and the token was lost.** A push whose `write` returned no
+ *    token and whose repair read also failed leaves a clean record with the
+ *    content the backend holds and no version (`versionAfterWrite`). Deleting
+ *    is right, and refusing to is the lost delete #827 set out to fix.
+ *  - **It never synced, and the path is someone else's now.** A draft created
+ *    and deleted between two syncs never had a version, and another device may
+ *    have pushed its own file to that slug in the meantime. Deleting destroys
+ *    a file this device has never read.
+ *
+ * A SHA cannot tell them apart — that is the whole of #1017 — but the content
+ * can. The tombstone carries what this device last knew the backend held
+ * (`recordLocalDelete`), so comparing that against what is actually there
+ * answers the question the SHA cannot: *is this still the file I meant to
+ * delete?* No `baseContent` at all means this device never saw anything at the
+ * path, which is the second case in its purest form.
+ *
+ * Deciding here rather than in the backend is the point. `StorageBackend` sees
+ * a path and a version; only the caller holds the tombstone, and only the
+ * tombstone remembers what was there.
+ */
+async function resolveUnversionedTombstone(
+  backend: StorageBackend,
+  vaultId: string,
+  f: CacheRecord,
+): Promise<{ kind: 'delete'; version: string } | { kind: 'absent' } | { kind: 'unacknowledged' }> {
+  const [remote] = await backend.readFiles([f.path])
+  journal('delete-reread', vaultId, f.path, { actual: remote?.version }, backend.kind)
+  if (!remote) return { kind: 'absent' }
+  if (f.baseContent !== undefined && remote.content === f.baseContent) {
+    return { kind: 'delete', version: remote.version }
+  }
+  return { kind: 'unacknowledged' }
+}
+
 async function pushDirty(
   backend: StorageBackend,
   vaultId: string,
@@ -698,7 +738,33 @@ async function pushDirty(
     try {
       // Pass the cached version (blob SHA for GitHub) so the delete works even
       // when the backend's in-memory SHA cache is cold after a page reload.
-      await backend.delete(f.path, f.version)
+      let version = f.version
+      if (version === undefined) {
+        const target = await resolveUnversionedTombstone(backend, vaultId, f)
+        if (target.kind === 'absent') {
+          // Nothing there to delete, so the end state the tombstone wants is
+          // already the end state. Counted as pushed: we know authoritatively
+          // what is at the path, so the same-cycle reconcile must not re-pull it.
+          await confirmDeleted(vaultId, f.path)
+          journal('delete-ok', vaultId, f.path, { note: 'already absent' }, backend.kind)
+          pushed.add(f.path)
+          continue
+        }
+        if (target.kind === 'unacknowledged') {
+          // The path holds content this device has never seen. Same answer as
+          // the `delete-conflict` branch below, and for the same reason — an
+          // edit beats a delete — so the tombstone is dropped without deleting
+          // anything and reconcile pulls the file in. Deliberately NOT added to
+          // `pushed`: that set skips reconcile's re-pull, and here we want it.
+          await confirmDeleted(vaultId, f.path)
+          journal('delete-unacknowledged', vaultId, f.path, undefined, backend.kind)
+          hadCollision = true
+          warn(`${f.path} holds a file this device has never synced — kept it instead of deleting.`)
+          continue
+        }
+        version = target.version
+      }
+      await backend.delete(f.path, version)
       await confirmDeleted(vaultId, f.path)
       journal('delete-ok', vaultId, f.path, undefined, backend.kind)
       pushed.add(f.path)
