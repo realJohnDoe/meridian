@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import MiniMonth from './MiniMonth'
 import { setupStore, seedStore, makeRoots, testKey } from '@/test-utils'
@@ -7,6 +7,22 @@ import { fmtISO } from '@/model'
 import type { StoreOcc } from '@/types'
 
 setupStore()
+
+// jsdom implements no Web Animations API — monthNav='buttons' pages through
+// SlideTransition (see components/primitives/slide-transition.tsx), which
+// calls Element.animate. Stubbed the same way FlipList.test.tsx stands in
+// for it, as an added property rather than a spy (so it must be deleted by
+// hand — restoreAllMocks doesn't know about it).
+beforeEach(() => {
+  Object.defineProperty(Element.prototype, 'animate', {
+    value: () => ({ finished: new Promise(() => {/* never settles */}), cancel: vi.fn() }) as unknown as Animation,
+    configurable: true,
+    writable: true,
+  })
+})
+afterEach(() => {
+  delete (Element.prototype as Partial<Element>).animate
+})
 
 const ANCHOR = new Date(2026, 7, 15) // August 15 2026
 
@@ -128,16 +144,16 @@ describe('MiniMonth', () => {
   // monthNav='buttons' (the desktop popover's own shape — see _app.tsx) swaps
   // MonthStrip's chip row for the grid's own normally-hidden caption/chevrons
   // instead — the inverse of the 'strip' default above, never both at once.
+  // Unlike 'strip', this mode has no swipe carousel to animate its own
+  // paging (the chevrons are "the one paging control" — see MiniMonth's own
+  // doc comment), so it renders a single pane rather than the 3-pane
+  // swipe carousel, wrapped in SlideTransition for the button-driven slide.
   it("pages via the grid's own prev/next chevrons under monthNav='buttons', with no month-chip row rendered", () => {
     const { container, onSelectDay, onBrowseMonth } = renderMini([], { monthNav: 'buttons' })
     expect(screen.queryByRole('group', { name: 'Jump to month' })).not.toBeInTheDocument()
-    // Three panes are mounted (see PANE_COUNT), each with its own nav — only
-    // the center one (index CENTER_PANE) is interactive, so the click must
-    // target that one specifically rather than whichever "Go to the Next
-    // Month" button a plain getByRole happens to find first.
-    const centerCalendar = container.querySelectorAll<HTMLElement>('[data-slot="calendar"]')[1]
-    if (!centerCalendar) throw new Error('center pane not rendered')
-    fireEvent.click(within(centerCalendar).getByRole('button', { name: 'Go to the Next Month' }))
+    const calendar = container.querySelector<HTMLElement>('[data-slot="calendar"]')
+    if (!calendar) throw new Error('calendar pane not rendered')
+    fireEvent.click(within(calendar).getByRole('button', { name: 'Go to the Next Month' }))
     expect(onSelectDay).not.toHaveBeenCalled()
     expect(onBrowseMonth).toHaveBeenCalledExactlyOnceWith(new Date(2026, 8, 1))
   }, 20000)
