@@ -1,14 +1,11 @@
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Archive, Trash2 } from 'lucide-react'
+import DeleteDialogFooter from './DeleteDialogFooter'
 
 interface Props {
   open: boolean
@@ -38,25 +35,11 @@ export default function DeleteDialog({ open, title, onConfirm, onClose, onArchiv
             Delete &ldquo;{title}&rdquo;? This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogFooter className="gap-2 sm:gap-0">
-          <AlertDialogCancel onClick={onClose} className="mt-0">Cancel</AlertDialogCancel>
-          {onArchive && (
-            <AlertDialogAction
-              className="bg-priority-3 text-priority-3-foreground hover:bg-priority-3/90 gap-1.5"
-              onClick={() => { onArchive(); onClose() }}
-            >
-              <Archive size={13} />
-              Archive instead
-            </AlertDialogAction>
-          )}
-          <AlertDialogAction
-            className="bg-priority-1 text-priority-1-foreground hover:bg-priority-1/90 gap-1.5"
-            onClick={() => { onConfirm(); onClose() }}
-          >
-            <Trash2 size={13} />
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
+        <DeleteDialogFooter
+          onClose={onClose}
+          onDelete={() => { onConfirm(); onClose() }}
+          onArchive={onArchive ? () => { onArchive(); onClose() } : undefined}
+        />
       </AlertDialogContent>
     </AlertDialog>
   )
