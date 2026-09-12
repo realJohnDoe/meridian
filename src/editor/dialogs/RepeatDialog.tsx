@@ -2,7 +2,7 @@ import { useReducer, useState } from 'react'
 import { Info } from 'lucide-react'
 import type { Repeat, Scheduled } from '@/types'
 import type { RepeatForm, RepeatFormContext, RepeatFormFreq, ScheduleFreq, MonthlyMode, RepeatEndType, DurationUnit } from '@/model'
-import { parseDateString, weekStartsOn, monthlyWeekdaySpec, repeatToForm, formToRepeat } from '@/model'
+import { parseDateString, weekStartsOn, monthlyWeekdaySpec, repeatToForm, formToRepeat, defaultMonths } from '@/model'
 import { useStore } from '@/store'
 import { useResetOnChange } from '@/hooks'
 import {
@@ -115,6 +115,15 @@ export default function RepeatDialog({
   )
   const { freq, wdays, monthly, months, endType, endVal, intervalNum, completionNum, completionUnit } = state
   const setFreq           = (freq: RepeatFormFreq) => dispatch({ type: 'set', patch: { freq } })
+  // Switching the "repeats every" unit to yearly with no months picked yet
+  // defaults the picker to the scheduled (or current) month, rather than
+  // opening on an all-unselected Months row.
+  const setScheduleFreq   = (freq: ScheduleFreq) => dispatch({
+    type: 'set',
+    patch: freq === 'yearly' && !months.some(Boolean)
+      ? { freq, months: defaultMonths(scheduled?.date) }
+      : { freq },
+  })
   const setWdays          = (wdays: boolean[])    => dispatch({ type: 'set', patch: { wdays } })
   const setMonthly        = (monthly: MonthlyMode)=> dispatch({ type: 'set', patch: { monthly } })
   const setMonths         = (months: boolean[])   => dispatch({ type: 'set', patch: { months } })
@@ -196,7 +205,7 @@ export default function RepeatDialog({
                   onNChange={setIntervalNum}
                   unit={freq}
                   units={FREQ_UNITS}
-                  onUnitChange={setFreq}
+                  onUnitChange={setScheduleFreq}
                   unitLabel={(u) => FREQ_UNIT_LABELS[u]}
                 />
               </div>

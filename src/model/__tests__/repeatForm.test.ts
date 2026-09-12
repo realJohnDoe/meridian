@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { repeatToForm, formToRepeat, monthlyWeekdaySpec } from '../repeat'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { repeatToForm, formToRepeat, monthlyWeekdaySpec, defaultMonths } from '../repeat'
 import type { Repeat } from '@/types'
 
 // The scheduled date every anchored case below hangs off: Monday 2026-06-15,
@@ -171,6 +171,25 @@ describe('repeatToForm', () => {
   it('defaults months to none selected when a yearly repeat has no bymonth', () => {
     const form = repeatToForm({ type: 'schedule', freq: 'yearly', interval: 1 }, ctx())
     expect(form.months).toEqual(new Array(12).fill(false))
+  })
+})
+
+describe('defaultMonths', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('selects the month the scheduled date falls in', () => {
+    const expected = new Array(12).fill(false)
+    expected[5] = true // June, index 5
+    expect(defaultMonths(DATE)).toEqual(expected)
+  })
+
+  it('falls back to the current calendar month with no parseable date', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 8, 12)) // September
+
+    const expected = new Array(12).fill(false)
+    expected[8] = true
+    expect(defaultMonths(null)).toEqual(expected)
   })
 })
 

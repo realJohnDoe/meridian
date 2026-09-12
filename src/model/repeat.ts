@@ -171,6 +171,18 @@ function defaultWdays(scheduledDate?: string | null): boolean[] {
 
 const NO_MONTHS = (): boolean[] => MONTH_NUMBERS.map(() => false)
 
+/**
+ * Default month selection for a yearly repeat freshly chosen in the picker:
+ * the month `scheduledDate` falls in, or the current calendar month with no
+ * parseable date — mirrors `defaultWdays`' scheduled-date-first fallback.
+ */
+export function defaultMonths(scheduledDate?: string | null): boolean[] {
+  const months = NO_MONTHS()
+  const d = parseDateString(scheduledDate ?? '')
+  months[d ? d.getMonth() : new Date().getMonth()] = true
+  return months
+}
+
 /** Derive editable form state from an existing Repeat value (or sensible defaults). */
 export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): RepeatForm {
   const { scheduledDate, hasSchedule, hasTracking } = ctx
