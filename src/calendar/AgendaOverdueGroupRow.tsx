@@ -4,6 +4,7 @@ import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
 import { useEntryAccess } from '@/hooks'
 import { fmtShort } from '@/format'
+import { Badge } from '@/components/ui/badge'
 import SwipeToDeleteRow from './SwipeToDeleteRow'
 
 interface Props {
@@ -58,12 +59,19 @@ function AgendaOverdueGroupRow({ occ, count, oldest, onOpen, onToggleDone, onSwi
       <div className="w-9 shrink-0 relative">
         {count > 1 && (
           <div className="absolute inset-x-0 top-0 flex justify-center">
-            <span
-              className="rounded-full bg-warning/15 text-warning text-2xs font-bold tabular-nums px-1.5 py-0.5"
+            {/* Same tint + text-chip-tint-foreground formula as the p3 chip
+                (HUE_CHIP in components/primitives/occurrence-variants.ts) —
+                bg-warning aliases bg-priority-3 in every theme, so this reads
+                with the same verified contrast rather than the plain
+                bg-warning/15 tint this replaced, which was barely visible on
+                light themes. */}
+            <Badge
+              variant="tag"
+              className="bg-warning/30 text-chip-tint-foreground font-bold tabular-nums"
               title={`${count} overdue, oldest ${fmtShort(oldest)}`}
             >
               ×{count}
-            </span>
+            </Badge>
           </div>
         )}
       </div>
