@@ -30,6 +30,10 @@ import { sweepRetention } from './retentionSweep'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 /** Refresh one vault's row in `syncByVault` — its dirty count and read-only flag. */
 export function updateSyncUI(backend: StorageBackend): void {
   if (backend.readOnly) {
@@ -172,6 +176,15 @@ async function writeConflictCopy(
  * token — destroyed the only copy of the edit while the UI reported "changes are
  * saved locally". See the data-integrity survey, finding #1.
  */
+
+/**
+ * How long to wait before retrying the one verification read below that
+ * looks stale. Not calibrated against a measured propagation window — chosen
+ * as a short, one-time wait for a read that, by hypothesis, is only briefly
+ * behind a write GitHub has already accepted.
+ */
+const POST_CONFLICT_READ_RETRY_MS = 500
+
 async function resolveCollision(
   backend: StorageBackend,
   vaultId: string,
@@ -181,6 +194,21 @@ async function resolveCollision(
   baseContent: string | undefined,
 ): Promise<CollisionOutcome> {
   let [remote] = await backend.readFiles([path])
+
+  // This read is not exempt from the eventual consistency the big comment
+  // above documents for the *write* — GitHub's Contents API can answer with a
+  // read replica that lags behind a ref update it has already accepted, and
+  // right after a 409 is exactly when that lag is most likely to show. A read
+  // that contradicts both spurious checks below — including one that reports
+  // a version *older* than what a prior push this very cycle already had
+  // confirmed via its own write response — might just be early. One retry,
+  // not a loop: a read that still disagrees after a brief wait is either a
+  // genuine divergence or a lag that outlasted a reasonable wait, and the
+  // merge/copy path below handles both correctly either way.
+  if (remote && expectedVersion !== undefined && remote.version !== expectedVersion && remote.content !== localContent) {
+    await sleep(POST_CONFLICT_READ_RETRY_MS)
+    ;[remote] = await backend.readFiles([path])
+  }
 
   // Every branch below wants the same three facts about what we just found, and
   // the journal wants them whichever way the branch goes.
