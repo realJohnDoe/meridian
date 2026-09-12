@@ -11,7 +11,7 @@
  * `@/storage/inFlight` is deliberately NOT mocked — it holds no Dexie state,
  * so the real refcounted registry is what these tests exercise.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { StorageBackend, RawFile } from '@/storage/backend'
 import type { VaultKind } from '@/vaultRef'
 import type { VaultAttention } from '@/store'
@@ -202,7 +202,8 @@ vi.mock('@/model', async (importActual) => ({
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
 import { reconcileWithBackend } from '@/storage/sync'
-import { startCrossTabSync } from '@/storage/crossTabSync'
+import { startCrossTabSync, isCrossTabSyncIdle } from '@/storage/crossTabSync'
+import { onCacheChange } from '@/storage/cache/broadcast'
 import { syncToBackend, autoSyncTick, flushPendingPush, syncOnActivate, scheduleAutoPush } from '@/storage/syncScheduler'
 import { resetSyncBackoff, dropAllSyncState } from '@/storage/syncState'
 import { writeEntityToCache, deleteFromBackend } from '@/storage/entityWrites'
@@ -2021,6 +2022,31 @@ describe('startCrossTabSync — another view of the same vault', () => {
   const oneItem = () => [{ date: '', time: null, source: 'explicit' as const, entryKey: K('note'), id: 'i1', metadata: {} }]
   const NOTE = (title: string) => `---\ntitle: ${title}\n---\n\nOriginal body.\n`
 
+  // BroadcastChannel delivery is a real event-loop task, not a microtask, so
+  // it can be stretched arbitrarily by CPU contention just like the
+  // CROSS_TAB_COALESCE_MS timer it feeds (#1031) — waiting a fixed number of
+  // ticks for it to land is exactly the guess that made settle() flaky under
+  // load. This probe is a second, independent subscription on the same
+  // channel (separate from whatever startCrossTabSync itself is doing) that
+  // counts deliveries, so settle() can confirm an announcement actually
+  // arrived instead of assuming it did after some elapsed time.
+  let announced = 0
+  let delivered = 0
+  let offDeliveryProbe: (() => void) | undefined
+
+  beforeEach(() => {
+    announced = 0
+    delivered = 0
+    offDeliveryProbe = onCacheChange(() => { delivered++ })
+  })
+
+  afterEach(() => { offDeliveryProbe?.() })
+
+  function announce(channel: BroadcastChannel, change: { vaultId: string; paths: string[] }): void {
+    announced++
+    channel.postMessage(change)
+  }
+
   /** The other view: it writes the shared row, then announces the path on its
    *  own channel object (ours never receives what it posts itself). */
   function otherView(): { write: (path: string, content: string) => void; close: () => void } {
@@ -2028,19 +2054,25 @@ describe('startCrossTabSync — another view of the same vault', () => {
     return {
       write: (path, content) => {
         seedClean('fake-vault', path, content, 'v2', Date.now())
-        channel.postMessage({ vaultId: 'fake-vault', paths: [path] })
+        announce(channel, { vaultId: 'fake-vault', paths: [path] })
       },
       close: () => { channel.close() },
     }
   }
 
-  /** The channel delivers on a macrotask and the listener coalesces for a
-   *  beat after that (CROSS_TAB_COALESCE_MS), so a real wait is what clears
-   *  both — then a flush for the fold's own awaits. Real timers, not fake
-   *  ones: BroadcastChannel delivery is the event loop's, not vitest's. */
+  /** Wait for every announcement sent so far to actually have been delivered
+   *  (the delivery probe above proves it, rather than assuming a fixed delay
+   *  did), then for `isCrossTabSyncIdle` to confirm the coalesce timer it
+   *  started and the fold that timer scheduled have both finished — again
+   *  polled for, not guessed. Real timers throughout, not fake ones:
+   *  BroadcastChannel delivery is the event loop's, not vitest's. */
   async function settle(): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 120))
-    await flush()
+    await vi.waitFor(() => {
+      if (delivered < announced) throw new Error('announcement not delivered yet')
+    }, { timeout: 2000, interval: 5 })
+    await vi.waitFor(() => {
+      if (!isCrossTabSyncIdle()) throw new Error('cross-tab sync still flushing')
+    }, { timeout: 2000, interval: 10 })
   }
 
   function titleInStore(slug: string): unknown {
@@ -2075,7 +2107,7 @@ describe('startCrossTabSync — another view of the same vault', () => {
       vaultPath: vp('fake-vault', 'note.md'), vaultId: 'fake-vault', path: 'note.md',
       content: '', status: 'deleted', updatedAt: Date.now(), version: 'v1',
     })
-    channel.postMessage({ vaultId: 'fake-vault', paths: ['note.md'] })
+    announce(channel, { vaultId: 'fake-vault', paths: ['note.md'] })
     await settle()
 
     expect(storeState.roots.has(K('note'))).toBe(false)
@@ -2119,7 +2151,7 @@ describe('startCrossTabSync — another view of the same vault', () => {
     const channel = new BroadcastChannel('meridian-cache')
 
     seedClean('other-vault', 'note.md', NOTE('Renamed elsewhere'), 'v2', Date.now())
-    channel.postMessage({ vaultId: 'other-vault', paths: ['note.md'] })
+    announce(channel, { vaultId: 'other-vault', paths: ['note.md'] })
     await settle()
 
     expect(storeState.layers.get('other-vault')?.size ?? 0).toBe(0)

@@ -37,6 +37,7 @@ const CROSS_TAB_COALESCE_MS = 60
 
 const _pendingCrossTab = new Map<string, Set<string>>()
 let _crossTabTimer: ReturnType<typeof setTimeout> | null = null
+let _crossTabFlushInFlight = false
 
 /**
  * Re-read the rows another view just wrote, and fold them into this view's
@@ -82,13 +83,16 @@ function flushCrossTab(): void {
   _crossTabTimer = null
   const batches = [..._pendingCrossTab]
   _pendingCrossTab.clear()
-  for (const [vaultId, paths] of batches) {
-    // Fire-and-forget, and never rejects onward: a fold that fails is a stale
-    // view, not a lost write, and it must not become an unhandled rejection.
-    void foldCacheChange(vaultId, paths).catch((e: unknown) => {
+  _crossTabFlushInFlight = true
+  // Fire-and-forget, and never rejects onward: a fold that fails is a stale
+  // view, not a lost write, and it must not become an unhandled rejection.
+  // Still tracked via _crossTabFlushInFlight so isCrossTabSyncIdle can tell a
+  // caller the fold — including its own awaits — has actually finished.
+  void Promise.all(batches.map(([vaultId, paths]) =>
+    foldCacheChange(vaultId, paths).catch((e: unknown) => {
       console.error(`[vault] could not fold a cross-tab change for ${vaultId}:`, e)
-    })
-  }
+    }),
+  )).then(() => { _crossTabFlushInFlight = false })
 }
 
 /**
@@ -111,4 +115,15 @@ export function startCrossTabSync(): () => void {
     if (_crossTabTimer) { clearTimeout(_crossTabTimer); _crossTabTimer = null }
     _pendingCrossTab.clear()
   }
+}
+
+/**
+ * True once any pending coalesce timer has fired and the fold it scheduled
+ * has finished. Exported so tests can poll for the real thing instead of
+ * guessing how long BroadcastChannel delivery plus CROSS_TAB_COALESCE_MS take
+ * under a loaded runner (#1031) — there is no other way to observe this
+ * module-private state from outside it.
+ */
+export function isCrossTabSyncIdle(): boolean {
+  return _crossTabTimer === null && !_crossTabFlushInFlight
 }
