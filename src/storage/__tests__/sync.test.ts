@@ -572,7 +572,15 @@ describe('pushDirty — a divergence on disjoint fields is merged, not copied', 
     await backend.write('essensplan.md', REMOTE, 'sha1')
     seedDirtyWithBase('fake-vault', 'essensplan.md', LOCAL, 'sha1', BASE)
 
-    backend.onNextReadFiles(() => { backend.seed('essensplan.md', '---\ntitle: Essensplan\n---\n\nA third version\n', 'sha9') })
+    const landThirdWriter = (): void => {
+      backend.seed('essensplan.md', '---\ntitle: Essensplan\n---\n\nA third version\n', 'sha9')
+    }
+    // resolveCollision retries its diagnostic read once when it disagrees with
+    // both spurious checks (see POST_CONFLICT_READ_RETRY_MS) before attempting
+    // the merge write. That first retry still has to see REMOTE/sha1 — the
+    // divergence this test is about — so land the third writer's change right
+    // before the merge write instead, one read later than before.
+    backend.onNextReadFiles(() => backend.onNextReadFiles(landThirdWriter))
 
     await syncToBackend()
 
@@ -800,6 +808,42 @@ describe('pushDirty — a refused write that did not actually diverge', () => {
     expect(cached?.version).toBe(backend.get('task.md')?.version)
     expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
     expect(syncOf().error).toBeNull()
+  })
+
+  it('retries the post-conflict read once when it looks staler than our own already-confirmed write', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const backend = new FakeBackend()
+      mountBackend(backend)
+      // The push this test exercises is itself the *second* of two rapid
+      // pushes to the same path — sha1 is the version a prior push in this
+      // same cycle already confirmed via its own write response (see
+      // markPushed). A read reporting anything else, right after a 409, is
+      // not evidence of a second writer: it can only be the read replica
+      // GitHub's Contents API serves, lagging behind a ref update it has
+      // already accepted.
+      backend.seed('task.md', 'stale — predates our own prior push', 'sha0')
+      backend.queueWriteError(new ConflictError('task.md', { status: 409, reason: 'is at sha0 but expected sha1' }))
+      // Once the stale read above is served, the backend "catches up" — the
+      // retry's read finds our own content already landed.
+      backend.onNextReadFiles(() => backend.seed('task.md', 'local edit', 'sha1'))
+      seedDirty('fake-vault', 'task.md', 'local edit', 'sha1')
+
+      const synced = syncToBackend()
+      await vi.advanceTimersByTimeAsync(500)
+      await synced
+
+      // Settled as spurious, not copied out: no second file, no toast.
+      expect(backend.listPaths()).toEqual(['task.md'])
+      expect(backend.readFilesCallCount).toBe(2)
+      const cached = cacheStore.get(vp('fake-vault', 'task.md'))
+      expect(cached?.status).toBe('clean')
+      expect(cached?.version).toBe('sha1')
+      expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
+      expect(notifyFns.warn).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('leaves a journal trail naming the layer each step happened in', async () => {
