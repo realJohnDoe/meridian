@@ -116,6 +116,30 @@ describe('RepeatDialog', () => {
     expect(onConfirm).toHaveBeenCalledWith({ type: 'schedule', freq: 'yearly', interval: 1, bymonth: [3, 9] })
   })
 
+  it('switching the repeat unit to yearly defaults the scheduled month as selected', () => {
+    const { onConfirm } = renderOpen({ scheduled: { date: '2026-06-15', time: '' } })
+
+    fireEvent.click(screen.getAllByRole('combobox')[1]!) // "Repeats every" unit select
+    fireEvent.click(screen.getByRole('option', { name: 'years' }))
+    clickSet()
+
+    expect(onConfirm).toHaveBeenCalledWith({ type: 'schedule', freq: 'yearly', interval: 1, bymonth: [6] })
+  })
+
+  it('does not override an already-selected month when re-picking yearly', () => {
+    const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1, bymonth: [9] }
+    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
+
+    // Switch away to monthly and back to yearly — the existing selection survives.
+    fireEvent.click(screen.getAllByRole('combobox')[1]!)
+    fireEvent.click(screen.getByRole('option', { name: 'months' }))
+    fireEvent.click(screen.getAllByRole('combobox')[1]!)
+    fireEvent.click(screen.getByRole('option', { name: 'years' }))
+    clickSet()
+
+    expect(onConfirm).toHaveBeenCalledWith(repeat)
+  })
+
   it('yearly weekday-pattern round-trips to the recomputed byweekday/bysetpos spec', () => {
     const spec = monthlyWeekdaySpec(new Date(2026, 5, 15))
     const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1, byweekday: spec.byweekday, bysetpos: spec.bysetpos }
