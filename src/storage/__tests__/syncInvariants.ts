@@ -331,13 +331,14 @@ function checkCleanTruth(world: WorldView): Violation | null {
         }
       }
       const held = world.remote.contentAtVersion(row.version)
-      if (!held) {
+      // `undefined`, not falsy: an empty file is content the remote can hold.
+      if (held === undefined) {
         return {
           invariant: 'clean-truth',
           detail: `${c.id} holds ${row.path} clean at version ${row.version}, which this remote never minted.`,
         }
       }
-      if (held.content !== row.content) {
+      if (held !== row.content) {
         return {
           invariant: 'clean-truth',
           detail:

@@ -1,7 +1,7 @@
 import type { StorageBackend, RawFile, PermissionOutcome } from './backend'
 import { isVaultFile } from './backend'
 import type { VaultKind } from '@/vaultRef'
-import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError } from './githubApi'
+import { makeOctokit, encodeBase64, decodeBase64, mapGitHubError, blobSha } from './githubApi'
 import { ensureFreshAccessToken } from './githubOAuth'
 import { isTransientSyncError, TransientSyncError } from './conflictError'
 import { journal } from './syncJournal'
@@ -394,9 +394,32 @@ export class GitHubBackend implements StorageBackend {
         content: encodeBase64(content),
         ...(expectedVersion ? { sha: expectedVersion } : {}),
       })
-      // Update SHA from the response so delete() still works in the same session.
-      const newSha = (data as { content?: { sha?: string } }).content?.sha
-      if (newSha) this._shas.set(path, newSha)
+      // The new token, from the response when it carries one and from the
+      // content otherwise.
+      //
+      // A `PUT` that resolves has committed, so the remote holds exactly the
+      // bytes just sent — and a git blob SHA is a pure function of those bytes
+      // (`blobSha`). The token is therefore knowable here whether or not the
+      // response survived the trip, which is the point: a response body lost to
+      // a dropped connection used to leave the caller with no version at all,
+      // and a record stamped clean with no version is a manufactured conflict
+      // on its next edit and a re-pull on every reconcile in between.
+      //
+      // The response still wins when it has one — GitHub is the authority on
+      // what GitHub holds. They are cross-checked rather than assumed equal:
+      // the only ways they can differ are a bug in `blobSha` or a remote that
+      // stores something other than the bytes it was handed, and both are
+      // invisible until a CAS starts failing for reasons nobody can see.
+      const reported = (data as { content?: { sha?: string } }).content?.sha
+      const computed = await blobSha(content)
+      if (reported === undefined) {
+        journal('version-local', this.id, path, { actual: computed }, this.kind)
+      } else if (reported !== computed) {
+        journal('version-mismatch', this.id, path, { actual: reported, note: computed }, this.kind)
+      }
+      const newSha = reported ?? computed
+      // Cached so delete() still works in the same session.
+      this._shas.set(path, newSha)
       return newSha
     } catch (e) {
       throw mapGitHubError(e, path)

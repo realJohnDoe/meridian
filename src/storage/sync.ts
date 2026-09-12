@@ -73,6 +73,15 @@ type CollisionOutcome =
  * recording `undefined` is actively harmful: the next edit to that file would
  * CAS with no precondition, which every backend reads as "must be absent", and
  * a file that plainly exists would conflict for no reason. Fall back to a read.
+ *
+ * Both shipping backends now answer before the fallback is reached — their
+ * tokens are functions of content (GitHub's blob SHA, the local FS's content
+ * hash), so a write that lands knows its own token without asking. The read
+ * stays for the case the interface still allows: a backend whose token is the
+ * remote's to mint. It is the last resort rather than the first, because it can
+ * itself fail — a connection that drops between a write and its answer is
+ * usually still down a moment later, and then this returns `undefined` after
+ * all.
  */
 async function versionAfterWrite(
   backend: StorageBackend,
