@@ -194,7 +194,8 @@ interface OwedWrite {
  * Deliberately *observational* rather than predictive — it never says what the
  * storage layer should do next, only what the user has been promised. A model
  * that predicted outcomes would have to reimplement `resolveCollision`, which
- * is the trap `sync-collision.test.ts` fell into and says so in its own header.
+ * is a trap a hand-written CAS harness fell into once already (removed in
+ * #1038 for testing a copy of `pushDirty` rather than `pushDirty` itself).
  */
 export class Ledger {
   private _owed: OwedWrite[] = []

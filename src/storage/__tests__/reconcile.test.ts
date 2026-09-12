@@ -3,8 +3,7 @@
  * paths to pull from the backend and which to drop from the cache.
  *
  * No Dexie, no backend, no store: planReconcile is side-effect-free, so these
- * tests pin the branching directly (mirrors how sync-collision.test.ts isolates
- * the CAS logic from module-level state).
+ * tests pin the branching directly against the exported function.
  */
 import { describe, it, expect } from 'vitest'
 import { planReconcile } from '@/storage/sync'
