@@ -8,7 +8,7 @@ import type { EntryKey } from '@/fileIO'
 import type { VaultRef } from '@/vaultRef'
 import { entriesOf } from '@/test-utils'
 import { useStore } from '@/store'
-import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
+import { setupStore, seedStore, installFakePersistence, makeOcc, makeSeries, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { useEntryEditor } from './useEntryEditor'
 
 const { navigateMock, backMock } = vi.hoisted(() => ({ navigateMock: vi.fn(), backMock: vi.fn() }))
@@ -57,6 +57,85 @@ describe('useEntryEditor', () => {
     act(() => { result.current.handleScopeChange('add') })
 
     expect(result.current.entry.done).toBe(false)
+  })
+
+  it('selecting an edit scope does not itself write', () => {
+    // Choosing a scope says which occurrences the *next* edit covers — it is
+    // not an edit. Committing here wrote the entry at the new scope with every
+    // field unchanged, which for 'future' means `applyFuture` splitting the
+    // series on the spot: merely opening "edit this and all following
+    // occurrences" cut a daily series in two and started a new one still
+    // carrying the old daily rule.
+    const series = makeSeries({
+      id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+      repeat: { type: 'schedule', freq: 'daily' },
+    })
+    const occ = makeOcc({
+      id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1',
+      date: '2026-09-10', time: null, source: 'generated',
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false },
+    })
+    seedStore([series, occ], makeRoots('note.md'))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('future') })
+
+    expect(persistence.writes).toEqual([])
+    expect(result.current.entry.editScope).toBe('future')
+  })
+
+  it('a future-scope repeat change splits the series once, with the picked rule', () => {
+    // The reported flow, in the order the UI allows it: the repeat chip is
+    // hidden while the scope is 'single' on a series occurrence, so the scope
+    // is chosen first and the rule picked after. That must produce exactly one
+    // split — the original capped the day before, and one new series carrying
+    // the picked rule. Committing on the scope change produced two: a daily one
+    // (an occurrence on every later day) beside the after_completion one (two
+    // occurrences on the split day).
+    const series = makeSeries({
+      id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+      repeat: { type: 'schedule', freq: 'daily' },
+    })
+    const occ = makeOcc({
+      id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1',
+      date: '2026-09-10', time: null, source: 'generated',
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false },
+    })
+    seedStore([series, occ], makeRoots('note.md'))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('future') })
+    act(() => { result.current.dialogHandlers.onRepeatConfirm({ type: 'after_completion', interval: '2 days' }) })
+
+    const written = persistence.contentByKey.get(testKey('note.md')) ?? ''
+    expect(written).toContain('type: after_completion')
+    expect(written).toContain('interval: 2 days')
+    // The original leg keeps the daily rule, capped the day before the split.
+    expect(written).toContain('date: 2026-09-09')
+    // Exactly one series starts on the split date, and no daily rule outlives
+    // the cap — the two halves of the bug report.
+    expect(written.match(/^ {2}- date: 2026-09-10$/gm)).toHaveLength(1)
+    expect(written.match(/freq: daily/g)).toHaveLength(1)
+  })
+
+  it('switching scope still re-derives a repeat the user has not touched', () => {
+    const series = makeSeries({
+      id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+      repeat: { type: 'schedule', freq: 'daily' },
+    })
+    const occ = makeOcc({
+      id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1',
+      date: '2026-09-10', time: null, source: 'generated',
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false },
+    })
+    seedStore([series, occ], makeRoots('note.md'))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    expect(result.current.entry.repeat).toBeNull() // scope 'single' carries no repeat
+
+    act(() => { result.current.handleScopeChange('future') })
+
+    expect(result.current.entry.repeat).toEqual({ type: 'schedule', freq: 'daily' })
   })
 
   it('autosave debounces body writes by 1500ms and commits the latest scheduled body', () => {

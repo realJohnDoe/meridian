@@ -315,6 +315,24 @@ export function useEntryEditor(
 
   const handleClose = () => goBack()
 
+  /**
+   * Picking a scope says which occurrences the *next* edit covers. It is not
+   * itself an edit, so it only moves the form — `setEntry`, never `updateEntry`.
+   *
+   * Committing here wrote the entry at the newly chosen scope with every field
+   * still unchanged, which for 'future' means `applyFuture` splitting the series
+   * on the spot: choosing "edit this and all following occurrences" silently cut
+   * the series in two, capping the original and starting a new one that carried
+   * the *old* repeat rule. The rule the user then picked committed a second
+   * time, and because `entry.item` still points at the original series, that
+   * second save split it again — leaving two series anchored on the same day
+   * (two occurrences that day) beside a daily one that never ended (an
+   * occurrence on every later day). Both are the reported bug.
+   *
+   * Scope 'add' has always been exempt from the meta save for the same reason
+   * (`saveMeta`), just expressed one layer down: choosing "add new occurrence"
+   * must not add one. The rule is the same for every scope.
+   */
   const handleScopeChange = (scope: EditScope) => {
     if (!entry.item) return
     const { scheduled, repeat } = applyScope(entry.item, scope)
@@ -323,7 +341,7 @@ export function useEntryEditor(
     // made a freshly added occurrence show up checked when the one it was
     // switched from happened to be done.
     const done = scope === 'add' ? false : entry.done
-    updateEntry({ ...entry, editScope: scope, scheduled, repeat, done })
+    setEntry({ ...entry, editScope: scope, scheduled, repeat, done })
   }
 
   const handleTypeChange = (t: ItemType) => {
