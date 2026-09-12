@@ -415,8 +415,8 @@ function otherBackend(id: string, kind: VaultKind = 'local'): FakeBackend {
   return backend
 }
 
-function seedTombstone(vaultId: string, path: string, version: string | undefined): void {
-  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content: '', status: 'deleted', updatedAt: Date.now(), version })
+function seedTombstone(vaultId: string, path: string, version: string | undefined, baseContent?: string): void {
+  cacheStore.set(vp(vaultId, path), { vaultPath: vp(vaultId, path), vaultId, path, content: '', status: 'deleted', updatedAt: Date.now(), version, baseContent })
 }
 
 function seedClean(vaultId: string, path: string, content: string, version: string | undefined, updatedAt: number): void {
@@ -909,6 +909,82 @@ describe('pushDirty — delete-conflict tombstone handling', () => {
     await syncToBackend()
 
     expect(backend.listPaths()).not.toContain('gone.md')
+    expect(cacheStore.has(vp('fake-vault', 'gone.md'))).toBe(false)
+    expect(notifyFns.warn).not.toHaveBeenCalled()
+    expect(syncOf().error).toBeNull()
+  })
+})
+
+// ── A tombstone with no base version (#1017) ────────────────────────────
+//
+// Two quite different histories produce one: a file that really is this
+// device's own whose version token was lost mid-flight, and a draft that never
+// synced onto a slug another device has since filled. A SHA cannot tell them
+// apart — #827 fell back to a stale cache and #1017's fix to a fresh re-read,
+// and both supplied one for *both* cases. The tombstone's last known backend
+// content can, which is why `recordLocalDelete` now keeps it.
+
+describe('pushDirty — a tombstone with no base version', () => {
+  it('deletes when the path still holds what this device last knew was there', async () => {
+    const backend = new FakeBackend()
+    backend.seed('mine.md', 'my content', 'sha1')
+    mountBackend(backend)
+    // The version was lost (a write that reported no token and whose repair
+    // read failed), but the content is still ours.
+    seedTombstone('fake-vault', 'mine.md', undefined, 'my content')
+
+    await syncToBackend()
+
+    expect(backend.listPaths()).not.toContain('mine.md')
+    expect(cacheStore.has(vp('fake-vault', 'mine.md'))).toBe(false)
+    expect(notifyFns.warn).not.toHaveBeenCalled()
+    expect(syncOf().error).toBeNull()
+  })
+
+  it('keeps a file this device has never seen, rather than destroying it', async () => {
+    const backend = new FakeBackend()
+    backend.seed('shared.md', "another device's note", 'sha1')
+    mountBackend(backend)
+    // A draft created and deleted between two syncs: no version, and no base
+    // content either, because this device never pulled or pushed anything here.
+    seedTombstone('fake-vault', 'shared.md', undefined, undefined)
+
+    await syncToBackend()
+
+    // The file survives...
+    expect(backend.get('shared.md')?.content).toBe("another device's note")
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
+    expect(notifyFns.warn.mock.calls[0]![0]).toContain('shared.md')
+    // ...and the same-cycle reconcile pulls it in, so the tombstone is gone
+    // rather than left to try again next cycle.
+    const cached = cacheStore.get(vp('fake-vault', 'shared.md'))
+    expect(cached?.status).toBe('clean')
+    expect(cached?.content).toBe("another device's note")
+    expect(syncOf().error).toBeNull()
+  })
+
+  it('keeps a file whose content moved on since this device last saw it', async () => {
+    const backend = new FakeBackend()
+    backend.seed('task.md', 'edited elsewhere', 'sha2')
+    mountBackend(backend)
+    // Ours once, but somebody has edited it since — an edit beats a delete,
+    // the same rule the delete-conflict branch applies when a version exists.
+    seedTombstone('fake-vault', 'task.md', undefined, 'what we last saw')
+
+    await syncToBackend()
+
+    expect(backend.get('task.md')?.content).toBe('edited elsewhere')
+    expect(notifyFns.warn).toHaveBeenCalledTimes(1)
+    expect(syncOf().error).toBeNull()
+  })
+
+  it('is still idempotent when the path is empty', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedTombstone('fake-vault', 'gone.md', undefined, 'once ours')
+
+    await syncToBackend()
+
     expect(cacheStore.has(vp('fake-vault', 'gone.md'))).toBe(false)
     expect(notifyFns.warn).not.toHaveBeenCalled()
     expect(syncOf().error).toBeNull()

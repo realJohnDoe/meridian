@@ -50,9 +50,11 @@ export type SyncEventKind =
   | 'push-ok'              // …and was accepted
   | 'push-conflict'        // …and the backend refused the precondition
   | 'delete-push'          // a staged delete went out
-  | 'delete-reread'        // no base version to CAS a delete against; re-read the current sha first
+  | 'delete-reread'        // no base version to CAS a delete against; read the path to see whether it is still ours
   | 'delete-ok'
   | 'delete-conflict'
+  | 'delete-unacknowledged' // …and it was not: the path holds content this device has never seen, so it was kept
+  | 'delete-skipped'       // a backend was asked to delete with no CAS precondition, which it will not guess at
   // ── cross-vault move (both halves share one correlation id in `note`) ──
   | 'move-staged'          // the target copy is durable; the source delete is staged but held
   | 'move-released'        // the target's remote confirmed the copy — the source delete may go out
