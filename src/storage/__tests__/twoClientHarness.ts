@@ -371,6 +371,18 @@ let _generation = 0
 function currentGeneration(): number { return _generation }
 
 /**
+ * TEMPORARY PROBE (#1052). How many backend calls are in flight right now.
+ *
+ * A backend call is only ever made from inside a sync cycle, so a non-zero
+ * count is a live cycle. `quiesce()` answers the same question from the
+ * *bookkeeping* side (`syncing`/`pushTimer`/`pushQueued`); where the two
+ * disagree, the bookkeeping is wrong — which is the hypothesis under test.
+ */
+let _inFlight = 0
+
+export function pendingBackendCalls(): number { return _inFlight }
+
+/**
  * Wrap `backend`'s network methods so each remembers the generation it was
  * created in (`gen`) and asserts, both when called and when it resolves, that
  * `resetWorld()` has not run again since. A mismatch means exactly the shape
@@ -386,40 +398,38 @@ function taggedBackend(backend: StorageBackend, vaultId: string, gen: number): S
       )
     }
   }
+  /** Run `op` counted as in flight, so `pendingBackendCalls()` sees it. */
+  const tracked = async <T>(method: string, path: string, op: () => Promise<T>): Promise<T> => {
+    guard('called', method, path)
+    _inFlight++
+    try {
+      const r = await op()
+      guard('resolved', method, path)
+      return r
+    } finally {
+      _inFlight--
+    }
+  }
   return {
     get id()        { return backend.id },
     get name()      { return backend.name },
     get kind()      { return backend.kind },
     get readOnly()  { return backend.readOnly },
     get hasRemote() { return backend.hasRemote },
-    async statAll() {
-      guard('called', 'statAll', '')
-      const r = await backend.statAll()
-      guard('resolved', 'statAll', '')
-      return r
+    statAll() {
+      return tracked('statAll', '', () => backend.statAll())
     },
-    async readFiles(paths) {
-      guard('called', 'readFiles', paths.join(','))
-      const r = await backend.readFiles(paths)
-      guard('resolved', 'readFiles', paths.join(','))
-      return r
+    readFiles(paths) {
+      return tracked('readFiles', paths.join(','), () => backend.readFiles(paths))
     },
-    async readAll(onProgress) {
-      guard('called', 'readAll', '')
-      const r = await backend.readAll(onProgress)
-      guard('resolved', 'readAll', '')
-      return r
+    readAll(onProgress) {
+      return tracked('readAll', '', () => backend.readAll(onProgress))
     },
-    async write(path, content, expectedVersion) {
-      guard('called', 'write', path)
-      const r = await backend.write(path, content, expectedVersion)
-      guard('resolved', 'write', path)
-      return r
+    write(path, content, expectedVersion) {
+      return tracked('write', path, () => backend.write(path, content, expectedVersion))
     },
     async delete(path, expectedVersion) {
-      guard('called', 'delete', path)
-      await backend.delete(path, expectedVersion)
-      guard('resolved', 'delete', path)
+      await tracked('delete', path, () => backend.delete(path, expectedVersion))
     },
     ensurePermission(interactive) { return backend.ensurePermission(interactive) },
     ...(backend.refreshAuth ? { refreshAuth: () => backend.refreshAuth!() } : {}),
@@ -467,7 +477,31 @@ export function makeClient(vaultId: string, opts: { legacyDelete?: boolean } = {
  * the cache on next launch.
  */
 export function closeApp(client: Client): void {
+  dropOrphanProbe(client.vaultId, 'closeApp')
   dropSyncState(client.vaultId)
+}
+
+/**
+ * TEMPORARY PROBE (#1052). Report a `dropSyncState` that lands on a vault
+ * whose cycle is still running.
+ *
+ * `dropSyncState` deletes this vault's record from the map; `syncStateFor`
+ * then mints a *fresh* one (`syncing: false`) on the next access. So the
+ * running cycle's own `syncing = true` survives only on an object nothing
+ * reads any more, and `quiesce()` — which calls `syncStateFor` per poll —
+ * reads the new record and reports idle while that cycle is still going.
+ * Nothing cancels the cycle itself, so it runs on into the next step, and
+ * (once `resetWorld()` has bumped the generation) into the next run.
+ */
+function dropOrphanProbe(vaultId: string, via: string): void {
+  const s = syncStateFor(vaultId)
+  if (s.syncing || s.pushQueued || _inFlight > 0) {
+    console.warn(
+      `#1052 probe: ${via}(${vaultId}) dropped sync state mid-cycle ` +
+      `(syncing=${String(s.syncing)} pushQueued=${String(s.pushQueued)} ` +
+      `inFlight=${String(_inFlight)}) in generation ${String(currentGeneration())}`,
+    )
+  }
 }
 
 /**
@@ -484,6 +518,7 @@ export function closeApp(client: Client): void {
  * for removing.
  */
 export function reloadClient(client: Client, opts: { legacyDelete?: boolean } = {}): Client {
+  dropOrphanProbe(client.vaultId, 'reloadClient')
   dropSyncState(client.vaultId)
   return makeClient(client.vaultId, opts)
 }
@@ -636,6 +671,15 @@ export async function skipAhead(ms: number, vaultIds: readonly string[]): Promis
  * instant the next `resetWorld` overwrites the stub.
  */
 export async function resetWorld(): Promise<FakeGitHub> {
+  // TEMPORARY PROBE (#1052): the run boundary itself. Anything still in
+  // flight here is work the *previous* run never drained — the leak, caught
+  // one step before the generation tripwire below would report its landing.
+  if (_inFlight > 0) {
+    console.warn(
+      `#1052 probe: resetWorld() entered with ${String(_inFlight)} backend call(s) still in ` +
+      `flight from generation ${String(currentGeneration())}`,
+    )
+  }
   _generation++
   const remote = new FakeGitHub()
   vi.stubGlobal('fetch', remote.handler)

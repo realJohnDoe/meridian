@@ -45,6 +45,7 @@ import { entryKey, keySlug } from '@/fileIO'
 import { getVaultLayer } from '@/storeBridge'
 import {
   makeClient, reloadClient, closeApp, settle, quiesce, syncClient, registerVaults, skipAhead,
+  pendingBackendCalls,
 } from './twoClientHarness'
 import type { Client, FakeGitHub } from './twoClientHarness'
 import { Ledger, checkSafety, checkLiveness, graceWindowPassed, tokenFor } from './syncInvariants'
@@ -230,6 +231,24 @@ export interface RunResult {
 }
 
 /**
+ * TEMPORARY PROBE (#1052). Report a `runInterleaving` return that leaves work
+ * behind.
+ *
+ * Every `if (violation) return` below skips the rest of the run, and with it
+ * every remaining `quiesce`. If a cycle is live at that moment, the run ends
+ * with it still going — and the next `resetWorld()` bumps the generation out
+ * from under it.
+ */
+function leakProbe(where: string, violation: Violation | null): void {
+  if (pendingBackendCalls() > 0) {
+    console.warn(
+      `#1052 probe: runInterleaving returned from ${where} with ${String(pendingBackendCalls())} ` +
+      `backend call(s) in flight (violation: ${violation?.invariant ?? 'none'})`,
+    )
+  }
+}
+
+/**
  * Run one interleaving, checking the four safety invariants after every step
  * and the two liveness invariants whenever the world is settled.
  *
@@ -354,7 +373,7 @@ export async function runInterleaving(remote: FakeGitHub, ops: readonly Op[]): P
     const world = await snapshot()
     ledger.observe(world)
     const violation = checkSafety(world, ledger) ?? (settled(world) ? checkLiveness(world) : null)
-    if (violation) return { violation, steps }
+    if (violation) { leakProbe('the op loop', violation); return { violation, steps } }
   }
 
   // ── The settling phase ─────────────────────────────────────────────
@@ -387,7 +406,7 @@ export async function runInterleaving(remote: FakeGitHub, ops: readonly Op[]): P
       world = await snapshot()
       ledger.observe(world)
       const violation = checkSafety(world, ledger)
-      if (violation) return { violation, steps }
+      if (violation) { leakProbe('the settling phase', violation); return { violation, steps } }
     }
     if (settled(world) && checkLiveness(world) === null) break
   }
@@ -395,5 +414,7 @@ export async function runInterleaving(remote: FakeGitHub, ops: readonly Op[]): P
   // Unconditional: a world that would not settle in `SETTLE_ROUNDS` rounds of
   // undisturbed syncing has something that never drains, and `progress` is the
   // invariant that says so.
-  return { violation: checkSafety(world, ledger) ?? checkLiveness(world), steps }
+  const finalViolation = checkSafety(world, ledger) ?? checkLiveness(world)
+  leakProbe('the final check', finalViolation)
+  return { violation: finalViolation, steps }
 }
