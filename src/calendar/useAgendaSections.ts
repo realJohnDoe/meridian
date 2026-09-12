@@ -11,7 +11,8 @@ import {
 import { computeOverduePool } from './overduePool'
 import { SECTIONS_CACHE_KEY, sectionsCacheSlot, overduePoolSlot } from './expansionCaches'
 
-export { estimateRow, type AgendaRow, type ExtraMetaProbe } from './agendaSections'
+export type { AgendaRow } from './agendaSections'
+export { estimateRow, type ExtraMetaProbe } from './agendaRowHeights'
 
 // The agenda is a singleton view (only one instance mounted at a time), so a
 // single cache slot each for the grouped/sorted sections and the overdue pool
