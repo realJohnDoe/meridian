@@ -17,14 +17,18 @@ export interface DexieFileRow {
   updatedAt: number
   version?:  string
   /**
-   * The content the backend held at `version` — the common ancestor a dirty
-   * record's edit was made from, kept so a collision can be merged rather
-   * than only copied out (see `mergeFileContent`).
+   * The content the backend held at `version` — the common ancestor a pending
+   * change was made from, kept so a collision can be merged rather than only
+   * copied out (see `mergeFileContent`), and so a tombstone can say what this
+   * device last knew was at the path (see `recordLocalDelete`).
    *
-   * Set on dirty records only: a clean record's `content` *is* its base, and
-   * storing a second copy of every file would double the cache for nothing.
-   * Absent on a dirty record written before this field existed, which is why
-   * every reader treats "no base" as "cannot merge" rather than as a default.
+   * Set on records with a change still pending — dirty ones and tombstones —
+   * and never on a clean one, whose `content` *is* its base: storing a second
+   * copy of every file would double the cache for nothing.
+   * Absent on a record written before this field existed, which is why every
+   * reader treats "no base" as "cannot merge" rather than as a default — and,
+   * on a tombstone, as "we have never seen anything here", which is the one
+   * case that must not delete.
    *
    * Not indexed, so it needs no Dexie version bump — `stores()` below declares
    * the primary key and indexes, not the row's shape.
