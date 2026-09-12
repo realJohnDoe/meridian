@@ -27,14 +27,18 @@
  * permanent regression case — the same ratchet `fixtures/` gives the round-trip
  * corpus.
  *
- * **Run several soaks rather than one long one.** Cost per run climbs with how
- * many have already run in the same process — 400 runs take ~75s, 1200 take
- * ~20min, and 4000 do not finish in half an hour. That is a leak in the harness
- * rather than anything fast-check does: a *fixed* sequence repeated 1200 times
- * shows the same curve, with the timer count flat and the heap climbing
- * (#1023). Until that is fixed, `MERIDIAN_SOAK_RUNS=400` several times over
- * covers strictly more ground per minute than one long run, and fast-check
- * picks a fresh seed each time anyway.
+ * **A long soak used to degrade to a crawl (#1023, fixed).** `resetWorld()`
+ * was wrapping the fetch stub in `vi.fn(remote.handler)` on every call, and
+ * every mock `vi.fn()` creates is registered in vitest's own module-level
+ * `REGISTERED_MOCKS` set — which nothing ever removes an entry from. A soak
+ * calling `resetWorld` thousands of times minted that many mocks, each
+ * closing over one run's `FakeGitHub`, and every one of them lived for the
+ * rest of the process: unbounded heap growth, and — since GC cost scales
+ * with live heap — the superlinear wall-time growth that made 400 runs take
+ * ~75s, 1200 take ~20min, and 4000 not finish in half an hour. See
+ * `resetWorld`'s own comment in `twoClientHarness.ts`, and
+ * `twoClientHarnessLeak.test.ts` for the regression coverage and a probe to
+ * re-measure the curve by hand.
  */
 import 'fake-indexeddb/auto'
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
@@ -196,11 +200,22 @@ describe('sync invariants — the starting corpus (#1021)', () => {
  * goes red and points at the entry to delete. An allowlist that can outlive its
  * defect is just a disabled test.
  *
- * #1017 was the first and so far only entry. Its pin did exactly this job — it
- * failed the moment the fix landed — and the interleaving that caught it is now
- * a permanent regression case in `CORPUS` above rather than an exemption here.
+ * #1017 was the first entry. Its pin did exactly this job — it failed the
+ * moment the fix landed — and the interleaving that caught it is now a
+ * permanent regression case in `CORPUS` above rather than an exemption here.
+ *
+ * #1052 is the second: a `clean-truth` violation ("<client> holds <path>
+ * clean at version <v>, which this remote never minted") that only surfaces
+ * after several hundred prior `resetWorld()` calls in the same soak, so —
+ * unlike #1017 — it has no isolated repro to promote into `CORPUS` yet. See
+ * the issue for what that implies about `resetWorld()`'s own teardown.
  */
-const KNOWN_VIOLATIONS: Array<{ issue: string; matches: (v: Violation) => boolean }> = []
+const KNOWN_VIOLATIONS: Array<{ issue: string; matches: (v: Violation) => boolean }> = [
+  {
+    issue: '#1052',
+    matches: v => v.invariant === 'clean-truth' && v.detail.includes('which this remote never minted'),
+  },
+]
 
 const knownFor = (v: Violation): string | undefined =>
   KNOWN_VIOLATIONS.find(k => k.matches(v))?.issue

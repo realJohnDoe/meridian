@@ -35,6 +35,7 @@ import { syncStateFor, dropSyncState, dropAllSyncState } from '@/storage/syncSta
 import { unmountAllBackends } from '@/storage/backends'
 import { cacheInit } from '@/storage/cache/db'
 import { syncToBackend } from '@/storage/syncScheduler'
+import { clearSyncJournal } from '@/storage/syncJournal'
 import { useStore } from '@/store'
 import type { VaultRef } from '@/vaultRef'
 
@@ -537,19 +538,33 @@ export async function skipAhead(ms: number, vaultIds: readonly string[]): Promis
  * Every piece of this is module state that outlives a test the way it outlives
  * a page's vaults, so none of it goes away on its own: the backend registry,
  * the per-vault sync records (a debounce left armed by the previous seed fires
- * into this one the moment the pump advances), the store, and the shared Dexie
- * — whose rows are keyed by vault id, so isolation between *clients* is real
- * while isolation between *seeds* is not.
+ * into this one the moment the pump advances), the store, the sync journal's
+ * `_lastSeen` map, and the shared Dexie — whose rows are keyed by vault id, so
+ * isolation between *clients* is real while isolation between *seeds* is not.
  *
  * Deliberately no `setSystemTime`: virtual time stays monotonic across the
  * file (see `useFixedClock`). A seed is a fixed sequence of operations, not a
  * fixed instant.
+ *
+ * **Not `vi.fn(remote.handler)` (#1023).** `vi.fn()` registers every mock it
+ * creates in vitest's own module-level `REGISTERED_MOCKS` set, which backs
+ * `clearAllMocks`/`resetAllMocks` — and which nothing ever removes an entry
+ * from, `vi.fn()`'s own included, since only a `spyOn`'s restore handle is
+ * tracked for that. A soak calling `resetWorld` thousands of times in one
+ * process would otherwise mint that many mocks, each closing over one run's
+ * `FakeGitHub` (and its several `Map`s), and every one of them would live for
+ * the rest of the process — the heap growth *and* the superlinear slowdown
+ * `#1023` measured (GC cost scales with live heap, and this retained garbage
+ * only ever grows). A plain function stubbed in behaves identically for every
+ * caller here — nothing reads `fetch`'s mock state — and is dropped the
+ * instant the next `resetWorld` overwrites the stub.
  */
 export async function resetWorld(): Promise<FakeGitHub> {
   const remote = new FakeGitHub()
-  vi.stubGlobal('fetch', vi.fn(remote.handler))
+  vi.stubGlobal('fetch', remote.handler)
   unmountAllBackends()
   dropAllSyncState()
+  clearSyncJournal()
   useStore.setState({ vaults: [], entries: new Map() })
   const db = await cacheInit()
   await db.files.clear()
