@@ -66,3 +66,70 @@ describe('vitest.config.ts coverage exclusions', () => {
     ).toEqual([])
   })
 })
+
+/**
+ * Guards against the failure mode #1039 found: a per-file threshold only
+ * fails CI once measured coverage drops *below* it, so nothing stops the gap
+ * between the two from growing in the other direction — every test added
+ * without a matching floor bump widens the slack, until the floor is no
+ * longer guarding anything. 25 of 57 per-file floors (plus all 4 globals) had
+ * drifted ≥10 points below measured before this guard existed; `store.ts` was
+ * the worst, at 21.1 points of slack. `plans/surveys/health.md`'s Budget calls
+ * a floor more than ~10 points under "guarding nothing" — this test makes
+ * that threshold machine-checked instead of something only a periodic survey
+ * catches.
+ *
+ * `coverage-summary.json` is a separate reporter output (`json-summary`,
+ * enabled above), written only once the full coverage run finishes — a test
+ * inside that same run can't read its own run's result. `test:coverage` in
+ * package.json therefore re-runs this one file, without `--coverage`, right
+ * after the coverage run completes, so the file is always fresh by the time
+ * this assertion matters. On a bare `vitest run` (no coverage collected) or
+ * the coverage run's own pass, the summary doesn't exist yet and this test is
+ * a no-op — there is nothing to compare against.
+ */
+describe('vitest.config.ts coverage thresholds vs measured coverage', () => {
+  it('no floor sits more than 10 points under its measured value', () => {
+    const summaryPath = path.join(ROOT, 'coverage', 'coverage-summary.json')
+    if (!fs.existsSync(summaryPath)) return
+
+    const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8')) as Record<
+      string,
+      Record<string, { pct: number }>
+    >
+    const thresholds = vitestConfig.test?.coverage?.thresholds ?? {}
+    const METRICS = ['statements', 'branches', 'functions', 'lines'] as const
+    const MAX_DRIFT = 10
+
+    const drifted: string[] = []
+
+    for (const metric of METRICS) {
+      const floor = thresholds[metric]
+      const measured = summary.total?.[metric]?.pct
+      if (typeof floor === 'number' && typeof measured === 'number' && measured - floor > MAX_DRIFT) {
+        drifted.push(`global ${metric}: floor ${floor} vs measured ${measured.toFixed(2)}`)
+      }
+    }
+
+    for (const [file, perFile] of Object.entries(thresholds)) {
+      if (NON_PATH_KEYS.has(file)) continue
+      const entry = summary[path.join(ROOT, file)]
+      if (!entry) continue // unresolvable keys are the other guard's job, above
+
+      for (const metric of METRICS) {
+        const floor = (perFile as Partial<Record<string, number>>)[metric]
+        const measured = entry[metric]?.pct
+        if (typeof floor === 'number' && typeof measured === 'number' && measured - floor > MAX_DRIFT) {
+          drifted.push(`${file} ${metric}: floor ${floor} vs measured ${measured.toFixed(2)}`)
+        }
+      }
+    }
+
+    expect(
+      drifted,
+      `floors drifted more than ${String(MAX_DRIFT)} points below measured coverage — re-measure ` +
+      `(\`pnpm run test:coverage\`) and tighten them a few points under, per the convention in ` +
+      `vitest.config.ts's thresholds comment:\n  ${drifted.join('\n  ')}`,
+    ).toEqual([])
+  })
+})
