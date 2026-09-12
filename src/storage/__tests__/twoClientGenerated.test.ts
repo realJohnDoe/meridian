@@ -204,18 +204,24 @@ describe('sync invariants — the starting corpus (#1021)', () => {
  * moment the fix landed — and the interleaving that caught it is now a
  * permanent regression case in `CORPUS` above rather than an exemption here.
  *
- * #1052 is the second: a `clean-truth` violation ("<client> holds <path>
- * clean at version <v>, which this remote never minted") that only surfaces
- * after several hundred prior `resetWorld()` calls in the same soak, so —
- * unlike #1017 — it has no isolated repro to promote into `CORPUS` yet. See
- * the issue for what that implies about `resetWorld()`'s own teardown.
+ * #1052 was the second, and its entry is gone without the defect being fixed —
+ * deliberately, because the entry no longer matches what a soak actually sees.
+ *
+ * That violation ("<client> holds <path> clean at version <v>, which this
+ * remote never minted") was never a defect in the code under test: it was a
+ * *previous seed's* still-running sync cycle landing a write after this seed's
+ * `resetWorld()` had cleared the cache. The version really had been minted —
+ * by a `FakeGitHub` a run or two back. `resetWorld`'s generation tripwire
+ * (`twoClientHarness.ts`) now catches that cycle where it leaks rather than
+ * where it lands, and it throws, which no allowlist here can suppress. So a
+ * pin keyed on `clean-truth` would sit unmatched forever, which is precisely
+ * the "allowlist that outlives its defect" this comment warns against.
+ *
+ * The leak is **not fixed** — it still reproduces in roughly half of 4,000-run
+ * sweeps. What changed is that it is now loud, fast (seconds, not an hour) and
+ * reported at its cause. See #1052.
  */
-const KNOWN_VIOLATIONS: Array<{ issue: string; matches: (v: Violation) => boolean }> = [
-  {
-    issue: '#1052',
-    matches: v => v.invariant === 'clean-truth' && v.detail.includes('which this remote never minted'),
-  },
-]
+const KNOWN_VIOLATIONS: Array<{ issue: string; matches: (v: Violation) => boolean }> = []
 
 const knownFor = (v: Violation): string | undefined =>
   KNOWN_VIOLATIONS.find(k => k.matches(v))?.issue

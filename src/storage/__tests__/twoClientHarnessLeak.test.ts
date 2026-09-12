@@ -78,7 +78,15 @@ describe('resetWorld does not leak across runs (#1023)', () => {
       for (let i = 0; i < BATCH && done + i < RUNS; i++) await runOnce()
       const ms = performance.now() - t0
       const heapMB = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(0)
-      console.log(`after ${done + BATCH} runs: ${ms.toFixed(0)}ms for this batch, heap=${heapMB}MB`)
+      // process.stdout.write, not console.log: vitest hides a passing test's
+      // console output, and these numbers are the entire point of the probe.
+      // vi.getTimerCount() is here because the clock is installed once per file
+      // and never rewound, so a timer neither fired nor cleared is retained for
+      // the rest of the process — along with everything its callback closes over.
+      process.stdout.write(
+        `after ${done + BATCH} runs: ${ms.toFixed(0)}ms for this batch, ` +
+        `heap=${heapMB}MB, pendingTimers=${String(vi.getTimerCount())}\n`,
+      )
     }
   }, Math.max(60_000, RUNS * 200))
 })

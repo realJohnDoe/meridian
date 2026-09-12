@@ -34,6 +34,7 @@ import { mountBackend } from '@/storage/backends'
 import { syncStateFor, dropSyncState, dropAllSyncState } from '@/storage/syncState'
 import { unmountAllBackends } from '@/storage/backends'
 import { cacheInit } from '@/storage/cache/db'
+import type { MeridianDB } from '@/storage/cache/db'
 import { syncToBackend } from '@/storage/syncScheduler'
 import { clearSyncJournal } from '@/storage/syncJournal'
 import { useStore } from '@/store'
@@ -371,16 +372,16 @@ let _generation = 0
 function currentGeneration(): number { return _generation }
 
 /**
- * TEMPORARY PROBE (#1052). How many backend calls are in flight right now.
+ * How many backend calls are in flight right now.
  *
  * A backend call is only ever made from inside a sync cycle, so a non-zero
- * count is a live cycle. `quiesce()` answers the same question from the
- * *bookkeeping* side (`syncing`/`pushTimer`/`pushQueued`); where the two
- * disagree, the bookkeeping is wrong — which is the hypothesis under test.
+ * count means a live cycle. `quiesce()` answers the same question from the
+ * *bookkeeping* side (`syncing`/`pushTimer`/`pushQueued`), and `resetWorld`
+ * below reports where the two disagree — a run that ended with work still
+ * running, which is #1052's own shape caught one step before the generation
+ * guard sees it land.
  */
 let _inFlight = 0
-
-export function pendingBackendCalls(): number { return _inFlight }
 
 /**
  * Wrap `backend`'s network methods so each remembers the generation it was
@@ -477,32 +478,9 @@ export function makeClient(vaultId: string, opts: { legacyDelete?: boolean } = {
  * the cache on next launch.
  */
 export function closeApp(client: Client): void {
-  dropOrphanProbe(client.vaultId, 'closeApp')
   dropSyncState(client.vaultId)
 }
 
-/**
- * TEMPORARY PROBE (#1052). Report a `dropSyncState` that lands on a vault
- * whose cycle is still running.
- *
- * `dropSyncState` deletes this vault's record from the map; `syncStateFor`
- * then mints a *fresh* one (`syncing: false`) on the next access. So the
- * running cycle's own `syncing = true` survives only on an object nothing
- * reads any more, and `quiesce()` — which calls `syncStateFor` per poll —
- * reads the new record and reports idle while that cycle is still going.
- * Nothing cancels the cycle itself, so it runs on into the next step, and
- * (once `resetWorld()` has bumped the generation) into the next run.
- */
-function dropOrphanProbe(vaultId: string, via: string): void {
-  const s = syncStateFor(vaultId)
-  if (s.syncing || s.pushQueued || _inFlight > 0) {
-    console.warn(
-      `#1052 probe: ${via}(${vaultId}) dropped sync state mid-cycle ` +
-      `(syncing=${String(s.syncing)} pushQueued=${String(s.pushQueued)} ` +
-      `inFlight=${String(_inFlight)}) in generation ${String(currentGeneration())}`,
-    )
-  }
-}
 
 /**
  * Simulate the device being closed and reopened: a brand-new `GitHubBackend`
@@ -518,7 +496,6 @@ function dropOrphanProbe(vaultId: string, via: string): void {
  * for removing.
  */
 export function reloadClient(client: Client, opts: { legacyDelete?: boolean } = {}): Client {
-  dropOrphanProbe(client.vaultId, 'reloadClient')
   dropSyncState(client.vaultId)
   return makeClient(client.vaultId, opts)
 }
@@ -670,13 +647,50 @@ export async function skipAhead(ms: number, vaultIds: readonly string[]): Promis
  * caller here — nothing reads `fetch`'s mock state — and is dropped the
  * instant the next `resetWorld` overwrites the stub.
  */
+/**
+ * Drop the finished transactions `fake-indexeddb` never lets go of — the
+ * other half of #1023, and the reason a long soak still slowed to a crawl
+ * after that issue's own fix landed.
+ *
+ * Its `Database` holds every transaction ever opened against a connection in
+ * one array (`transactions.push(tx)` in `FDBDatabase`, with no removal
+ * anywhere in the library), and `processTransactions` re-`filter`s that whole
+ * array on every transaction creation and every complete/abort. Across a soak
+ * that is two compounding problems and not one: an unbounded **retention** —
+ * each finished transaction keeps its scope and request objects alive — and an
+ * O(n) **scan per transaction event** over an array that grows by two per
+ * `resetWorld`, which makes the harness quadratic in the number of runs.
+ *
+ * Measured over 1,200 `resetWorld()` calls: 69MB climbing to 91MB without
+ * this, flat at 65MB with it; the fixed-sequence probe in
+ * `twoClientHarnessLeak.test.ts` goes from 2,400 runs costing 4.2x the
+ * per-run cost of the first 400 to holding roughly steady. That per-run climb
+ * is what `#1023` read as "ordinary GC behavior at a growing live heap" — it
+ * is neither ordinary nor GC's doing, it is this.
+ *
+ * Only records already marked `finished` go, so a transaction still running
+ * or waiting is left for the library's own scheduler. Nothing else releases
+ * these: `cacheInit()`'s database is deliberately a process singleton (it is
+ * only ever `.clear()`ed, never rebuilt), and production runs against a real
+ * IndexedDB where the question doesn't arise.
+ */
+function pruneFinishedTransactions(db: MeridianDB): void {
+  const raw = (db.backendDB() as unknown as {
+    _rawDatabase?: { transactions: { _state?: string }[] }
+  })._rawDatabase
+  if (!raw) return
+  raw.transactions = raw.transactions.filter(t => t._state !== 'finished')
+}
+
 export async function resetWorld(): Promise<FakeGitHub> {
-  // TEMPORARY PROBE (#1052): the run boundary itself. Anything still in
-  // flight here is work the *previous* run never drained — the leak, caught
-  // one step before the generation tripwire below would report its landing.
+  // The run boundary itself (#1052). Anything still in flight here is work the
+  // *previous* run never drained, which `quiesce` should have made impossible —
+  // the leak named where it happens rather than one generation later, where
+  // `taggedBackend`'s guard would otherwise report only its landing. A warning
+  // and not a throw: the run that would fail is the innocent one starting now.
   if (_inFlight > 0) {
     console.warn(
-      `#1052 probe: resetWorld() entered with ${String(_inFlight)} backend call(s) still in ` +
+      `#1052: resetWorld() entered with ${String(_inFlight)} backend call(s) still in ` +
       `flight from generation ${String(currentGeneration())}`,
     )
   }
@@ -690,6 +704,7 @@ export async function resetWorld(): Promise<FakeGitHub> {
   const db = await cacheInit()
   await db.files.clear()
   await db.meta.clear()
+  pruneFinishedTransactions(db)
   return remote
 }
 
