@@ -9,6 +9,10 @@ export function makeOctokit(token: string): InstanceType<typeof ThrottledOctokit
   return new ThrottledOctokit({
     auth: token,
     throttle: {
+      // Bottleneck's write group enforces minTime: 1000ms. Under test the
+      // transport is a stubbed fetch, so that is a second of real sleep
+      // per request with nothing to rate-limit.
+      enabled: !import.meta.env.VITEST,
       onRateLimit: (retryAfter: number, options: { method: string; url: string }, _octokit: unknown, retryCount: number) => {
         console.warn(`[github] rate limit hit for ${options.method} ${options.url}; retrying after ${retryAfter}s (attempt ${retryCount + 1})`)
         return retryCount < 2
