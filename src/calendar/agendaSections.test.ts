@@ -3,9 +3,10 @@ import type { Occurrence, Priority } from '@/types'
 import { fmtISO } from '@/model'
 import { addDays } from '@/format'
 import {
-  computeAgendaSections, estimateRow, type ExtraMetaProbe,
+  computeAgendaSections,
   type AgendaChunkOccs, type AgendaSectionCache, type Section, type AgendaRow,
 } from './agendaSections'
+import { estimateRow, type ExtraMetaProbe } from './agendaRowHeights'
 import type { FilterOccs } from './useCalendarFilter'
 import { agendaChunkRun, chunkIndexFor, chunkRange, chunkIndicesFor, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS } from './agendaChunks'
 import { weekStartFor } from './weekRange'

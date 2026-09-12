@@ -1,18 +1,16 @@
 import {
   applyRemoteBatch, confirmDeleted, cacheGetDirty,
-  setResolvedClean, markPushed, cacheDirtyCount, cacheLoadAll, cacheGetRecord,
+  setResolvedClean, markPushed, cacheLoadAll,
   cacheGetTombstones, markMerged,
 } from '@/storage/cache/files'
 import type { CacheRecord } from '@/storage/cache/files'
-import { pendingMovesLoad, pendingMoveDrop, heldDeletePaths } from '@/storage/cache/pendingMoves'
-import type { PendingMove } from '@/storage/cache/pendingMoves'
-import { onCacheChange } from '@/storage/cache/broadcast'
+import { heldDeletePaths } from '@/storage/cache/pendingMoves'
 import { getInFlightPaths } from '@/storage/inFlight'
 import { conflictPath } from './conflictName'
 import { ConflictError, AuthSyncError, isTransientSyncError } from './conflictError'
 import type { StorageBackend, RawFile } from './backend'
 import { mergeFileContent } from '@/model'
-import { pathToKey, keyToPath, keySlug, keyVaultId } from '@/fileIO'
+import { pathToKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import type { Entries } from '@/types'
 import {
@@ -27,21 +25,13 @@ import { journal, hashContent, syncJournalDump } from './syncJournal'
 import { parseFiles, reportParseFailures } from './parseReport'
 import { syncStateFor, noteSyncSuccess, noteSyncFailure } from './syncState'
 import { sweepRetention } from './retentionSweep'
+import { updateSyncUI } from './syncUI'
+import { settlePendingMoves } from './pendingMoveSettle'
 
 // ── HELPERS ────────────────────────────────────────────────────
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-/** Refresh one vault's row in `syncByVault` — its dirty count and read-only flag. */
-export function updateSyncUI(backend: StorageBackend): void {
-  if (backend.readOnly) {
-    setVaultSync(backend.id, { dirtyCount: 0, readOnly: true })
-    return
-  }
-  setVaultSync(backend.id, { readOnly: false })
-  cacheDirtyCount(backend.id).then(n => setVaultSync(backend.id, { dirtyCount: n })).catch(() => {})
 }
 
 // ── COLLISION RESOLUTION ───────────────────────────────────────────
@@ -395,7 +385,7 @@ export function planReconcile(
  * also what every path is resolved against, so an identically-slugged file in
  * another vault is never in this set to begin with.
  */
-function mergeChangedIntoStore(
+export function mergeChangedIntoStore(
   vaultId: string,
   records: Array<{ path: string; content: string }>,
   alsoAffected: Iterable<EntryKey> = [],
@@ -426,126 +416,9 @@ function mergeChangedIntoStore(
   auditRoundTrip()
 }
 
-// ── CROSS-TAB COHERENCE ───────────────────────────────────────
-//
-// Two views of one vault (two tabs, or a tab plus the installed PWA) share one
-// Dexie database and nothing else. Everything below this comment already
-// handles a *second device* correctly — its cache is its own, so its push CASes
-// against a token the backend has moved past and `resolveCollision` runs. A
-// second view is the case none of that machinery can see: it inherits the very
-// `version` the first view's push just wrote into the shared row, so its
-// compare-and-swap passes against content it has never seen and the first
-// view's edit is gone, silently (data-integrity survey 2026-09-05, finding #2).
-//
-// The fix is not more conflict detection — it is not letting the second view's
-// store go stale in the first place. `cache/broadcast.ts` announces every row
-// whose content changed; this folds those rows back in through
-// `mergeChangedIntoStore`, the same seam `reconcileWithBackend` uses, so a
-// cross-tab change arrives by exactly the path a pulled change does: one
-// vault's layer, parse failures reported, round trip audited. The editor's
-// `touchedFieldsOnly` then does the rest — the next save writes only what this
-// view's user actually touched, over content that is now current.
-
-/**
- * Announcements arrive one row at a time (an autosave, a checkbox, a push
- * marking a batch clean), and each fold re-parses and re-writes a whole vault
- * layer. Buffering a beat coalesces a burst — a bulk pull in the other tab, a
- * run of keystrokes — into one fold, at a delay no one can perceive.
- */
-const CROSS_TAB_COALESCE_MS = 60
-
-const _pendingCrossTab = new Map<string, Set<string>>()
-let _crossTabTimer: ReturnType<typeof setTimeout> | null = null
-let _crossTabFlushInFlight = false
-
-/**
- * Re-read the rows another view just wrote, and fold them into this view's
- * store.
- *
- * `getInFlightPaths` is the trap this has to step around. It is per-process
- * bookkeeping, so it says nothing about the other tab — but it does say that
- * *this* tab has a write for that path between its store update and its Dexie
- * row, and folding the row in there would paint the pre-edit content over an
- * edit that is still only in the store. Same reasoning as `effectiveSkip` in
- * `reconcileWithBackend`. The residual race is narrow and one-sided: this tab's
- * in-flight write wins that path, and the other view's change for it is
- * dropped from this store until the next reconcile re-reads it.
- *
- * A row that is gone, or staged for delete, is an eviction rather than a
- * merge — `mergeChangedIntoStore` takes those as `alsoAffected` keys, which is
- * exactly what a reconcile's `deleted` list is.
- */
-async function foldCacheChange(vaultId: string, paths: Iterable<string>): Promise<void> {
-  // Not registered here (never was, or removed in Settings): there is no layer
-  // to write, and re-checked after the awaits below for the same reason
-  // `reconcileWithBackend` re-checks before its own merge.
-  if (!getBackend(vaultId)) return
-  const inFlight = getInFlightPaths(vaultId)
-  const records: Array<{ path: string; content: string }> = []
-  const evicted: EntryKey[] = []
-  for (const path of paths) {
-    if (inFlight.has(path)) continue
-    const row = await cacheGetRecord(vaultId, path)
-    if (!row || row.status === 'deleted') { evicted.push(pathToKey(vaultId, path)); continue }
-    records.push({ path, content: row.content })
-  }
-  if (records.length === 0 && evicted.length === 0) return
-  const backend = getBackend(vaultId)
-  if (!backend) return
-  mergeChangedIntoStore(vaultId, records, evicted)
-  // The other view's edit is dirty in the shared cache until someone pushes it,
-  // so this view's sync chip is wrong until it re-counts.
-  updateSyncUI(backend)
-}
-
-function flushCrossTab(): void {
-  _crossTabTimer = null
-  const batches = [..._pendingCrossTab]
-  _pendingCrossTab.clear()
-  _crossTabFlushInFlight = true
-  // Fire-and-forget, and never rejects onward: a fold that fails is a stale
-  // view, not a lost write, and it must not become an unhandled rejection.
-  // Still tracked via _crossTabFlushInFlight so isCrossTabSyncIdle can tell a
-  // caller the fold — including its own awaits — has actually finished.
-  void Promise.all(batches.map(([vaultId, paths]) =>
-    foldCacheChange(vaultId, paths).catch((e: unknown) => {
-      console.error(`[vault] could not fold a cross-tab change for ${vaultId}:`, e)
-    }),
-  )).then(() => { _crossTabFlushInFlight = false })
-}
-
-/**
- * Start listening for other views' cache writes. Returns the unsubscribe.
- *
- * Called once for the app's lifetime (`routes/__root.tsx`), not per vault: the
- * announcement carries its own `vaultId`, and a vault that is not registered
- * here is dropped by `foldCacheChange` rather than by a subscription that would
- * have to be torn down and rebuilt on every registry change.
- */
-export function startCrossTabSync(): () => void {
-  const off = onCacheChange(({ vaultId, paths }) => {
-    const bucket = _pendingCrossTab.get(vaultId) ?? new Set<string>()
-    for (const p of paths) bucket.add(p)
-    _pendingCrossTab.set(vaultId, bucket)
-    _crossTabTimer ??= setTimeout(flushCrossTab, CROSS_TAB_COALESCE_MS)
-  })
-  return () => {
-    off()
-    if (_crossTabTimer) { clearTimeout(_crossTabTimer); _crossTabTimer = null }
-    _pendingCrossTab.clear()
-  }
-}
-
-/**
- * True once any pending coalesce timer has fired and the fold it scheduled
- * has finished. Exported so tests can poll for the real thing instead of
- * guessing how long BroadcastChannel delivery plus CROSS_TAB_COALESCE_MS take
- * under a loaded runner (#1031) — there is no other way to observe this
- * module-private state from outside it.
- */
-export function isCrossTabSyncIdle(): boolean {
-  return _crossTabTimer === null && !_crossTabFlushInFlight
-}
+// Cross-tab coherence (another view of the same vault folding in a cache
+// change) lives in `crossTabSync.ts` — it calls back into `mergeChangedIntoStore`
+// above but nothing here calls into it, so the two stay one-directional.
 
 // Above this many changed paths, a per-file readFiles() fan-out risks the same
 // secondary-rate-limit burst readAll() avoids on initial load — e.g. a
@@ -843,107 +716,10 @@ async function pushDirty(
   return { hadCollision, pushed }
 }
 
-// ── CROSS-VAULT MOVES ─────────────────────────────────────────────────
-
-/**
- * Decide the fate of every staged cross-vault move whose outcome is now known.
- *
- * A move (see `moveEntry.ts`) leaves the source's tombstone staged but held:
- * `pushDirty` won't send it, so the entry survives in the source's remote
- * while the target's copy is still only local. This is what un-holds it — or,
- * when the target's copy turns out never to have become durable, what puts the
- * entry back.
- *
- * The question is asked of the *target's cache record*, not of a push result,
- * so it answers the same way after a reload as it does in the cycle that
- * pushed: `dirty` means still waiting, anything else means the target's remote
- * has it. A move whose confirming push landed seconds before the tab closed
- * would otherwise be held forever — the record it was waiting on is clean, and
- * a clean record is never pushed again.
- *
- * Never throws: a move that cannot be settled stays staged, which is the safe
- * state, and must not take the surrounding sync cycle down with it.
- *
- * Releasing a move frees the source vault's held delete, which then wants a
- * push — but "ask for a push" is the scheduler's word, and the scheduler is
- * downstream of this file. So the ids of the vaults that need one are
- * collected into `released` and handed back up through `runSync` for the
- * scheduler to act on, the same way `runSync`'s own return value already
- * hands back the mid-cycle push drain. Nothing here calls upward.
- */
-async function settlePendingMoves(released: Set<string>): Promise<void> {
-  let moves: PendingMove[]
-  try {
-    moves = await pendingMovesLoad()
-  } catch (e) {
-    console.error('[vault] could not read staged moves:', e)
-    return
-  }
-  for (const move of moves) {
-    try {
-      await settleMove(move, released)
-    } catch (e) {
-      console.error('[vault] could not settle move', move.id, e)
-    }
-  }
-}
-
-async function settleMove(move: PendingMove, released: Set<string>): Promise<void> {
-  const toVault = keyVaultId(move.toKey)
-  // The target vault being gone is the same verdict as its record being gone:
-  // removing a vault clears its cache, so either way nothing durable is left
-  // holding the entry at the target end.
-  const target = getBackend(toVault)
-    ? await cacheGetRecord(toVault, keyToPath(move.toKey))
-    : undefined
-  if (!target) { await abandonMove(move); return }
-  // Still local-only at the target — keep holding.
-  if (target.status === 'dirty') return
-  // `clean` is the ordinary confirmation. `deleted` counts too: the user
-  // deleted the moved entry at its new home, so resurrecting the source copy
-  // by abandoning here would undo a deliberate delete.
-  await releaseMove(move, released)
-}
-
-/**
- * The target's remote has the entry — let the source's delete go out.
- *
- * Records the source vault in `released` rather than scheduling its push here;
- * see `settlePendingMoves` for why the request travels upward instead.
- */
-async function releaseMove(move: PendingMove, released: Set<string>): Promise<void> {
-  await pendingMoveDrop(move.id)
-  const fromVault = keyVaultId(move.fromKey)
-  journal('move-released', fromVault, keyToPath(move.fromKey), { note: move.id })
-  const from = getBackend(fromVault)
-  if (!from || from.readOnly) return
-  updateSyncUI(from)
-  released.add(from.id)
-}
-
-/**
- * Nothing durable ever reached the target — undo the source half instead.
- *
- * The tombstone is *removed*, not pushed and not rewritten: with no copy at
- * the target, deleting the source's remote file is the one outcome this whole
- * mechanism exists to prevent. Removing the record entirely (rather than, say,
- * marking it dirty) is also what brings the entry back into view — the store
- * was re-keyed into the target vault when the move committed, and the next
- * reconcile of the source vault treats a path the cache has never seen as new
- * and pulls it in, root and items.
- */
-async function abandonMove(move: PendingMove): Promise<void> {
-  await pendingMoveDrop(move.id)
-  const fromVault = keyVaultId(move.fromKey)
-  const fromPath  = keyToPath(move.fromKey)
-  journal('move-abandoned', fromVault, fromPath, { note: move.id })
-  const record = await cacheGetRecord(fromVault, fromPath)
-  if (record?.status === 'deleted') await confirmDeleted(fromVault, fromPath)
-  const from = getBackend(fromVault)
-  if (!from) return
-  updateSyncUI(from)
-  warn(`Couldn't finish moving "${keySlug(move.fromKey)}" — it's still in "${from.name}".`)
-}
+// Settling cross-vault moves (deciding whether a staged move's source delete
+// can go out, or must be undone) lives in `pendingMoveSettle.ts` — `runSync`
+// below calls its `settlePendingMoves` after a successful cycle; nothing
+// there calls back in here.
 
 /**
  * What one cycle leaves for its caller to finish.

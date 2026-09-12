@@ -1,11 +1,11 @@
 /**
  * Contract tests for the local (File System Access) backend's CAS behaviour.
  *
- * sync-collision.test.ts already pins these rules — but against a FakeBackend
- * that only *mirrors* GitHub's semantics. These run the same rules through the
- * real `diskWrite`/`diskDelete` on an in-memory `FileSystemDirectoryHandle`
- * stand-in, so a local vault can't quietly implement a weaker contract than
- * `StorageBackend` documents.
+ * sync.test.ts already exercises these rules through pushDirty — but against a
+ * FakeBackend that only *mirrors* GitHub's semantics. These run the same rules
+ * through the real `diskWrite`/`diskDelete` on an in-memory
+ * `FileSystemDirectoryHandle` stand-in, so a local vault can't quietly
+ * implement a weaker contract than `StorageBackend` documents.
  */
 import { describe, it, expect } from 'vitest'
 import { diskWrite, diskDelete, diskReadAll, diskStatAll } from '@/storage/fs'
