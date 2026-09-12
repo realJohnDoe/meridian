@@ -1,20 +1,16 @@
 import { useState } from 'react'
-import { Archive, TriangleAlert } from 'lucide-react'
+import { TriangleAlert } from 'lucide-react'
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
-  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { buttonVariants } from '@/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { cn } from '@/lib/cn'
 import { useResetOnChange } from '@/hooks'
 import type { SeriesSheetConfig } from '@/editor/save'
+import DeleteDialogFooter from './DeleteDialogFooter'
 
 interface Props {
   config: SeriesSheetConfig | null
@@ -84,24 +80,12 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
           </div>
         )}
 
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
-          {config?.onArchive && (
-            <AlertDialogAction
-              className={cn(buttonVariants({ variant: 'secondary' }), 'gap-1.5')}
-              onClick={handleArchive}
-            >
-              <Archive size={13} />
-              Archive whole file instead
-            </AlertDialogAction>
-          )}
-          <AlertDialogAction
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
-            onClick={handleDelete}
-          >
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
+        <DeleteDialogFooter
+          onClose={onClose}
+          onDelete={handleDelete}
+          onArchive={config?.onArchive ? handleArchive : undefined}
+          archiveLabel="Archive whole file instead"
+        />
       </AlertDialogContent>
     </AlertDialog>
   )
