@@ -32,7 +32,11 @@ import { GitHubBackend } from '@/storage/githubBackend'
 import type { StorageBackend, RawFile, PermissionOutcome } from '@/storage/backend'
 import { encodeBase64 } from '@/storage/githubApi'
 import { mountBackend } from '@/storage/backends'
-import { syncStateFor, dropSyncState } from '@/storage/syncState'
+import { syncStateFor, dropSyncState, dropAllSyncState } from '@/storage/syncState'
+import { unmountAllBackends } from '@/storage/backends'
+import { cacheInit } from '@/storage/cache/db'
+import { syncToBackend } from '@/storage/syncScheduler'
+import { useStore } from '@/store'
 import type { VaultRef } from '@/vaultRef'
 
 /** Fixed epoch every seeded run starts from, so `updatedAt` and the journal are reproducible. */
@@ -79,6 +83,17 @@ export interface RemoteCall {
 export class FakeGitHub {
   private _files = new Map<string, RemoteFile>()
   private _shaCounter = 0
+  /**
+   * Every `(sha -> path, content)` this repo has ever minted.
+   *
+   * GitHub's blob SHAs are content-addressed and immortal, so this is a
+   * faithful model rather than a testing convenience — and it is what lets an
+   * assertion ask the one question a live remote cannot answer after the fact:
+   * *did the remote ever hold this content at this version?* A cache record
+   * stamped clean against a version the remote never had at that content is
+   * the shape of #520 and #738, and only a history can catch it.
+   */
+  private _history = new Map<string, { path: string; content: string }>()
   /** Paths whose tree listing is pinned to an older sha — see `staleTreeFor`. */
   private _staleTree = new Map<string, string>()
   readonly calls: RemoteCall[] = []
@@ -87,7 +102,13 @@ export class FakeGitHub {
   seed(path: string, content: string): string {
     const sha = this._mintSha()
     this._files.set(path, { content, sha })
+    this._history.set(sha, { path, content })
     return sha
+  }
+
+  /** What this repo held at `sha`, or `undefined` if it never minted one. */
+  contentAtVersion(sha: string): { path: string; content: string } | undefined {
+    return this._history.get(sha)
   }
 
   get(path: string): RemoteFile | undefined { return this._files.get(path) }
@@ -157,7 +178,9 @@ export class FakeGitHub {
       return Promise.resolve(resp({ message: 'is at ' + (existing?.sha ?? 'nothing') + ' but expected ' + sent }, 409))
     }
     const sha = this._mintSha()
-    this._files.set(path, { content: decodeBody(body), sha })
+    const content = decodeBody(body)
+    this._files.set(path, { content, sha })
+    this._history.set(sha, { path, content })
     this._staleTree.delete(path)
     this._record('write', 'PUT', path, 200, sent)
     return Promise.resolve(resp({ content: { sha } }, 200))
@@ -414,4 +437,72 @@ export async function quiesce(vaultIds: readonly string[]): Promise<void> {
     await vi.advanceTimersByTimeAsync(PUMP_STEP_MS)
   }
   if (busy()) throw new Error('quiesce: a vault never returned to idle')
+}
+
+/**
+ * Jump virtual time forward by `ms` in one go, firing everything scheduled in
+ * between, then drain to idle.
+ *
+ * Two of the sync layer's own rules are stated in minutes, and no pump built
+ * out of `PUMP_STEP_MS` will ever reach them: `RECONCILE_DELETE_GRACE_MS` (5
+ * minutes) makes reconcile ignore a listing's silence about a recently-written
+ * file, so a file deleted on the other device *legitimately* lingers in this
+ * one's cache until the window passes. An assertion that two settled clients
+ * agree is therefore only meaningful on the far side of it.
+ *
+ * Jumping forward is safe where rewinding is not — see `useFixedClock`. The
+ * Bottleneck deadline this is guarding against sits in the *past* and only
+ * gets further into the past from here.
+ */
+export async function skipAhead(ms: number, vaultIds: readonly string[]): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms)
+  await quiesce(vaultIds)
+}
+
+// ── Per-seed setup ────────────────────────────────────────────────────
+
+/**
+ * Put the world back to "no vaults, no rows, an empty repo" — everything a
+ * seed needs done before it runs, and nothing that would rewind the clock.
+ *
+ * Every piece of this is module state that outlives a test the way it outlives
+ * a page's vaults, so none of it goes away on its own: the backend registry,
+ * the per-vault sync records (a debounce left armed by the previous seed fires
+ * into this one the moment the pump advances), the store, and the shared Dexie
+ * — whose rows are keyed by vault id, so isolation between *clients* is real
+ * while isolation between *seeds* is not.
+ *
+ * Deliberately no `setSystemTime`: virtual time stays monotonic across the
+ * file (see `useFixedClock`). A seed is a fixed sequence of operations, not a
+ * fixed instant.
+ */
+export async function resetWorld(): Promise<FakeGitHub> {
+  const remote = new FakeGitHub()
+  vi.stubGlobal('fetch', vi.fn(remote.handler))
+  unmountAllBackends()
+  dropAllSyncState()
+  useStore.setState({ vaults: [], entries: new Map() })
+  const db = await cacheInit()
+  await db.files.clear()
+  await db.meta.clear()
+  return remote
+}
+
+/**
+ * Register these clients' vaults in the store. `writeTarget` refuses a write
+ * to a vault the registry has never heard of, which is never what a seed is
+ * testing.
+ */
+export function registerVaults(...clients: Client[]): void {
+  useStore.setState({ vaults: clients.map(c => c.ref) })
+}
+
+/**
+ * Run one full sync cycle for `client`, then drain **every** registered vault
+ * back to idle — see `quiesce`, without which a debounced push fired by the
+ * pump runs concurrently with the next step.
+ */
+export async function syncClient(client: Client): Promise<void> {
+  await settle(syncToBackend(client.vaultId))
+  await quiesce(useStore.getState().vaults.map(v => v.id))
 }

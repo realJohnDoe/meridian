@@ -293,7 +293,7 @@ async function resolveCollision(
  * Deliberately applied to the delete branch only (see below) — not to the
  * changed branch, which confirms itself via a fresh read.
  */
-const RECONCILE_DELETE_GRACE_MS = 5 * 60_000
+export const RECONCILE_DELETE_GRACE_MS = 5 * 60_000
 
 /**
  * Pure reconciliation planner: given the backend's listing tokens and the local

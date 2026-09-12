@@ -11,8 +11,11 @@
  */
 import 'fake-indexeddb/auto'
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { FakeGitHub, makeClient, reloadClient, closeApp, useFixedClock, settle, quiesce } from './twoClientHarness'
-import type { Client } from './twoClientHarness'
+import {
+  makeClient, reloadClient, closeApp, useFixedClock, settle,
+  resetWorld, registerVaults, syncClient as sync,
+} from './twoClientHarness'
+import type { Client, FakeGitHub } from './twoClientHarness'
 
 const { notifyFns } = vi.hoisted(() => ({
   notifyFns: { notify: vi.fn(), warn: vi.fn(), notifyError: vi.fn(), warnWithDetails: vi.fn() },
@@ -22,11 +25,8 @@ vi.mock('@/storage/githubOAuth', () => ({
   ensureFreshAccessToken: vi.fn(() => Promise.resolve({ status: 'ok', token: 'ghp_test' })),
 }))
 
-const { syncToBackend } = await import('@/storage/syncScheduler')
 const { writeEntityToCache, deleteFromBackend } = await import('@/storage/entityWrites')
 const { cacheGetRecord, cacheLoadAll } = await import('@/storage/cache/files')
-const { unmountAllBackends } = await import('@/storage/backends')
-const { dropAllSyncState } = await import('@/storage/syncState')
 const { useStore } = await import('@/store')
 const { entryKey } = await import('@/fileIO')
 
@@ -37,44 +37,12 @@ function note(title: string, body: string): string {
 
 let remote: FakeGitHub
 
-/** Register both clients' vaults in the store — `writeTarget` refuses a write
- *  to a vault the registry has never heard of, which is not what we're testing. */
-function registerVaults(...clients: Client[]): void {
-  useStore.setState({ vaults: clients.map(c => c.ref) })
-}
-
-/**
- * Run one full sync cycle for `client`, then drain every vault back to idle —
- * see `quiesce`, without which a debounced push fired by the pump runs
- * concurrently with the next step.
- */
-async function sync(client: Client): Promise<void> {
-  await settle(syncToBackend(client.vaultId))
-  await quiesce(useStore.getState().vaults.map(v => v.id))
-}
-
 // Installed once and never rewound — see `useFixedClock`'s doc comment for
 // the Octokit/Bottleneck constraint that makes a per-test clock unusable.
 beforeAll(() => { useFixedClock() })
 afterAll(() => { vi.useRealTimers() })
 
-beforeEach(async () => {
-  remote = new FakeGitHub()
-  vi.stubGlobal('fetch', vi.fn(remote.handler))
-  unmountAllBackends()
-  // Per-vault sync state is module state keyed by vault id, so it outlives a
-  // test the way it outlives a page's vaults. A debounce timer left armed by
-  // the previous seed fires into this one the moment the pump advances the
-  // clock — the harness owns the scheduler, so it has to own this too.
-  dropAllSyncState()
-  useStore.setState({ vaults: [], entries: new Map() })
-  // Wipe the shared Dexie between seeds — the rows are keyed by vault id, so
-  // isolation between clients is real, but isolation between *tests* is not.
-  const { cacheInit } = await import('@/storage/cache/db')
-  const db = await cacheInit()
-  await db.files.clear()
-  await db.meta.clear()
-})
+beforeEach(async () => { remote = await resetWorld() })
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -127,13 +95,7 @@ describe('two-client harness — the seam itself', () => {
     const first = await trace()
 
     // Reset and replay from the same seed.
-    remote = new FakeGitHub()
-    vi.stubGlobal('fetch', vi.fn(remote.handler))
-    unmountAllBackends()
-    useStore.setState({ vaults: [], entries: new Map() })
-    const { cacheInit } = await import('@/storage/cache/db')
-    await (await cacheInit()).files.clear()
-    dropAllSyncState()
+    remote = await resetWorld()
 
     // Deliberately no `setSystemTime` back to T0: virtual time stays monotonic
     // (see `useFixedClock`). The trace is a sequence of operations, and that is
