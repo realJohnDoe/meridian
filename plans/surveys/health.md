@@ -25,6 +25,17 @@ from training data. Two rules are specific to this survey:
   warning that a new route escapes the layout checks until someone lists it,
   when `scripts/layout-smoke.mjs` already carries an `assertRouteCoverage()` that
   fails the build on exactly that.
+- **Attribute a measured anomaly to the environment before you attribute it to
+  the repo.** The measurement rules above make it easy to produce a number the
+  repo did not cause. On 2026-09-12 every one of 126 e2e tests took a
+  near-identical ~14.5s, which reads exactly like a repo-wide test-harness
+  defect; probing showed browser launch was 235ms, every local request finished
+  within 95ms, and the remaining 12.6s was a render-blocking Google Fonts
+  `<link>` stalling against *this sandbox's* egress proxy and then resetting.
+  On a normal runner that cost does not exist. Before filing any timing,
+  network or resource finding, isolate the suspect with a throwaway probe and
+  say in the coverage statement whether the environment is implicated — a
+  uniform per-unit cost across otherwise unrelated units is the tell.
 - **Grep the config comments for expiry conditions, and check whether they have been met.** A pin, cap, or disabled rule whose comment says "revisit once X", "until Y lands", or "remove when Z ships" is a decision with a stated trigger and no owner — nothing re-checks it. These are cheap to verify (one registry or issue-tracker query each) and high-yield, because the rationale is already written down for you and the only question is whether it still holds. A met condition is a finding; so is a comment whose stated rationale you can show is no longer true. Check the value against its own comment too — a comment asserting the opposite of the setting beneath it is its own finding.
 
 ## Budget
@@ -46,6 +57,27 @@ from training data. Two rules are specific to this survey:
   exclusion glob keeps matching whatever grows underneath it (an `_entry*.tsx`
   glob had swallowed 258 lines of route logic, one file of it at 0% coverage).
   `src/coverageConfig.test.ts` now guards both halves for `src/routes/`.
+  **Diff the global floors too, not only the per-file ones.** They drift by the
+  same mechanism and nothing in the paragraph above points at them, so two runs
+  in a row checked the 57 named files and skipped the four numbers above them:
+  on 2026-09-12 the globals sat at 68/62/59/70 against a measured
+  83.05/76.70/78.70/85.18 — 15 to 20 points of slack, the widest drift in the
+  file. Use `--coverage.reporter=json-summary` and compare programmatically
+  rather than reading the text table: the text reporter nests by directory and
+  repeats bare basenames, so matching threshold keys against it by eye (or by
+  basename) silently drops about half of them.
+- **Measure the test suite per file, not just as a wall-clock total, and read
+  the phase breakdown.** A slow file is invisible in wall-clock time when other
+  workers absorb it — on 2026-09-12 one file was 27.2s of a 99s total (27% of
+  all CPU the suite spent, 4× the next slowest) while removing that cost moved
+  the *wall* clock only 158.1s → 149.1s, so a survey watching the total would
+  have scored it a non-finding. Run `vitest run --reporter=json` and rank files,
+  then rank tests within the worst ones; a cluster of tests at a suspiciously
+  round duration (16 tests at ~1000ms each, there) means real time is being
+  slept, not spent. Vitest's own summary line —
+  `transform / setup / import / tests / environment` — is the other half: when
+  `import` is several times `tests`, the suite is paying for isolation rather
+  than for assertions, and the question is which files actually need it.
 - **Establish which workspace each gate actually covers, and record it as a matrix.** Give **coverage its own row, separate from `test`** — they are usually different scripts, and the common shape is a `test` script that fans out to every workspace beside a `test:coverage` script that does not, so the suite runs everywhere while coverage is measured and gated in one package only. A sub-package whose own test config has no `coverage` block at all is the same finding seen from the other side. Do not assume a root-level `build`/`test` script reaches a sub-workspace — verify it (e.g. does the root test runner's `include` glob match the sub-package? does the root `tsc -b` reference its tsconfig?) and list the gates on one axis against the workspaces on the other. A package that CI checks in a separate job but the documented local command silently skips is a real finding, and it is invisible unless you build this matrix: every gate is green, and the gap only shows in what each one *ran on*. This is the single cheapest high-yield check in this section for any repo with more than one package.
 - **Build the app and look at what shipped, not just at what was written.** Run
   the production build and rank the emitted chunks by size, then grep the largest
@@ -184,7 +216,8 @@ Examples (not exhaustive):
 Examples (not exhaustive):
 
 - Core domain logic with no test coverage at all, or coverage concentrated on trivial code while the risky paths go untested
-- Tests that can't fail meaningfully — over-mocked tests, snapshot rot, assertions on implementation details
+- Tests that can't fail meaningfully — over-mocked tests, snapshot rot, assertions on implementation details, or a test whose *subject* is a copy of production rather than production itself. The tell is the import list: a test file that imports no function from the module named in its own header is asserting against a stand-in. Grep test files for comments admitting the coupling (`mirrors`, `must match`, `keep in sync`) — on 2026-09-12 that grep found a 232-line file whose nine tests all ran against a hand-written copy of `pushDirty`, and a test re-declaring three production constants plus a line-for-line copy of a layout function
+- The same behaviour asserted at more than one activation level — a pure function tested directly *and* through the component that calls it, or one code path covered by a fake-everything unit test, a partly-faked integration test, and a real end-to-end test. Not automatically a fault: levels that assert genuinely different things (the logic vs the wiring vs the real I/O) each earn their place, and the good ones say so in their headers. It is a fault when the expensive level asserts nothing the cheap one does not, which it usually does by taking a callback payload rather than inspecting rendered output — compare the per-test cost from the timing data (235ms through a React render against 0.6ms direct, in the case found on 2026-09-12), and check whether the cheap level's fixtures are byte-identical to the expensive one's
 - Swallowed errors — empty or log-only `catch` blocks, unhandled promise rejections, errors caught without surfacing to the user or a recovery path
 - No consistent error strategy — each layer inventing its own mix of throw / return-null / silent-default
 
