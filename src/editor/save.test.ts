@@ -304,6 +304,58 @@ Buy milk.
     expect(root?.extra).toMatchObject({ tags: 'shopping' })
     expect(root?.title).toBe('Groceries (weekly)')
   })
+
+  // Bug repro: moving an after_completion series' projected occurrence and
+  // then, in the same editor session, ticking it done saved the move but
+  // silently dropped the done state. useEntryEditor pins `item` to the
+  // pre-move occurrence for the whole session (see the idempotency note on
+  // `applySingle`'s "generated occurrence moved" branch in storeOps.ts), so
+  // the done-toggle save replays with that stale, pre-move `item`. Its id
+  // matches the exclusion stub `applySingle` leaves behind at the old slot —
+  // and `currentFields` was reading that stub back as "the live occurrence",
+  // reverting `scheduled` to the stub's pre-move date for every field this
+  // save didn't itself touch. That made the done-toggle land on the stale,
+  // excluded stub instead of the occurrence now visible on the moved date.
+  it('keeps a move made earlier in the session when a later save only ticks done', () => {
+    const FIXTURE = `---
+defaults:
+  done: false
+title: Water the plants
+date: 2026-05-23
+repeat:
+  type: after_completion
+  interval: 2 weeks
+instances:
+  - date: 2026-07-09
+    done: true
+  - date: 2026-07-23
+---
+`
+    const parsed = parseToStoreItems('plants.md', FIXTURE, TEST_VAULT)
+    seedStore(parsed.items, new Map([[parsed.key, parsed.root]]))
+    const from = new Date('2026-01-01')
+    const to = new Date('2026-12-31')
+    const occ = expandRange(parsed.items, new Map([[parsed.key, parsed.root]]), from, to).find(o => o.date === '2026-07-23')!
+    expect(occ.source).toBe('generated')
+
+    // useEntryEditor's useState initialiser — pinned for the whole session.
+    const pinned = occ
+    let base = entryFromOccurrence(pinned, 'single')
+
+    // Move it (the date-picker save).
+    const moved = { ...base, scheduled: { date: '2026-07-24', time: '' } }
+    saveNode(pinned, 'single', moved, { base })
+    base = moved // useEntryEditor's commitEntry advances baseRef.current on a successful save
+
+    // Later in the same session: tick it done, without touching the date.
+    saveNode(pinned, 'single', { ...base, done: true }, { base })
+
+    const key = testKey('plants')
+    const items = useStore.getState().items.filter(i => i.entryKey === key)
+    const movedItem = items.find(i => i.date === '2026-07-24')
+    expect(movedItem?.metadata.done).toBe(true)
+    expect(items.some(i => i.date === '2026-07-23' && !('excluded' in i && (i as { excluded?: boolean }).excluded))).toBe(false)
+  })
 })
 
 // plans/archived-entries.md PR 2 — archiving via the editor and its delete

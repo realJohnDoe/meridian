@@ -167,7 +167,15 @@ function currentFields(item: Occurrence, editScope: EditScope, next: EditFields)
   if (!entry) return next
 
   const live = entry.items.find(i => !isSeries(i) && i.id === item.id)
-  if (!live || isSeries(live)) {
+  // An excluded override is a suppression stub for a slot the occurrence has
+  // moved off of (see `applySingle`'s "generated occurrence moved to a
+  // different date" branch, which reuses the pre-move id for exactly this
+  // stub) — never the live state of the occurrence the editor is holding.
+  // Reading its date/done back as "current" is what reverted an
+  // after_completion occurrence's move the next time the same session saved
+  // (e.g. ticking it done right after moving it): the stub's stale
+  // pre-move date would win every field this save didn't itself touch.
+  if (!live || isSeries(live) || live.excluded) {
     return { ...next, title: entry.root.title, body: entry.root.body ?? '', tags: [...entry.root.tags], items: [...entry.root.items] }
   }
 
