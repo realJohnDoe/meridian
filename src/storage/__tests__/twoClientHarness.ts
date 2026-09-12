@@ -311,7 +311,7 @@ function resp(body: unknown, status: number) {
  * so the same seeded scenario runs against both this and the real backend and
  * the two outcomes are compared. That comparison is the test.
  */
-function withLegacyDelete(inner: GitHubBackend): StorageBackend {
+function withLegacyDelete(inner: StorageBackend): StorageBackend {
   const shas = new Map<string, string>()
   return {
     get id()        { return inner.id },
@@ -351,6 +351,81 @@ function withLegacyDelete(inner: GitHubBackend): StorageBackend {
   }
 }
 
+// ── Generation tagging (diagnostic for #1052) ───────────────────────────
+
+/**
+ * Bumped once per `resetWorld()` call — i.e. once per seed/run.
+ *
+ * `runInterleaving` awaits every op through `settle`/`quiesce` before it
+ * returns, so in correct behaviour no backend method call started by one run
+ * can still be in flight (or land) once the *next* run's `resetWorld()` has
+ * bumped this. `taggedBackend` below is the tripwire for #1052's own
+ * hypothesis — "a stale async chain from an earlier, not-fully-quiesced run"
+ * — surfacing the exact vault, method and path the instant such a call is
+ * made or resolves in a generation that isn't its own, rather than only the
+ * symptom several steps downstream (a clean row stamped with a version the
+ * *current* remote never minted).
+ */
+let _generation = 0
+
+export function currentGeneration(): number { return _generation }
+
+/**
+ * Wrap `backend`'s network methods so each remembers the generation it was
+ * created in (`gen`) and asserts, both when called and when it resolves, that
+ * `resetWorld()` has not run again since. A mismatch means exactly the shape
+ * #1052 describes: this backend belongs to a run that has already ended.
+ */
+function taggedBackend(backend: StorageBackend, vaultId: string, gen: number): StorageBackend {
+  const guard = (when: 'called' | 'resolved', method: string, path: string): void => {
+    const now = currentGeneration()
+    if (now !== gen) {
+      throw new Error(
+        `#1052 zombie: ${vaultId}'s backend from generation ${String(gen)} ${when} ` +
+        `${method}(${path}) in generation ${String(now)} — a previous run's async chain is still alive.`,
+      )
+    }
+  }
+  return {
+    get id()        { return backend.id },
+    get name()      { return backend.name },
+    get kind()      { return backend.kind },
+    get readOnly()  { return backend.readOnly },
+    get hasRemote() { return backend.hasRemote },
+    async statAll() {
+      guard('called', 'statAll', '')
+      const r = await backend.statAll()
+      guard('resolved', 'statAll', '')
+      return r
+    },
+    async readFiles(paths) {
+      guard('called', 'readFiles', paths.join(','))
+      const r = await backend.readFiles(paths)
+      guard('resolved', 'readFiles', paths.join(','))
+      return r
+    },
+    async readAll(onProgress) {
+      guard('called', 'readAll', '')
+      const r = await backend.readAll(onProgress)
+      guard('resolved', 'readAll', '')
+      return r
+    },
+    async write(path, content, expectedVersion) {
+      guard('called', 'write', path)
+      const r = await backend.write(path, content, expectedVersion)
+      guard('resolved', 'write', path)
+      return r
+    },
+    async delete(path, expectedVersion) {
+      guard('called', 'delete', path)
+      await backend.delete(path, expectedVersion)
+      guard('resolved', 'delete', path)
+    },
+    ensurePermission(interactive) { return backend.ensurePermission(interactive) },
+    ...(backend.refreshAuth ? { refreshAuth: () => backend.refreshAuth!() } : {}),
+  }
+}
+
 // ── Clients ───────────────────────────────────────────────────────────
 
 export interface Client {
@@ -370,7 +445,8 @@ export function makeClient(vaultId: string, opts: { legacyDelete?: boolean } = {
   const real = new GitHubBackend(vaultId, `${OWNER}/${REPO}`, {
     owner: OWNER, repo: REPO, branch: BRANCH, token: 'ghp_test',
   })
-  const backend = opts.legacyDelete ? withLegacyDelete(real) : real
+  const tagged = taggedBackend(real, vaultId, currentGeneration())
+  const backend = opts.legacyDelete ? withLegacyDelete(tagged) : tagged
   mountBackend(backend)
   const ref: VaultRef = {
     id: vaultId, name: vaultId, kind: 'github',
@@ -560,6 +636,7 @@ export async function skipAhead(ms: number, vaultIds: readonly string[]): Promis
  * instant the next `resetWorld` overwrites the stub.
  */
 export async function resetWorld(): Promise<FakeGitHub> {
+  _generation++
   const remote = new FakeGitHub()
   vi.stubGlobal('fetch', remote.handler)
   unmountAllBackends()
