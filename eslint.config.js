@@ -508,15 +508,14 @@ export default [
     },
   },
 
-  // ExampleBackend and the sync-collision/sync tests' FakeBackend +
-  // in-memory cache/storeBridge mocks are deliberately synchronous (no real
-  // I/O to await) — the `async` keyword is there only so their signatures
+  // ExampleBackend and the sync tests' FakeBackend + in-memory
+  // cache/storeBridge mocks are deliberately synchronous (no real I/O to
+  // await) — the `async` keyword is there only so their signatures
   // structurally match the Promise-returning contracts they stand in for,
   // not because they ever await anything.
   {
     files: [
       'src/storage/exampleBackend.ts',
-      'src/storage/__tests__/sync-collision.test.ts',
       'src/storage/__tests__/sync.test.ts',
       'src/storage/__tests__/fs.test.ts',
       'src/storage/__tests__/vaultRegistry.test.ts',

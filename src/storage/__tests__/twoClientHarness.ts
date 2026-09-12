@@ -2,12 +2,10 @@
  * A deterministic two-client harness over the **real** storage layer — the
  * spike for #1006.
  *
- * Every existing sync suite tests one client, and the two that come closest to
- * an interleaving reimplement the code they are testing: `sync-collision.test.ts`
- * says so in its own comment ("Lightweight CAS harness (mirrors pushDirty
- * logic)"), and `sync.test.ts` replaces `cache/files`, `storeBridge` and
- * `notifications` with in-memory fakes. Neither can express "two devices, one
- * vault, in this order", which is the shape of all 16 lost-write defects.
+ * Every existing sync suite tests one client, and the closest one comes to an
+ * interleaving is `sync.test.ts`, which replaces `cache/files`, `storeBridge`
+ * and `notifications` with in-memory fakes. It cannot express "two devices,
+ * one vault, in this order", which is the shape of all 16 lost-write defects.
  *
  * What is real here: `GitHubBackend` (including its private `_shas` cache, the
  * thing #827 was about), `sync.ts`'s `pushDirty`/`reconcileWithBackend`,
