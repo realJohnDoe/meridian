@@ -153,6 +153,24 @@ const ROUTES = [
  * against the same build before being turned into a gate (PR #1013). Lower
  * an entry whenever a fix drops that combo's count — the corresponding test
  * logs the new number to use.
+ *
+ * Re-baselined for #1026: the sweep now pins "today" (see the fixed clock
+ * below) instead of drifting with the calendar, so every number here is
+ * against 2026-09-04 specifically, not whatever date the floors were last
+ * measured on. Two effects from that one change, both intentional:
+ *  - meridian-light/catppuccin-latte/solarized-light dropped sharply (11-12
+ *    to 2-3 on the six app routes) because darkening --muted-foreground
+ *    (src/index.css) fixed the one token behind 12 of the original 13
+ *    reported violations.
+ *  - rose-pine-dawn rose (2 to 3 on the same six routes): pinning "today" to
+ *    a date those routes actually render surfaced a real, previously-masked
+ *    violation — the white-on-purple "today" day-badge — that a moving,
+ *    usually-elsewhere "today" never used to land on a pinned route. Not
+ *    fixed here, same reasoning as the "Calendar" chip below: a color-only
+ *    fix risks legibility regressions this file's own contrast math can't
+ *    catch (WCAG doesn't model chip-on-row compositing — see the on-accent
+ *    text comments throughout this file), so it wants a deliberate look
+ *    rather than a reflexive token nudge.
  */
 const FLOOR: Record<string, Record<string, number>> = {
   meridian: {
@@ -160,28 +178,28 @@ const FLOOR: Record<string, Record<string, number>> = {
     '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
   'meridian-light': {
-    '/': 11, '/backlog': 11, '/notes': 11, '/day/2026-09-04': 11, '/week/2026-09-04': 11, '/calendar/2026-09': 11,
-    '/entry/example/01-start-here': 4, '/entry/new': 2, '/settings': 3, '/settings/appearance': 2, '/settings/vault/example': 3,
+    '/': 2, '/backlog': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
+    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
   },
   'tokyo-night': {
     '/': 1, '/backlog': 1, '/notes': 1, '/day/2026-09-04': 1, '/week/2026-09-04': 1, '/calendar/2026-09': 1,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
   },
   'catppuccin-latte': {
-    '/': 11, '/backlog': 11, '/notes': 11, '/day/2026-09-04': 11, '/week/2026-09-04': 11, '/calendar/2026-09': 11,
-    '/entry/example/01-start-here': 6, '/entry/new': 2, '/settings': 3, '/settings/appearance': 2, '/settings/vault/example': 3,
+    '/': 3, '/backlog': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09': 3,
+    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
   },
   'catppuccin-mocha': {
     '/': 0, '/backlog': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09': 0,
     '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
   'rose-pine-dawn': {
-    '/': 2, '/backlog': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
+    '/': 3, '/backlog': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09': 3,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
   },
   'solarized-light': {
-    '/': 12, '/backlog': 12, '/notes': 12, '/day/2026-09-04': 12, '/week/2026-09-04': 12, '/calendar/2026-09': 12,
-    '/entry/example/01-start-here': 4, '/entry/new': 2, '/settings': 3, '/settings/appearance': 2, '/settings/vault/example': 4,
+    '/': 3, '/backlog': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09': 3,
+    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 2,
   },
   'solarized-dark': {
     '/': 2, '/backlog': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
@@ -387,6 +405,15 @@ for (const themeId of themeIds) {
   test.describe(themeId, () => {
     for (const { path: route, ready } of ROUTES) {
       test(route, async ({ page }) => {
+        // Freeze "today" so routes that render relative to the current date
+        // (`/`, `/backlog`, `/notes`) produce the same DOM — and the same
+        // violation count — on every run, matching the three routes above
+        // that already pin a literal date in their path. Without this, the
+        // day-cell count on those three routes drifts with the calendar and
+        // a fixed FLOOR can silently go from passing to failing with no code
+        // change (#1026). Date-only (not setTimeout/rAF), so waitForTimeout
+        // below still advances in real time.
+        await page.clock.setFixedTime(new Date(2026, 8, 4, 12, 0, 0))
         await page.context().addInitScript(id => { localStorage.setItem('meridian_theme', id) }, themeId)
         await page.goto(`${BASE_URL}${route}`, { waitUntil: 'load' })
         await page.waitForSelector(ready, { timeout: 30_000 })

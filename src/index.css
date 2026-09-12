@@ -309,8 +309,10 @@
    on a 0.18-lightness surface, and carrying them over unchanged would leave
    every chip failing contrast against a 0.945 one. Every pairing below was
    checked against WCAG AA (4.5:1 for text, 3:1 for icon/UI tiers); the
-   tightest are muted-foreground on --background at 4.58:1 and ink-light on
-   --note at 4.66:1, so treat those two as the floor when retuning. */
+   tightest are muted-foreground on --background at 4.87:1 (was 4.58:1 before
+   #1026 darkened it further — it was clearing --background but failing the
+   raised --secondary/--muted surface at 4.43:1) and ink-light on --note at
+   4.66:1, so treat those two as the floor when retuning. */
 .meridian-light {
   /* Surfaces — 4-step ramp, darkest at the backdrop so it recedes */
   --backdrop:   oklch(0.90  0.015 252);
@@ -328,7 +330,7 @@
   --popover-foreground:   oklch(0.36  0.045 270);
   --accent-foreground:    oklch(0.36  0.045 270);
   --secondary-foreground: oklch(0.46  0.055 272);   /* indigo-tinted — wikilinks, time, entry body */
-  --muted-foreground:     oklch(0.525 0.038 250);   /* dim labels, placeholders, weekdays, icons, unselected nav */
+  --muted-foreground:     oklch(0.51  0.038 250);   /* dim labels, placeholders, weekdays, icons, unselected nav — was 0.525 (4.43:1 on --secondary/--muted, under AA); darkened to clear 4.5:1, see #1026 */
 
   /* Brand — same 278 indigo, darkened to carry light ink as a filled button */
   --primary:            oklch(0.52 0.20 278);
@@ -342,8 +344,8 @@
   --ink-dark:  oklch(0.17 0.030 270);
 
   /* Borders */
-  --border: color-mix(in oklab, oklch(0.525 0.038 250), transparent 78%);
-  --input:  color-mix(in oklab, oklch(0.525 0.038 250), transparent 68%);
+  --border: color-mix(in oklab, oklch(0.51 0.038 250), transparent 78%);
+  --input:  color-mix(in oklab, oklch(0.51 0.038 250), transparent 68%);
 
   /* Domain colors — .meridian's hues, darkened for a light ground */
   --event:        oklch(0.52 0.20 278);   /* indigo — alias of primary */
@@ -612,7 +614,7 @@
   --popover-foreground:   #445960;
   --accent-foreground:    #445960;
   --secondary-foreground: #4c6169;
-  --muted-foreground:     #5b6b6d;
+  --muted-foreground:     #576769;   /* darkened — was #5b6b6d (4.43:1 on --secondary/--muted, under AA), see #1026 */
 
   /* On-accent ink pair — see --*-foreground assignments above.
      ink-dark was this theme's own --foreground (a muted slate), which only
@@ -804,7 +806,7 @@
      4.5:1+ against the tightest surface, same hue. --sidebar-foreground
      mirrors --secondary-foreground below, so it moves too. */
   --secondary-foreground: #5a5d75;   /* subtext1 */
-  --muted-foreground:     #65687e;   /* subtext0 — placeholder, labels, icons, unselected nav */
+  --muted-foreground:     #61647a;   /* subtext0, darkened — placeholder, labels, icons, unselected nav; was #65687e (4.43:1 on --secondary/--muted, under AA), see #1026 */
 
   /* Brand — mauve */
   --primary:            #8839ef;
