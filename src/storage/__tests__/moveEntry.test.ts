@@ -60,7 +60,7 @@ vi.mock('@/storeBridge', () => ({
     storeLayers.get(vaultId) ?? { items: [], roots: new Map() }),
 }))
 
-vi.mock('@/storage/sync', () => ({ updateSyncUI: syncFns.updateSyncUI }))
+vi.mock('@/storage/syncUI', () => ({ updateSyncUI: syncFns.updateSyncUI }))
 vi.mock('@/storage/syncScheduler', () => ({ scheduleAutoPush: syncFns.scheduleAutoPush }))
 
 vi.mock('@/storage/notifications', () => notifyFns)

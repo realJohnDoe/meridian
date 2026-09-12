@@ -20,7 +20,7 @@ export { entriesToIcs } from './ical/entriesToIcs'
 export { isFolderPickerSupported } from './fs'
 
 export { syncToBackend, autoSyncTick, flushPendingPush } from './syncScheduler'
-export { startCrossTabSync } from './sync'
+export { startCrossTabSync } from './crossTabSync'
 export { resetSyncBackoff } from './syncState'
 
 export { cacheDirtyCount } from './cache/files'

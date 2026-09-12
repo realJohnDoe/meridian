@@ -201,7 +201,8 @@ vi.mock('@/model', async (importActual) => ({
 
 // Imports of the module under test (and its non-mocked collaborators) must
 // come after the vi.mock calls above.
-import { reconcileWithBackend, startCrossTabSync } from '@/storage/sync'
+import { reconcileWithBackend } from '@/storage/sync'
+import { startCrossTabSync } from '@/storage/crossTabSync'
 import { syncToBackend, autoSyncTick, flushPendingPush, syncOnActivate, scheduleAutoPush } from '@/storage/syncScheduler'
 import { resetSyncBackoff, dropAllSyncState } from '@/storage/syncState'
 import { writeEntityToCache, deleteFromBackend } from '@/storage/entityWrites'

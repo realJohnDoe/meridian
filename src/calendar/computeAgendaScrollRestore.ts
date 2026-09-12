@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import type { Virtualizer, VirtualItem } from '@tanstack/react-virtual'
 import { calendarView } from './viewState'
-import { estimateRow, type AgendaRow, type ExtraMetaProbe } from './agendaSections'
+import type { AgendaRow } from './agendaSections'
+import { estimateRow, type ExtraMetaProbe } from './agendaRowHeights'
 
 type AgendaVirtualizer = Virtualizer<HTMLDivElement, Element>
 
