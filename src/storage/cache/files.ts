@@ -38,9 +38,10 @@ export interface CacheRecord {
    */
   version?:  string
   /**
-   * The backend's content at `version` — the ancestor this record's edit was
-   * made from, for a three-way merge on collision. Dirty records only; see
-   * `DexieFileRow.baseContent`.
+   * The backend's content at `version` — the ancestor this record's pending
+   * change was made from, for a three-way merge on collision and for a
+   * version-less tombstone's "is this still the file I meant to delete".
+   * Dirty records and tombstones; see `DexieFileRow.baseContent`.
    */
   baseContent?: string
   /** The retention sweep's age signal — see `DexieFileRow.lastModified`. */

@@ -347,12 +347,14 @@ unknown never archives.
 → `storage/cache/db.ts` · `DexieFileRow`
 
 ### base version / base content
-Two halves of the same ancestor, on one dirty cache record. The **base
-version** is the backend's opaque token (GitHub blob SHA, FS content hash) —
-enough to detect that the remote drifted. The **base content** is the file at
-that token — enough to work out *what* each side changed, which is what a
-three-way merge needs and a version token alone can never supply. Kept on
-dirty records only; a clean record's content is its own ancestor.
+Two halves of the same ancestor, on one cache record with a change still
+pending. The **base version** is the backend's opaque token (GitHub blob SHA,
+FS content hash) — enough to detect that the remote drifted. The **base
+content** is the file at that token — enough to work out *what* each side
+changed, which is what a three-way merge needs and a version token alone can
+never supply, and what a version-less tombstone compares the path against
+before deleting it. Kept on dirty records and tombstones; never on a clean
+one, whose content is its own ancestor.
 → `storage/cache/db.ts` · `DexieFileRow`
 
 ### merge / conflict copy
