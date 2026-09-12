@@ -9,6 +9,7 @@ import { useResetOnChange, useToday, useOccPainter } from '@/hooks'
 import { cn } from '@/lib/cn'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { IconButton } from '@/components/primitives/icon-button'
+import { SlideTransition } from '@/components/primitives/slide-transition'
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useCalendarFilter } from './useCalendarFilter'
 import { dayDotsFor } from './dayDots'
@@ -348,6 +349,29 @@ export default function MiniMonth(props: Props) {
     onRecentered,
   })
 
+  // 'buttons' mode has no month-chip row and no swipe to animate its own
+  // paging (see this mode's own doc comment above) — its chevrons are "the
+  // one paging control", so a single pane wrapped in SlideTransition covers
+  // it, rather than the 3-pane swipe carousel 'strip' mode needs.
+  if (monthNav === 'buttons') {
+    return (
+      <SlideTransition slideKey={fmtMonth(month)}>
+        <MiniMonthPane
+          monthKey={fmtMonth(month)}
+          highlightDates={highlightDates}
+          onSelectDay={onSelectDay}
+          onMonthChange={setMonth}
+          items={items}
+          roots={roots}
+          filterOccs={filterOccs}
+          ws={ws}
+          monthNav={monthNav}
+          today={today}
+        />
+      </SlideTransition>
+    )
+  }
+
   return (
     <div>
       {/* Embla viewport → container → panes, same shape as DayView/MonthView's
@@ -374,9 +398,7 @@ export default function MiniMonth(props: Props) {
           ))}
         </div>
       </div>
-      {monthNav === 'strip' && (
-        <MonthStrip activeMonth={browsePreview ? parseMonth(browsePreview) : month} onNavigateMonth={setMonth} />
-      )}
+      <MonthStrip activeMonth={browsePreview ? parseMonth(browsePreview) : month} onNavigateMonth={setMonth} />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { addDays, startOfToday } from 'date-fns'
-import { fmtISO, parseDateString } from '@/model'
+import { fmtISO, fmtMonth, parseDateString } from '@/model'
 import { CALENDAR_FORMATTERS, useCalendarWeekStartsOn } from '@/calendar'
 import { useResetOnChange } from '@/hooks'
 import {
@@ -11,6 +11,7 @@ import {
 } from '@/components/primitives/responsive-modal'
 import { Calendar } from '@/components/ui/calendar'
 import { Button } from '@/components/primitives/button'
+import { SlideTransition } from '@/components/primitives/slide-transition'
 
 // ── Component ───────────────────────────────────────────────────
 interface Props {
@@ -72,17 +73,19 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
         <div className="px-4 pt-4 pb-4">
           {/* pt-0 cancels Calendar's built-in p-3 top — separator-to-calendar
               gap is owned entirely by the content div's pt-4 above            */}
-          <Calendar
-            mode="single"
-            fixedWeeks
-            weekStartsOn={ws}
-            selected={selected}
-            onSelect={setSelected}
-            month={month}
-            onMonthChange={setMonth}
-            formatters={CALENDAR_FORMATTERS}
-            className="w-full [--cell-size:2.25rem] p-0"
-          />
+          <SlideTransition slideKey={fmtMonth(month)}>
+            <Calendar
+              mode="single"
+              fixedWeeks
+              weekStartsOn={ws}
+              selected={selected}
+              onSelect={setSelected}
+              month={month}
+              onMonthChange={setMonth}
+              formatters={CALENDAR_FORMATTERS}
+              className="w-full [--cell-size:2.25rem] p-0"
+            />
+          </SlideTransition>
 
           {/* Shortcut toggles — filled when that day is selected in the grid.
               Calendar's pb-3 (12 px) keeps these closer to the grid than to
