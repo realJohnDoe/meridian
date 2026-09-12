@@ -12,7 +12,7 @@ setupStore()
 describe('OccurrenceCard', () => {
   describe('leading slot', () => {
     it('leadingIcon="checkbox" shows a checkbox for a trackable occurrence', () => {
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false } })
       render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="checkbox" />)
       expect(screen.getByRole('checkbox')).toBeInTheDocument()
     })
@@ -25,14 +25,14 @@ describe('OccurrenceCard', () => {
     })
 
     it('leadingIcon="kind" always shows KindIcon, even for a trackable occurrence', () => {
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false } })
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
       expect(container.querySelector('.lucide-square-check-big')).toBeInTheDocument()
     })
 
     it('leadingIcon="both" shows the checkbox for a trackable occurrence', () => {
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false } })
       render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="both" />)
       expect(screen.getByRole('checkbox')).toBeInTheDocument()
     })
@@ -47,7 +47,7 @@ describe('OccurrenceCard', () => {
 
   describe('done / dimmed state', () => {
     it('strike-throughs the title and shows the done overlay when metadata.done is true', () => {
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Done Task', tags: [], items: [], done: true } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Done Task', done: true } })
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="checkbox" />)
       expect(screen.getByText('Done Task')).toHaveClass('line-through')
       expect(container.querySelector('[style*="done-overlay"]')).toBeInTheDocument()
@@ -55,18 +55,14 @@ describe('OccurrenceCard', () => {
 
     it('shows the done overlay (but not strike-through) for a past, non-done event', () => {
       const now = new Date('2026-06-16T12:00:00')
-      const occ = makeOcc({
-        date: '2026-06-15',
-        time: '09:00',
-        metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Past Event', tags: [], items: [], jsTime: new Date('2026-06-15T09:00:00') },
-      })
+      const occ = makeOcc({ date: '2026-06-15', time: '09:00', metadata: { fileSlug: 'note', title: 'Past Event', jsTime: new Date('2026-06-15T09:00:00') } })
       const { container } = render(<OccurrenceCard occ={occ} now={now} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       expect(screen.getByText('Past Event')).not.toHaveClass('line-through')
       expect(container.querySelector('[style*="done-overlay"]')).toBeInTheDocument()
     })
 
     it('shows neither strike-through nor the done overlay for an open, non-past occurrence', () => {
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open Task', tags: [], items: [], done: false } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Open Task', done: false } })
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="checkbox" />)
       expect(screen.getByText('Open Task')).not.toHaveClass('line-through')
       expect(container.querySelector('[style*="done-overlay"]')).not.toBeInTheDocument()
@@ -87,7 +83,7 @@ describe('OccurrenceCard', () => {
 
   describe('meta row', () => {
     it('renders no meta row when there is nothing to show', () => {
-      const occ = makeOcc({ time: '', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Bare', tags: [], items: [] } })
+      const occ = makeOcc({ time: '', metadata: { fileSlug: 'note', title: 'Bare' } })
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" showTagsParticipants={false} />)
       expect(screen.getByText('Bare')).toBeInTheDocument()
       // No time/date/duration/tags configured, and participants are hidden -> no meta badges at all
@@ -115,7 +111,7 @@ describe('OccurrenceCard', () => {
     })
 
     it('shows a formatted duration chip when a duration is set and no time is scheduled', () => {
-      const occ = makeOcc({ time: '', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Standup', tags: [], items: [], duration: '90 minutes' } })
+      const occ = makeOcc({ time: '', metadata: { fileSlug: 'note', duration: '90 minutes' } })
       render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       expect(screen.getByText('1 hour, 30 minutes')).toBeInTheDocument()
     })
@@ -147,7 +143,7 @@ describe('OccurrenceCard', () => {
           { id: 'other-vault', name: 'Home', kind: 'local' },
         ],
       })
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false, priority: 'high' } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false, priority: 'high' } })
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       expect(screen.queryByText('Work')).toBeNull()
       const badge = screen.getByText('High')
@@ -164,7 +160,7 @@ describe('OccurrenceCard', () => {
           { id: 'other-vault', name: 'Home', kind: 'local' },
         ],
       })
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false } })
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       expect(container.querySelector('[data-chip]')).toBeNull()
     })
@@ -177,7 +173,7 @@ describe('OccurrenceCard', () => {
           { id: 'other-vault', name: 'Home', kind: 'local' },
         ],
       })
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false, priority: 'high' } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false, priority: 'high' } })
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       expect(container.querySelector('.bg-muted-foreground')).not.toBeNull()
       expect(container.querySelector('.bg-priority-1')).toBeNull()
@@ -199,9 +195,7 @@ describe('OccurrenceCard', () => {
 
   describe('participants', () => {
     it('shows initials for up to 3 participants and a +N overflow badge beyond that', () => {
-      const occ = makeOcc({
-        metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: ['Alice', 'Bob', 'Carol', 'Dave'], title: 'Standup', tags: [], items: [] },
-      })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', participants: ['Alice', 'Bob', 'Carol', 'Dave'] } })
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       expect(container.querySelector('[title="Alice"]')).toBeInTheDocument()
       expect(container.querySelector('[title="Bob"]')).toBeInTheDocument()
@@ -211,7 +205,7 @@ describe('OccurrenceCard', () => {
     })
 
     it('hides participant avatars and listed-on chips when showTagsParticipants is false', () => {
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: ['Alice'], title: 'Standup', tags: [], items: [] } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', participants: ['Alice'] } })
       const { container } = render(
         <OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" listedOn={['Project X']} showTagsParticipants={false} />,
       )
@@ -231,7 +225,7 @@ describe('OccurrenceCard', () => {
 
     it('calls onToggleDone and optimistically checks the box when clicked', () => {
       const onToggleDone = vi.fn()
-      const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false } })
+      const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false } })
       render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={onToggleDone} leadingIcon="checkbox" />)
       const checkbox = screen.getByRole('checkbox')
       expect(checkbox).not.toBeChecked()

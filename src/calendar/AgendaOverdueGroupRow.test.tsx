@@ -10,10 +10,7 @@ setupStore()
 
 function baseProps() {
   return {
-    occ: makeOcc({
-      id: 'overdue-1',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
-    }),
+    occ: makeOcc({ id: 'overdue-1', metadata: { fileSlug: 'note', title: 'Pay the invoice', done: false } }),
     count: 1,
     oldest: new Date(),
     onOpen: vi.fn(),

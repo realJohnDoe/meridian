@@ -4,7 +4,7 @@ import { setEntityPersistence } from '@/persistencePort'
 import { resetCalendarOnVaultChange } from '@/calendar'
 import { entryKey as makeEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
-import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata, Entries } from '@/types'
+import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata, Entries, AppMetadata } from '@/types'
 
 const initialStoreState = useStore.getInitialState()
 
@@ -156,15 +156,18 @@ export function installFakePersistence(): FakePersistence {
   return calls
 }
 
-export function makeOcc(overrides: Partial<Occurrence> = {}): Occurrence {
+export function makeOcc(
+  overrides: Partial<Omit<Occurrence, 'metadata'>> & { metadata?: Partial<AppMetadata> } = {},
+): Occurrence {
+  const { metadata, ...rest } = overrides
   return {
     date: '2026-06-15',
     time: '09:00',
     source: 'explicit',
     entryKey: testKey('note.md'),
     id: 'occ-1',
-    metadata: { participants: [], title: 'Standup', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'note.md' },
-    ...overrides,
+    ...rest,
+    metadata: { participants: [], title: 'Standup', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'note.md', ...metadata },
   }
 }
 

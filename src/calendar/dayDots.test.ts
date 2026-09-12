@@ -5,10 +5,7 @@ import type { Occurrence } from '@/types'
 import { makeOcc } from '@/test-utils'
 
 function occAt(iso: string, hour: number, overrides: Partial<Occurrence> = {}): Occurrence {
-  return makeOcc({
-    metadata: { participants: [], title: 'x', tags: [], items: [], vaultId: 'v', fileSlug: 'note.md', jsTime: new Date(`${iso}T${String(hour).padStart(2, '0')}:00:00`) },
-    ...overrides,
-  })
+  return makeOcc({ metadata: { title: 'x', vaultId: 'v', jsTime: new Date(`${iso}T${String(hour).padStart(2, '0')}:00:00`) }, ...overrides })
 }
 
 describe('dayDotsFor', () => {
@@ -63,7 +60,7 @@ describe('dayDotsFor', () => {
   })
 
   it('skips occurrences without a jsTime', () => {
-    const dots = dayDotsFor([makeOcc({ metadata: { participants: [], title: '', tags: [], items: [], vaultId: 'v', fileSlug: 'n' } })], typeHue)
+    const dots = dayDotsFor([makeOcc({ metadata: { title: '', vaultId: 'v', fileSlug: 'n' } })], typeHue)
     expect(dots.size).toBe(0)
   })
 })

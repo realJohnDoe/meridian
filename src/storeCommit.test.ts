@@ -25,7 +25,7 @@ const KEY = testKey('handy')
 function oneEntry(): StoreData {
   return {
     entries: entriesOf(
-      [makeOcc({ id: 'occ-1', entryKey: KEY, date: '2026-08-18', metadata: { vaultId: TEST_VAULT, fileSlug: 'handy', participants: [], title: 'handy', tags: ['errands'], items: [] } })],
+      [makeOcc({ id: 'occ-1', entryKey: KEY, date: '2026-08-18', metadata: { vaultId: TEST_VAULT, fileSlug: 'handy', title: 'handy', tags: ['errands'] } })],
       makeRoots('handy', { title: 'handy', tags: ['errands'], body: 'Compare the plans.' }),
     ),
   }
@@ -106,7 +106,7 @@ describe('commitMove', () => {
   it('hands the port the entry as it exists at the target key', () => {
     const moved: StoreData = {
       entries: entriesOf(
-        [makeOcc({ id: 'occ-1', entryKey: toKey, metadata: { vaultId: OTHER, fileSlug: 'handy', participants: [], title: 'handy', tags: [], items: [] } })],
+        [makeOcc({ id: 'occ-1', entryKey: toKey, metadata: { vaultId: OTHER, fileSlug: 'handy', title: 'handy' } })],
         new Map([[toKey, { title: 'handy', tags: [], items: [], vaultId: OTHER, fileSlug: 'handy' }]]),
       ),
     }

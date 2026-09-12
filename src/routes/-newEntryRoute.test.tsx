@@ -57,7 +57,7 @@ describe('/entry/new', () => {
     // the editor, which no longer recognised the file its first visit had made
     // and created `buy-milk-2` beside it — carrying the title, but none of the
     // edits that had landed on the first.
-    const occ = makeOcc({ id: DRAFT_ID, entryKey: testKey('buy-milk'), metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-milk', participants: [], title: 'Buy milk', tags: [], items: [], priority: 'high' } })
+    const occ = makeOcc({ id: DRAFT_ID, entryKey: testKey('buy-milk'), metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-milk', title: 'Buy milk', priority: 'high' } })
     seedStore([occ], makeRoots('buy-milk', { title: 'Buy milk' }))
 
     render(<NewEntryPage />)

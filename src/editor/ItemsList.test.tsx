@@ -47,22 +47,19 @@ const PAST   = new Date('2000-01-01T09:00:00')
 
 describe('rowSortKey', () => {
   it('groups an undone link to a note as [0, 0, title]', () => {
-    const occ = makeOcc({ date: '', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'My Note', tags: [], items: [] } })
+    const occ = makeOcc({ date: '', metadata: { fileSlug: 'note', title: 'My Note' } })
     expect(rowSortKey(linkRow(0, occ))).toEqual([0, 0, 'my note'])
   })
 
   it('groups an undone link to a future event as [1, jsTime, ""]', () => {
-    const occ = makeOcc({
-      date: '2099-01-01', time: '09:00',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Launch', tags: [], items: [], jsTime: FUTURE },
-    })
+    const occ = makeOcc({ date: '2099-01-01', time: '09:00', metadata: { fileSlug: 'note', title: 'Launch', jsTime: FUTURE } })
     expect(rowSortKey(linkRow(0, occ))).toEqual([1, FUTURE.getTime(), ''])
   })
 
   it.each([
     ['high', 0], ['medium', 1], ['low', 2], [undefined, 3],
   ] as const)('groups an undone link to a %s-priority task as [2, %i, title]', (priority, rank) => {
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false, priority } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false, priority } })
     expect(rowSortKey(linkRow(0, occ))).toEqual([2, rank, 'task'])
   })
 
@@ -71,15 +68,12 @@ describe('rowSortKey', () => {
   })
 
   it('groups a done task-link as [4, 2 (doneKindOrder task), title]', () => {
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Finished', tags: [], items: [], done: true } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Finished', done: true } })
     expect(rowSortKey(linkRow(0, occ))).toEqual([4, 2, 'finished'])
   })
 
   it('groups a past event-link as [4, 1 (doneKindOrder event), title]', () => {
-    const occ = makeOcc({
-      date: '2000-01-01', time: '09:00',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Old Meeting', tags: [], items: [], jsTime: PAST },
-    })
+    const occ = makeOcc({ date: '2000-01-01', time: '09:00', metadata: { fileSlug: 'note', title: 'Old Meeting', jsTime: PAST } })
     expect(rowSortKey(linkRow(0, occ))).toEqual([4, 1, 'old meeting'])
   })
 
@@ -106,12 +100,12 @@ describe('ItemsList sort order (end-to-end via rowSortKey)', () => {
   }
 
   it('orders notes -> events chronologically -> open tasks by priority -> open string tasks -> done items -> broken links', () => {
-    const note        = makeOcc({ date: '', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Note', tags: [], items: [] } })
-    const laterEvent   = makeOcc({ date: '2099-01-02', time: '09:00', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Later', tags: [], items: [], jsTime: new Date('2099-01-02T09:00:00') } })
-    const soonerEvent  = makeOcc({ date: '2099-01-01', time: '09:00', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Sooner', tags: [], items: [], jsTime: FUTURE } })
-    const highTask     = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'High prio', tags: [], items: [], done: false, priority: 'high' } })
-    const lowTask      = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Low prio', tags: [], items: [], done: false, priority: 'low' } })
-    const doneTaskLink = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Done link', tags: [], items: [], done: true } })
+    const note        = makeOcc({ date: '', metadata: { fileSlug: 'note', title: 'Note' } })
+    const laterEvent   = makeOcc({ date: '2099-01-02', time: '09:00', metadata: { fileSlug: 'note', title: 'Later', jsTime: new Date('2099-01-02T09:00:00') } })
+    const soonerEvent  = makeOcc({ date: '2099-01-01', time: '09:00', metadata: { fileSlug: 'note', title: 'Sooner', jsTime: FUTURE } })
+    const highTask     = makeOcc({ metadata: { fileSlug: 'note', title: 'High prio', done: false, priority: 'high' } })
+    const lowTask      = makeOcc({ metadata: { fileSlug: 'note', title: 'Low prio', done: false, priority: 'low' } })
+    const doneTaskLink = makeOcc({ metadata: { fileSlug: 'note', title: 'Done link', done: true } })
 
     const rows: Row[] = [
       linkRow(10, doneTaskLink),
@@ -211,7 +205,7 @@ describe('ItemsList wikilink rows', () => {
   // this fixed logic apart from the bug it fixes (see the recurring-series
   // case below).
   it('calls onToggleDone and begins an exit animation when a standalone linked task is checked off', () => {
-    const occ = makeOcc({ entryKey: testKey('linked.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'linked.md', participants: [], title: 'Linked Task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ entryKey: testKey('linked.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'linked.md', title: 'Linked Task', done: false } })
     const onToggleDone = vi.fn(toggleOccDone)
     const roots = makeRoots('current.md')
     roots.set(testKey('linked.md'), makeRootMeta('linked.md', { title: 'Linked Task', tags: [], items: [] }))
@@ -303,10 +297,7 @@ describe('ItemsList link picker', () => {
   })
 
   it('reopens a done file when it is picked from the "Link file" list', () => {
-    const doneOcc = makeOcc({
-      id: 'occ-1', entryKey: testKey('done.md'), date: '2020-01-01',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'done.md', participants: [], title: 'Old Task', tags: [], items: [], done: true },
-    })
+    const doneOcc = makeOcc({ id: 'occ-1', entryKey: testKey('done.md'), date: '2020-01-01', metadata: { vaultId: TEST_VAULT, fileSlug: 'done.md', title: 'Old Task', done: true } })
     const roots = makeRoots('current.md')
     roots.set(testKey('done.md'), makeRootMeta('done.md', { title: 'Old Task' }))
     seedStore([doneOcc], roots)

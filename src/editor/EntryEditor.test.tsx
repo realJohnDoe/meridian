@@ -50,7 +50,7 @@ function Harness({ occ }: { occ: Occurrence }) {
 
 describe('EntryEditor', () => {
   it('autosaves a body edit after the debounce and persists a checkbox toggle immediately', () => {
-    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
     seedStore([occ], makeRoots('note.md'))
     render(<Harness occ={occ} />)
 
@@ -114,7 +114,7 @@ describe('EntryEditor — archived banner', () => {
   }
 
   it('shows the archived banner with an Unarchive action', () => {
-    const occ = makeOcc({ id: 'occ-arch', entryKey: testKey('old-task.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'old-task.md', participants: [], title: 'Old Task', tags: [], items: [] } })
+    const occ = makeOcc({ id: 'occ-arch', entryKey: testKey('old-task.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'old-task.md', title: 'Old Task' } })
     seedStore([occ], makeRoots('old-task.md', { archived: true }))
 
     render(<ArchiveHarness occ={occ} roots={archivedRoots(occ, 'Old Task', true)} />)
@@ -124,7 +124,7 @@ describe('EntryEditor — archived banner', () => {
   })
 
   it('shows no banner for an ordinary, unarchived entry', () => {
-    const occ = makeOcc({ id: 'occ-plain', entryKey: testKey('plain-task.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'plain-task.md', participants: [], title: 'Plain Task', tags: [], items: [] } })
+    const occ = makeOcc({ id: 'occ-plain', entryKey: testKey('plain-task.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'plain-task.md', title: 'Plain Task' } })
     seedStore([occ], makeRoots('plain-task.md'))
 
     render(<ArchiveHarness occ={occ} roots={archivedRoots(occ, 'Plain Task', false)} />)
@@ -133,7 +133,7 @@ describe('EntryEditor — archived banner', () => {
   })
 
   it('clicking Unarchive clears the flag in the store', () => {
-    const occ = makeOcc({ id: 'occ-unarch', entryKey: testKey('unarchive-me.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'unarchive-me.md', participants: [], title: 'Coming Back', tags: [], items: [] } })
+    const occ = makeOcc({ id: 'occ-unarch', entryKey: testKey('unarchive-me.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'unarchive-me.md', title: 'Coming Back' } })
     seedStore([occ], makeRoots('unarchive-me.md', { archived: true }))
 
     render(<ArchiveHarness occ={occ} roots={archivedRoots(occ, 'Coming Back', true)} />)

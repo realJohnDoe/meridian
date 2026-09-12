@@ -233,13 +233,7 @@ const today = new Date()
  */
 function overdueTask(i: number): Occurrence {
   const date = fmtISO(addDays(today, -(1 + (i % 300))))
-  return makeOcc({
-    id: `overdue-${i}`,
-    date,
-    time: '09:00',
-    entryKey: testKey('note.md'),
-    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Overdue task ${i}`, tags: [], items: [], done: false },
-  })
+  return makeOcc({ id: `overdue-${i}`, date, time: '09:00', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: `Overdue task ${i}`, done: false } })
 }
 
 /** Every rendered occurrence card — SurfaceButton carries aria-label={title}. */
@@ -272,12 +266,7 @@ describe('AgendaView', () => {
   })
 
   it('renders the overdue header and its grouped task, and leaves the task on its own day', () => {
-    const task = makeOcc({
-      id: 'overdue-1',
-      date: fmtISO(addDays(today, -3)),
-      time: '09:00',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
-    })
+    const task = makeOcc({ id: 'overdue-1', date: fmtISO(addDays(today, -3)), time: '09:00', metadata: { fileSlug: 'note', title: 'Pay the invoice', done: false } })
     seedStore([task], makeRoots('note.md'))
 
     render(<AgendaView onOpen={vi.fn()} />)
@@ -301,12 +290,7 @@ describe('AgendaView', () => {
       repeat: { type: 'schedule', freq: 'weekly' },
       metadata: { participants: [], done: false },
     })
-    const once = makeOcc({
-      id: 'once-1',
-      date: fmtISO(addDays(today, -2)),
-      time: '09:00',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
-    })
+    const once = makeOcc({ id: 'once-1', date: fmtISO(addDays(today, -2)), time: '09:00', metadata: { fileSlug: 'note', title: 'Pay the invoice', done: false } })
     seedStore([weekly, once], new Map([
       ...makeRoots('note.md'),
       ...makeRoots('plants.md', { title: 'Water the plants' }),
@@ -360,12 +344,7 @@ describe('AgendaView', () => {
   })
 
   it('calls onOpen with the representative occurrence when an overdue group row is clicked', () => {
-    const task = makeOcc({
-      id: 'overdue-1',
-      date: fmtISO(addDays(today, -3)),
-      time: '09:00',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Pay the invoice', tags: [], items: [], done: false },
-    })
+    const task = makeOcc({ id: 'overdue-1', date: fmtISO(addDays(today, -3)), time: '09:00', metadata: { fileSlug: 'note', title: 'Pay the invoice', done: false } })
     seedStore([task], makeRoots('note.md'))
 
     const onOpen = vi.fn()
@@ -410,17 +389,11 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
   // row after a large insertion above it isn't clamped by the end of the
   // scroll range. Without this the future is bare week dividers and the whole
   // agenda is barely two screens tall.
-  const upcoming = () => Array.from({ length: 40 }, (_, i) => makeOcc({
-    id: `up-${i}`, date: fmtISO(addDays(today, 1 + i * 2)), time: '14:00', entryKey: testKey('note.md'),
-    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Upcoming ${i}`, tags: [], items: [] },
-  }))
+  const upcoming = () => Array.from({ length: 40 }, (_, i) => makeOcc({ id: `up-${i}`, date: fmtISO(addDays(today, 1 + i * 2)), time: '14:00', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: `Upcoming ${i}` } }))
   /** Past-dated events — no `done`, so `occKind` is 'event' and they stay on
    * their own past days instead of pooling into overdue the way tasks do.
    * This is the shape an iCal subscription's history has. */
-  const pastEvents = (n: number) => Array.from({ length: n }, (_, i) => makeOcc({
-    id: `past-${i}`, date: fmtISO(addDays(today, -(1 + i * 2))), time: '10:00', entryKey: testKey('note.md'),
-    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Past ${i}`, tags: [], items: [] },
-  }))
+  const pastEvents = (n: number) => Array.from({ length: n }, (_, i) => makeOcc({ id: `past-${i}`, date: fmtISO(addDays(today, -(1 + i * 2))), time: '10:00', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: `Past ${i}` } }))
 
   // The virtualizer only clears `isScrolling` on a debounce timer
   // (isScrollingResetDelay, 150ms). Left ticking on real timers it never fires
@@ -692,14 +665,8 @@ describe('AgendaView — incremental loading', () => {
   // and makes maybeGrowForward legitimately fire once at first paint. That's a
   // real growth, not a bug, so a sparser fixture here tests that pass, not
   // first paint.
-  const upcoming = () => Array.from({ length: 60 }, (_, i) => makeOcc({
-    id: `up-${i}`, date: fmtISO(addDays(today, 1 + i)), time: '14:00', entryKey: testKey('note.md'),
-    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Upcoming ${i}`, tags: [], items: [] },
-  }))
-  const pastEvents = (n: number) => Array.from({ length: n }, (_, i) => makeOcc({
-    id: `past-${i}`, date: fmtISO(addDays(today, -(1 + i * 2))), time: '10:00', entryKey: testKey('note.md'),
-    metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: `Past ${i}`, tags: [], items: [] },
-  }))
+  const upcoming = () => Array.from({ length: 60 }, (_, i) => makeOcc({ id: `up-${i}`, date: fmtISO(addDays(today, 1 + i)), time: '14:00', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: `Upcoming ${i}` } }))
+  const pastEvents = (n: number) => Array.from({ length: n }, (_, i) => makeOcc({ id: `past-${i}`, date: fmtISO(addDays(today, -(1 + i * 2))), time: '10:00', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: `Past ${i}` } }))
 
   beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
   afterEach(() => { vi.useRealTimers() })
