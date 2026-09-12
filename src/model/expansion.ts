@@ -252,7 +252,7 @@ function* iterScheduledDates(
   from: Date,
   to: Date,
 ): Generator<Date> {
-  const { freq, byweekday, bymonthday, bymonth, bysetpos, interval = 1, end } = sched
+  const { freq, byweekday, bymonthday, bymonth, bysetpos, interval = 1, wkst, end } = sched
   // `end.time` only ever accompanies `end.date` — it names an instant within
   // that day, not a bound on its own.
   const untilDate = end?.type === 'until' && end.date ? toDate(end.date) : null
@@ -267,7 +267,32 @@ function* iterScheduledDates(
     return r
   }
 
-  // The next period's start: a day, a 7-day window opening on the anchor's
+  /**
+   * Where a weekly rule's 7-day windows open — every place a window boundary
+   * is ever measured or stepped from (`iterScheduledDates`' own `cursor`,
+   * `resolveCountBound`'s, and `periodsBetween`'s skip-ahead) starts here.
+   *
+   * With no `wkst`, this is `anchor` itself — the deliberate, documented
+   * choice from the data-integrity survey (finding #6): windows open on the
+   * *anchor's* weekday, not a viewer-local `WKST`, so a file means the same
+   * thing on every device. `matchesInPeriod`'s weekly branch then reads each
+   * period's own opening weekday back off `periodStart` rather than off
+   * `anchor` directly, which is what makes that branch correct for both
+   * cases from one formula — see its comment.
+   *
+   * With an explicit `wkst`, this is RFC 5545's own week start: the most
+   * recent (or same) day carrying that weekday, at or before the anchor. A
+   * period earlier than the anchor's own is legal here — `periodDates`' own
+   * `d > anchor` filter is what excludes an in-window date that falls before
+   * the anchor without excluding the rest of that same window, which is
+   * exactly how the RFC "skips this period, picks it up next" for a named
+   * weekday earlier than the anchor's inside the RFC week (see #1010).
+   */
+  const weekOrigin: Date = (freq === 'weekly' && wkst)
+    ? withTime(addDays(startOfDay(anchor), -(((anchor.getDay() - (WDAYS_MAP[wkst.toLowerCase()] ?? anchor.getDay())) + 7) % 7)))
+    : anchor
+
+  // The next period's start: a day, a 7-day window opening on `weekOrigin`'s
   // weekday, a calendar month, or a calendar year.
   //
   // Yearly normalises to January 1 rather than keeping the anchor's month.
@@ -296,13 +321,14 @@ function* iterScheduledDates(
     return withTime(n)
   }
 
-  // Number of `nextBase` steps from `anchor` to the period boundary at or
-  // immediately before `target`, computed analytically so a query window far
-  // from the anchor doesn't require iterating every intermediate period.
+  // Number of `nextBase` steps from `anchor` (or, for weekly, `weekOrigin`)
+  // to the period boundary at or immediately before `target`, computed
+  // analytically so a query window far from the anchor doesn't require
+  // iterating every intermediate period.
   function periodsBetween(target: Date): number {
     if (interval <= 0) return 0
     if (freq === 'daily')   return Math.floor(differenceInCalendarDays(target, anchor) / interval)
-    if (freq === 'weekly')  return Math.floor(differenceInCalendarDays(target, anchor) / (7 * interval))
+    if (freq === 'weekly')  return Math.floor(differenceInCalendarDays(target, weekOrigin) / (7 * interval))
     if (freq === 'monthly') {
       const months = (target.getFullYear() - anchor.getFullYear()) * 12 + (target.getMonth() - anchor.getMonth())
       return Math.floor(months / interval)
@@ -400,36 +426,49 @@ function* iterScheduledDates(
         })
       if (passesWeekday && passesMonthday) dates.push(periodStart)
     } else if (freq === 'weekly') {
-      if (!byweekday || !byweekday.length) {
-        dates.push(periodStart)
-      } else {
-        // The period is the 7 days starting at `periodStart`, which always
-        // falls on the ANCHOR's weekday (the cursor only ever moves in whole
-        // weeks). So each named weekday is 0–6 days forward from there.
-        //
-        // Anchoring the week here — rather than on the viewer's locale — is
-        // what makes a `weekly` + `interval >= 2` + `byweekday` rule mean the
-        // same thing on every device. `byweekday` was never the ambiguous
-        // part: it is already stored as words (`[mo, we, fr]`) and WDAYS_MAP
-        // reads them unambiguously. The ambiguity was which 7-day window a
-        // date belongs to, and with `interval >= 2` the windows no longer
-        // tile, so a Monday-first and a Sunday-first reader bucketed the same
-        // file into different fortnights and got disjoint date sets. See the
-        // data-integrity survey, finding #6.
-        //
-        // `interval: 1` is unaffected by construction: with a 7-day step every
-        // window contains each weekday exactly once wherever the boundary
-        // sits, so the windows tile identically however you draw them.
-        //
-        // Equivalent to RFC 5545 with `WKST` pinned to the anchor's weekday,
-        // so an ICS export could reproduce this exactly by emitting that.
-        const anchorDow = anchor.getDay()
-        for (const dStr of byweekday) {
-          const target = WDAYS_MAP[dStr.toLowerCase()] ?? 0
-          const dayCandidate = new Date(periodStart)
-          dayCandidate.setDate(periodStart.getDate() + (target - anchorDow + 7) % 7)
-          dates.push(dayCandidate)
-        }
+      // The period is the 7 days starting at `periodStart`, which always
+      // falls on the window's own opening weekday (the cursor only ever
+      // moves in whole weeks from `weekOrigin`) — the ANCHOR's weekday with
+      // no `wkst`, or `wkst` itself when one is set. So each named weekday is
+      // 0–6 days forward from there, read back off `periodStart` rather than
+      // recomputed from `anchor`/`wkst` directly — one formula for both.
+      //
+      // With no `byweekday`, the rule repeats the anchor's own weekday every
+      // `interval` weeks (RFC 5545's implicit default), which this same
+      // formula produces by naming that weekday as the sole target: at
+      // `periodStart === weekOrigin + 7*interval*k` the offset from the
+      // window's opening weekday back to the anchor's is constant across
+      // every period, so it always lands the walk back on the anchor's day.
+      //
+      // Anchoring the week on the anchor by default — rather than on the
+      // viewer's locale — is what makes a `weekly` + `interval >= 2` +
+      // `byweekday` rule mean the same thing on every device. `byweekday` was
+      // never the ambiguous part: it is already stored as words (`[mo, we,
+      // fr]`) and WDAYS_MAP reads them unambiguously. The ambiguity was which
+      // 7-day window a date belongs to, and with `interval >= 2` the windows
+      // no longer tile, so a Monday-first and a Sunday-first reader bucketed
+      // the same file into different fortnights and got disjoint date sets.
+      // See the data-integrity survey, finding #6.
+      //
+      // `interval: 1` is unaffected by construction: with a 7-day step every
+      // window contains each weekday exactly once wherever the boundary
+      // sits, so the windows tile identically however you draw them — which
+      // is also why `wkst` can never change a date at `interval: 1`.
+      //
+      // An explicit `wkst` (#1010) reproduces RFC 5545 exactly rather than
+      // merely being equivalent to it: `weekOrigin` opens the window on
+      // `wkst` instead of the anchor's weekday, so a named day earlier in the
+      // RFC week than the anchor falls before `anchor` in period 0 — excluded
+      // by `periodDates`' own `d > anchor` filter — and is picked up in
+      // period 1 instead, exactly as the RFC skips and resumes it.
+      const originDow = periodStart.getDay()
+      const targets = byweekday && byweekday.length
+        ? byweekday.map(d => WDAYS_MAP[d.toLowerCase()] ?? 0)
+        : [anchor.getDay()]
+      for (const target of targets) {
+        const dayCandidate = new Date(periodStart)
+        dayCandidate.setDate(periodStart.getDate() + (target - originDow + 7) % 7)
+        dates.push(dayCandidate)
       }
     } else if (freq === 'monthly') {
       dates.push(...monthCandidates(periodStart.getFullYear(), periodStart.getMonth()))
@@ -478,7 +517,7 @@ function* iterScheduledDates(
    * skip-ahead below.
    */
   function resolveCountBound(remaining: number): Date {
-    let cursor = new Date(anchor)
+    let cursor = new Date(weekOrigin)
     let last = new Date(anchor)
     let seen = 0
     for (let iter = 0; seen < remaining && iter < PERIOD_WALK_LIMIT; iter++) {
@@ -515,9 +554,10 @@ function* iterScheduledDates(
       ? cachedCountBound(sched, anchor, anchorTimeStr, () => resolveCountBound(Math.max(0, end.occurrences - 1)))
       : to
 
-  let cursor = new Date(anchor)
-  // Every period between the anchor and `from` is equivalent to "not a match"
-  // and can be bypassed analytically rather than walked.
+  let cursor = new Date(weekOrigin)
+  // Every period between the anchor (weekOrigin, for weekly) and `from` is
+  // equivalent to "not a match" and can be bypassed analytically rather than
+  // walked.
   if (from > cursor) {
     const steps = periodsBetween(from)
     if (steps > 0) cursor = advanceCursor(cursor, steps)

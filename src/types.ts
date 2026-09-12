@@ -22,9 +22,16 @@ type RepeatEnd =
  * into the months it names and *limits* every finer frequency to them, which
  * is RFC 5545 §3.3.10's own split; `model/expansion.ts` is where that is
  * carried out and where the per-month reading of `bysetpos` is argued.
+ *
+ * `wkst` (weekly only) names which weekday opens each 7-day window — RFC
+ * 5545's `WKST`. Absent, a weekly window opens on the *anchor's* own weekday
+ * instead, which is what every file written before this field existed already
+ * means and what keeps meaning unchanged for `interval: 1` regardless (see
+ * `model/expansion.ts`'s weekly branch of `matchesInPeriod`). Only
+ * `interval >= 2` combined with `byweekday` can tell the two apart.
  */
 export type Repeat =
-  | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bymonth?: number[]; bysetpos?: number | number[]; interval?: number; end?: RepeatEnd }
+  | { type: 'schedule'; freq: 'daily' | 'weekly' | 'monthly' | 'yearly'; byweekday?: Weekday[]; bymonthday?: number[]; bymonth?: number[]; bysetpos?: number | number[]; interval?: number; wkst?: Weekday; end?: RepeatEnd }
   | { type: 'after_completion'; interval: string; end?: RepeatEnd }
 
 // ── Metadata types ────────────────────────────────────────────────────────────
