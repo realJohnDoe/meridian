@@ -146,7 +146,11 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
           ? [readOnlyTheme]
           : [emptyLineCaret, emptyLineCaretTheme, emptyPlaceholder, emptyPlaceholderTheme('Add a description…')]),
         EditorView.lineWrapping,
-        EditorView.contentAttributes.of({ spellcheck: 'false' }),
+        // Markdown body is full of `[[wikilinks]]`, frontmatter-like tokens, and code —
+        // iOS Safari's autocorrect mangles these constantly and pops its "Undo" bubble
+        // (German: "Widerrufen") after each correction. Disable autocorrect/autocapitalize
+        // outright rather than fighting the popup.
+        EditorView.contentAttributes.of({ spellcheck: 'false', autocorrect: 'off', autocapitalize: 'off' }),
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         // Drive the [[…]] autocomplete popup and report body changes
