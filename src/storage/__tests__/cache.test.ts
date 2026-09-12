@@ -166,6 +166,31 @@ describe('cache/files — persisted status representation', () => {
     expect((await rawRow(V, 'a.md'))?.dirty).toBe(2)
   })
 
+  it('carries the last known backend content onto a tombstone (#1017)', async () => {
+    // A version-less tombstone is ambiguous — this device's own file whose
+    // token was lost, or a slug another device has since filled — and only the
+    // content it last knew was there tells `pushDirty` which.
+    await m.files.setResolvedClean(V, 'clean.md', 'what the backend holds', 'sha1')
+    await m.files.recordLocalDelete(V, 'clean.md')
+    // A clean record's own content IS what the backend holds.
+    expect((await m.files.cacheGetRecord(V, 'clean.md'))?.baseContent).toBe('what the backend holds')
+
+    // A dirty record's local edit is NOT: the ancestor it was made from is.
+    await m.files.setResolvedClean(V, 'edited.md', 'pulled', 'sha2')
+    await m.files.recordLocalEdit(V, 'edited.md', 'my unpushed edit')
+    await m.files.recordLocalDelete(V, 'edited.md')
+    expect((await m.files.cacheGetRecord(V, 'edited.md'))?.baseContent).toBe('pulled')
+
+    // A file this device has never pulled or pushed answers with nothing,
+    // which is what must stop the delete going out.
+    await m.files.recordLocalEdit(V, 'draft.md', 'never synced')
+    await m.files.recordLocalDelete(V, 'draft.md')
+    expect((await m.files.cacheGetRecord(V, 'draft.md'))?.baseContent).toBeUndefined()
+
+    // The tombstone is still not a copy of the file.
+    expect((await m.files.cacheGetRecord(V, 'clean.md'))?.content).toBe('')
+  })
+
   it('maps those numbers back to the status union on read', async () => {
     await m.files.recordLocalEdit(V, 'dirty.md', 'body')
     await m.files.setResolvedClean(V, 'clean.md', 'body', 'sha1')

@@ -60,7 +60,7 @@ the spike's own findings are instances of it.
 | #827 | A version-less delete CASed against a stale SHA cache, destroying a remote edit. |
 | #977 | A second view of one vault inherited the shared row's version and destroyed the first view's work with no conflict at all. |
 | #981 | A debounced autosave never reached Dexie before the tab closed. |
-| #1017 | The #827 fix inverted: a delete with no base version now destroys whatever sits at the path, including a file this device never held. **Still open.** |
+| #1017 | The #827 fix inverted: a delete with no base version destroyed whatever sat at the path, including a file this device never held. Open when this run reported; fixed immediately after, by moving the decision out of the backend — see the postscript. |
 
 **Making it checkable** was the hard part, and it is not "is the content still
 there". A delete is *supposed* to remove content. What separates a legitimate
@@ -240,7 +240,39 @@ each flat, so none of them is it. Until #1023 is closed, several soaks of ~400
 runs cover more ground per minute than one long one — and fast-check picks a
 fresh seed each time, so the coverage is at least as good.
 
-Because #1017 is open, a generated run that hits it stops there and the rest of
-its sequence goes unexplored. Closing #1017 deepens every run in the file — the
-entry in `KNOWN_VIOLATIONS` and the test pinning it are both to be deleted then,
-and the pin is what makes sure they are.
+Because #1017 was open when this ran, a generated run that hit it stopped there
+and the rest of its sequence went unexplored. Closing it deepens every run in
+the file — see the postscript.
+
+## Postscript, 2026-09-12: #1017 closed, and what the ratchet did
+
+Recorded here rather than in a new report because it is the same run's
+machinery reporting its own result.
+
+The entry in `KNOWN_VIOLATIONS` was paired with a test asserting the defect was
+**still reachable**. When the fix landed, that test failed — `violation` came
+back `null` where it had been a `durability` violation — which is exactly the
+signal it existed to give: not "something broke" but "the exemption is spent,
+delete it." Both the entry and the pin are gone, and the four-operation
+interleaving that caught the defect is now a permanent case in `CORPUS`.
+
+**The fix, in one sentence:** the ambiguity was resolved in the wrong layer
+twice, so it moved. `GitHubBackend.delete` fell back to a stale `_shas` cache
+(#827) and then to a fresh re-read (#1017); both answer *what is at this path
+now*, and neither answers *is this the file the caller meant to delete*. Nothing
+reachable from inside a backend can answer the second — it sees a path and a
+version. `pushDirty` can, because the tombstone remembers what this device last
+knew the backend held (`recordLocalDelete` now keeps it, via the `baseFor`
+helper that already existed for merges). So the backend refuses to guess a
+precondition, and `pushDirty` compares content before deciding: delete when the
+path still holds what we last saw, keep the file when it does not, and no-op
+when the path is already empty. The "keep" branch is the rule `resolveCollision`
+already states for itself — an edit beats a delete — applied to the one case
+that had been escaping it.
+
+**What the invariants said about the fix.** The assertions were written before
+it and were not adjusted for it: the promoted #1017 case passes, and three
+further 400-run soaks found no violation of the six now that runs explore past
+where they used to stop. That last point is the one worth keeping — the deeper
+exploration was the thing this report predicted would follow, and it came back
+clean.

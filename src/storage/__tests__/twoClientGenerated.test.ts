@@ -128,6 +128,33 @@ const CORPUS: Array<{ name: string; ops: Op[] }> = [
       write('deviceA', 'note', 'body', 'draft'), reload('deviceA'), sync('deviceA'),
     ],
   },
+  {
+    // #1017, found by this generator and shrunk to four operations — it was a
+    // live defect when this file was written, allowlisted and pinned as "still
+    // reachable" until the fix landed. Promoted to the corpus rather than
+    // deleted with the pin: the interleaving that caught it is exactly the one
+    // a future change to the tombstone path must keep passing.
+    //
+    // It is also a wider statement of the defect than #1017's own reproduction,
+    // which reaches the version-less tombstone through a page *reload* (a cold
+    // `_shas`). No reload is needed — a page that closes inside the 1s autosave
+    // debounce leaves the same row.
+    name: '#1017: a version-less tombstone must not delete a file this device has never seen',
+    ops: [
+      // B creates the note and pushes it. A has never seen this file.
+      write('deviceB', 'note', 'title'),
+      // A creates its own note on the same slug; the page closes inside the
+      // debounce, so nothing goes out and A's row has no base version.
+      write('deviceA', 'note', 'title', 'draft'),
+      // A deletes its own draft. `recordLocalDelete` carries the row's version
+      // forward, so the tombstone has none either.
+      del('deviceA', 'note'),
+      // Before the fix: the re-read supplied B's SHA, the CAS passed, and B's
+      // file was destroyed. Now the tombstone's last-known content says the
+      // path is not ours, so B's file is kept.
+      sync('deviceA'),
+    ],
+  },
 ]
 
 describe('sync invariants — the starting corpus (#1021)', () => {
@@ -144,61 +171,22 @@ describe('sync invariants — the starting corpus (#1021)', () => {
 /**
  * Violations with an issue already filed against them.
  *
- * A generator that finds a real, known, still-open defect must not turn the
- * build red every time it runs — but suppressing it silently would be worse
- * than not generating at all. So each entry names its issue, and each one is
- * pinned below by a test that asserts the defect is **still reachable**: the
- * day it is fixed, that pin goes red and points at the entry to delete. An
- * allowlist that can outlive its defect is just a disabled test.
+ * **Empty, and that is the point of keeping it.** A generator that finds a
+ * real but already-known defect must not turn the build red on every run — but
+ * suppressing one silently would be worse than not generating at all. So the
+ * mechanism stays: each entry names its issue, and each is paired with a test
+ * asserting the defect is *still reachable*, so the day it is fixed that test
+ * goes red and points at the entry to delete. An allowlist that can outlive its
+ * defect is just a disabled test.
  *
- * The cost, stated so it is not discovered later: a run that hits a known
- * violation stops there, so the sequence's remaining steps go unexplored.
- * Closing #1017 deepens every run in this file.
+ * #1017 was the first and so far only entry. Its pin did exactly this job — it
+ * failed the moment the fix landed — and the interleaving that caught it is now
+ * a permanent regression case in `CORPUS` above rather than an exemption here.
  */
-const KNOWN_VIOLATIONS: Array<{ issue: string; matches: (v: Violation) => boolean }> = [
-  {
-    issue: '#1017 — a delete with no base version destroys a remote file this device never held',
-    matches: v => v.invariant === 'durability' && v.cause === 'delete',
-  },
-]
+const KNOWN_VIOLATIONS: Array<{ issue: string; matches: (v: Violation) => boolean }> = []
 
 const knownFor = (v: Violation): string | undefined =>
   KNOWN_VIOLATIONS.find(k => k.matches(v))?.issue
-
-/**
- * #1017, as an interleaving — and four operations rather than the six the
- * spike needed to describe it by hand.
- *
- * Found by this generator, not written: the soak shrank it to here. It is also
- * a slightly wider statement of the defect than #1017's own reproduction, which
- * reaches the version-less tombstone via a page *reload* (a cold `_shas`). No
- * reload is needed. A page that closes inside the 1s autosave debounce leaves
- * the same row — dirty, no base version — and the delete that follows destroys
- * whatever the path holds.
- */
-const SEED_1017: Op[] = [
-  // B creates the note and pushes it. A has never seen this file.
-  write('deviceB', 'note', 'title'),
-  // A creates its own note on the same slug; the page closes inside the
-  // debounce, so nothing goes out and A's row has no base version.
-  write('deviceA', 'note', 'title', 'draft'),
-  // A deletes its own draft. `recordLocalDelete` carries the row's version
-  // forward, so the tombstone has none either.
-  del('deviceA', 'note'),
-  // The re-read #827 added supplies B's SHA, the CAS passes, B's file is gone.
-  sync('deviceA'),
-]
-
-describe('sync invariants — defects that are open (#1021)', () => {
-  it('#1017 is still reachable: a delete with no base version destroys another device\'s file', async () => {
-    const { violation } = await runInterleaving(remote, SEED_1017)
-    // When this stops failing, #1017 is fixed: delete this test AND its
-    // KNOWN_VIOLATIONS entry, and move SEED_1017 into CORPUS above.
-    expect(violation?.invariant).toBe('durability')
-    expect(violation?.cause).toBe('delete')
-    expect(knownFor(violation!)).toContain('#1017')
-  })
-})
 
 // ── The generated sweep ──────────────────────────────────────────────
 

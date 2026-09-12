@@ -175,15 +175,41 @@ describe('#827 — a delete with no base version', () => {
     expect(remote.get('note.md')?.content).toContain('B body')
   })
 
-  it('current main: the delete re-reads and lands — destroying B\'s file', async () => {
+  it('current main: the tombstone is not ours, so B\'s file is kept', async () => {
     await seed827({ legacyDelete: false })
 
-    // The re-read #827 added supplies a sha for a file this client has never
-    // held, so the CAS passes and the DELETE succeeds.
-    const deletes = remote.calls.filter(c => c.op === 'delete')
-    expect(deletes).toHaveLength(1)
-    expect(deletes[0]?.status).toBe(200)
-    expect(remote.has('note.md')).toBe(false)
+    // Between #827 and #1017 this was the failing case: the re-read supplied a
+    // sha for a file this client had never held, the CAS passed, and B's file
+    // was destroyed. `pushDirty` now compares what is at the path against what
+    // the tombstone last knew was there — nothing, for a draft that never
+    // synced — so no DELETE goes out at all.
+    expect(remote.calls.filter(c => c.op === 'delete')).toHaveLength(0)
+    expect(remote.get('note.md')?.content).toContain('B body')
+    // The tombstone is dropped rather than retried, and reconcile pulls B's
+    // file into A in the same cycle, so A ends the cycle holding B's note
+    // rather than a tombstone that would try again next time.
+    const onA = await cacheGetRecord('deviceA', 'note.md')
+    expect(onA?.status).toBe('clean')
+    expect(onA?.content).toContain('B body')
+    expect(notifyFns.warn).toHaveBeenCalledWith(expect.stringContaining('never synced'))
+  })
+
+  // #1017's own acceptance criterion: "Afterwards the two scenarios must agree:
+  // B's file survives under both the reconstructed pre-#827 delete and the
+  // shipped one." They agree for different reasons — the reconstruction returns
+  // early with no sha anywhere, the shipped path establishes the file is not
+  // ours — and the point of asserting it is that the *outcome* no longer
+  // depends on which of the two is running.
+  it('the two agree: B\'s file survives either way', async () => {
+    await seed827({ legacyDelete: true })
+    const legacy = { deletes: remote.calls.filter(c => c.op === 'delete').length, note: remote.get('note.md')?.content }
+
+    remote = await resetWorld()
+    await seed827({ legacyDelete: false })
+    const shipped = { deletes: remote.calls.filter(c => c.op === 'delete').length, note: remote.get('note.md')?.content }
+
+    expect(shipped).toEqual(legacy)
+    expect(shipped.note).toContain('B body')
   })
 })
 
@@ -199,6 +225,9 @@ describe('#827 — a delete with no base version', () => {
 // This is driven at the backend directly rather than through a sync cycle:
 // the question is about one method's precondition, and a scenario that had to
 // arrange a version-less tombstone as well would confound the two.
+//
+// Since #1017 the answer is that the backend has no business having a
+// precondition of its own — see the second test.
 
 describe('finding #3 — a stale _shas cache behind a version-less delete', () => {
   /** B's edit lands after A's last listing, so A's `_shas` predates it. */
@@ -227,15 +256,19 @@ describe('finding #3 — a stale _shas cache behind a version-less delete', () =
     expect(remote.get('note.md')?.content).toContain('v2 body')
   })
 
-  it('current main: the re-read supplies the fresh sha, and the delete lands', async () => {
+  it('current main: the backend will not guess a precondition at all', async () => {
     const A = await staleSeed(false)
 
+    // #827 replaced the stale-cache fallback with a fresh re-read, which made
+    // this delete land and destroyed B's edit (#1017). Neither source was ever
+    // an answer to the question that matters — *is this the file the caller
+    // meant to delete?* — so the backend no longer answers it: with no
+    // `expectedVersion` it does nothing, and `pushDirty` supplies one.
     await settle(A.backend.delete('note.md'))
-    const del = remote.calls.filter(c => c.op === 'delete')
-    expect(del).toHaveLength(1)
-    expect(del[0]?.status).toBe(200)
-    // B's edit is gone. Same interleaving, opposite outcome to the one above.
-    expect(remote.has('note.md')).toBe(false)
+    expect(remote.calls.filter(c => c.op === 'delete')).toHaveLength(0)
+    // B's edit survives — the same outcome as the reconstruction above, which
+    // is the whole of the fix.
+    expect(remote.get('note.md')?.content).toContain('v2 body')
   })
 })
 

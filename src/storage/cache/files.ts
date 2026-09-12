@@ -265,12 +265,33 @@ export async function cacheGetDirty(vaultId: string): Promise<CacheRecord[]> {
  * the UI immediately but the backend delete is deferred to the next sync
  * (pushDirty). The base version is preserved so GitHub's delete API can use
  * it as the required blob SHA even after a page reload.
+ *
+ * `baseContent` is preserved for the case where the version is *not* — the
+ * tombstone's answer to "what did this device think was at that path". A
+ * version-less tombstone is ambiguous: the file may be this device's own, with
+ * its token lost mid-flight, or it may be a draft that never synced and whose
+ * path some other device has since filled with a file this one has never seen.
+ * Deleting is right in the first case and destroys someone's work in the
+ * second, and `pushDirty` can only tell them apart by comparing what is at the
+ * path against what we last knew was there (#1017).
+ *
+ * `content` is still blanked — the tombstone is not a copy of the file, and
+ * the delete-undo path re-serializes from the store, not from here. `baseFor`
+ * is what the backend held, which for a clean record is its content and for a
+ * dirty one is the ancestor its unpushed edit was made from; a record that has
+ * never been pulled or pushed answers `undefined`, which is exactly the "we
+ * have never seen anything at this path" that must not delete.
  */
 export async function recordLocalDelete(vaultId: string, path: string): Promise<void> {
   const d = await cacheInit()
   const key = vp(vaultId, path)
   const existing = await d.files.get(key)
-  await d.files.put({ vaultPath: key, vaultId, path, content: '', dirty: DIRTY_BY_STATUS.deleted, updatedAt: Date.now(), version: existing?.version })
+  await d.files.put({
+    vaultPath: key, vaultId, path, content: '',
+    dirty: DIRTY_BY_STATUS.deleted, updatedAt: Date.now(),
+    version: existing?.version,
+    baseContent: baseFor(existing),
+  })
   publishCacheChange(vaultId, [path])
 }
 
