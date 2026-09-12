@@ -22,7 +22,7 @@ import { getVaults } from '@/storeBridge'
 import { warn, notifyError } from './notifications'
 import { getBackend } from './backends'
 import { journal, hashContent } from './syncJournal'
-import { updateSyncUI } from './sync'
+import { updateSyncUI } from './syncUI'
 import { scheduleAutoPush } from './syncScheduler'
 
 /**

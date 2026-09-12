@@ -385,7 +385,7 @@ own store: the **live reload**. An open editor takes from it only the fields
 its user has not touched; the ones both sides moved are the drift conflict
 below.
 → `storage/cache/broadcast.ts` · `publishCacheChange`, `onCacheChange`
-→ `storage/sync.ts` · `startCrossTabSync`
+→ `storage/crossTabSync.ts` · `startCrossTabSync`
 → `editor/useLiveReload.ts` · `useLiveReload`
 
 ### drift conflict

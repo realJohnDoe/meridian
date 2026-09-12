@@ -26,7 +26,7 @@ import {
 } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { mountBackend, unmountBackend } from './backends'
-import { updateSyncUI } from './sync'
+import { updateSyncUI } from './syncUI'
 import { syncOnActivate } from './syncScheduler'
 import { dropSyncState } from './syncState'
 import { parseFiles, reportParseFailures } from './parseReport'
