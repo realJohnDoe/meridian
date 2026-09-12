@@ -212,6 +212,31 @@ function cachedCountBound(
 }
 
 /**
+ * Whether a `schedule` repeat's `until` bound falls strictly before `anchor`.
+ *
+ * `expandNode` normally emits a node's own anchor unconditionally — it is
+ * documented elsewhere as "occurrence #1", a series' own start can never be
+ * past its own end. That invariant holds for every series built through the
+ * editor's "single"/"all" edit scopes, but `applyFuture`'s `future`-scope
+ * split (`storeOps.ts`) can violate it: capping the *old* leg at
+ * `dayBefore(occDate)` while leaving its anchor `date` field at `occDate`
+ * itself is only wrong when `occDate` was the series' own anchor to begin
+ * with (e.g. splitting at the very first occurrence, or re-splitting at a
+ * boundary a previous split already created) — every other split leaves the
+ * old anchor safely before the new cap. Rather than trust every future
+ * caller to keep that invariant, `expandNode` checks it directly so a
+ * mis-capped series degrades to emitting nothing instead of an extra
+ * occurrence on the cap day.
+ */
+function isPastUntilBound(anchor: Date, end: Extract<Repeat, { type: 'schedule' }>['end']): boolean {
+  if (end?.type !== 'until' || !end.date) return false
+  const untilDate = toDate(end.date)
+  if (!untilDate) return false
+  const bound = end.time ? (parseDateTime(fmtISO(untilDate), end.time) ?? endOfDay(untilDate)) : endOfDay(untilDate)
+  return anchor > bound
+}
+
+/**
  * Lazy, ascending date walk for a `schedule` repeat rule — one `yield` per
  * date passing the same `from`/`to` predicate `generateScheduledDates` used
  * to filter its materialised array with. `generateScheduledDates` is now a
@@ -620,7 +645,8 @@ function expandNode<M>(
   }
 
   if (node.repeat?.type !== 'after_completion') {
-    if (anchor >= from && anchor <= to) {
+    const endedBeforeAnchor = node.repeat?.type === 'schedule' && isPastUntilBound(anchor, node.repeat.end)
+    if (!endedBeforeAnchor && anchor >= from && anchor <= to) {
       emitSlot(anchor, node.repeat ? 'generated' : 'explicit')
     }
   }

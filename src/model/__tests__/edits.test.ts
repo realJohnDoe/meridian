@@ -216,6 +216,34 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  it('future-scope split at the series\' own anchor date does not double-emit', () => {
+    // Regression for the reported bug: editing "this and future" occurrences
+    // of a daily series *on its very first occurrence* (so the split point
+    // equals the series' own anchor date) while switching to an
+    // after_completion repeat produced two occurrences on that day and left
+    // the capped leg's anchor dangling past its own `end`. `applyFuture` caps
+    // the old leg at `dayBefore(occDate)` but never moves its `date` field off
+    // `occDate` — only `expandNode` refusing to emit an anchor past its own
+    // `end` (see `isPastUntilBound`) keeps that leg from re-adding a second,
+    // never-completing occurrence on the split day (and, since it can never
+    // be marked done, forever after in the overdue pool).
+    const data = fixtureData('weekly-series')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-06') // the series' own anchor date
+    const next = applyEdit(data, occ, 'future', editFields(occ, {
+      repeat: { type: 'after_completion', interval: '2 days' },
+    }), NEW_TARGET)
+
+    const series = itemsOf(next).filter(isSeries)
+    expect(series).toHaveLength(2)
+    const newSeries = series.find(s => s.repeat.type === 'after_completion')!
+    expect(newSeries).toBeDefined()
+
+    const expanded = expandRange(itemsOf(next), rootsIn(next), new Date('2026-03-01'), new Date('2026-05-31'))
+    const onAnchor = expanded.filter(o => o.date === '2026-04-06')
+    expect(onAnchor).toHaveLength(1)
+    expect(onAnchor[0]!.ownerId).toBe(newSeries.id)
+  })
+
   it('excludeOccurrence drops a single generated occurrence', () => {
     const data = fixtureData('weekly-series')
     const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
