@@ -276,3 +276,62 @@ further 400-run soaks found no violation of the six now that runs explore past
 where they used to stop. That last point is the one worth keeping — the deeper
 exploration was the thing this report predicted would follow, and it came back
 clean.
+
+## Postscript, 2026-09-12: the invariant that was asserted but unreachable
+
+Same reason as the postscript above — this is the same machinery reporting on
+itself — and it is the other half of the #1017 story.
+
+Invariant 2 rejects a record that is **clean with no version** outright, and
+says why: the next edit CASes with no precondition, which every backend reads
+as "must be absent", so a file that plainly exists conflicts for no reason and
+copies itself out (#738). The fix above names the same state from the other
+side, as the first of the two histories a version-less tombstone can have: *"a
+push whose `write` returned no token and whose repair read also failed leaves a
+clean record with the content the backend holds and no version"*.
+
+So the assertion and the code path that breaks it were both in the tree, and
+the sweep was green. Not because the sweep was wrong — because the alphabet
+could not reach it. A write in `interleavings.ts` staged two ways, `pushed` or
+`draft`, and `FakeGitHub` answered every `PUT` with a freshly minted token. No
+sequence of writes, deletes, syncs and reloads produces a write whose answer
+never arrives.
+
+**What was added.** A third staging, `unacked`: the write commits and its
+acknowledgement is lost — `FakeGitHub.loseWriteAck` answers the `PUT` 200 with
+no `content.sha` and kills the one request that follows, which is the repair
+read. One dropped connection, modelled end to end; both halves are needed,
+since a missing token alone is repaired by the read and a failing read alone
+had a token. It is a staging rather than a fourth op for the reason the other
+two are: a fault armed in its own step lands on whichever push goes out next,
+which on this pump is rarely the write it was written for.
+
+The state is reached in one operation, and the violation is invariant 2's own
+sentence, verbatim.
+
+**The fix.** `GitHubBackend.write` derives the token from the bytes it sent
+when the response carries none. A `PUT` that resolves has committed, so the
+remote holds exactly those bytes, and a git blob SHA is a pure function of
+them — the token is knowable whether or not the response survived the trip.
+The response still wins when there is one, and the two are cross-checked so a
+remote that stores something other than what it was handed says so in the
+journal (`version-mismatch`) rather than through a CAS that quietly stops
+succeeding.
+
+**What this cost the harness, and what that bought.** `FakeGitHub` minted SHAs
+from a counter. A counter cannot model a token the client can compute, so every
+derived version would be one "this remote never minted" — invariant 2 failing
+on an artefact of the fake. It mints git's real hash now, from content, which
+is also more faithful in its own right: two paths holding the same bytes share
+one SHA, and a rewrite with unchanged content mints nothing new. Deliberately
+via Node's `createHash` rather than by calling `blobSha`: a fake that reuses the
+code under test agrees with it by construction, including where both are wrong.
+
+`blobSha` is pinned against `git hash-object` for empty, ASCII and multi-byte
+content. The multi-byte case is the one that matters — the header counts UTF-8
+bytes, and a length read off `content.length` passes the first two and fails
+only on a real note with an umlaut in it, months later, as a CAS that never
+succeeds again.
+
+**Soaks.** 400 generated interleavings with `unacked` in the alphabet, no
+violation of the six.

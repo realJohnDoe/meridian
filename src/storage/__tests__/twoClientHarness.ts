@@ -27,6 +27,7 @@
  * doesn't re-evaluate externalised node_modules, so both graphs keep the one
  * `dexie` that was loaded first.
  */
+import { createHash } from 'node:crypto'
 import { vi } from 'vitest'
 import { GitHubBackend } from '@/storage/githubBackend'
 import type { StorageBackend, RawFile, PermissionOutcome } from '@/storage/backend'
@@ -76,15 +77,17 @@ export interface RemoteCall {
  *    is already gone is a 404. This is not a convenience: whether GitHub
  *    enforces the precondition on `DELETE` is exactly what finding #3 turns
  *    on, so it is modelled rather than assumed away.
+ *  - **A write's acknowledgement can be lost.** `loseWriteAck` commits the
+ *    write and drops the answer — the only route to a clean record with no
+ *    version token.
  *
- * SHAs are minted from a counter, never a clock or a random — a seed replays
- * byte-for-byte.
+ * SHAs are git's own, hashed from content (`_mintSha`) — deterministic, so a
+ * seed still replays byte-for-byte.
  */
 export class FakeGitHub {
   private _files = new Map<string, RemoteFile>()
-  private _shaCounter = 0
   /**
-   * Every `(sha -> path, content)` this repo has ever minted.
+   * Every `(sha -> content)` this repo has ever minted.
    *
    * GitHub's blob SHAs are content-addressed and immortal, so this is a
    * faithful model rather than a testing convenience — and it is what lets an
@@ -93,21 +96,28 @@ export class FakeGitHub {
    * stamped clean against a version the remote never had at that content is
    * the shape of #520 and #738, and only a history can catch it.
    */
-  private _history = new Map<string, { path: string; content: string }>()
+  private _history = new Map<string, string>()
   /** Paths whose tree listing is pinned to an older sha — see `staleTreeFor`. */
   private _staleTree = new Map<string, string>()
+  /** Paths whose next `PUT` answers without a token — see `loseWriteAck`. */
+  private _loseAck = new Set<string>()
+  /**
+   * The path whose *immediately following* request dies at the transport, set
+   * by the `PUT` that lost its ack and cleared by whatever request comes next.
+   */
+  private _deadRead: string | undefined
   readonly calls: RemoteCall[] = []
 
   /** Put a file there with no client involved — the state a scenario starts from. */
   seed(path: string, content: string): string {
-    const sha = this._mintSha()
+    const sha = this._mintSha(content)
     this._files.set(path, { content, sha })
-    this._history.set(sha, { path, content })
+    this._history.set(sha, content)
     return sha
   }
 
   /** What this repo held at `sha`, or `undefined` if it never minted one. */
-  contentAtVersion(sha: string): { path: string; content: string } | undefined {
+  contentAtVersion(sha: string): string | undefined {
     return this._history.get(sha)
   }
 
@@ -124,10 +134,59 @@ export class FakeGitHub {
   staleTreeFor(path: string, sha: string): void { this._staleTree.set(path, sha) }
   clearStaleTree(): void { this._staleTree.clear() }
 
-  private _mintSha(): string { return `sha${++this._shaCounter}` }
+  /**
+   * Drop the connection around the next write to `path`: the `PUT` commits and
+   * answers 200 with no `content.sha`, and the single request that follows it
+   * fails at the transport if it is a read of that path — the repair read.
+   *
+   * Both halves are needed to reach the state this exists for. A missing token
+   * alone is harmless: `versionAfterWrite` re-reads and recovers it. A failing
+   * read alone is harmless: there was a token. Together they are the one way a
+   * record reaches `clean` with **no version**, which `checkCleanTruth` calls a
+   * violation of invariant 2 and which nothing else in the op alphabet can
+   * produce. Nor is the pairing a convenience — a connection that dies between
+   * the commit and its response is still dead a moment later, when the repair
+   * read goes out.
+   *
+   * Exactly one request, because that is how long the outage has to last. Armed
+   * until *some* read of the path comes along, it would sit unspent through the
+   * fix that stops the repair read from happening at all, and kill another
+   * device's pull days of virtual time later.
+   *
+   * Armed against the path rather than the step, so it lands on that path's
+   * next write wherever the debounce actually fires.
+   */
+  loseWriteAck(path: string): void { this._loseAck.add(path) }
+
+  /**
+   * The blob SHA for `content` — git's own hash, independently implemented.
+   *
+   * Content-addressed rather than counted, which is what the real thing is:
+   * two paths holding the same bytes share one SHA, and re-writing a file with
+   * the content it already had mints nothing new. It has to be the real
+   * function now that `GitHubBackend.write` derives a token from the bytes it
+   * sent (`blobSha`) rather than only reading one off the response — a counter
+   * would make every derived token one this repo "never minted", failing
+   * invariant 2 for a reason that is an artefact of the fake.
+   *
+   * Deliberately *not* a call to `blobSha`: a fake that reuses the code under
+   * test agrees with it by construction, including where both are wrong. Node's
+   * `createHash` and the production WebCrypto path are two implementations of
+   * one published format, so agreement between them is evidence.
+   */
+  private _mintSha(content: string): string {
+    const bytes = Buffer.from(content, 'utf8')
+    return createHash('sha1').update(`blob ${bytes.length}\u0000`).update(bytes).digest('hex')
+  }
 
   /** The `fetch` implementation to stub in. */
   handler = (url: string, init?: RequestInit): Promise<unknown> => {
+    // A dropped connection outlives the write it killed by exactly one
+    // request — the repair read that follows it. Anything else reaching the
+    // server means the client has moved on and so has the connection, so the
+    // arming lapses here rather than lying in wait for an unrelated read.
+    const dead = this._deadRead
+    this._deadRead = undefined
     const method = (init?.method ?? 'GET').toUpperCase()
     const u = new URL(url)
     const body = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : {}
@@ -135,7 +194,7 @@ export class FakeGitHub {
     if (u.pathname.includes('/git/trees/')) return this._trees()
     const m = /\/repos\/[^/]+\/[^/]+\/contents\/(.+)$/.exec(u.pathname)
     const path = m?.[1] ? decodeURIComponent(m[1]) : ''
-    if (method === 'GET')    return this._read(path)
+    if (method === 'GET')    return this._read(path, dead === path)
     if (method === 'PUT')    return this._write(path, body)
     if (method === 'DELETE') return this._delete(path, body)
     return Promise.resolve(resp({ message: 'Not Found' }, 404))
@@ -153,7 +212,14 @@ export class FakeGitHub {
     return Promise.resolve(resp({ tree, truncated: false }, 200))
   }
 
-  private _read(path: string): Promise<unknown> {
+  private _read(path: string, dead = false): Promise<unknown> {
+    // The second half of `loseWriteAck`: this read never reaches the server.
+    // Status 0 is the trace's mark for "no response", which is what Octokit
+    // sees when the connection is gone.
+    if (dead) {
+      this._record('read', 'GET', path, 0)
+      return Promise.reject(new TypeError('Failed to fetch'))
+    }
     const f = this._files.get(path)
     if (!f) {
       this._record('read', 'GET', path, 404)
@@ -177,12 +243,17 @@ export class FakeGitHub {
       this._record('write', 'PUT', path, 409, sent)
       return Promise.resolve(resp({ message: 'is at ' + (existing?.sha ?? 'nothing') + ' but expected ' + sent }, 409))
     }
-    const sha = this._mintSha()
     const content = decodeBody(body)
+    const sha = this._mintSha(content)
     this._files.set(path, { content, sha })
-    this._history.set(sha, { path, content })
+    this._history.set(sha, content)
     this._staleTree.delete(path)
     this._record('write', 'PUT', path, 200, sent)
+    // The commit landed either way; a lost ack costs only the answer.
+    if (this._loseAck.delete(path)) {
+      this._deadRead = path
+      return Promise.resolve(resp({ content: {} }, 200))
+    }
     return Promise.resolve(resp({ content: { sha } }, 200))
   }
 

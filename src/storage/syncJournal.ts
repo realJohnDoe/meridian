@@ -69,6 +69,8 @@ export type SyncEventKind =
   | 'pull'                 // reconcile pulled fresh remote content over a clean record
   | 'drop'                 // reconcile evicted a record the backend no longer lists
   | 'version-repair'       // a backend that could not report its new token was re-read
+  | 'version-local'        // …or, where the token is a function of content, derived from the bytes just written
+  | 'version-mismatch'     // a derived token disagreed with the one the backend reported — never expected; see `blobSha`
   // ── auth ──────────────────────────────────────────────────────
   | 'auth-refresh'         // a stored GitHub credential was due (or forced) to rotate
   | 'auth-refreshed'       // …and it succeeded — the new token is stored

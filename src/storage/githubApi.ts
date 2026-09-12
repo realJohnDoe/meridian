@@ -39,6 +39,32 @@ export function decodeBase64(b64: string): string {
   return new TextDecoder().decode(bytes)
 }
 
+// ── Blob SHAs ──────────────────────────────────────────────────
+
+/**
+ * The git blob SHA GitHub will hold for `content` — the same token its
+ * Contents API reports as `sha` and accepts as a CAS precondition.
+ *
+ * Not a fingerprint of our own invention: git hashes a blob as
+ * `sha1("blob " + <byte length> + "\0" + bytes)`, and the Contents API commits
+ * the bytes it was handed, so this is computable before the write goes out and
+ * equal to what comes back after it. That is what makes it usable as a version
+ * token for a write whose response never arrived (`GitHubBackend.write`).
+ *
+ * The length is in **UTF-8 bytes**, not UTF-16 code units — one umlaut in a
+ * note is the difference between this matching GitHub and never matching it
+ * again, which is why `write` cross-checks the two whenever it has both.
+ */
+export async function blobSha(content: string): Promise<string> {
+  const bytes  = new TextEncoder().encode(content)
+  const header = new TextEncoder().encode(`blob ${bytes.length}\u0000`)
+  const framed = new Uint8Array(header.length + bytes.length)
+  framed.set(header)
+  framed.set(bytes, header.length)
+  const digest = await crypto.subtle.digest('SHA-1', framed)
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 // ── Error mapping ──────────────────────────────────────────────
 
 import { ConflictError, AuthSyncError, TransientSyncError } from './conflictError'

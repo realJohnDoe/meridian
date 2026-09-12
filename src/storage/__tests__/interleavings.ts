@@ -81,6 +81,25 @@ export type Staging =
   | 'pushed'
   /** The page closes first: the change is durable locally and nothing went out. */
   | 'draft'
+  /**
+   * The debounce fires and the write lands, but its acknowledgement is lost —
+   * the response carries no token and the repair read that follows cannot get
+   * through either (`FakeGitHub.loseWriteAck`).
+   *
+   * The third staging rather than a fourth op, for the reason above: a fault
+   * armed in its own step lands on whichever push happens to go out next, which
+   * on this pump is rarely the write it was written for. It reaches the one
+   * state the other two cannot — a record that is **clean with no version** —
+   * and that state is not exotic: any dropped connection between the commit and
+   * its answer produces it, on a file this device really does own.
+   */
+  | 'unacked'
+
+/**
+ * A delete stages two ways, not three: a `DELETE` returns no token to lose, so
+ * there is no acknowledgement whose absence would leave a record behind.
+ */
+export type DeleteStaging = Exclude<Staging, 'unacked'>
 
 export type Op =
   /**
@@ -91,7 +110,7 @@ export type Op =
    */
   | { t: 'write';  c: ClientId; slug: Slug; field: 'title' | 'body'; staging: Staging }
   /** The user deletes the entry. */
-  | { t: 'delete'; c: ClientId; slug: Slug; staging: Staging }
+  | { t: 'delete'; c: ClientId; slug: Slug; staging: DeleteStaging }
   /** One full sync cycle: push what's dirty, reconcile against the listing. */
   | { t: 'sync';   c: ClientId }
   /** The page reloads: cold `_shas`, cold tree ETag, the Dexie rows surviving. */
@@ -110,7 +129,8 @@ const slugArb   = fc.constantFrom(...SLUGS)
  * specific state — a dirty row with no base version — which two of them in a
  * row does no better than one.
  */
-const stagingArb = fc.constantFrom('pushed' as const, 'draft' as const)
+const stagingArb = fc.constantFrom('pushed' as const, 'draft' as const, 'unacked' as const)
+const deleteStagingArb = fc.constantFrom('pushed' as const, 'draft' as const)
 
 const opArb: fc.Arbitrary<Op> = fc.oneof(
   { weight: 5, arbitrary: fc.record({
@@ -118,7 +138,7 @@ const opArb: fc.Arbitrary<Op> = fc.oneof(
     field: fc.constantFrom('title' as const, 'body' as const), staging: stagingArb,
   }) },
   { weight: 4, arbitrary: fc.record({ t: fc.constant('sync' as const), c: clientArb }) },
-  { weight: 2, arbitrary: fc.record({ t: fc.constant('delete' as const), c: clientArb, slug: slugArb, staging: stagingArb }) },
+  { weight: 2, arbitrary: fc.record({ t: fc.constant('delete' as const), c: clientArb, slug: slugArb, staging: deleteStagingArb }) },
   { weight: 1, arbitrary: fc.record({ t: fc.constant('reload' as const), c: clientArb }) },
 )
 
@@ -292,6 +312,10 @@ export async function runInterleaving(remote: FakeGitHub, ops: readonly Op[]): P
         const rows = await cacheLoadAll(c.vaultId)
         const row = rows.find(r => r.path === pathOf(op.slug) && r.status !== 'deleted')
         const { content, fields } = nextContent(row?.content, op.slug, op.field, token)
+        // Armed before the edit, not after: the debounced push can go out any
+        // time from here on, and the fault has to already be in place when it
+        // does.
+        if (op.staging === 'unacked') remote.loseWriteAck(pathOf(op.slug))
         await settle(writeEntityToCache(entryKey(c.vaultId, op.slug), content))
         if (op.staging === 'draft') closeApp(c)
         ledger.noteWrite(op.c, pathOf(op.slug), fields, token, i)

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { encodeBase64, decodeBase64, mapGitHubError } from '@/storage/githubApi'
+import { encodeBase64, decodeBase64, mapGitHubError, blobSha } from '@/storage/githubApi'
 import { GitHubBackend } from '@/storage/githubBackend'
 import { ConflictError, AuthSyncError, TransientSyncError, isTransientSyncError } from '@/storage/conflictError'
 
@@ -33,6 +33,33 @@ describe('encodeBase64 / decodeBase64', () => {
     // GitHub returns base64 with newlines every 60 chars
     const withNewlines = raw.replace(/.{10}/g, '$&\n')
     expect(decodeBase64(withNewlines)).toBe(text)
+  })
+})
+
+// ── Blob SHAs ──────────────────────────────────────────────────
+
+describe('blobSha', () => {
+  // Expectations are git's own output — `git hash-object <file>` — not this
+  // implementation's. A test that asserts what the code already does would
+  // pass just as happily on a hash GitHub has never heard of, and the whole
+  // value of the token is that GitHub agrees with it.
+  it('matches git for an empty file', async () => {
+    await expect(blobSha('')).resolves.toBe('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391')
+  })
+
+  it('matches git for ASCII content', async () => {
+    await expect(blobSha('hello\n')).resolves.toBe('ce013625030ba8dba906f756967f9e9ca394464a')
+  })
+
+  // The one that catches the likely mistake: the header counts UTF-8 bytes,
+  // and this note is 35 of them against 30 UTF-16 code units. A length taken
+  // from `content.length` passes both cases above and fails only here — on a
+  // real user's note, months later, as a CAS that never succeeds again.
+  it('matches git for multi-byte UTF-8 content', async () => {
+    const note = '---\ntitle: \u00dcber\n---\n\nGr\u00fc\u00dfe \ud83c\udf0d\n'
+    expect(new TextEncoder().encode(note)).toHaveLength(35)
+    expect(note).toHaveLength(30)
+    await expect(blobSha(note)).resolves.toBe('8ec310dd29ea94a4a056cbdc57a37befd269d57d')
   })
 })
 
@@ -329,6 +356,33 @@ describe('GitHubBackend', () => {
     const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
     const body = parseRequestBody(init)
     expect(body.sha).toBeUndefined()
+  })
+
+  it('write returns the sha the response carries', async () => {
+    mockFetch({ content: { sha: 'fromgithub' } })
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.write('note.md', '# New')).resolves.toBe('fromgithub')
+  })
+
+  // The response body is the half of a write that a dropped connection takes
+  // with it. The commit still landed, so the token is still knowable — it is a
+  // function of the bytes we sent. Without this the caller is left with no
+  // version at all, which is a manufactured conflict on the next edit (#738)
+  // and a re-pull on every reconcile until then.
+  it('write derives the sha from the content when the response carries none', async () => {
+    mockFetch({ content: {} })
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.write('note.md', 'hello\n')).resolves.toBe(await blobSha('hello\n'))
+  })
+
+  // GitHub is the authority on what GitHub holds; the derived token is only a
+  // stand-in for an answer that did not arrive. If the two ever disagree, the
+  // remote is storing something other than the bytes it was handed, and the
+  // one to keep is the one the remote named.
+  it('write keeps the response sha when it disagrees with the derived one', async () => {
+    mockFetch({ content: { sha: 'somethingelse' } })
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await expect(backend.write('note.md', 'hello\n')).resolves.toBe('somethingelse')
   })
 
   it('write throws ConflictError on 409', async () => {

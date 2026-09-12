@@ -41,7 +41,7 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } 
 import fc from 'fast-check'
 import { useFixedClock, resetWorld } from './twoClientHarness'
 import type { FakeGitHub } from './twoClientHarness'
-import type { Op, Staging, ClientId, Slug } from './interleavings'
+import type { Op, Staging, DeleteStaging, ClientId, Slug } from './interleavings'
 import type { Violation } from './syncInvariants'
 
 const { notifyFns } = vi.hoisted(() => ({
@@ -64,7 +64,7 @@ afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks() })
 // ── Op shorthand, so a corpus case reads as the story it is ──────────
 
 const write  = (c: ClientId, slug: Slug, field: 'title' | 'body', staging: Staging = 'pushed'): Op => ({ t: 'write', c, slug, field, staging })
-const del    = (c: ClientId, slug: Slug, staging: Staging = 'pushed'): Op => ({ t: 'delete', c, slug, staging })
+const del    = (c: ClientId, slug: Slug, staging: DeleteStaging = 'pushed'): Op => ({ t: 'delete', c, slug, staging })
 const sync   = (c: ClientId): Op => ({ t: 'sync', c })
 const reload = (c: ClientId): Op => ({ t: 'reload', c })
 
@@ -153,6 +153,23 @@ const CORPUS: Array<{ name: string; ops: Op[] }> = [
       // file was destroyed. Now the tombstone's last-known content says the
       // path is not ours, so B's file is kept.
       sync('deviceA'),
+    ],
+  },
+  {
+    // The state this reaches is one no other staging can: a record that is
+    // clean and carries no version. `checkCleanTruth` rejects it outright, and
+    // the second write is why — with no precondition to send, the push goes out
+    // shaped as a create, GitHub answers 422, and `resolveCollision` copies out
+    // a conflict that never happened (invariant 3, #738).
+    name: 'a write whose acknowledgement was lost is still clean against a version the remote really holds',
+    ops: [
+      // A creates the note. The commit lands; the response and the repair read
+      // that follows it are both lost to the same dropped connection.
+      write('deviceA', 'note', 'body', 'unacked'),
+      // A keeps typing. This is the edit that pays for a missing version.
+      write('deviceA', 'note', 'body'),
+      sync('deviceA'),
+      sync('deviceB'),
     ],
   },
 ]
