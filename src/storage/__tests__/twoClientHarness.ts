@@ -368,7 +368,7 @@ function withLegacyDelete(inner: StorageBackend): StorageBackend {
  */
 let _generation = 0
 
-export function currentGeneration(): number { return _generation }
+function currentGeneration(): number { return _generation }
 
 /**
  * Wrap `backend`'s network methods so each remembers the generation it was
