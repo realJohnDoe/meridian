@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run && pnpm --filter meridian-oauth-worker run test",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage && pnpm --filter meridian-oauth-worker run test:coverage",
+    "test:coverage": "vitest run --coverage && vitest run src/coverageConfig.test.ts && pnpm --filter meridian-oauth-worker run test:coverage",
     "lint": "eslint src worker/src --max-warnings=0 && pnpm run lint:deps",
     "lint:deps": "depcruise src",
     "test:e2e": "playwright test",

@@ -17,7 +17,7 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
+      reporter: ['text', 'html', 'json-summary'],
       // Count every source file, not just ones a test happens to import —
       // otherwise whole untested modules silently vanish from the report.
       include: ['src/**/*.{ts,tsx}'],
@@ -71,21 +71,30 @@ export default defineConfig({
       // storeCommit.ts sat at 30/95/45/35 against a measured 100/100/100/100
       // until 2026-09-06 for exactly that reason. Re-measure the floors
       // (`pnpm run test:coverage`) when running the health survey, per
-      // plans/surveys/health.md's Budget.
+      // plans/surveys/health.md's Budget — and src/coverageConfig.test.ts's
+      // third guard now fails CI on its own once any floor drifts more than
+      // ~10 points below measured, so a missed re-measure doesn't go
+      // unnoticed until the next survey (#1039).
       thresholds: {
         // Global floor. Per-file thresholds only guard the files they name, so
         // a brand-new untested logic module used to slip through the gate
         // entirely. This catches that: adding a sizeable unexercised module
         // drags the project total below the floor and fails CI. Kept a few
         // points under the measured total so ordinary UI work doesn't trip it.
-        statements: 68,
-        branches: 62,
-        functions: 59,
-        lines: 70,
-        'src/model/collapse.ts': { statements: 90, branches: 80, functions: 95, lines: 90 },
-        'src/editor/cm/taskLines.ts': { statements: 90, branches: 80, functions: 95, lines: 95 },
+        // Re-measured 2026-09-12 (#1039): was 68/62/59/70 against a measured
+        // 83.08/76.75/78.75/85.25 — 15-20 points of slack that would have let
+        // a sizeable untested module through. Floored a few points under.
+        statements: 78,
+        branches: 71,
+        functions: 73,
+        lines: 80,
+        // Re-measured 2026-09-12 (#1039): measured 98.33/95.95/100/100.
+        'src/model/collapse.ts': { statements: 93, branches: 91, functions: 95, lines: 95 },
+        // Re-measured 2026-09-12 (#1039): measured 96.96/92.85/100/100.
+        'src/editor/cm/taskLines.ts': { statements: 92, branches: 88, functions: 95, lines: 95 },
         'src/editor/cm/markdownFormatting.ts': { statements: 88, branches: 78, functions: 70, lines: 87 },
-        'src/editor/cm/ReactWidget.ts': { statements: 78, branches: 90, functions: 50, lines: 77 },
+        // Re-measured 2026-09-12 (#1039): measured 85.71/100/57.14/84.21.
+        'src/editor/cm/ReactWidget.ts': { statements: 81, branches: 95, functions: 52, lines: 79 },
         // The only XSS gate between file-/feed-derived `url:` frontmatter and a
         // rendered `<a href>` (health-ui-results.md finding #8) — a single
         // anchored allowlist regex, fully exercised by urlSafety.test.ts.
@@ -124,13 +133,18 @@ export default defineConfig({
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 82, branches: 78, functions: 78, lines: 85 },
         'src/occurrenceActions.ts': { statements: 90, branches: 77, functions: 95, lines: 94 },
         'src/editor/useEntryEditor.ts': { statements: 77, branches: 55, functions: 73, lines: 82 },
-        'src/editor/useAutoSave.ts': { statements: 85, branches: 70, functions: 80, lines: 90 },
-        'src/editor/useVaultTarget.ts': { statements: 88, branches: 72, functions: 90, lines: 95 },
+        // Re-measured 2026-09-12 (#1039): measured 90.9/75/90/95.65.
+        'src/editor/useAutoSave.ts': { statements: 86, branches: 70, functions: 85, lines: 91 },
+        // Re-measured 2026-09-12 (#1039): measured 93.75/80/100/100.
+        'src/editor/useVaultTarget.ts': { statements: 89, branches: 75, functions: 95, lines: 95 },
         // The three one-way localStorage migrations (favorites, participant
         // filter, show-tasks) are now covered by store.migrations.test.ts;
         // this floor guards that from regressing without pinning the rest of
         // this cross-cutting file's many untested setters to the same bar.
-        'src/store.ts': { statements: 68, branches: 55, functions: 58, lines: 68 },
+        // Re-measured 2026-09-12 (#1039): was 68/55/58/68 against a measured
+        // 84.64/76.06/74.5/85.64 — 21.1 points of slack, the widest drift in
+        // the file. Floored a few points under the fresh measurement.
+        'src/store.ts': { statements: 79, branches: 71, functions: 69, lines: 80 },
         // The persistence commit path: every write, delete and cross-vault
         // move leaves through one of these five functions. Measured
         // 100/100/100/100 on 2026-09-06; floored just under that. The previous
@@ -147,25 +161,36 @@ export default defineConfig({
         // floor — before the split they were covered under sync.ts's, and
         // nothing else would hold them there.
         'src/storage/parseReport.ts': { statements: 92, branches: 78, functions: 85, lines: 94 },
-        'src/storage/syncState.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        // Re-measured 2026-09-12 (#1039): measured 96.15/100/100/100.
+        'src/storage/syncState.ts': { statements: 91, branches: 95, functions: 95, lines: 95 },
         'src/storage/syncScheduler.ts': { statements: 80, branches: 60, functions: 88, lines: 85 },
         // entityWrites sits lower than its old home because the split made its
         // two `catch` arms (a Dexie write failing outright) visible as their
         // own file rather than diluted across sync.ts. Still floored: a save
         // that vanishes silently is the worst bug this codebase can have.
-        'src/storage/entityWrites.ts': { statements: 85, branches: 83, functions: 95, lines: 85 },
+        // Re-measured 2026-09-12 (#1039): measured 94.23/96.15/100/94.87.
+        'src/storage/entityWrites.ts': { statements: 89, branches: 91, functions: 95, lines: 90 },
         // First-party primitives lifted out of components/ui/, where the
-        // coverage exclusion had kept them invisible.
-        'src/components/primitives/responsive-modal.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
-        'src/components/primitives/icon-button.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
-        'src/editor/dialogs/TimeWheels.tsx': { statements: 88, branches: 78, functions: 95, lines: 95 },
-        'src/editor/FloatingComboboxList.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
-        'src/calendar/ContinuationChevron.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        // coverage exclusion had kept them invisible. Re-measured
+        // 2026-09-12 (#1039): both measured 100/100/100/100 — floored at
+        // 97/97/97/97 rather than raised to 100, which would leave zero
+        // headroom and fail CI on the first untested branch added later.
+        'src/components/primitives/responsive-modal.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/components/primitives/icon-button.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        // Re-measured 2026-09-12 (#1039): measured 96.32/88.46/96.77/99.1.
+        'src/editor/dialogs/TimeWheels.tsx': { statements: 91, branches: 83, functions: 92, lines: 94 },
+        // Re-measured 2026-09-12 (#1039): measured 100/100/100/100 — floored
+        // at 97/97/97/97, not raised to 100 (see responsive-modal.tsx above).
+        'src/editor/FloatingComboboxList.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/calendar/ContinuationChevron.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
         // src/routes/ files that are not route registration. auth.callback.tsx
         // is the OAuth phase machine — a regression there is a broken sign-in
         // with no other way in — so it gets the tightest floor here.
         'src/routes/auth.callback.tsx': { statements: 92, branches: 88, functions: 95, lines: 95 },
-        'src/routes/__root.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        // Re-measured 2026-09-12 (#1039): measured 100/100/100/100 — floored
+        // at 97/97/97/97 rather than raised to 100 (see responsive-modal.tsx
+        // above).
+        'src/routes/__root.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
         // Un-excluded from coverage (health-ui-results.md finding #6):
         // AppMain's shell layout and quick-nav panel mechanics, not
         // registration. Re-measured after finding #1 moved the per-view half
@@ -182,23 +207,32 @@ export default defineConfig({
         // part of it; keeping it floored here is what stops the extraction
         // from quietly downgrading its guard. -weekChrome.tsx is the loosest
         // because its onBrowseMonthPreview only fires mid-gesture.
-        'src/routes/-viewChrome.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
-        'src/routes/-useViewChrome.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
-        'src/routes/-dayChrome.tsx': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        // Re-measured 2026-09-12 (#1039): these four and -listChrome.ts below
+        // all measured 100/100/100/100 — floored at 97/97/97/97 rather than
+        // raised to 100 (see responsive-modal.tsx above). -weekChrome.tsx and
+        // -agendaChrome.tsx are untouched: neither drifted ≥10 points.
+        'src/routes/-viewChrome.ts': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/routes/-useViewChrome.ts': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/routes/-dayChrome.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
         'src/routes/-weekChrome.tsx': { statements: 88, branches: 78, functions: 75, lines: 90 },
-        'src/routes/-monthChrome.tsx': { statements: 92, branches: 90, functions: 95, lines: 95 },
-        'src/routes/-listChrome.ts': { statements: 92, branches: 90, functions: 95, lines: 95 },
+        'src/routes/-monthChrome.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/routes/-listChrome.ts': { statements: 97, branches: 97, functions: 97, lines: 97 },
         'src/routes/-agendaChrome.tsx': { statements: 92, branches: 82, functions: 95, lines: 95 },
-        'src/entryRoute.ts': { statements: 92, branches: 85, functions: 95, lines: 95 },
+        // Re-measured 2026-09-12 (#1039): measured 100/100/100/100 — floored
+        // at 97/97/97/97, not raised to 100 (see responsive-modal.tsx above).
+        'src/entryRoute.ts': { statements: 97, branches: 97, functions: 97, lines: 97 },
         // Draft resume keyed on TanStack's history `__TSR_key` — without it a
         // returning user's second save minted `buy-milk-2` beside the first,
         // carrying none of the edits. Measured 95.12/48.48/88.23/92.59 on
         // 2026-09-06, its first measurement: the `_entry*.tsx` exclusion glob
         // had kept it out of the report entirely.
         'src/routes/_entry.entry.new.tsx': { statements: 92, branches: 44, functions: 85, lines: 90 },
-        'src/routes/-entryTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
-        'src/routes/-pagedTopbar.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
-        'src/routes/-topbarEdgePadding.ts': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        // Re-measured 2026-09-12 (#1039): all three measured 100/100/100/100
+        // — floored at 97/97/97/97, not raised to 100 (see
+        // responsive-modal.tsx above).
+        'src/routes/-entryTopbar.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/routes/-pagedTopbar.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/routes/-topbarEdgePadding.ts': { statements: 97, branches: 97, functions: 97, lines: 97 },
         // health-results.md finding #6: the URL->occurrence resolution route
         // (date/id disambiguation, the view-only vs editable branch, the
         // not-found state) and the app shell's sidebar/search bar, all
@@ -215,8 +249,11 @@ export default defineConfig({
         // ~0%. Measured 2026-09-06: AddVaultWizard.tsx 100/91.3/100/100;
         // VaultDetail.tsx and AppearanceSettings.tsx both 100/100/100/100.
         'src/settings/AddVaultWizard.tsx': { statements: 95, branches: 86, functions: 95, lines: 95 },
-        'src/settings/VaultDetail.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
-        'src/settings/AppearanceSettings.tsx': { statements: 92, branches: 90, functions: 95, lines: 92 },
+        // Re-measured 2026-09-12 (#1039): both measured 100/100/100/100 —
+        // floored at 97/97/97/97, not raised to 100 (see responsive-modal.tsx
+        // above).
+        'src/settings/VaultDetail.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/settings/AppearanceSettings.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
       },
     },
   },
