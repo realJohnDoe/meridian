@@ -166,7 +166,11 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
 
   const { effectiveKey, pendingKeys, handleAdd, handleRemove } = pendingLinks
 
-  const linkedKeys = [...(effectiveKey ? backlinks.get(effectiveKey) ?? [] : []), ...pendingKeys]
+  // `pendingKeys` is optimistic state for a pick not yet reflected in the store's
+  // `backlinks` index — once the write lands, the same key shows up in both and
+  // must not be listed twice.
+  const knownLinks = effectiveKey ? backlinks.get(effectiveKey) ?? [] : []
+  const linkedKeys = [...new Set([...knownLinks, ...pendingKeys])]
 
   const { isRecurring, isScheduled, isAfterCompletion } = series
   const hasSched = !!item?.date

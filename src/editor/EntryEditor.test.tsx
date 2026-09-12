@@ -30,6 +30,11 @@ vi.mock('./EntryBody', () => ({
 setupStore()
 const persistence = installFakePersistence()
 
+// jsdom lays nothing out, so every rect is zeros — see ListedOnRow.test.tsx for why
+// that reads as "scrolled out of view" and hides the floating picker entirely.
+Element.prototype.getBoundingClientRect = () =>
+  ({ x: 0, y: 100, top: 100, left: 0, right: 200, bottom: 130, width: 200, height: 30, toJSON: () => ({}) })
+
 beforeEach(() => {
   vi.useFakeTimers()
 })
@@ -62,6 +67,31 @@ describe('EntryEditor', () => {
     expect(persistence.writes).toEqual([testKey('note.md'), testKey('note.md')])
     const saved = useStore.getState().items.find(i => i.id === 'occ-1') as { metadata: { done?: boolean } } | undefined
     expect(saved?.metadata.done).toBe(true)
+  })
+})
+
+// Reproduces the reported bug: adding a brand-new, never-saved entry straight to
+// a list showed that list's chip twice. `handleAddLink` writes the link directly
+// (since Save/Back flush nothing when no autosave is pending — see
+// useEntryEditor.test.tsx's "listed on" suite) *and* leaves the pick sitting in
+// `pendingLinks.pendingKeys`; once the store's `backlinks` index catches up with
+// that same write, the list showed up from both sources at once.
+describe('EntryEditor — listed on', () => {
+  function NewEntryHarness() {
+    const hooks = useEntryEditor(null, 'all', 'Buy milk')
+    return <EntryEditor hooks={hooks} items={[]} roots={useStore.getState().roots} />
+  }
+
+  it('does not duplicate the chip for a list a brand-new entry was added to', () => {
+    seedStore([], makeRoots('groceries', { title: 'Groceries' }))
+    render(<NewEntryHarness />)
+
+    fireEvent.click(screen.getByRole('button', { name: /add to list/i }))
+    fireEvent.change(screen.getByPlaceholderText('Search files…'), { target: { value: 'Groceries' } })
+    fireEvent.click(screen.getByText('Groceries').closest('[cmdk-item]')!)
+
+    expect(useStore.getState().roots.get(testKey('groceries'))?.items).toEqual(['[[buy-milk]]'])
+    expect(screen.getAllByText('Groceries')).toHaveLength(1)
   })
 })
 
