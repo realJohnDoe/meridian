@@ -35,7 +35,7 @@ beforeEach(() => {
 
 describe('EntryViewOnly', () => {
   it('renders the title as static text, not an editable field', () => {
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Team sync', tags: [], items: [] } })
+    const occ = makeOcc({ metadata: { title: 'Team sync' } })
     render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={makeRoots('note.md')} />)
 
     expect(screen.getByText('Team sync')).toBeInTheDocument()
@@ -46,14 +46,7 @@ describe('EntryViewOnly', () => {
     // duration is stored short-form here on purpose — the UI must always render
     // the long form regardless of how the source vault (e.g. an iCal import)
     // spelled it on disk.
-    const occ = makeOcc({
-      date: '2026-06-15',
-      time: '09:00',
-      metadata: {
-        vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [],
-        participants: ['Alice', 'Bob'], duration: '30m',
-      },
-    })
+    const occ = makeOcc({ date: '2026-06-15', time: '09:00', metadata: { title: 'Team sync', participants: ['Alice', 'Bob'], duration: '30m' } })
     render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={makeRoots('note.md')} />)
 
     expect(screen.getByText('Family calendar')).toBeInTheDocument()
@@ -65,12 +58,7 @@ describe('EntryViewOnly', () => {
   })
 
   it('renders location, url and organizer from extra, with url as a link', () => {
-    const occ = makeOcc({
-      metadata: {
-        vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [], participants: [],
-        extra: { location: 'Room 4B', url: 'https://meet.example.com/abc', organizer: 'Carol', uid: 'xyz' },
-      },
-    })
+    const occ = makeOcc({ metadata: { title: 'Team sync', extra: { location: 'Room 4B', url: 'https://meet.example.com/abc', organizer: 'Carol', uid: 'xyz' } } })
     render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={makeRoots('note.md')} />)
 
     expect(screen.getByText('Room 4B')).toBeInTheDocument()
@@ -81,12 +69,7 @@ describe('EntryViewOnly', () => {
   })
 
   it('renders a javascript: url from a feed as plain text, not a link', () => {
-    const occ = makeOcc({
-      metadata: {
-        vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [], participants: [],
-        extra: { url: 'javascript:alert(1)', uid: 'xyz' },
-      },
-    })
+    const occ = makeOcc({ metadata: { title: 'Team sync', extra: { url: 'javascript:alert(1)', uid: 'xyz' } } })
     render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={makeRoots('note.md')} />)
 
     expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument()
@@ -94,13 +77,7 @@ describe('EntryViewOnly', () => {
   })
 
   it('renders attendees from extra, separately from participant chips', () => {
-    const occ = makeOcc({
-      metadata: {
-        vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [],
-        participants: ['Alice'],
-        extra: { attendees: ['Alice', 'bob@example.com'], uid: 'xyz' },
-      },
-    })
+    const occ = makeOcc({ metadata: { title: 'Team sync', participants: ['Alice'], extra: { attendees: ['Alice', 'bob@example.com'], uid: 'xyz' } } })
     render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={makeRoots('note.md')} />)
 
     expect(screen.getAllByText('Alice')).toHaveLength(1) // participant chip only — attendees render as one joined line
@@ -108,9 +85,7 @@ describe('EntryViewOnly', () => {
   })
 
   it('passes body through EntryBody as read-only', () => {
-    const occ = makeOcc({
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [], participants: [], body: 'Agenda here' },
-    })
+    const occ = makeOcc({ metadata: { title: 'Team sync', body: 'Agenda here' } })
     render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={makeRoots('note.md')} />)
 
     const body = screen.getByTestId('entry-body')
@@ -119,7 +94,7 @@ describe('EntryViewOnly', () => {
   })
 
   it('still resolves wikilink clicks within the entry\'s own vault', () => {
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Team sync', tags: [], items: [], participants: [] } })
+    const occ = makeOcc({ metadata: { title: 'Team sync' } })
     const roots = makeRoots('note.md')
     roots.set(testKey('other-note'), { title: 'Other', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'other-note' })
     render(<EntryViewOnly occ={occ} vault={VAULT} items={[occ]} roots={roots} />)

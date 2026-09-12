@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
+import { setupStore, seedStore, makeOcc, makeRoots, testKey } from '@/test-utils'
 import { fmtISO, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { addDays } from '@/format'
 import { useAgendaSections } from './useAgendaSections'
@@ -84,12 +84,7 @@ describe('useAgendaSections', () => {
   })
 
   it('summarises an undone past task in overdue while leaving it on its own day', () => {
-    const overdueTask = makeOcc({
-      id: 'overdue-1',
-      date: '2026-06-10',
-      time: null,
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'other.md', participants: [], title: 'Old task', tags: [], items: [], done: false },
-    })
+    const overdueTask = makeOcc({ id: 'overdue-1', date: '2026-06-10', time: null, metadata: { fileSlug: 'other.md', title: 'Old task', done: false } })
     const pastEvent = makeOcc({
       id: 'past-event-1',
       date: '2026-06-10',
@@ -116,12 +111,7 @@ describe('useAgendaSections', () => {
   // what the agenda actually opens on: the overdue work itself, with Today
   // directly below it.
   it('expands the overdue section by default, keeping its header as the scroll target', () => {
-    const overdueTask = makeOcc({
-      id: 'overdue-1',
-      date: '2026-06-10',
-      time: null,
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Old task', tags: [], items: [], done: false },
-    })
+    const overdueTask = makeOcc({ id: 'overdue-1', date: '2026-06-10', time: null, metadata: { fileSlug: 'note', title: 'Old task', done: false } })
     seedStore([overdueTask], makeRoots('note.md'))
 
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
@@ -137,12 +127,7 @@ describe('useAgendaSections', () => {
   })
 
   it('collapses the overdue section to just its header when the user collapses it', () => {
-    const overdueTask = makeOcc({
-      id: 'overdue-1',
-      date: '2026-06-10',
-      time: null,
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Old task', tags: [], items: [], done: false },
-    })
+    const overdueTask = makeOcc({ id: 'overdue-1', date: '2026-06-10', time: null, metadata: { fileSlug: 'note', title: 'Old task', done: false } })
     seedStore([overdueTask], makeRoots('note.md'))
     collapseOverdue()
 
@@ -173,12 +158,7 @@ describe('useAgendaSections', () => {
 
   it('hands back untouched rows by reference when a task is toggled done', () => {
     const roots = makeRoots('note.md')
-    const task = makeOcc({
-      id: 'today-task',
-      date: '2026-06-15',
-      time: '09:00',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false },
-    })
+    const task = makeOcc({ id: 'today-task', date: '2026-06-15', time: '09:00', metadata: { fileSlug: 'note', title: 'Task', done: false } })
     const future = makeOcc({ id: 'future-1', date: '2026-06-20', time: '09:00' })
     seedStore([task, future], roots)
 

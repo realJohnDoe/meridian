@@ -266,7 +266,7 @@ describe('VaultSettings — archived', () => {
   const LOCAL_VAULT: VaultRef = { id: TEST_VAULT, name: 'Notes', kind: 'local' }
 
   function seedArchived(slug: string, title: string) {
-    const occ = makeOcc({ entryKey: testKey(slug), metadata: { vaultId: TEST_VAULT, fileSlug: slug, participants: [], title, tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey(slug), metadata: { vaultId: TEST_VAULT, fileSlug: slug, title } })
     seedStore([occ], makeRoots(slug, { title, archived: true }))
   }
 
@@ -275,7 +275,7 @@ describe('VaultSettings — archived', () => {
   // helper rather than calling seedArchived in a loop.
   function seedArchivedMany(entries: Array<{ slug: string; title: string }>) {
     const occs = entries.map(({ slug, title }) =>
-      makeOcc({ entryKey: testKey(slug), metadata: { vaultId: TEST_VAULT, fileSlug: slug, participants: [], title, tags: [], items: [] } }))
+      makeOcc({ entryKey: testKey(slug), metadata: { vaultId: TEST_VAULT, fileSlug: slug, title } }))
     const roots: Roots = new Map(entries.map(({ slug, title }) =>
       [testKey(slug), { title, tags: [], items: [], vaultId: TEST_VAULT, fileSlug: slug, archived: true }]))
     seedStore(occs, roots)
@@ -309,7 +309,7 @@ describe('VaultSettings — archived', () => {
   // PR 3 is explicit that the list is per vault, not global.
   it('never lists another vault\'s archived entry', () => {
     const otherKey = entryKey('other-vault', 'stray')
-    const otherOcc = makeOcc({ entryKey: otherKey, metadata: { vaultId: 'other-vault', fileSlug: 'stray', participants: [], title: 'Stray', tags: [], items: [] } })
+    const otherOcc = makeOcc({ entryKey: otherKey, metadata: { vaultId: 'other-vault', fileSlug: 'stray', title: 'Stray' } })
     seedStore([otherOcc], new Map([[otherKey, { title: 'Stray', tags: [], items: [], vaultId: 'other-vault', fileSlug: 'stray', archived: true }]]))
 
     render(<VaultSettings vault={LOCAL_VAULT} />)

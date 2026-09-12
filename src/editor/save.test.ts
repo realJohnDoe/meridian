@@ -27,7 +27,7 @@ describe('entryFromOccurrence', () => {
   })
 
   it('derives a task when `done` is defined, regardless of scheduling', () => {
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false } })
     const entry = entryFromOccurrence(occ, 'single')
     expect(entry.itemType).toBe('task')
     expect(entry.tracked).toBe(true)
@@ -35,14 +35,14 @@ describe('entryFromOccurrence', () => {
   })
 
   it('resets done to false for "add" scope even when the source occurrence is done', () => {
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Task', tags: [], items: [], done: true } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: true } })
     const entry = entryFromOccurrence(occ, 'add')
     expect(entry.done).toBe(false)
   })
 
   it('copies array-valued metadata fields instead of aliasing them', () => {
     const tags = ['work']
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: ['alice'], title: 'T', tags, items: [], done: true } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', participants: ['alice'], title: 'T', tags, done: true } })
     const entry = entryFromOccurrence(occ, 'single')
     entry.tags.push('mutated')
     expect(tags).toEqual(['work'])
@@ -200,7 +200,7 @@ describe('saveNode — writes only the fields the editor changed', () => {
 
   /** A note in the store, plus the editor snapshot taken when it was opened. */
   function openEditorOn(body: string) {
-    const occ = makeOcc({ date: '', time: null, entryKey: testKey('essensplan'), metadata: { vaultId: TEST_VAULT, fileSlug: 'essensplan', participants: [], title: 'Essensplan', tags: [], items: [], body } })
+    const occ = makeOcc({ date: '', time: null, entryKey: testKey('essensplan'), metadata: { vaultId: TEST_VAULT, fileSlug: 'essensplan', title: 'Essensplan', body } })
     seedStore([occ], makeRoots('essensplan', { title: 'Essensplan', body }))
     return { occ, base: { ...entryFromOccurrence(occ, 'single'), body } }
   }
@@ -367,7 +367,7 @@ describe('archiveEntry', () => {
   const persistence = installFakePersistence()
 
   it('archiving writes archived: true to the file', () => {
-    const occ = makeOcc({ entryKey: testKey('solo'), metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', participants: [], title: 'Solo note', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('solo'), metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', title: 'Solo note' } })
     seedStore([occ], makeRoots('solo', { title: 'Solo note' }))
 
     archiveEntry(testKey('solo'), true)
@@ -379,7 +379,7 @@ describe('archiveEntry', () => {
   // The trap PR 1 pinned at the registry level (round-trip-totality.test.ts):
   // clearing must never round-trip as a written `archived: false`.
   it('unarchiving writes no archived key at all', () => {
-    const occ = makeOcc({ entryKey: testKey('solo'), metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', participants: [], title: 'Solo note', tags: [], items: [], archived: true } })
+    const occ = makeOcc({ entryKey: testKey('solo'), metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', title: 'Solo note', archived: true } })
     seedStore([occ], makeRoots('solo', { title: 'Solo note', archived: true }))
 
     archiveEntry(testKey('solo'), false)
@@ -394,7 +394,7 @@ describe('deleteNode — archiving instead of deleting', () => {
   installFakePersistence()
 
   it('single-entry path (no siblings, not recurring): archives without navigating away', () => {
-    const occ = makeOcc({ entryKey: testKey('solo'), id: 'solo-1', metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', participants: [], title: 'Solo note', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('solo'), id: 'solo-1', metadata: { vaultId: TEST_VAULT, fileSlug: 'solo', title: 'Solo note' } })
     seedStore([occ], makeRoots('solo', { title: 'Solo note' }))
 
     const navigateBack = vi.fn()
@@ -414,8 +414,8 @@ describe('deleteNode — archiving instead of deleting', () => {
   })
 
   it('multi-item file path: the series sheet\'s archive option archives the WHOLE file, not one occurrence', () => {
-    const occA = makeOcc({ entryKey: testKey('multi'), id: 'multi-a', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', participants: [], title: 'Task A', tags: [], items: [], done: false } })
-    const occB = makeOcc({ entryKey: testKey('multi'), id: 'multi-b', date: '2026-06-16', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', participants: [], title: 'Task A', tags: [], items: [], done: false } })
+    const occA = makeOcc({ entryKey: testKey('multi'), id: 'multi-a', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A', done: false } })
+    const occB = makeOcc({ entryKey: testKey('multi'), id: 'multi-b', date: '2026-06-16', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A', done: false } })
     seedStore([occA, occB], makeRoots('multi', { title: 'Task A' }))
 
     let config: SeriesSheetConfig | undefined

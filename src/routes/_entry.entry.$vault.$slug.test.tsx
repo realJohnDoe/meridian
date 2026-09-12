@@ -99,7 +99,7 @@ describe('_entry/entry/$vault/$slug — URL to occurrence resolution', () => {
   // synchronous getByTestId right after render would still be looking at the
   // fallback and pass for the wrong reason. findByTestId awaits that swap.
   it('resolves from the file map when no date is pinned', async () => {
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Plain note', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Plain note' } })
     seedStore([occ], makeRoots('note.md', { title: 'Plain note' }))
 
     render(<EntrySlugPage />)
@@ -107,8 +107,8 @@ describe('_entry/entry/$vault/$slug — URL to occurrence resolution', () => {
   })
 
   it('picks the occurrence matching the pinned date and id, when two occurrences share a date', async () => {
-    const occA = makeOcc({ id: 'occ-a', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'First', tags: [], items: [] } })
-    const occB = makeOcc({ id: 'occ-b', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Second', tags: [], items: [] } })
+    const occA = makeOcc({ id: 'occ-a', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'First' } })
+    const occB = makeOcc({ id: 'occ-b', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Second' } })
     seedStore([occA, occB], makeRoots('note.md'))
     searchMock.mockReturnValue({ date: '2026-06-15', id: 'occ-b' })
 
@@ -117,8 +117,8 @@ describe('_entry/entry/$vault/$slug — URL to occurrence resolution', () => {
   })
 
   it('falls back to the first candidate on that date when id is absent (older links)', async () => {
-    const occA = makeOcc({ id: 'occ-a', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'First', tags: [], items: [] } })
-    const occB = makeOcc({ id: 'occ-b', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Second', tags: [], items: [] } })
+    const occA = makeOcc({ id: 'occ-a', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'First' } })
+    const occB = makeOcc({ id: 'occ-b', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Second' } })
     seedStore([occA, occB], makeRoots('note.md'))
     searchMock.mockReturnValue({ date: '2026-06-15' })
 
@@ -127,7 +127,7 @@ describe('_entry/entry/$vault/$slug — URL to occurrence resolution', () => {
   })
 
   it('falls back to the file map when the pinned date has no matching candidate', async () => {
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Plain note', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Plain note' } })
     seedStore([occ], makeRoots('note.md'))
     searchMock.mockReturnValue({ date: '2099-01-01' })
 
@@ -138,7 +138,7 @@ describe('_entry/entry/$vault/$slug — URL to occurrence resolution', () => {
 
 describe('_entry/entry/$vault/$slug — editable vs view-only branch', () => {
   it('renders the editable editor for a writable vault', async () => {
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Plain note', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Plain note' } })
     seedStore([occ], makeRoots('note.md'))
     useStore.setState({ vaults: [LOCAL_VAULT] })
 
@@ -148,7 +148,7 @@ describe('_entry/entry/$vault/$slug — editable vs view-only branch', () => {
   })
 
   it('renders the read-only view for a vault with no write access', async () => {
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Family event', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Family event' } })
     seedStore([occ], makeRoots('note.md'))
     useStore.setState({ vaults: [ICAL_VAULT] })
 
@@ -158,7 +158,7 @@ describe('_entry/entry/$vault/$slug — editable vs view-only branch', () => {
   })
 
   it('hides the delete action for a view-only entry', async () => {
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Family event', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Family event' } })
     seedStore([occ], makeRoots('note.md'))
     useStore.setState({ vaults: [ICAL_VAULT] })
 
@@ -168,7 +168,7 @@ describe('_entry/entry/$vault/$slug — editable vs view-only branch', () => {
   })
 
   it('wires the editable topbar\'s back/delete buttons to the editor hooks', () => {
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Plain note', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Plain note' } })
     seedStore([occ], makeRoots('note.md'))
     useStore.setState({ vaults: [LOCAL_VAULT] })
 
@@ -181,7 +181,7 @@ describe('_entry/entry/$vault/$slug — editable vs view-only branch', () => {
   })
 
   it('toggles the favorite flag in the store from either branch\'s topbar', () => {
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Plain note', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Plain note' } })
     seedStore([occ], makeRoots('note.md'))
     useStore.setState({ vaults: [LOCAL_VAULT] })
 
@@ -193,7 +193,7 @@ describe('_entry/entry/$vault/$slug — editable vs view-only branch', () => {
 
 describe('_entry/entry/$vault/$slug — view-only back navigation', () => {
   function seedIcalEntry() {
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Family event', tags: [], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Family event' } })
     seedStore([occ], makeRoots('note.md'))
     useStore.setState({ vaults: [ICAL_VAULT] })
   }

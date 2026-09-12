@@ -54,11 +54,7 @@ function baseProps(occs: Occurrence[]) {
 
 /** An undated task, i.e. the kind BacklogView pools without a bound. */
 function undatedTask(i: number, done = false): Occurrence {
-  return makeOcc({
-    id: `task-${i}`,
-    time: null,
-    metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: `Task ${i}`, tags: [], items: [], done },
-  })
+  return makeOcc({ id: `task-${i}`, time: null, metadata: { fileSlug: 'note', title: `Task ${i}`, done } })
 }
 
 /** Every rendered occurrence card — SurfaceButton carries aria-label={title}. */
@@ -76,22 +72,22 @@ function swipeLeft(title: string) {
 
 describe('OccurrenceList', () => {
   it('shows active items immediately', () => {
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Open task', done: false } })
     render(<OccurrenceList {...baseProps([occ])} />)
 
     expect(screen.getByText('Open task')).toBeInTheDocument()
   })
 
   it('omits the Done section entirely when there are no done items', () => {
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Open task', done: false } })
     render(<OccurrenceList {...baseProps([occ])} />)
 
     expect(screen.queryByText(/^Done ·/)).not.toBeInTheDocument()
   })
 
   it('hides done items behind a collapsed Done section, revealed on click', () => {
-    const open = makeOcc({ id: 'a', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
-    const done = makeOcc({ id: 'b', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Finished task', tags: [], items: [], done: true } })
+    const open = makeOcc({ id: 'a', metadata: { fileSlug: 'note', title: 'Open task', done: false } })
+    const done = makeOcc({ id: 'b', metadata: { fileSlug: 'note', title: 'Finished task', done: true } })
     render(<OccurrenceList {...baseProps([open, done])} />)
 
     expect(screen.getByText('Open task')).toBeInTheDocument()
@@ -105,7 +101,7 @@ describe('OccurrenceList', () => {
 
   it('calls onToggleDone when a row checkbox is clicked', () => {
     const onToggleDone = vi.fn()
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Open task', done: false } })
     render(<OccurrenceList {...baseProps([occ])} onToggleDone={onToggleDone} />)
 
     fireEvent.click(screen.getByRole('checkbox'))
@@ -145,7 +141,7 @@ describe('OccurrenceList', () => {
 
   it('swipe-deletes a row in a normal vault', () => {
     const onSwipeDelete = vi.fn(() => vi.fn())
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Open task', done: false } })
     render(<OccurrenceList {...baseProps([occ])} onSwipeDelete={onSwipeDelete} />)
 
     swipeLeft('Open task')
@@ -157,7 +153,7 @@ describe('OccurrenceList', () => {
     const vault: VaultRef = { id: TEST_VAULT, name: 'Tutorial', kind: 'example' }
     useStore.setState({ vaults: [vault] })
     const onSwipeDelete = vi.fn(() => vi.fn())
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Open task', done: false } })
     render(<OccurrenceList {...baseProps([occ])} onSwipeDelete={onSwipeDelete} />)
 
     swipeLeft('Open task')
@@ -169,7 +165,7 @@ describe('OccurrenceList', () => {
     const vault: VaultRef = { id: TEST_VAULT, name: 'Family calendar', kind: 'ical', ical: { url: 'https://example.com/cal.ics' } }
     useStore.setState({ vaults: [vault] })
     const onSwipeDelete = vi.fn(() => vi.fn())
-    const occ = makeOcc({ metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
+    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Open task', done: false } })
     render(<OccurrenceList {...baseProps([occ])} onSwipeDelete={onSwipeDelete} />)
 
     swipeLeft('Open task')
@@ -178,8 +174,8 @@ describe('OccurrenceList', () => {
   })
 
   it('marks the Done toggle expanded only while it is open', () => {
-    const open = makeOcc({ id: 'a', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Open task', tags: [], items: [], done: false } })
-    const done = makeOcc({ id: 'b', metadata: { vaultId: TEST_VAULT, fileSlug: 'note', participants: [], title: 'Finished task', tags: [], items: [], done: true } })
+    const open = makeOcc({ id: 'a', metadata: { fileSlug: 'note', title: 'Open task', done: false } })
+    const done = makeOcc({ id: 'b', metadata: { fileSlug: 'note', title: 'Finished task', done: true } })
     render(<OccurrenceList {...baseProps([open, done])} />)
 
     const toggle = screen.getByRole('button', { expanded: false })

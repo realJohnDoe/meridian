@@ -103,7 +103,7 @@ describe('FileResultsList', () => {
     // the item's own metadata over the root's — so the item's title must agree with the
     // root's for this test to observe a single, unambiguous title. The match itself,
     // though, is filtered from `fileEntries(roots)`, i.e. root-level tags/items/title.
-    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Groceries', tags: ['urgent'], items: [] } })
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Groceries', tags: ['urgent'] } })
     const roots: Roots = makeRoots('note.md', { title: 'Groceries', tags: ['urgent'] })
     seedStore([occ], roots)
     const { type } = renderList()
@@ -115,8 +115,8 @@ describe('FileResultsList', () => {
   })
 
   it('ranks a prefix match above a scattered subsequence match', () => {
-    const a = makeOcc({ id: 'a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', participants: [], title: 'Xylophone practice', tags: [], items: [] } })
-    const b = makeOcc({ id: 'b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', participants: [], title: 'Practice notes', tags: [], items: [] } })
+    const a = makeOcc({ id: 'a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', title: 'Xylophone practice' } })
+    const b = makeOcc({ id: 'b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', title: 'Practice notes' } })
     const roots: Roots = makeRoots('a.md', { title: 'Xylophone practice' }) // 'p...r...a...c' scattered match for "pra"
     roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'Practice notes', tags: [], items: [] }))     // starts with "pra" -> scoreQuery prefix bonus
     seedStore([a, b], roots)
@@ -167,10 +167,7 @@ describe('FileResultsList', () => {
     // which is what both the search overlay creates and what a file carrying
     // only file-level fields parses into. It must draw a card, not a gap.
     seedStore(
-      [makeOcc({
-        id: 'occ-handy', entryKey: testKey('handy'), date: '', time: null,
-        metadata: { participants: [], title: 'handy', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'handy' },
-      })],
+      [makeOcc({ id: 'occ-handy', entryKey: testKey('handy'), date: '', time: null, metadata: { title: 'handy', vaultId: TEST_VAULT, fileSlug: 'handy' } })],
       makeRoots('handy', { title: 'handy' }),
     )
     const { type, container } = renderList()

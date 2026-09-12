@@ -37,7 +37,7 @@ afterEach(() => {
 
 describe('useEntryEditor', () => {
   it('meta save (handleDoneToggle) writes synchronously', () => {
-    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -48,7 +48,7 @@ describe('useEntryEditor', () => {
   })
 
   it('switching scope to "add" resets done, even though it was done just before the switch', () => {
-    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: true } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: true } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -70,11 +70,7 @@ describe('useEntryEditor', () => {
       id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
       repeat: { type: 'schedule', freq: 'daily' },
     })
-    const occ = makeOcc({
-      id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1',
-      date: '2026-09-10', time: null, source: 'generated',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false },
-    })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-09-10', time: null, source: 'generated', metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
     seedStore([series, occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -96,11 +92,7 @@ describe('useEntryEditor', () => {
       id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
       repeat: { type: 'schedule', freq: 'daily' },
     })
-    const occ = makeOcc({
-      id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1',
-      date: '2026-09-10', time: null, source: 'generated',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false },
-    })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-09-10', time: null, source: 'generated', metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
     seedStore([series, occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -123,11 +115,7 @@ describe('useEntryEditor', () => {
       id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
       repeat: { type: 'schedule', freq: 'daily' },
     })
-    const occ = makeOcc({
-      id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1',
-      date: '2026-09-10', time: null, source: 'generated',
-      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false },
-    })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-09-10', time: null, source: 'generated', metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
     seedStore([series, occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -156,7 +144,7 @@ describe('useEntryEditor', () => {
   })
 
   it('a scheduled autosave commits against the latest entry state, not a stale snapshot', () => {
-    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -285,7 +273,7 @@ describe('useEntryEditor', () => {
     const listKey = testKey('groceries')
 
     function seedList() {
-      const list = makeOcc({ id: 'list-1', entryKey: listKey, date: '', metadata: { vaultId: TEST_VAULT, fileSlug: 'groceries', participants: [], title: 'Groceries', tags: [], items: [] } })
+      const list = makeOcc({ id: 'list-1', entryKey: listKey, date: '', metadata: { vaultId: TEST_VAULT, fileSlug: 'groceries', title: 'Groceries' } })
       seedStore([list], makeRoots('groceries', { title: 'Groceries' }))
     }
 
@@ -337,7 +325,7 @@ describe('useEntryEditor', () => {
     })
 
     it('links an existing entry to a list it creates, same as it links an existing one', () => {
-      const occ = makeOcc({ id: 'occ-1', entryKey: testKey('buy-milk'), metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-milk', participants: [], title: 'Buy milk', tags: [], items: [] } })
+      const occ = makeOcc({ id: 'occ-1', entryKey: testKey('buy-milk'), metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-milk', title: 'Buy milk' } })
       seedStore([occ], makeRoots('buy-milk', { title: 'Buy milk' }))
       const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -352,7 +340,7 @@ describe('useEntryEditor', () => {
     // the slug an unrelated entry already owns. A write is a whole-file replace,
     // so creating the new entry there destroyed the existing one outright — no
     // error, no artifact, and every wikilink to it silently re-pointed.
-    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('buy-groceries'), date: '2026-04-08', metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-groceries', participants: [], title: 'Buy groceries', tags: ['errands'], items: [] } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('buy-groceries'), date: '2026-04-08', metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-groceries', title: 'Buy groceries', tags: ['errands'] } })
     seedStore([occ], makeRoots('buy-groceries', { title: 'Buy groceries', tags: ['errands'], body: 'Remember the bags.' }))
 
     renderHook(() => useEntryEditor(null, 'all', 'Buy groceries!'))
@@ -369,7 +357,7 @@ describe('useEntryEditor', () => {
     // creating save lands on `buy-groceries-2`, and the autosave that follows must
     // upsert onto it rather than allocate `buy-groceries-3` (or fall back onto the
     // unrelated `buy-groceries`).
-    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('buy-groceries'), date: '2026-04-08', metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-groceries', participants: [], title: 'Buy groceries', tags: [], items: [] } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('buy-groceries'), date: '2026-04-08', metadata: { vaultId: TEST_VAULT, fileSlug: 'buy-groceries', title: 'Buy groceries' } })
     seedStore([occ], makeRoots('buy-groceries', { title: 'Buy groceries', body: 'Remember the bags.' }))
 
     const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy groceries!'))
@@ -426,7 +414,7 @@ describe('useEntryEditor', () => {
   })
 
   it('editScope "add" suppresses both the meta save and the autosave', () => {
-    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ, 'add'))
 
@@ -446,7 +434,7 @@ describe('useEntryEditor', () => {
   })
 
   it('handleSave with an empty title flags titleMissing and bumps focusTitleTick instead of navigating back', () => {
-    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [], done: false } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
     seedStore([occ], makeRoots('note.md'))
     const { result } = renderHook(() => useEntryEditor(occ))
 
@@ -567,7 +555,7 @@ describe('useEntryEditor — moving between vaults', () => {
   })
 
   it('offers no move at all out of a non-writable vault', () => {
-    const occ = makeOcc({ id: 'occ-1', entryKey: makeEntryKey('example', 'note.md'), metadata: { vaultId: 'example', fileSlug: 'note.md', participants: [], title: 'Standup', tags: [], items: [] } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: makeEntryKey('example', 'note.md'), metadata: { vaultId: 'example', fileSlug: 'note.md' } })
     const roots: Roots = new Map([[makeEntryKey('example', 'note.md'), { title: 'Note', tags: [], items: [], vaultId: 'example', fileSlug: 'note.md' }]])
     seedStore([occ], roots)
     useStore.setState({ vaults: [{ id: 'example', name: 'Tutorial', kind: 'example' }, ...VAULTS] })
