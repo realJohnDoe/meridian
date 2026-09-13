@@ -24,7 +24,7 @@ export default function VaultList() {
       title="Vaults"
       description="Where your entries live. Every vault stays mounted and syncing."
     >
-      {vaults.map(vault => {
+      {[...vaults].sort((a, b) => a.name.localeCompare(b.name)).map(vault => {
         const attention = syncByVault.get(vault.id)?.needsAttention ?? null
         return (
           <SettingsLinkRow
