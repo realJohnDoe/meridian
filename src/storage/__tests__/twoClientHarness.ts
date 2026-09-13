@@ -26,6 +26,7 @@
  * `dexie` that was loaded first.
  */
 import { createHash } from 'node:crypto'
+import { setImmediate as realSetImmediate } from 'node:timers'
 import { vi } from 'vitest'
 import { GitHubBackend } from '@/storage/githubBackend'
 import type { StorageBackend, RawFile, PermissionOutcome } from '@/storage/backend'
@@ -538,6 +539,52 @@ const PUMP_STEP_MS = 25
 const PUMP_LIMIT = 4000
 
 /**
+ * One pump step: move virtual time on, **then hand the real event loop a
+ * turn of its own.**
+ *
+ * The second line is #1052, and it is not belt-and-braces. A fake clock owns
+ * the timer queue and nothing else, while the storage layer waits on real
+ * async work that no timer will ever deliver: every `GitHubBackend.write`
+ * ends in `blobSha`, which hashes through `crypto.subtle.digest` — Node's
+ * WebCrypto, completing off the main thread — and `fake-indexeddb` drives its
+ * transactions off `setImmediate`. `advanceTimersByTimeAsync` does yield
+ * around the timers it fires, so that work *usually* progresses a step at a
+ * time and the old bare-`advanceTimersByTimeAsync` pump looked fine.
+ *
+ * Usually. Measured over 4,000-run soaks, the old pump put the process into
+ * one of two modes and stayed there: either every `blobSha` resolved inside a
+ * handful of pump steps, or **thousands** of them took hundreds each —
+ * 7,000-9,000 slow digests in a sweep, single `write` calls spending 20-60
+ * *virtual seconds* on ~1ms of real work. Two of three sweeps landed in the
+ * slow mode. What flips it was not worth pinning down, because it is not a
+ * property of the code under test: it is the harness leaning on a yield it
+ * does not control. An explicit turn per step removes the dependence, and
+ * with it both modes — seven consecutive 4,000-run sweeps, zero slow digests,
+ * against a ~60% sweep failure rate before.
+ *
+ * Two things followed from the slow mode, and the second is what got filed.
+ * Virtual time ran away from the work being done; and `quiesce`'s budget
+ * below — nominally 100 virtual seconds, far longer than any wait the sync
+ * layer actually asks for — was in truth a budget on *pump steps*, which a
+ * cycle doing a few writes could exhaust. When it did, `quiesce` threw, and
+ * the run was abandoned with its sync cycle **still running**, straight into
+ * the next seed's world. That is the "stale async chain from an earlier,
+ * not-fully-quiesced run" #1052 described, and the reason a `clean-truth`
+ * violation could name a version no live `FakeGitHub` had ever minted: a
+ * previous seed's remote had minted it.
+ *
+ * `node:timers`' `setImmediate` rather than the global one, for the same
+ * reason the rest of this file is careful about the clock: `useFixedClock`
+ * fakes the `setTimeout` family, and an unfaked import states that this turn
+ * is meant to be a real one instead of relying on `setImmediate` staying off
+ * that list.
+ */
+async function pump(ms: number): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms)
+  await new Promise<void>(resolve => { realSetImmediate(resolve) })
+}
+
+/**
  * Await `p` while driving the virtual clock forward — the "owned scheduler"
  * half of the harness.
  *
@@ -552,6 +599,9 @@ const PUMP_LIMIT = 4000
  * Stepping rather than `runAllTimersAsync` on purpose: the debounced push
  * re-arms a timer from inside its own callback, which `runAllTimers` chases
  * until it gives up.
+ *
+ * A step is `pump`, not a bare `advanceTimersByTimeAsync` — the timer queue is
+ * not the only queue a cycle waits on. See #1052 there.
  */
 export async function settle<T>(p: Promise<T>): Promise<T> {
   let done = false
@@ -566,7 +616,7 @@ export async function settle<T>(p: Promise<T>): Promise<T> {
   // caller still sees it when it awaits the returned promise.
   tracked.catch(() => {})
   for (let i = 0; i < PUMP_LIMIT && !settled(); i++) {
-    await vi.advanceTimersByTimeAsync(PUMP_STEP_MS)
+    await pump(PUMP_STEP_MS)
   }
   return tracked
 }
@@ -593,9 +643,25 @@ export async function quiesce(vaultIds: readonly string[]): Promise<void> {
     return s.syncing || s.pushTimer !== null || s.pushQueued
   })
   for (let i = 0; i < PUMP_LIMIT && busy(); i++) {
-    await vi.advanceTimersByTimeAsync(PUMP_STEP_MS)
+    await pump(PUMP_STEP_MS)
   }
-  if (busy()) throw new Error('quiesce: a vault never returned to idle')
+  // Name what is still moving. This throw is the run boundary's last chance to
+  // report a cycle before it becomes the *next* run's problem (see `pump`, and
+  // `resetWorld`'s in-flight check) — and "a vault" alone sent #1052's own
+  // investigation looking for state the harness had failed to clear, when what
+  // it needed was which vault, and whether the cycle was running or merely
+  // scheduled.
+  if (busy()) {
+    const stuck = vaultIds
+      .map(id => ({ id, s: syncStateFor(id) }))
+      .filter(({ s }) => s.syncing || s.pushTimer !== null || s.pushQueued)
+      .map(({ id, s }) =>
+        `${id} (syncing=${String(s.syncing)} pushTimer=${String(s.pushTimer !== null)} pushQueued=${String(s.pushQueued)})`)
+    throw new Error(
+      `quiesce: a vault never returned to idle after ${String(PUMP_LIMIT * PUMP_STEP_MS)}ms of virtual ` +
+      `time: ${stuck.join(', ')}`,
+    )
+  }
 }
 
 /**
@@ -614,7 +680,7 @@ export async function quiesce(vaultIds: readonly string[]): Promise<void> {
  * gets further into the past from here.
  */
 export async function skipAhead(ms: number, vaultIds: readonly string[]): Promise<void> {
-  await vi.advanceTimersByTimeAsync(ms)
+  await pump(ms)
   await quiesce(vaultIds)
 }
 
