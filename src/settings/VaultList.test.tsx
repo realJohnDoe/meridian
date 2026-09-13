@@ -78,6 +78,18 @@ describe('VaultList', () => {
     expect(screen.getByRole('link', { name: /Work/ })).not.toHaveTextContent('Signed out')
   })
 
+  it('lists vaults alphabetically by name, regardless of registration order', () => {
+    useStore.setState({ vaults: [GITHUB_VAULT, ICAL_VAULT] })
+    render(<VaultList />)
+
+    const links = screen.getAllByRole('link')
+    expect(links.map(l => l.textContent)).toEqual([
+      expect.stringContaining('Team calendar'),
+      expect.stringContaining('Work'),
+      expect.stringContaining('Add vault'),
+    ])
+  })
+
   it('distinguishes same-named vaults by their source', () => {
     useStore.setState({
       vaults: [
