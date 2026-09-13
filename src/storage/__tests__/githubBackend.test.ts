@@ -578,8 +578,44 @@ describe('GitHubBackend', () => {
     fetchSpy
       .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
       .mockResolvedValueOnce(makeJsonResp({ message: 'Branch not found' }, 404))
+      // The repo has branches — just not the configured one. A real wrong-branch config.
+      .mockResolvedValueOnce(makeJsonResp([{ name: 'trunk' }]))
     const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
     expect(await backend.ensurePermission(false)).toBe('denied')
+  })
+
+  // A repo created without "Add a README" reports a default_branch that has no
+  // ref behind it yet, so the branch check 404s on a repo Meridian can write to
+  // perfectly well. Denying it reported "no write permission" for a repo whose
+  // permissions.push is true, and made such a repo impossible to add as a vault.
+  it('ensurePermission returns granted for a repo with no commits yet (branch 404, no branches at all)', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
+      .mockResolvedValueOnce(makeJsonResp({ message: 'Branch not found' }, 404))
+      .mockResolvedValueOnce(makeJsonResp([]))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('granted')
+  })
+
+  // The other shape GitHub uses for the same state, depending on the endpoint.
+  it('ensurePermission returns granted when the branch listing reports the repo empty (409)', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
+      .mockResolvedValueOnce(makeJsonResp({ message: 'Branch not found' }, 404))
+      .mockResolvedValueOnce(makeJsonResp({ message: 'Git Repository is empty.' }, 409))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('granted')
+  })
+
+  // The emptiness probe must not turn an offline blip into a permission verdict,
+  // for the same reason the branch check itself must not (see below).
+  it('ensurePermission returns unreachable when the branch-listing probe hits a network error', async () => {
+    fetchSpy
+      .mockResolvedValueOnce(makeJsonResp({ id: 123, name: 'notes', permissions: { push: true, pull: true, admin: false } }))
+      .mockResolvedValueOnce(makeJsonResp({ message: 'Branch not found' }, 404))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    expect(await backend.ensurePermission(false)).toBe('unreachable')
   })
 
   it('ensurePermission returns denied on 401', async () => {
