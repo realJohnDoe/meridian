@@ -7,7 +7,8 @@ specific to it — its categories, its findings cap, its target
 invariants/flows/niches — and points back here for the rest.
 Finished reports live in `plans/reports/` beside this directory rather than in
 it, so everything here is a runnable survey and none of it needs an exception.
-That is where a run's own report goes too — see **Reporting** below.
+A survey *run* produces no file at all — it is a parent issue with its findings
+as sub-issues; see **Reporting** below.
 
 Read this once before running (or editing) any survey.
 
@@ -37,6 +38,17 @@ These four rules held identically in every survey and are stated once here.
 - **The category ranking is a tiebreaker, not a filter.** A serious finding in
   any category outranks a minor finding in a higher-priority one. Never omit a
   high-impact issue because its category ranks lower.
+- **Read the merged-PR history for defect classes, not just for churn.** This
+  repo's git history is squashed — 148 commits spanning one week, as of
+  2026-09-13 — so `git log` cannot tell you where bugs actually come from. The PR
+  titles can, and they are the only record of it that survives; sample the last
+  ~200 and tally what was being fixed, not just which directories were touched.
+  Every gap the 2026-09-13 review of these survey files found was visible there
+  and nowhere else: a nine-PR cluster of view-state desync that no category
+  names, three test flakes that no survey mentions, and a measurement harness
+  `performance.md` had never heard of. A class the repo keeps paying for that no
+  category names is a finding *about the survey* — fix it with a diff on the
+  survey file, per the last section here.
 
 ### What this environment can and cannot do
 
@@ -135,7 +147,7 @@ Two knock-on effects to handle rather than ignore:
 - **Rank is a column, not an identity.** A finding's identity is its issue
   number, which never changes; the category verdicts reference it and so does
   any code comment citing the finding. So carry rank as its own column in the
-  run report's summary table and re-sort that, rather than reordering anything
+  parent issue's summary table and re-sort that, rather than reordering anything
   that looks like an id.
 
 ## Ranking findings
@@ -265,12 +277,14 @@ surfaces — an ambiguous instruction, a budget item that turned out to be
 unmeasurable, a category boundary that didn't hold, a scoring rule that
 produced a counterintuitive order, a "known suspect" that's now stale. After
 finishing a run, edit the survey `.md` file directly with the proposed
-improvements, as its own commit separate from the run report and from any
+improvements, as its own commit separate from filing the run and from any
 fixes to the product itself — that way the suggestion shows up as an
 ordinary reviewable diff in the PR (GitHub's review UI, comments,
 approve/request-changes) instead of prose the user has to re-transcribe by
 hand to apply it. Keep the edit scoped to genuine process learnings, not
 findings, which are issues. Still propose rather than silently commit past
-review: open it on a `survey-run/<name>` branch so the user reviews and merges
-it like any other change, and note in the run report, in one line, that the
+review: keep it on the branch the session is already working on — a remote
+session is *assigned* its branch name, so the `survey-run/<name>` branch this
+paragraph used to ask for was never available to follow and no such branch has
+ever existed here — and note in the run's parent issue, in one line, that the
 survey file was updated and why, so the two stay linked.

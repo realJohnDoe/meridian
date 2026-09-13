@@ -30,6 +30,17 @@ Findings must be anchored to one or more of these flows — an issue that no com
   - **Measurement recipe:** the exact, re-runnable steps that produced the number — the instrumentation snippet (`performance.mark`/`performance.measure` pairs, a render counter, `why-did-you-render`-style logging), where it was patched in, the interaction performed, and how the number was read out. This recipe is the acceptance test for the fix: after the fix, rerun it and compare.
   - Instrumentation is temporary — patch it in, measure, and revert; do not leave measurement code in the working tree.
 - **How to measure in this environment:** start the dev server via the preview tools (follow the preview gotchas in CLAUDE.md — worktree-specific launch config, unique port, SPA-navigate instead of hard-navigating to an entry URL), drive the flows via the browser tools, and read numbers via `javascript_tool` (e.g. `performance.getEntriesByType('measure')`, patched-in counters on `window`). For render counts, a module-level counter incremented in the component body and read from the console is fine. For bundle findings, `pnpm run build` output is the measurement.
+- **No `preview_*` tooling is not a reason to skip the measurement pass** — check
+  before planning around it, because this survey's entire value is in phase 2 and
+  a run that quietly drops it lands as "partially assessed" without anyone seeing
+  that nothing was measured. `scripts/perf/stress.mjs` launches Chromium itself
+  via `@playwright/test` (a devDependency) and needs no preview tools at all, so it
+  is both the primary harness above and the fallback here; for the four flows it
+  does not cover, drive your own Chromium the same way (`pnpm exec vite --port
+  <unique> --strictPort`, then `import { chromium } from '@playwright/test'`), with
+  `e2e/` as the worked example. Only if even that is unavailable: say so in the
+  coverage statement, mark the flows **traced, not measured**, and flag every
+  finding that rests on an unmade measurement.
 - **React Compiler is enabled** (`vite.config.ts` applies `reactCompilerPreset`; components and hooks are auto-memoized at build time). Static "missing `memo`" / "unstable props defeat memoization" reasoning does not transfer to this codebase — memoization findings must be backed by runtime render counts, never by code inspection alone.
 - **Dev-mode numbers are relative, not absolute.** The dev server runs unminified dev-mode React, which overstates ms costs. Treat dev-server measurements as baselines for before/after comparison, not as absolute latency claims. Measure flow 6 (cold start, first paint, service-worker behavior) and all bundle findings against the production build (`pnpm run build` + `vite preview`) — and since the big-vault generator is dev-only, accept the small example vault for prod-build measurements and state that limitation in the coverage statement.
 - **Only the example (Tutorial) backend is measurable** — see [what this environment can and cannot do](./README.md#what-this-environment-can-and-cannot-do). Record the other two as "traced, not measured".
@@ -40,6 +51,23 @@ Findings must be anchored to one or more of these flows — an issue that no com
 ## Budget
 
 - **Use the existing big-vault generator — do not write a new one** ([recipe](./README.md#what-this-environment-can-and-cannot-do)). The example vault is too small to expose scaling problems; run all measurements against the generated one and note its size in the coverage statement.
+- **Use the existing stress harness too — do not hand-roll instrumentation it
+  already has.** `scripts/perf/` (`stress.mjs`, `probe.mjs`, `table.mjs`, plus its
+  own README) measures three of the seven flows above directly — cold start,
+  toggling a task, agenda scroll — as well as the parse/derive pipeline stage by
+  stage (`parseToStoreItems`, `deriveViews`, `buildBacklinkIndex`,
+  `computeExpansionCache`, `computeAgendaSections`, `rankByQuery`,
+  `updateFileOccurrenceMap`) and the Dexie path, over the generated vault from 300
+  to 30 000 files, with a fresh browser context per size so one size's IndexedDB
+  and heap cannot leak into the next one's numbers. Read
+  `scripts/perf/README.md` before writing your first `performance.mark`, and
+  reserve hand-instrumentation for the four flows it does not cover (search, new
+  item, metadata edit, editor keystrokes). Say in the coverage statement which
+  numbers came from the harness and which you patched in. Two caveats it states
+  itself: nothing in CI runs it, so a result is a point-in-time artefact of one
+  machine (the numbers worth keeping are in
+  [vault-scaling.md](../reports/vault-scaling.md)), and it runs against the dev
+  server, so read the scaling curve rather than the absolute milliseconds.
 - Skim the full directory tree so nothing is invisible to you.
 - Read closely: the store (`store.ts`, `storeBridge.ts`) and every selector/subscription pattern it exposes; the components rendered per occurrence/row in agenda view (these multiply — a small waste per row is a big waste per screen); the toggle/save/commit path (`occurrenceActions.ts`, `storeCommit.ts`, `persistencePort.ts`); the search implementation (`search/`) end to end from keystroke to result click; the editor's update/decoration path; the route definitions and what each view mounts.
 - **Read the build and loading story, not just the source:** the Vite config, route-level lazy loading (or its absence), the service worker / PWA caching setup, and the dependency list for heavyweight imports reachable from the entry point. Run the production build and record chunk sizes.

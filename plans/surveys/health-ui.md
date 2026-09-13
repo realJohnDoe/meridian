@@ -46,6 +46,30 @@ are specific to this survey:
 - Read closely: the app shell / root layout, the most-imported components and hooks (measure this — don't guess), the 15 largest component files, every file in the shared-components directory, and at least 2–3 representative components from every feature directory that renders UI.
 - **Read the UI toolchain, not just the source:** Tailwind config, global CSS / theme tokens, the shadcn component inventory (`components/ui/` or equivalent) and its divergence from upstream, lint config for React/JSX/a11y/Tailwind rules, and the component-test setup (or its absence). From `package.json`, inventory the **UI-related** dependencies (React ecosystem, radix/shadcn, styling, icons, animation, forms, a11y) and know where each is used — this feeds the Library Fit category.
 - **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. Install and generate the gitignored types first, per [what this environment can and cannot do](./README.md#what-this-environment-can-and-cannot-do).
+- **Look at the running app at phone width, in every theme — this survey cannot
+  be done from jsdom.** Categories 3 and 2 are largely unreachable without it:
+  touch-target size, safe-area insets, hover-only affordances, focus after
+  navigation and dark-mode gaps have no layout engine to fail against in the test
+  suite, and the consequence shows in the PR history — the contrast and
+  phone-layout defects of 2026-08/09 (light-theme chip borders, four successive
+  passes at chip contrast, low-contrast text tiers across nine themes, banner
+  contrast, touching date cells) were all found by hand, by the user, after a UI
+  survey had passed over the same files. `CLAUDE.md`'s "don't proactively drive
+  the dev server" rule does not apply to a survey run, and this is the pass it
+  exempts; until 2026-09-13 this file never asked for it, while `CLAUDE.md` said
+  it did.
+
+  Read the two CI gates first so the pass is spent on what they cannot see:
+  `e2e/contrast-sweep.spec.ts` is an enforced contrast floor across all nine
+  themes and `e2e/layout-smoke.spec.ts` pins shell geometry plus route coverage,
+  so contrast findings need to clear that floor to be findings at all. If the
+  session has no `preview_*` tooling, drive Chromium yourself rather than
+  skipping: `@playwright/test` is a devDependency and `e2e/` is the worked
+  example — `pnpm exec vite --port <unique> --strictPort`, then
+  `import { chromium } from '@playwright/test'`, at 390×844 and 1440×900, setting
+  the theme in an init script per palette. If even that is unavailable, say so in
+  the coverage statement and mark the affected categories **partially assessed**;
+  an admitted gap beats an impression inferred from tokens.
 - **Audit the gates' own config, not just their exit codes.** A green gate says nothing about whether it is still aimed at the right files. Check every path in the lint, coverage and smoke-test configs against the filesystem: per-file coverage thresholds naming a moved file, exclusion globs whose stated rationale has been outgrown by a file that has since tripled in size, and route lists that a new route does not automatically join. These fail *open* — Vitest, for one, accepts a threshold for a nonexistent path and exits 0 with no warning — so nothing surfaces them but this check.
 - **Sample git history for co-change patterns** among components, hooks, and style files (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest of the UI. Do not skip a UI directory entirely without recording it in the coverage statement. Non-UI directories may be skipped wholesale — record them as "out of scope" rather than "skipped."
@@ -119,6 +143,19 @@ Examples (not exhaustive):
 - UI state managed in the wrong place — global store used for local component state, or vice versa; derived state stored instead of computed
 - Missing component API boundaries — feature components reaching into another feature's component internals instead of its public surface
 - Side effects in render paths, effect chains that re-derive what a `useMemo`/selector should own
+- **Two writers for one piece of view state.** This is the largest single defect
+  cluster in the repo's recent history and no category named it before
+  2026-09-13: a derived navigation value owned by more than one controller. The
+  week topbar's label desyncing from the quick-nav month strip (PR #885), the
+  agenda's own scroll position steering the quick-nav grid (PR #908), one swipe
+  firing two browses (PR #913), a swipe preview coupled to route navigation (PR
+  #901), a seeded scroll offset that had to be reverted outright for a drifting
+  Today button and a broken cold start (PR #911 → #915) — nine PRs between
+  2026-08-31 and 2026-09-12, all the same shape. The tells: a value held in
+  `calendar/viewState.ts` *and* in a component's `useState`; an effect that
+  writes the state its own dependency array reads; a gesture handler and a route
+  loader that both set the visible date. Trace each navigation value to exactly
+  one writer and report the ones with two.
 
 ### 2. Styling System Consistency _(high weight)_
 
