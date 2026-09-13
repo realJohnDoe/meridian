@@ -176,6 +176,30 @@ const CORPUS: Array<{ name: string; ops: Op[] }> = [
       sync('deviceB'),
     ],
   },
+  {
+    // #1062, found by the soak and shrunk to six operations. `readFiles`
+    // swallowed *every* per-path failure, so a read that never reached GitHub
+    // arrived as "the path is empty" — and `resolveUnversionedTombstone` read
+    // that silence as authoritative.
+    name: '#1062: a delete-reread that fails at the transport must not confirm the tombstone',
+    ops: [
+      // B drafts plan.md; the page closes inside the debounce, so nothing is
+      // pushed and the row carries no base version.
+      write('deviceB', 'plan', 'title', 'draft'),
+      // B deletes its own never-synced draft — a version-less tombstone.
+      del('deviceB', 'plan', 'draft'),
+      write('deviceA', 'note', 'title', 'pushed'),
+      // A really does create plan.md. Its ack is lost, which also arms the
+      // dead read that B's delete-reread walks into.
+      write('deviceA', 'plan', 'title', 'unacked'),
+      // Before the fix: B's reread died at the transport, came back empty,
+      // and the tombstone was confirmed against a file that was really there
+      // — while `pushed` suppressed the same-cycle re-pull that would have
+      // noticed it in the listing. B settled without plan.md, for good.
+      sync('deviceB'),
+      sync('deviceA'),
+    ],
+  },
 ]
 
 describe('sync invariants — the starting corpus (#1021)', () => {

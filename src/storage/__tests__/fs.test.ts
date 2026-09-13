@@ -8,7 +8,7 @@
  * implement a weaker contract than `StorageBackend` documents.
  */
 import { describe, it, expect } from 'vitest'
-import { diskWrite, diskDelete, diskReadAll, diskStatAll } from '@/storage/fs'
+import { diskWrite, diskDelete, diskReadFiles, diskReadAll, diskStatAll } from '@/storage/fs'
 import { ConflictError } from '@/storage/conflictError'
 
 // ── In-memory FileSystemDirectoryHandle ────────────────────────
@@ -195,6 +195,76 @@ describe('diskDelete — CAS', () => {
 
     await expect(diskDelete(dh, 'gone.md', '1000:5')).resolves.toBeUndefined()
     await expect(diskDelete(dh, 'gone.md', undefined)).resolves.toBeUndefined()
+  })
+})
+
+// ── absence vs. failure (#1062) ────────────────────────────────
+//
+// The same distinction the GitHub backend draws at a 404, on the other
+// backend. A path missing from a read's result means that path does not
+// exist — `resolveUnversionedTombstone` confirms a delete on exactly that —
+// so a file that is *there but unreadable* (a lock, an I/O error, permission
+// revoked mid-session) must not be reported the same way.
+
+/**
+ * A file that exists and cannot be read — not the same thing as an absent one.
+ *
+ * Patched into both routes a handle is reached by: `getFileHandle` (what
+ * `diskReadFiles` resolves a path through) and the directory's own `entries`
+ * iterator (what `diskStatAll`/`diskReadAll` walk).
+ */
+function unreadable(dh: FakeHandle, name: string): void {
+  const fail = (): Promise<never> => {
+    const e = new Error('The requested file could not be read')
+    e.name = 'NotReadableError'
+    return Promise.reject(e)
+  }
+  // A fresh stand-in rather than a copy of the seeded one: the only member
+  // either read path touches is getFile, and that is the one that must fail.
+  const locked = (handleName: string): FileSystemFileHandle =>
+    ({ kind: 'file', name: handleName, getFile: fail } as unknown as FileSystemFileHandle)
+
+  const originalGet = dh.getFileHandle.bind(dh)
+  dh.getFileHandle = async (wanted: string, opts?: FileSystemGetFileOptions) => {
+    const fh = await originalGet(wanted, opts)
+    return wanted === name ? locked(wanted) : fh
+  }
+
+  const originalEntries = dh.entries.bind(dh)
+  // `as unknown as` because lib.dom types `entries()` as yielding the base
+  // `FileSystemHandle` while the property it is assigned back to yields the
+  // file/directory union — the same one-way mismatch `makeHandle` casts past.
+  dh.entries = (async function* () {
+    for await (const [entryName, handle] of originalEntries()) {
+      yield [entryName, entryName === name ? locked(entryName) : handle]
+    }
+  }) as unknown as FakeHandle['entries']
+}
+
+describe('local reads — absence vs. failure', () => {
+  it('diskReadFiles omits a path that is genuinely gone, and keeps the rest', async () => {
+    const dh = makeHandle({ 'a.md': { content: 'body', lastModified: 1000 } })
+
+    const files = await diskReadFiles(dh, ['a.md', 'gone.md'])
+
+    expect(files.map(f => f.path)).toEqual(['a.md'])
+  })
+
+  it('diskReadFiles throws rather than reporting an unreadable file as absent', async () => {
+    const dh = makeHandle({ 'a.md': { content: 'body', lastModified: 1000 }, 'locked.md': { content: 'body', lastModified: 1000 } })
+    unreadable(dh, 'locked.md')
+
+    await expect(diskReadFiles(dh, ['a.md', 'locked.md'])).rejects.toThrow(/could not be read/)
+  })
+
+  it('diskStatAll throws rather than leaving an unreadable file out of the listing', async () => {
+    // A listing's silence about a path is read as a remote delete
+    // (`planReconcile`), so a file dropped from it for any reason other than
+    // being gone takes the local cache row with it.
+    const dh = makeHandle({ 'a.md': { content: 'body', lastModified: 1000 }, 'locked.md': { content: 'body', lastModified: 1000 } })
+    unreadable(dh, 'locked.md')
+
+    await expect(diskStatAll(dh)).rejects.toThrow(/could not be read/)
   })
 })
 

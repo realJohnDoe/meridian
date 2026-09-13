@@ -321,6 +321,76 @@ describe('GitHubBackend', () => {
     expect(files[0]!.version).toBe('sha1')
   })
 
+  // ── readFiles: absence vs. failure (#1062) ────────────────────────────
+  //
+  // The distinction the whole issue turns on. `readFiles` omits a path from
+  // its result to mean "that path does not exist", and a caller acts on that:
+  // `resolveUnversionedTombstone` confirms a delete on it. So the *only*
+  // failure it may swallow is the one that means the file is not there.
+  describe('readFiles — absence vs. failure (#1062)', () => {
+    /** Answer per path, so a batch's responses can't be matched up by call order. */
+    function mockByPath(answers: Record<string, { status: number; body: unknown }>) {
+      fetchSpy.mockImplementation((url: string) => {
+        const path = /\/contents\/([^?]+)/.exec(url)?.[1] ?? ''
+        const a = answers[decodeURIComponent(path)]
+        if (!a) throw new Error(`unexpected request for ${url}`)
+        return Promise.resolve(makeJsonResp(a.body, a.status))
+      })
+    }
+
+    it('omits a path GitHub answers 404 for, and keeps the rest of the batch', async () => {
+      mockByPath({
+        'here.md': { status: 200, body: makeFileResponse('here.md', '# Here', 'sha-here') },
+        'gone.md': { status: 404, body: { message: 'Not Found' } },
+      })
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      const files   = await backend.readFiles(['here.md', 'gone.md'])
+
+      expect(files.map(f => f.path)).toEqual(['here.md'])
+    })
+
+    // Before the fix this resolved to `[]` — indistinguishable from the 404
+    // above, which is what let a tombstone be confirmed against a file that
+    // was really on the remote.
+    it('throws instead of reporting a path absent when GitHub is unwell (503)', async () => {
+      mockByPath({ 'note.md': { status: 503, body: { message: 'Service Unavailable' } } })
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+
+      await expect(backend.readFiles(['note.md'])).rejects.toThrow(TransientSyncError)
+    })
+
+    it('throws instead of reporting a path absent when the request never reached GitHub', async () => {
+      fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'))
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+
+      await expect(backend.readFiles(['note.md'])).rejects.toSatisfy(isTransientSyncError)
+    })
+
+    // The per-path catch rethrows the *raw* error for the outer catch to map,
+    // rather than mapping it itself: an AuthSyncError carries no top-level
+    // `status`, so a second pass through mapGitHubError would re-read it as
+    // "never reached GitHub" and downgrade a revoked token to a retry.
+    it('surfaces a 401 as an auth failure, not a transient one', async () => {
+      mockByPath({ 'note.md': { status: 401, body: { message: 'Bad credentials' } } })
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+
+      await expect(backend.readFiles(['note.md'])).rejects.toBeInstanceOf(AuthSyncError)
+    })
+
+    // One unreadable file must not shorten the batch into a partial answer:
+    // `reconcileWithBackend` applies what comes back as though it were
+    // everything it asked for.
+    it('fails the whole batch rather than returning the paths that did arrive', async () => {
+      mockByPath({
+        'here.md': { status: 200, body: makeFileResponse('here.md', '# Here', 'sha-here') },
+        'down.md': { status: 500, body: { message: 'Server Error' } },
+      })
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+
+      await expect(backend.readFiles(['here.md', 'down.md'])).rejects.toThrow(TransientSyncError)
+    })
+  })
+
   it('write sends PUT with base64-encoded content (new file, no sha)', async () => {
     mockFetch({ content: { sha: 'newsha1' } })
 

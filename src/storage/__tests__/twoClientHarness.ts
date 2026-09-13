@@ -515,9 +515,10 @@ export function reloadClient(client: Client, opts: { legacyDelete?: boolean } = 
  * against whatever clock was installed when it last ran. Reinstalling a fake
  * clock back at `T0` in the next test therefore leaves it holding a deadline
  * far in the future: the next request waits, and at ~2 minutes Bottleneck's
- * own job timeout drops it. `readFiles` swallows that as "the file isn't
- * there", so the failure surfaces as a *silently skipped delete* — a wrong
- * answer, not an error.
+ * own job timeout drops it. That timeout is now an error rather than a wrong
+ * answer — `readFiles` swallows only a genuine 404 since #1062, so a dropped
+ * job reaches the caller as the transient failure it is — but the deadline
+ * still stalls every request behind it, so the rule stands.
  *
  * Keeping virtual time monotonic across the file keeps that deadline in the
  * past, where it belongs. Determinism is unaffected: a seed is a fixed

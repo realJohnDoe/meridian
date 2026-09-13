@@ -251,6 +251,39 @@ export class GitHubBackend implements StorageBackend {
     }
   }
 
+  /**
+   * Reads each path, omitting the ones that are genuinely not there.
+   *
+   * The per-path catch below swallows **only a 404**, which is the whole of
+   * #1062. It used to swallow everything and drop the file from the result, so
+   * a 404, a 503, an expired token and a dropped connection all arrived at the
+   * caller as the same empty answer — and a caller cannot act on "the path is
+   * empty" unless it means the path is empty. `resolveUnversionedTombstone`
+   * took exactly that step: it read the silence as authoritative and confirmed
+   * a delete against a file that was really on the remote.
+   *
+   * The asymmetry is what makes the narrow fix sufficient. A transport failure
+   * already classifies correctly — no status at all, which `classifyFailure`
+   * reads as transient — as do 5xx, 429 and a rate-limited 403. 404 was the
+   * one status that had to be told apart from its neighbours before a decision
+   * could be taken on it, the same refinement `isRateLimitError` made for 403.
+   * So rethrowing everything else costs no new return type and no `strict`
+   * flag: an omitted path now means "not there", and a caller that needs
+   * certainty has it, while backoff handles the rest.
+   *
+   * Bulk callers keep the tolerance that is actually warranted. A file deleted
+   * between a listing and this read must not take the whole batch down —
+   * that is a 404 — but a batch cut short by a dead connection is a partial
+   * answer, and applying it as though it were complete (`reconcileWithBackend`
+   * did) drops the paths that never arrived.
+   *
+   * The one 404 this still flattens is the repo's own: a repository that is
+   * gone answers 404 to a path inside it exactly as a missing file does, and
+   * nothing in the response tells them apart. It is not a decision taken
+   * blind, though — every cycle reaches this repo through `statAll` or a
+   * `write` first, and both surface that same 404 as the `config` failure it
+   * is (`mapGitHubError`), which is what marks the vault as needing attention.
+   */
   async readFiles(paths: string[]): Promise<RawFile[]> {
     try {
       // Bounded concurrency: an unbounded fan-out here reproduces the same
@@ -269,7 +302,10 @@ export class GitHubBackend implements StorageBackend {
           this._shas.set(path, file.sha)
           return { path, content, version: file.sha }
         } catch (e) {
-          console.warn('[github] could not read', path, e)
+          // Rethrown raw, not mapped here: the outer catch maps once, and
+          // mapping twice would re-classify an already-mapped AuthSyncError
+          // (which carries no `status`) as transient.
+          if ((e as { status?: number }).status !== 404) throw e
           return null
         }
       })

@@ -155,6 +155,24 @@ export async function diskPickDirectory(): Promise<FileSystemDirectoryHandle> {
   }
 }
 
+/**
+ * True only for the one failure that really does mean "there is nothing at
+ * this path" — the same `NotFoundError` `statVersion` above already reads that
+ * way, raised when the file or one of its ancestor directories is gone.
+ *
+ * Every read below is filtered through this rather than swallowing whatever
+ * comes out, and that distinction is #1062: a caller cannot act on "the path
+ * is empty" unless it means the path is empty. An unreadable file (a lock, an
+ * I/O error, permission revoked mid-session) is not an absent one, and
+ * reporting it as absent is what lets a delete confirm itself against a file
+ * that is still there, or a reconcile drop a cache row for a file that never
+ * left the disk. The GitHub backend draws the same line at a 404 — see
+ * `GitHubBackend.readFiles`.
+ */
+function isAbsentError(e: unknown): boolean {
+  return (e as { name?: string }).name === 'NotFoundError'
+}
+
 export async function diskStatAll(
   dh: FileSystemDirectoryHandle,
 ): Promise<Map<string, string>> {
@@ -166,7 +184,13 @@ export async function diskStatAll(
       try {
         const file = await fh.getFile()
         tokens.set(path, await contentHash(await file.text()))
-      } catch (e) { console.warn('[storage] could not stat', path, e) }
+      } catch (e) {
+        // A file deleted between the walk above and this read is simply not in
+        // the listing. Anything else means this listing would be *wrong* —
+        // silence about a file that is still on disk — and `planReconcile`
+        // reads a listing's silence as a remote delete.
+        if (!isAbsentError(e)) throw e
+      }
     })
   )
   return tokens
@@ -184,7 +208,8 @@ export async function diskReadFiles(
         const content = await file.text()
         return { path, content, version: await contentHash(content), lastModified: file.lastModified }
       } catch (e) {
-        console.warn('[storage] could not read', path, e)
+        // Omitted only when the path is genuinely gone — see isAbsentError.
+        if (!isAbsentError(e)) throw e
         return null
       }
     })
@@ -204,7 +229,9 @@ export async function diskReadAll(
         const content = await file.text()
         return { path, content, version: await contentHash(content), lastModified: file.lastModified }
       } catch (e) {
-        console.warn('[storage] could not read', path, e)
+        // As above: a file deleted between the walk and this read is absent,
+        // an unreadable one is not.
+        if (!isAbsentError(e)) throw e
         return null
       }
     })

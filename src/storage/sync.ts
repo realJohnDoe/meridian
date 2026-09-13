@@ -74,8 +74,15 @@ type CollisionOutcome =
  * stays for the case the interface still allows: a backend whose token is the
  * remote's to mint. It is the last resort rather than the first, because it can
  * itself fail — a connection that drops between a write and its answer is
- * usually still down a moment later, and then this returns `undefined` after
- * all.
+ * usually still down a moment later.
+ *
+ * When it does fail it now *throws* rather than answering `undefined` (#1062:
+ * a read that could not reach the backend has no answer to give). That ends
+ * the cycle as transient and leaves the record dirty against its old base
+ * version, which is the honest state: the write landed, so the next cycle's
+ * CAS is refused, `resolveCollision` finds the remote already holding exactly
+ * what we were pushing, and the record is stamped clean with the real token.
+ * One more round trip, and never the clean-with-no-version row #738 is about.
  */
 async function versionAfterWrite(
   backend: StorageBackend,
@@ -211,6 +218,12 @@ async function resolveCollision(
     bytes:      localContent.length,
   })
 
+  // Absence, not silence: `readFiles` omits a path only when it is genuinely
+  // not there and throws otherwise (#1062), so the re-create below is taken on
+  // a fact about the remote rather than on a read that may never have reached
+  // it. This branch failed comparatively safely even before that — the create
+  // goes out with no precondition, so a file that *is* there answers 422 and
+  // stops it — but "the wrong branch is survivable" is not a reason to take it.
   if (!remote) {
     try {
       // No `expectedVersion`: the record's base version points at the blob that
@@ -585,6 +598,14 @@ async function resolveUnversionedTombstone(
   vaultId: string,
   f: CacheRecord,
 ): Promise<{ kind: 'delete'; version: string } | { kind: 'absent' } | { kind: 'unacknowledged' }> {
+  // An empty answer here is read as "the path is empty", so it has to mean
+  // that. It did not until #1062: `readFiles` swallowed every per-path failure
+  // and dropped the file, so a dead connection reached this line looking
+  // exactly like a 404 — and this function concluded the delete was already
+  // done against a file that was really on the remote. The backend now throws
+  // anything that is not a genuine absence (see `StorageBackend.readFiles`),
+  // which leaves the tombstone staged for the next cycle rather than
+  // confirming it on no evidence.
   const [remote] = await backend.readFiles([f.path])
   journal('delete-reread', vaultId, f.path, { actual: remote?.version }, backend.kind)
   if (!remote) return { kind: 'absent' }
@@ -668,11 +689,22 @@ async function pushDirty(
         const target = await resolveUnversionedTombstone(backend, vaultId, f)
         if (target.kind === 'absent') {
           // Nothing there to delete, so the end state the tombstone wants is
-          // already the end state. Counted as pushed: we know authoritatively
-          // what is at the path, so the same-cycle reconcile must not re-pull it.
+          // already the end state.
+          //
+          // Deliberately NOT added to `pushed`, unlike every other branch that
+          // reaches its end state. That set exists to stop a same-cycle
+          // reconcile re-pulling a path from an eventually-consistent listing
+          // whose answer we have already bettered — but here we wrote nothing,
+          // and the listing is fetched *after* the read above, so it is the
+          // fresher of the two. Letting reconcile look costs at most a
+          // redundant read: its changed branch re-reads through the Contents
+          // API before trusting anything (see `planReconcile`), and its delete
+          // branch has no row left to act on. What it buys is a second chance
+          // — if another device created the path between the read and the
+          // listing, this cycle pulls it instead of leaving the file unseen
+          // until something else happens to disturb it.
           await confirmDeleted(vaultId, f.path)
           journal('delete-ok', vaultId, f.path, { note: 'already absent' }, backend.kind)
-          pushed.add(f.path)
           continue
         }
         if (target.kind === 'unacknowledged') {
