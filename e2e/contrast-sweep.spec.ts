@@ -118,7 +118,7 @@ function extractThemeIds(): string[] {
   const src = readFileSync(rootPath, 'utf8')
   const block = src.match(/export const THEME_CLASS: Record<string, string> = \{([\s\S]*?)\n\}/)?.[1]
   if (!block) throw new Error('extractThemeIds: could not find THEME_CLASS in __root.tsx — this extraction regex is stale')
-  const ids = [...block.matchAll(/^\s*(?:'([^']+)'|([\w-]+)):/gm)].map(m => m[1] ?? m[2]!)
+  const ids = [...block.matchAll(/^\s*(?:'([^']+)'|([\w-]+)):/gm)].map(m => m[1] ?? m[2])
   const themeIds = [...new Set(ids)].filter(id => id !== 'light' && id !== 'dark')
   if (themeIds.length === 0) throw new Error('extractThemeIds: matched zero theme ids — this extraction regex is stale')
   return themeIds
@@ -260,11 +260,11 @@ function collectTextElementsInPage(): CollectedElement[] {
     }
     const overBlack = overBackdrop('#000000')
     const overWhite = overBackdrop('#ffffff')
-    const perChannelAlpha = [0, 1, 2].map(i => 1 - (overWhite[i]! - overBlack[i]!) / 255)
+    const perChannelAlpha = [0, 1, 2].map(i => 1 - (overWhite[i] - overBlack[i]) / 255)
     const alpha = Math.min(1, Math.max(0, perChannelAlpha.reduce((a, b) => a + b, 0) / 3))
     const rgb = alpha > 0.001
-      ? [0, 1, 2].map(i => Math.min(255, Math.max(0, Math.round(overBlack[i]! / alpha))))
-      : [overBlack[0]!, overBlack[1]!, overBlack[2]!]
+      ? [0, 1, 2].map(i => Math.min(255, Math.max(0, Math.round(overBlack[i] / alpha))))
+      : [overBlack[0], overBlack[1], overBlack[2]]
     return { rgb, alpha }
   }
 
@@ -355,9 +355,9 @@ function sampleModeColor(png: PNG, rect: { x: number; y: number; w: number; h: n
   for (let y = y0; y < y1; y += STEP) {
     for (let x = x0; x < x1; x += STEP) {
       const idx = (png.width * y + x) * 4
-      const r = png.data[idx]! >> 3 << 3
-      const g = png.data[idx + 1]! >> 3 << 3
-      const b = png.data[idx + 2]! >> 3 << 3
+      const r = png.data[idx] >> 3 << 3
+      const g = png.data[idx + 1] >> 3 << 3
+      const b = png.data[idx + 2] >> 3 << 3
       const key = (r << 16) | (g << 8) | b
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
@@ -371,14 +371,14 @@ function sampleModeColor(png: PNG, rect: { x: number; y: number; w: number; h: n
 
 function relLuminance([r, g, b]: number[]): number {
   const lin = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4 }
-  return 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!)
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
 }
 
 function contrastRatio(rgbA: number[], rgbB: number[]): number {
   const lA = relLuminance(rgbA)
   const lB = relLuminance(rgbB)
   const [hi, lo] = lA > lB ? [lA, lB] : [lB, lA]
-  return (hi! + 0.05) / (lo! + 0.05)
+  return (hi + 0.05) / (lo + 0.05)
 }
 
 /** WCAG 2 AA: large text (>=24px, or >=18.66px/14pt at bold weight) needs 3:1; everything else needs 4.5:1. */
@@ -434,7 +434,7 @@ for (const themeId of themeIds) {
           if (bgRGB === null) continue
           const textRGB = el.textAlpha >= 0.999
             ? el.textRGB
-            : el.textRGB.map((c, i) => Math.round(el.textAlpha * c + (1 - el.textAlpha) * bgRGB[i]!))
+            : el.textRGB.map((c, i) => Math.round(el.textAlpha * c + (1 - el.textAlpha) * bgRGB[i]))
           const ratio = contrastRatio(textRGB, bgRGB)
           const threshold = aaThreshold(el.fontSize, el.fontWeight)
           if (ratio < threshold) {
