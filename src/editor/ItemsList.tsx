@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
-import { occKind } from '@/occView'
 import { parseItemEntry, serializeTaskEntry } from './items'
 import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList } from '@/components'
-import { isDimmed, priorityRank, doneKindOrder } from '@/calendar'
+import { isDimmed, priorityRank, occSortKey, compareSortKeys } from '@/calendar'
+import type { SortKey } from '@/calendar'
 import { IconButton } from '@/components/primitives/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
@@ -41,23 +41,20 @@ const ROW_GAP = '0.375rem'
 type ParsedEntry = ReturnType<typeof parseItemEntry> & { idx: number }
 type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
 
-// Sort order: notes α → events chronologically → open tasks by priority →
-// open string tasks (stored) → done tasks + done string tasks (notes α → events α → tasks α) → broken links (stored)
-export function rowSortKey({ entry, occ }: Row): [number, number, string] {
+// Reuses sortOccs' own rule (type, then priority, then time, then title —
+// see SortKey in @/calendar) for the rows that resolve to a real occurrence,
+// so this list reads by the same logic as every calendar view instead of a
+// second, drifting copy of it. The two row shapes sortOccs never has to
+// handle get an equivalent key by hand: a plain checklist-text task has no
+// type/priority/time of its own, so it sorts as a bare, unprioritized task
+// (bucket matches its own done state); a broken link resolves to nothing at
+// all, so it gets a bucket of its own past both active and done items.
+export function rowSortKey({ entry, occ }: Row, now: Date): SortKey {
   if (entry.kind === 'link') {
-    if (!occ) return [5, entry.idx, '']
-    if (isDimmed(occ)) {
-      return [4, doneKindOrder(occKind(occ)), occ.metadata.title.toLowerCase()]
-    }
-    const k = occKind(occ)
-    if (k === 'note')  return [0, 0, occ.metadata.title.toLowerCase()]
-    if (k === 'event') return [1, occ.metadata.jsTime?.getTime() ?? 0, '']
-    // task: sort by priority
-    return [2, priorityRank(occ.metadata.priority), occ.metadata.title.toLowerCase()]
+    if (!occ) return { bucket: 2, typeKey: 0, prioKey: 0, jsTimeMs: 0, title: entry.ref }
+    return occSortKey(occ, now)
   }
-  // string task (always kind 'task')
-  if (entry.done) return [4, doneKindOrder('task'), entry.text.toLowerCase()]
-  return [3, entry.idx, '']
+  return { bucket: entry.done ? 1 : 0, typeKey: 3, prioKey: priorityRank(undefined), jsTimeMs: 0, title: entry.text }
 }
 
 export default function ItemsList({ items, onChange, roots, currentKey, vaultId, onPromote, onOpenWikilink, onToggleDone }: Props) {
@@ -85,13 +82,10 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
       const target = vaultId ? resolveWikilink(entry.ref, roots, vaultId) : undefined
       return { entry, occ: target ? occBySlug.get(target) : undefined }
     })
-    return [...rows].sort((a, b) => {
-      const [ga, na, sa] = rowSortKey(a)
-      const [gb, nb, sb] = rowSortKey(b)
-      if (ga !== gb) return ga - gb
-      if (na !== nb) return na - nb
-      return sa.localeCompare(sb)
-    })
+    const now = new Date()
+    const decorated = rows.map(row => ({ row, key: rowSortKey(row, now) }))
+    decorated.sort((a, b) => compareSortKeys(a.key, b.key))
+    return decorated.map(d => d.row)
   })()
 
   const toggleTask = (idx: number, text: string, done: boolean, row?: Row) => {

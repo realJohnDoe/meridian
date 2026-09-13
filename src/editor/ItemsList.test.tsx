@@ -6,6 +6,7 @@ import ItemsList, { rowSortKey } from './ItemsList'
 import { parseItemEntry } from './items'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeSeries, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
 import { toggleOccDone } from '@/occurrenceActions'
+import { compareSortKeys } from '@/calendar'
 import { useStore } from '@/store'
 import type { Occurrence, Roots, StoreOcc } from '@/types'
 
@@ -44,62 +45,61 @@ function taskRow(idx: number, raw: string): Row {
 
 const FUTURE = new Date('2099-01-01T09:00:00')
 const PAST   = new Date('2000-01-01T09:00:00')
+// Between PAST and FUTURE, so soonerEvent/laterEvent read as active and the
+// past-event fixture reads as dimmed.
+const NOW    = new Date('2020-06-15T12:00:00')
 
 describe('rowSortKey', () => {
-  it('groups an undone link to a note as [0, 0, title]', () => {
+  it('groups an undone link to a note as an active, unprioritized task-typed row', () => {
     const occ = makeOcc({ date: '', metadata: { fileSlug: 'note', title: 'My Note' } })
-    expect(rowSortKey(linkRow(0, occ))).toEqual([0, 0, 'my note'])
+    expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 0, typeKey: 3, prioKey: 3, jsTimeMs: 0, title: 'My Note' })
   })
 
-  it('groups an undone link to a future event as [1, jsTime, ""]', () => {
+  it('groups an undone link to a future timed event as active, typeKey 2, by time', () => {
     const occ = makeOcc({ date: '2099-01-01', time: '09:00', metadata: { fileSlug: 'note', title: 'Launch', jsTime: FUTURE } })
-    expect(rowSortKey(linkRow(0, occ))).toEqual([1, FUTURE.getTime(), ''])
+    expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 0, typeKey: 2, prioKey: 3, jsTimeMs: FUTURE.getTime(), title: 'Launch' })
   })
 
   it.each([
     ['high', 0], ['medium', 1], ['low', 2], [undefined, 3],
-  ] as const)('groups an undone link to a %s-priority task as [2, %i, title]', (priority, rank) => {
+  ] as const)('groups an undone link to a %s-priority task with prioKey %i', (priority, rank) => {
     const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false, priority } })
-    expect(rowSortKey(linkRow(0, occ))).toEqual([2, rank, 'task'])
+    expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 0, typeKey: 3, prioKey: rank, jsTimeMs: 0, title: 'Task' })
   })
 
-  it('groups an open string task as [3, idx, ""] — sorted by stored order, not text', () => {
-    expect(rowSortKey(taskRow(7, '[ ] buy milk'))).toEqual([3, 7, ''])
+  it('groups an open string task as an active, unprioritized task-typed row — sorted by its own text', () => {
+    expect(rowSortKey(taskRow(7, '[ ] buy milk'), NOW)).toEqual({ bucket: 0, typeKey: 3, prioKey: 3, jsTimeMs: 0, title: 'buy milk' })
   })
 
-  it('groups a done task-link as [4, 2 (doneKindOrder task), title]', () => {
+  it('groups a done task-link into the dimmed bucket, same type/priority key as an open task', () => {
     const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Finished', done: true } })
-    expect(rowSortKey(linkRow(0, occ))).toEqual([4, 2, 'finished'])
+    expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 1, typeKey: 3, prioKey: 3, jsTimeMs: 0, title: 'Finished' })
   })
 
-  it('groups a past event-link as [4, 1 (doneKindOrder event), title]', () => {
+  it('groups a past event-link into the dimmed bucket, keeping its timed-event type key', () => {
     const occ = makeOcc({ date: '2000-01-01', time: '09:00', metadata: { fileSlug: 'note', title: 'Old Meeting', jsTime: PAST } })
-    expect(rowSortKey(linkRow(0, occ))).toEqual([4, 1, 'old meeting'])
+    expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 1, typeKey: 2, prioKey: 3, jsTimeMs: PAST.getTime(), title: 'Old Meeting' })
   })
 
-  it('groups a done string task as [4, 2 (doneKindOrder task), text]', () => {
-    expect(rowSortKey(taskRow(0, '[x] buy milk'))).toEqual([4, 2, 'buy milk'])
+  it('groups a done string task into the dimmed bucket', () => {
+    expect(rowSortKey(taskRow(0, '[x] buy milk'), NOW)).toEqual({ bucket: 1, typeKey: 3, prioKey: 3, jsTimeMs: 0, title: 'buy milk' })
   })
 
-  it('groups a link with no resolvable occurrence as [5, idx, ""] — broken link', () => {
-    expect(rowSortKey(linkRow(3, undefined))).toEqual([5, 3, ''])
+  it('groups a link with no resolvable occurrence into its own trailing bucket — broken link', () => {
+    expect(rowSortKey(linkRow(3, undefined), NOW)).toEqual({ bucket: 2, typeKey: 0, prioKey: 0, jsTimeMs: 0, title: 'note.md' })
   })
 })
 
 describe('ItemsList sort order (end-to-end via rowSortKey)', () => {
   // Mirrors the production comparator in ItemsList's `sortedRows`, built on
-  // top of the exported `rowSortKey` so this exercises the real per-row logic.
-  function sortRows(rows: Row[]): Row[] {
-    return [...rows].sort((a, b) => {
-      const [ga, na, sa] = rowSortKey(a)
-      const [gb, nb, sb] = rowSortKey(b)
-      if (ga !== gb) return ga - gb
-      if (na !== nb) return na - nb
-      return sa.localeCompare(sb)
-    })
+  // top of the exported `rowSortKey` + `compareSortKeys` — the same rule
+  // sortOccs applies to every calendar view — so this exercises the real
+  // per-row logic rather than a copy of it.
+  function sortRows(rows: Row[], now: Date): Row[] {
+    return [...rows].sort((a, b) => compareSortKeys(rowSortKey(a, now), rowSortKey(b, now)))
   }
 
-  it('orders notes -> events chronologically -> open tasks by priority -> open string tasks -> done items -> broken links', () => {
+  it('orders active items by type/priority/time/title, then dimmed items the same way, then broken links', () => {
     const note        = makeOcc({ date: '', metadata: { fileSlug: 'note', title: 'Note' } })
     const laterEvent   = makeOcc({ date: '2099-01-02', time: '09:00', metadata: { fileSlug: 'note', title: 'Later', jsTime: new Date('2099-01-02T09:00:00') } })
     const soonerEvent  = makeOcc({ date: '2099-01-01', time: '09:00', metadata: { fileSlug: 'note', title: 'Sooner', jsTime: FUTURE } })
@@ -120,15 +120,17 @@ describe('ItemsList sort order (end-to-end via rowSortKey)', () => {
       linkRow(4, note),
     ]
 
-    const titles = sortRows(rows).map(({ entry, occ }) =>
+    const titles = sortRows(rows, NOW).map(({ entry, occ }) =>
       entry.kind === 'link' ? occ?.metadata.title : entry.text,
     )
 
+    // Timed events (typeKey 2) by time, then unprioritized/task-typed rows
+    // (typeKey 3 — tasks and notes alike) by priority then title, then the
+    // same rule again for the dimmed bucket, then the broken link last.
     expect(titles).toEqual([
-      'Note',
       'Sooner', 'Later',
       'High prio', 'Low prio',
-      'first stored task', 'second stored task',
+      'first stored task', 'Note', 'second stored task',
       'Done link', 'done string task',
       undefined, // broken link has no title
     ])
