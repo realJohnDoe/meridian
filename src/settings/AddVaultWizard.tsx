@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { HardDrive, GitBranch, CalendarDays, BookOpen } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
@@ -6,8 +6,10 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
 import {
-  addLocalVault, addIcalVault, addExampleVault, startGitHubSignIn, isFolderPickerSupported,
+  addLocalVault, addIcalVault, addExampleVault, addGitHubVaultOAuth, startGitHubSignIn,
+  findReusableGitHubSession, fetchInstalledRepos, isFolderPickerSupported,
   previewIcalFeed, GITHUB_APP_INSTALL_URL,
+  type ReusableGitHubSession, type InstalledRepo,
 } from '@/vaultActions'
 
 type WizardStep = 'source' | 'github' | 'ical'
@@ -48,6 +50,22 @@ interface FeedPreview {
 }
 
 /**
+ * The github step's own state machine, separate from `WizardStep` because it
+ * has to run a check *before* deciding whether to show a sign-in button at
+ * all: 'idle' until that check starts, 'checking' while it's in flight,
+ * 'signed-out' once it comes up empty (no reusable session — show the button
+ * as before), and 'picking'/'repos-error' once a reused session's repo list
+ * either loaded or didn't.
+ */
+type GithubPhase =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'signed-out' }
+  | { kind: 'picking'; session: ReusableGitHubSession; repos: InstalledRepo[] }
+  | { kind: 'repos-error'; session: ReusableGitHubSession; message: string }
+  | { kind: 'connecting' }
+
+/**
  * Adding a vault, on its own screen.
  *
  * It was previously a second `step` of the settings modal, which meant a
@@ -69,9 +87,17 @@ export default function AddVaultWizard() {
   const [feedError, setFeedError] = useState<string | null>(null)
   const [preview,   setPreview]   = useState<FeedPreview | null>(null)
 
+  const [githubPhase, setGithubPhase] = useState<GithubPhase>({ kind: 'idle' })
+  // Guards the check below against its own `setGithubPhase` calls: depending
+  // on `githubPhase.kind` in the effect's deps would re-run it the moment
+  // 'checking' commits, cancelling the very request it just started. A ref
+  // sidesteps that because writing it doesn't schedule a re-render.
+  const githubCheckStartedRef = useRef(false)
+
   // Read from the store rather than taken as a prop: the wizard is now reached
   // by URL, so there is no parent left to compute it.
   const offerTutorial = useStore(s => !s.vaults.some(v => v.kind === 'example'))
+  const hasGithubVault = useStore(s => s.vaults.some(v => v.kind === 'github'))
 
   // Probed here rather than at module scope: the settings barrel is imported by
   // tests that never mount this screen, and a top-level `window` probe makes
@@ -81,10 +107,60 @@ export default function AddVaultWizard() {
 
   const done = () => void navigate({ to: '/settings' })
 
+  // Reused-sign-in check, run once per visit to the github step (reset
+  // whenever the step is left — see setStep('source') below). A GitHub App
+  // user-access-token grant authorizes the account, not one repository, so
+  // an existing GitHub vault's tokens are equally good for adding a second —
+  // this is what lets the step skip startGitHubSignIn's full-page redirect
+  // (and the confusing instant bounce through github.com it does when the
+  // browser is already signed in there) whenever one is usable. Whether
+  // there's anything to check (`hasGithubVault`) is derived state, rendered
+  // directly below rather than mirrored into `githubPhase` via a synchronous
+  // setState here — only the async lookup itself belongs in the effect.
+  useEffect(() => {
+    if (step !== 'github' || !hasGithubVault) { githubCheckStartedRef.current = false; return }
+    if (githubCheckStartedRef.current) return
+    githubCheckStartedRef.current = true
+
+    const githubVaultIds = useStore.getState().vaults.filter(v => v.kind === 'github').map(v => v.id)
+    let cancelled = false
+    setGithubPhase({ kind: 'checking' })
+    findReusableGitHubSession(githubVaultIds)
+      .then(async session => {
+        if (!session) {
+          if (!cancelled) setGithubPhase({ kind: 'signed-out' })
+          return
+        }
+        try {
+          const repos = await fetchInstalledRepos(session.accessToken)
+          if (!cancelled) setGithubPhase({ kind: 'picking', session, repos })
+        } catch (e) {
+          if (!cancelled) {
+            setGithubPhase({ kind: 'repos-error', session, message: e instanceof Error ? e.message : 'Could not load repositories.' })
+          }
+        }
+      })
+      .catch(() => { if (!cancelled) setGithubPhase({ kind: 'signed-out' }) })
+    return () => { cancelled = true }
+  }, [step, hasGithubVault])
+
   async function handleSignIn() {
     setSigningIn(true)
     await startGitHubSignIn() // full-page redirect on success — component unmounts
     setSigningIn(false) // only reached if sign-in failed and notified instead of redirecting
+  }
+
+  async function handleConnectRepo(session: ReusableGitHubSession, repo: InstalledRepo) {
+    setGithubPhase({ kind: 'connecting' })
+    done()
+    await addGitHubVaultOAuth({
+      owner:        repo.owner,
+      repo:         repo.repo,
+      branch:       repo.branch,
+      accessToken:  session.accessToken,
+      refreshToken: session.refreshToken,
+      expiresAt:    session.expiresAt,
+    })
   }
 
   async function handleNext() {
@@ -226,28 +302,100 @@ export default function AddVaultWizard() {
     )
   }
 
+  const backToSource = () => { setStep('source'); setGithubPhase({ kind: 'idle' }) }
+  const installAppLink = (
+    <a
+      href={GITHUB_APP_INSTALL_URL}
+      target="_blank"
+      rel="noreferrer"
+      className="underline underline-offset-2 hover:text-foreground"
+    >
+      Install the GitHub App
+    </a>
+  )
+
+  if (githubPhase.kind === 'connecting') {
+    return (
+      <div className="flex flex-col gap-4">
+        <h2 className="px-1 text-sm font-semibold text-foreground">Connecting…</h2>
+      </div>
+    )
+  }
+
+  if (githubPhase.kind === 'picking' || githubPhase.kind === 'repos-error') {
+    const { session } = githubPhase
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="px-1">
+          <h2 className="text-sm font-semibold text-foreground">Connect a GitHub repository</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Signed in as <span className="font-medium text-foreground">{session.login}</span>.{' '}
+            <button
+              type="button"
+              onClick={handleSignIn}
+              disabled={signingIn}
+              className="underline underline-offset-2 hover:text-foreground"
+            >
+              Not you? Sign in with a different account
+            </button>
+          </p>
+        </div>
+
+        {githubPhase.kind === 'repos-error'
+          ? <p className="text-xs text-destructive">{githubPhase.message}</p>
+          : (
+            <>
+              {githubPhase.repos.length > 0 ? (
+                <div className="flex flex-col gap-2">
+                  {githubPhase.repos.map(repo => (
+                    <button
+                      key={`${repo.owner}/${repo.repo}`}
+                      type="button"
+                      onClick={() => void handleConnectRepo(session, repo)}
+                      className="rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                    >
+                      {repo.owner}/{repo.repo}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Meridian isn&rsquo;t installed on any repository yet.
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Only repositories with Meridian&rsquo;s GitHub App installed appear here.{' '}
+                {installAppLink}
+              </p>
+            </>
+          )}
+
+        <div className="flex justify-between">
+          <Button variant="ghost" onClick={backToSource} disabled={signingIn}>Back</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <h2 className="px-1 text-sm font-semibold text-foreground">Connect a GitHub repository</h2>
 
-      <Button onClick={handleSignIn} disabled={signingIn}>
-        {signingIn ? 'Redirecting to GitHub…' : 'Sign in with GitHub'}
-      </Button>
+      {githubPhase.kind === 'checking'
+        ? <p className="text-sm text-muted-foreground">Checking GitHub sign-in…</p>
+        : (
+          <Button onClick={handleSignIn} disabled={signingIn}>
+            {signingIn ? 'Redirecting to GitHub…' : 'Sign in with GitHub'}
+          </Button>
+        )}
       <p className="text-xs text-muted-foreground">
         You&rsquo;ll need a GitHub repository with Meridian&rsquo;s app installed on it — you can
         create one and install the app after signing in.{' '}
-        <a
-          href={GITHUB_APP_INSTALL_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="underline underline-offset-2 hover:text-foreground"
-        >
-          Install the GitHub App
-        </a>
+        {installAppLink}
       </p>
 
       <div className="flex justify-between">
-        <Button variant="ghost" onClick={() => { setStep('source') }} disabled={signingIn}>Back</Button>
+        <Button variant="ghost" onClick={backToSource} disabled={signingIn}>Back</Button>
       </div>
     </div>
   )
