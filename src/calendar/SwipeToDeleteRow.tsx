@@ -44,9 +44,15 @@ export default function SwipeToDeleteRow({ occ, onSwipeDelete, disabled, childre
     const hintL = hintRef.current
     const icon  = iconRef.current
 
-    const THRESHOLD = 72
-    const FULL_FRAC = 0.5
-    let sx = 0, sy = 0, tracking = false, blocked = false
+    // Commit distance is a fixed physical distance, not a fraction of the
+    // row's width. iOS/Android swipe-action patterns (Mail, Gmail, Files)
+    // commit once the action itself is comfortably exposed — a distance that
+    // doesn't grow with the screen. A row-width fraction does grow with it,
+    // which is exactly why the old 50%-of-row-width rule felt fine on a
+    // phone (~150-200px) but made an iPad row (easily 700-1000px) require
+    // dragging 350-500px to delete.
+    const COMMIT_PX = 96
+    let sx = 0, sy = 0, tracking = false, blocked = false, armed = false
     let deleteTimeout: ReturnType<typeof setTimeout> | undefined
 
     function onTouchStart(e: TouchEvent) {
@@ -55,6 +61,7 @@ export default function SwipeToDeleteRow({ occ, onSwipeDelete, disabled, childre
       sy = t.clientY
       tracking = false
       blocked = false
+      armed = false
       row.style.animation = 'none'
       row.style.transition = 'none'
     }
@@ -71,34 +78,31 @@ export default function SwipeToDeleteRow({ occ, onSwipeDelete, disabled, childre
       if (blocked) return
       e.preventDefault()
       const rowW = wrap.offsetWidth || 320
-      const absDx = Math.abs(dx)
       const clamped = Math.min(Math.max(dx, -rowW), 0)
       row.style.setProperty('--swipe-x', `${clamped}px`)
-      if (dx < -8) {
-        const fullPx = rowW * FULL_FRAC
-        const prog = Math.min(absDx / fullPx, 1)
-        hintL.style.setProperty('--hint-filter', `saturate(${0.3 + prog * 0.7})`)
-        hintL.style.setProperty('--hint-opacity', String(0.4 + prog * 0.6))
-        hintL.classList.add('active')
-        icon.style.setProperty('--icon-scale', String(0.7 + prog * 0.3))
-      } else {
-        hintL.classList.remove('active')
+      hintL.classList.toggle('active', dx < -8)
+      // Bump the icon the instant the drag crosses the commit threshold,
+      // rather than growing it continuously with drag progress — a discrete
+      // "you're past the point of no return" cue instead of a gradual one,
+      // which reads more clearly as the moment the release action changes.
+      const nowArmed = dx <= -COMMIT_PX
+      if (nowArmed !== armed) {
+        armed = nowArmed
+        icon.style.setProperty('--icon-scale', armed ? '1.18' : '1')
       }
     }
 
-    function onTouchEnd(e: TouchEvent) {
+    function onTouchEnd() {
       if (blocked || !tracking) {
         row.style.transition = ''
         row.style.setProperty('--swipe-x', '0px')
         hintL.classList.remove('active')
         return
       }
-      const dx = e.changedTouches[0]!.clientX - sx
       const rowW = wrap.offsetWidth || 320
-      const isFull = Math.abs(dx) / rowW >= FULL_FRAC
       hintL.classList.remove('active')
       icon.style.setProperty('--icon-scale', '1')
-      if (dx <= -THRESHOLD && isFull) {
+      if (armed) {
         // Phase 1: show toast immediately (before animation completes).
         // beginSwipeDelete() returns applyDelete — the function that actually
         // removes the item from the store once the exit animation is done.
@@ -136,22 +140,36 @@ export default function SwipeToDeleteRow({ occ, onSwipeDelete, disabled, childre
     // the horizontal slide. Callers own the outer box that carries the card's
     // elevation shadow, since that shadow would otherwise be clipped here too.
     <div className="relative overflow-hidden rounded-lg" ref={wrapRef}>
-      {/* Left swipe hint — display and opacity/filter driven by CSS (.swipe-hint/.active) */}
+      {/* Full-bleed red backdrop, same box as the row it sits behind — it
+          doesn't fade or saturate in, it's simply uncovered as the row (and
+          the card inside it) slides away. display and layout (flex) driven
+          by CSS (.swipe-hint/.active) rather than an inline `flex` utility —
+          see index.css for why display:none/flex, not opacity, gates this.
+          rounded-lg here matches the row's own (see .swipe-row's rounding
+          below) purely for belt-and-suspenders: wrap's clip already applies
+          the same shape at rest. */}
       <div
         ref={hintRef}
-        className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive"
+        className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive rounded-lg"
       >
         <Trash2
           ref={iconRef}
           size={18}
           strokeWidth={2.5}
-          className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-150"
+          className="shrink-0 stroke-primary-foreground fill-none [transform:scale(var(--icon-scale,1))] transition-transform duration-200 [transition-timing-function:cubic-bezier(.34,1.56,.64,1)]"
         />
         <span className="text-xs font-bold text-primary-foreground whitespace-nowrap">Delete</span>
       </div>
 
-      {/* Main row — transform driven by CSS (.swipe-row) */}
-      <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none">
+      {/* Main row — transform driven by CSS (.swipe-row). rounded-lg
+          overflow-hidden here (not just on wrap) makes this box's own clip
+          shape track the card it contains exactly, at every translateX
+          offset while dragging — not just at rest. Without it, this row is a
+          plain unrounded rectangle sitting behind the card's own rounded
+          corners; as it slides, that rectangle's square corners peek out
+          past the card's rounded ones, right at the seam with the red
+          backdrop, reading as a sharp notch cut into the reveal. */}
+      <div ref={rowRef} className="swipe-row relative z-10 bg-background touch-pan-y select-none rounded-lg overflow-hidden">
         {children}
       </div>
     </div>
