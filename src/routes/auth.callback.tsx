@@ -6,6 +6,7 @@ import {
   type InstalledRepo, type OAuthTokens,
 } from '@/vaultActions'
 import { Button } from '@/components/primitives/button'
+import { RepoPicker } from '@/components'
 import { useStore } from '@/store'
 
 /**
@@ -24,10 +25,6 @@ function waitForVaultsLoaded(): Promise<void> {
     })
   })
 }
-
-// Prefills the name field on GitHub's own new-repository form — verified live
-// (2026-09-04): github.com/new honours ?name= across the sign-in redirect.
-const NEW_REPO_URL = 'https://github.com/new?name=meridian-vault'
 
 export const Route = createFileRoute('/auth/callback')({
   component: AuthCallbackPage,
@@ -175,47 +172,13 @@ function AuthCallbackPage() {
   }
 
   // A zero-length and a non-empty repo list are the same screen — an empty
-  // list plus these two out-links is a normal state, not a dead end — so
+  // list plus RepoPicker's out-links is a normal state, not a dead end — so
   // there is no separate "come back and sign in again" phase; only the title
   // differs.
   return (
     <CenteredMessage title={phase.repos.length === 0 ? "Meridian isn't installed on any repository yet" : 'Choose a repository'}>
-      <div className="flex w-full max-w-sm flex-col gap-3">
-        {phase.repos.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {phase.repos.map(repo => (
-              <button
-                key={`${repo.owner}/${repo.repo}`}
-                type="button"
-                onClick={() => connect(phase.tokens, repo)}
-                className="rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-              >
-                {repo.owner}/{repo.repo}
-              </button>
-            ))}
-          </div>
-        )}
-        <p className="text-xs text-muted-foreground">
-          Only repositories with Meridian's GitHub App installed appear here.
-        </p>
-        <div className="flex flex-col gap-1.5 border-t border-border pt-3 text-sm">
-          <a
-            href={NEW_REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >
-            Create a new repository on GitHub
-          </a>
-          <a
-            href={GITHUB_APP_INSTALL_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >
-            Add another repository…
-          </a>
-        </div>
+      <div className="w-full max-w-sm">
+        <RepoPicker repos={phase.repos} onPick={repo => connect(phase.tokens, repo)} />
       </div>
     </CenteredMessage>
   )

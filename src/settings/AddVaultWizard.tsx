@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { HardDrive, GitBranch, CalendarDays, BookOpen } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
+import { RepoPicker } from '@/components'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
@@ -345,28 +346,12 @@ export default function AddVaultWizard() {
           ? <p className="text-xs text-destructive">{githubPhase.message}</p>
           : (
             <>
-              {githubPhase.repos.length > 0 ? (
-                <div className="flex flex-col gap-2">
-                  {githubPhase.repos.map(repo => (
-                    <button
-                      key={`${repo.owner}/${repo.repo}`}
-                      type="button"
-                      onClick={() => void handleConnectRepo(session, repo)}
-                      className="rounded-lg border border-border px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
-                    >
-                      {repo.owner}/{repo.repo}
-                    </button>
-                  ))}
-                </div>
-              ) : (
+              {githubPhase.repos.length === 0 && (
                 <p className="text-xs text-muted-foreground">
                   Meridian isn&rsquo;t installed on any repository yet.
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Only repositories with Meridian&rsquo;s GitHub App installed appear here.{' '}
-                {installAppLink}
-              </p>
+              <RepoPicker repos={githubPhase.repos} onPick={repo => void handleConnectRepo(session, repo)} />
             </>
           )}
 
