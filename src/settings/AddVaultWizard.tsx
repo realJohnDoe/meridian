@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { HardDrive, GitBranch, CalendarDays, BookOpen } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
-import { RepoPicker } from '@/components'
 import { Input } from '@/components/ui/input'
+import RepoPicker from './RepoPicker'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
 import {
@@ -326,34 +326,31 @@ export default function AddVaultWizard() {
   if (githubPhase.kind === 'picking' || githubPhase.kind === 'repos-error') {
     const { session } = githubPhase
     return (
-      <div className="flex flex-col gap-4">
-        <div className="px-1">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-0.5 px-1">
           <h2 className="text-sm font-semibold text-foreground">Connect a GitHub repository</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Signed in as <span className="font-medium text-foreground">{session.login}</span>.{' '}
-            <button
-              type="button"
-              onClick={handleSignIn}
-              disabled={signingIn}
-              className="underline underline-offset-2 hover:text-foreground"
-            >
-              Missing a repository you just added, or want a different account? Sign in again
-            </button>
+          <p className="text-xs text-muted-foreground">
+            Signed in as <span className="font-medium text-foreground">{session.login}</span>
           </p>
         </div>
 
-        {githubPhase.kind === 'repos-error'
-          ? <p className="text-xs text-destructive">{githubPhase.message}</p>
-          : (
-            <>
-              {githubPhase.repos.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Meridian isn&rsquo;t installed on any repository yet.
-                </p>
-              )}
-              <RepoPicker repos={githubPhase.repos} onPick={repo => void handleConnectRepo(session, repo)} />
-            </>
-          )}
+        {githubPhase.kind === 'repos-error' && (
+          <p className="px-1 text-xs text-destructive">{githubPhase.message}</p>
+        )}
+        {githubPhase.kind === 'picking' && githubPhase.repos.length === 0 && (
+          <p className="px-1 text-xs text-muted-foreground">
+            Meridian isn&rsquo;t installed on any repository yet.
+          </p>
+        )}
+
+        {/* Rendered on the error path too, with no list: its out-links — and
+            the sign-in-again row in particular — are the way out of a repo
+            fetch that failed, not just of one that came back empty. */}
+        <RepoPicker
+          repos={githubPhase.kind === 'picking' ? githubPhase.repos : []}
+          onPick={repo => void handleConnectRepo(session, repo)}
+          onSignInAgain={() => { void handleSignIn() }}
+        />
 
         <div className="flex justify-between">
           <Button variant="ghost" onClick={backToSource} disabled={signingIn}>Back</Button>

@@ -295,13 +295,47 @@ describe('AddVaultWizard — GitHub step — reusing an existing sign-in', () =>
     expect(screen.getByText('octocat')).toBeInTheDocument()
   })
 
-  it('starts a fresh sign-in — picking up a repo just added, or a different account — via the "sign in again" link', async () => {
+  it('starts a fresh sign-in from the picker\'s "different account" row', async () => {
     vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
     vi.mocked(fetchInstalledRepos).mockResolvedValue([])
     goToGitHubStep()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Sign in again/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Sign in with a different account/ }))
 
     expect(startGitHubSignIn).toHaveBeenCalledTimes(1)
+  })
+
+  // The repo fetch failing is the one state with no list to pick from, so the
+  // out-links — and the sign-in-again row especially — are the only way
+  // forward. They used to disappear exactly when they were needed most.
+  it('still offers the picker\'s out-links when the repo fetch failed', async () => {
+    vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
+    vi.mocked(fetchInstalledRepos).mockRejectedValue(new Error('Could not list repositories.'))
+    goToGitHubStep()
+
+    expect(await screen.findByText('Could not list repositories.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Sign in with a different account/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Add another repository/ })).toBeInTheDocument()
+  })
+
+  it('marks a repo that already backs a vault as added, and refuses to add it twice', async () => {
+    useStore.setState({ vaults: [githubVault] })
+    vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
+    vi.mocked(fetchInstalledRepos).mockResolvedValue([
+      { owner: 'acme', repo: 'notes', branch: 'main' },
+      { owner: 'acme', repo: 'journal', branch: 'main' },
+    ])
+    goToGitHubStep()
+
+    // The vault's own repo — offered, but inert.
+    const taken = await screen.findByRole('button', { name: /acme\/notes/ })
+    expect(taken).toBeDisabled()
+    expect(taken).toHaveTextContent('Added')
+
+    fireEvent.click(taken)
+    expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
+
+    // The one that isn't a vault yet still works.
+    expect(screen.getByRole('button', { name: /acme\/journal/ })).toBeEnabled()
   })
 })

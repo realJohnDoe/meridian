@@ -512,6 +512,34 @@ export class GitHubBackend implements StorageBackend {
     }
   }
 
+  /**
+   * Whether the repository has no branches at all.
+   *
+   * This is the state a repo created without "Add a README" is in: it reports
+   * a `default_branch` (GitHub picks the name at creation) while no such ref
+   * exists yet, so asking for that branch by name 404s. Distinguishing it from
+   * a genuinely wrong branch name is the whole point — both 404, and only one
+   * of them is a misconfiguration.
+   *
+   * Both shapes GitHub uses to say "no commits here" are accepted, because
+   * which one comes back depends on the endpoint: the Git Data API answers
+   * 409 "Git Repository is empty" (see `isEmptyRepoError`, already relied on
+   * by `statAll`), while the repos API answers an ordinary empty list.
+   */
+  private async hasNoBranches(): Promise<boolean> {
+    try {
+      const { data } = await this._octokit.request('GET /repos/{owner}/{repo}/branches', {
+        owner:    this._cfg.owner,
+        repo:     this._cfg.repo,
+        per_page: 1,
+      })
+      return data.length === 0
+    } catch (e) {
+      if (isEmptyRepoError(e)) return true
+      throw e
+    }
+  }
+
   async ensurePermission(_interactive: boolean): Promise<PermissionOutcome> {
     try {
       const { data } = await this._octokit.request('GET /repos/{owner}/{repo}', {
@@ -521,11 +549,22 @@ export class GitHubBackend implements StorageBackend {
       // permissions is only present for authenticated requests; absent means read-only or public token
       if (!data.permissions?.push) return 'denied'
       // Verify the configured branch exists so a wrong-branch config fails early
-      await this._octokit.request('GET /repos/{owner}/{repo}/branches/{branch}', {
-        owner:  this._cfg.owner,
-        repo:   this._cfg.repo,
-        branch: this._cfg.branch,
-      })
+      try {
+        await this._octokit.request('GET /repos/{owner}/{repo}/branches/{branch}', {
+          owner:  this._cfg.owner,
+          repo:   this._cfg.repo,
+          branch: this._cfg.branch,
+        })
+      } catch (e) {
+        // A missing branch is only a misconfiguration when the repo *has*
+        // branches. On a repo with no commits it means nothing has been
+        // pushed yet — which `statAll` already treats as a vault with no
+        // files, the same as an empty local folder. Denying here instead
+        // reported a repo Meridian can write to as one it has no write
+        // permission on, and blocked it from ever being added.
+        if ((e as { status?: number }).status !== 404) throw e
+        if (!await this.hasNoBranches()) return 'denied'
+      }
       return 'granted'
     } catch (e) {
       // Route through the same classifier every other GitHub call already

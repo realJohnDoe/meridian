@@ -171,9 +171,9 @@ describe('auth.callback — repository fan-out', () => {
     render(<AuthCallbackPage />)
 
     expect(await screen.findByText("Meridian isn't installed on any repository yet")).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Create a new repository on GitHub' }))
+    expect(screen.getByRole('link', { name: /Create a new repository on GitHub/ }))
       .toHaveAttribute('href', 'https://github.com/new?name=meridian-vault')
-    expect(screen.getByRole('link', { name: 'Add another repository…' }))
+    expect(screen.getByRole('link', { name: /Add another repository/ }))
       .toHaveAttribute('href', 'https://github.com/apps/test-app/installations/new')
     expect(addGitHubVaultOAuth).not.toHaveBeenCalled()
   })
@@ -183,8 +183,8 @@ describe('auth.callback — repository fan-out', () => {
     fetchInstalledRepos.mockResolvedValue([repo('notes')])
     render(<AuthCallbackPage />)
 
-    expect(await screen.findByRole('link', { name: 'Create a new repository on GitHub' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Add another repository…' })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /Create a new repository on GitHub/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Add another repository/ })).toBeInTheDocument()
   })
 
   // The PKCE verifier for a fresh sign-in lives in sessionStorage and does not
@@ -196,7 +196,7 @@ describe('auth.callback — repository fan-out', () => {
     fetchInstalledRepos.mockResolvedValue([])
     render(<AuthCallbackPage />)
 
-    for (const name of ['Create a new repository on GitHub', 'Add another repository…']) {
+    for (const name of [/Create a new repository on GitHub/, /Add another repository/]) {
       const link = await screen.findByRole('link', { name })
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', 'noreferrer')
