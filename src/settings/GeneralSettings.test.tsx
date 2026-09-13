@@ -1,23 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import type { ReactNode, AnchorHTMLAttributes } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { useStore } from '@/store'
 import { setupStore } from '@/test-utils'
 import type { VaultRef } from '@/vaultRef'
 import GeneralSettings from './GeneralSettings'
 
-vi.mock('@tanstack/react-router', () => ({
-  Link: ({ to, params, children, ...rest }: {
-    to: string
-    params?: Record<string, string>
-    children: ReactNode
-  } & AnchorHTMLAttributes<HTMLAnchorElement>) => (
-    <a href={Object.entries(params ?? {}).reduce((path, [k, v]) => path.replace(`$${k}`, v), to)} {...rest}>
-      {children}
-    </a>
-  ),
-}))
+vi.mock('@tanstack/react-router', async () => {
+  const { linkStub } = await import('@/test-utils/router')
+  return { Link: linkStub }
+})
 
 vi.mock('next-themes', () => ({ useTheme: () => ({ theme: 'dracula', setTheme: vi.fn(), systemTheme: 'dark' }) }))
 vi.mock('@/vaultActions', () => ({ setDefaultVault: vi.fn() }))

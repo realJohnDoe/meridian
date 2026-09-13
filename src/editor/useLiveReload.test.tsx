@@ -28,12 +28,8 @@ const { navigateMock, backMock, warnMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReactRouter>()
-  return {
-    ...actual,
-    useNavigate: () => navigateMock,
-    useRouter: () => ({ history: { back: backMock } }),
-  }
+  const [actual, { navigateStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
+  return { ...actual, ...navigateStub({ navigate: navigateMock, back: backMock }) }
 })
 
 vi.mock('sonner', () => ({

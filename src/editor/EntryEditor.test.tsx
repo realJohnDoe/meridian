@@ -11,12 +11,8 @@ import EntryEditor from './EntryEditor'
 const { navigateMock, backMock } = vi.hoisted(() => ({ navigateMock: vi.fn(), backMock: vi.fn() }))
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReactRouter>()
-  return {
-    ...actual,
-    useNavigate: () => navigateMock,
-    useRouter: () => ({ history: { back: backMock } }),
-  }
+  const [actual, { navigateStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
+  return { ...actual, ...navigateStub({ navigate: navigateMock, back: backMock }) }
 })
 
 // CodeMirror can't mount in jsdom — stand in a plain textarea wired to the same

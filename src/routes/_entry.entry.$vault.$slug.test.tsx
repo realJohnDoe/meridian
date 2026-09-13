@@ -19,11 +19,10 @@ const { navigateMock, backMock, paramsMock, searchMock, handleDelete, handleClos
 // router tree — Route.useParams()/useSearch() need live router context
 // otherwise, same approach as auth.callback.test.tsx.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReactRouter>()
+  const [actual, { navigateStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
   return {
     ...actual,
-    useNavigate: () => navigateMock,
-    useRouter: () => ({ history: { back: backMock } }),
+    ...navigateStub({ navigate: navigateMock, back: backMock }),
     createFileRoute: () => (opts: Record<string, unknown>) => ({
       ...opts,
       useParams: () => paramsMock(),

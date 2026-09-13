@@ -13,13 +13,12 @@ const { navigateMock, backMock, pathnameRef } = vi.hoisted(() => ({
 // __root.test.tsx — the real route is bound to the generated tree. Outlet
 // needs router context this test doesn't set up, so it's stubbed too.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReactRouter>()
+  const [actual, { navigateStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
   return {
     ...actual,
     createFileRoute: () => (opts: Record<string, unknown>) => opts,
     Outlet: () => <div data-testid="outlet" />,
-    useNavigate: () => navigateMock,
-    useRouter: () => ({ history: { back: backMock } }),
+    ...navigateStub({ navigate: navigateMock, back: backMock }),
     useRouterState: <T,>({ select }: { select: (s: { location: { pathname: string } }) => T }) =>
       select({ location: { pathname: pathnameRef.current } }),
   }
