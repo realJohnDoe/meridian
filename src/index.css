@@ -1024,14 +1024,18 @@
 }
 
 
-/* ── SWIPE GESTURES — kept: JS-toggled visibility and CSS-var-driven properties ── */
-/* opacity, not display: toggling display:none/flex forces a reflow every
-   time a drag crosses the 8px dead zone below, where translateX itself is
-   already compositor-only. No transition on opacity either: the red
-   backdrop is meant to be revealed by the row sliding away, not to fade in
-   on its own. */
-.swipe-hint{opacity:0}
-.swipe-hint.active{opacity:1}
+/* ── SWIPE GESTURES — kept: JS-toggled display and CSS-var-driven properties ── */
+/* display:none, not opacity:0: e2e/contrast-sweep.spec.ts's visibleRect()
+   relies on a display:none subtree producing an all-zero
+   getBoundingClientRect() to exclude it from the sweep — opacity:0 still
+   lays out normally (real, non-zero rect) and is only checked on the
+   element being swept itself, not an invisible ancestor, so the "Delete"
+   label would get its contrast sampled against whatever's really painted
+   there while hidden. No opacity/filter CSS vars on top of that either: the
+   red backdrop is meant to be revealed by the row sliding away, not to fade
+   in on its own. */
+.swipe-hint{display:none}
+.swipe-hint.active{display:flex}
 .swipe-row{transform:translateX(var(--swipe-x,0px))}
 
 /* ── CURRENT-TIME LINE — functional indicator, kept ── */

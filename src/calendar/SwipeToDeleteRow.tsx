@@ -142,13 +142,15 @@ export default function SwipeToDeleteRow({ occ, onSwipeDelete, disabled, childre
     <div className="relative overflow-hidden rounded-lg" ref={wrapRef}>
       {/* Full-bleed red backdrop, same box as the row it sits behind — it
           doesn't fade or saturate in, it's simply uncovered as the row (and
-          the card inside it) slides away, per .swipe-hint/.active below.
+          the card inside it) slides away. display and layout (flex) driven
+          by CSS (.swipe-hint/.active) rather than an inline `flex` utility —
+          see index.css for why display:none/flex, not opacity, gates this.
           rounded-lg here matches the row's own (see .swipe-row's rounding
           below) purely for belt-and-suspenders: wrap's clip already applies
           the same shape at rest. */}
       <div
         ref={hintRef}
-        className="swipe-hint absolute inset-0 flex items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive rounded-lg"
+        className="swipe-hint absolute inset-0 items-center justify-end gap-2.5 px-5 pointer-events-none z-0 bg-destructive rounded-lg"
       >
         <Trash2
           ref={iconRef}
