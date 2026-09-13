@@ -14,11 +14,10 @@ const { navigateMock, searchMock, historyKeyMock } = vi.hoisted(() => ({
 // Same shape as auth.callback.test.tsx: createFileRoute is mocked so the page
 // component is reachable without standing up a router.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReactRouter>()
+  const [actual, { navigateStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
   return {
     ...actual,
-    useNavigate: () => navigateMock,
-    useRouter: () => ({ history: { back: vi.fn() } }),
+    ...navigateStub({ navigate: navigateMock, back: vi.fn() }),
     // Runs the page's own selector, so the shape it reads (`location.state`)
     // is part of what this pins rather than an assumption.
     useRouterState: ({ select }: { select: (s: { location: { state: { __TSR_key?: string } } }) => unknown }) =>

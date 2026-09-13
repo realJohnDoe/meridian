@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import type { ReactNode, AnchorHTMLAttributes } from 'react'
 import { render, screen } from '@testing-library/react'
 import { useStore, emptySyncStatus } from '@/store'
 import { setupStore } from '@/test-utils'
@@ -9,17 +8,10 @@ import VaultList from './VaultList'
 
 // No router is mounted, so `Link` is stubbed as the anchor it renders, with
 // `to`/`params` resolved into the href the assertions read.
-vi.mock('@tanstack/react-router', () => ({
-  Link: ({ to, params, children, ...rest }: {
-    to: string
-    params?: Record<string, string>
-    children: ReactNode
-  } & AnchorHTMLAttributes<HTMLAnchorElement>) => (
-    <a href={Object.entries(params ?? {}).reduce((path, [k, v]) => path.replace(`$${k}`, v), to)} {...rest}>
-      {children}
-    </a>
-  ),
-}))
+vi.mock('@tanstack/react-router', async () => {
+  const { linkStub } = await import('@/test-utils/router')
+  return { Link: linkStub }
+})
 
 setupStore()
 

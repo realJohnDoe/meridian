@@ -6,6 +6,8 @@ import { entryKey as makeEntryKey } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import type { Occurrence, StoreSeries, StoreItem, Roots, FileMetadata, Entries, AppMetadata } from '@/types'
 
+export { linkStub, navigateStub } from './router'
+
 const initialStoreState = useStore.getInitialState()
 
 /**

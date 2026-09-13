@@ -27,7 +27,20 @@ function findModules(dir, base = '') {
   return modules
 }
 
-const MODULES = findModules(path.resolve(import.meta.dirname, 'src')).sort()
+// test-utils/ has its own index.ts (setMediaQuery, linkStub, navigateStub, …)
+// but isn't a feature module the barrel-privacy invariant is meant to
+// protect — it's shared test infrastructure, meant to be reached however a
+// test file needs it, deep imports included. That matters concretely for
+// router.tsx: a `vi.mock('@tanstack/react-router', ...)` factory has to
+// reach linkStub/navigateStub through a dynamic import (vi.mock hoisting —
+// see CLAUDE.md), and importing the barrel there would recurse back into
+// `@tanstack/react-router` (via @/calendar's view components, or into
+// @/store's `useStore.getInitialState()` when a test also mocks @/store) —
+// so that import has to reach router.tsx directly, which a protected zone
+// would forbid.
+const MODULES = findModules(path.resolve(import.meta.dirname, 'src'))
+  .filter(m => m !== 'test-utils')
+  .sort()
 
 // True when `a` is nested inside `b`'s own directory tree (or vice versa).
 // Used to keep a nested module (e.g. a hypothetical editor/cm) out of its own

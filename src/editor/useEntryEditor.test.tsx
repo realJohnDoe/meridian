@@ -14,12 +14,8 @@ import { useEntryEditor } from './useEntryEditor'
 const { navigateMock, backMock } = vi.hoisted(() => ({ navigateMock: vi.fn(), backMock: vi.fn() }))
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReactRouter>()
-  return {
-    ...actual,
-    useNavigate: () => navigateMock,
-    useRouter: () => ({ history: { back: backMock } }),
-  }
+  const [actual, { navigateStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
+  return { ...actual, ...navigateStub({ navigate: navigateMock, back: backMock }) }
 })
 
 setupStore()

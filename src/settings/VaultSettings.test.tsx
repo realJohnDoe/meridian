@@ -24,28 +24,12 @@ vi.mock('@/vaultActions', async (importOriginal) => ({
 // The archived list's rows are real `Link`s (see keyRoute), which need a
 // live router context `Link` itself can't get from a plain RTL render —
 // jsdom throws deep inside useLinkProps without one. Stubbed to a plain
-// anchor that reconstructs keyRoute's actual href from its known shape
-// (`to: '/entry/$vault/$slug', params: { vault, slug }`), so the archived
-// tests below can assert on where the link really points, not just that
-// something renders.
+// anchor that resolves `to`/`params` the same way the real `Link` would, so
+// the archived tests below can assert on where the link really points, not
+// just that something renders.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof ReactRouter>()
-  return {
-    ...actual,
-    Link: ({ children, className, to, params }: {
-      children: React.ReactNode
-      className?: string
-      to?: string
-      params?: { vault?: string; slug?: string }
-    }) => (
-      <a
-        className={className}
-        href={to === '/entry/$vault/$slug' && params ? `/entry/${params.vault}/${params.slug}` : String(to)}
-      >
-        {children}
-      </a>
-    ),
-  }
+  const [actual, { linkStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
+  return { ...actual, Link: linkStub }
 })
 
 setupStore()
