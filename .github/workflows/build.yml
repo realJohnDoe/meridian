@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --audit-level=high
+      - run: pnpm audit --audit-level=moderate
       # build first: it regenerates src/routeTree.gen.ts (gitignored, produced
       # by the TanStack Router vite plugin). Type-aware lint rules need it —
       # running lint first left Route.useSearch()/useParams() unresolved on a
