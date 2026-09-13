@@ -1,20 +1,81 @@
-import { coverageConfigDefaults, defineConfig } from 'vitest/config'
+import fs from 'fs'
 import path from 'path'
+import { coverageConfigDefaults, defineConfig } from 'vitest/config'
+
+const SRC_DIR = path.resolve(__dirname, './src')
+const alias = { '@': SRC_DIR }
+const setupFiles = ['src/test-utils/setup.ts']
+
+/**
+ * Whether a test file needs its own isolate: a jsdom environment, a `vi.mock`
+ * registry, or a `vi.resetModules()` call, any of which can bleed module
+ * state into a neighbour sharing the same worker. `vi.resetModules()` earned
+ * its place here by getting caught, not by inspection — cache.test.ts and
+ * exampleBackend.test.ts call it to force a fresh module graph over a
+ * memoised singleton (db.ts's cached Dexie handle), which under `isolate:
+ * false` clears the *shared* registry every un-isolated file runs in,
+ * corrupting whichever neighbour happens to run next; `--sequence.shuffle`
+ * on the pure project surfaced it as flaky IndexedDB failures. Everything
+ * else gets a clean store via `setupStore()` (src/test-utils/index.ts) and is
+ * safe to run un-isolated.
+ *
+ * Computed by scanning file contents rather than hard-coded as a path list —
+ * a hard-coded list rots silently the first time a file gains one of these
+ * markers, staying in the wrong project until it breaks. This way the file
+ * moves buckets on its own.
+ */
+function needsIsolation(relativePath: string): boolean {
+  const contents = fs.readFileSync(path.join(__dirname, relativePath), 'utf-8')
+  return (
+    contents.includes('@vitest-environment jsdom') ||
+    contents.includes('vi.mock(') ||
+    contents.includes('vi.resetModules(')
+  )
+}
+
+const allTestFiles = fs
+  .readdirSync(SRC_DIR, { recursive: true })
+  .filter((entry): entry is string => typeof entry === 'string' && /\.test\.tsx?$/.test(entry))
+  .map((entry) => path.join('src', entry))
+
+const isolatedTestFiles = allTestFiles.filter(needsIsolation)
 
 // Standalone Vitest config — intentionally does NOT load the app's Vite plugins
 // (PWA, the debug-page middleware, react-refresh). Most of the suite is pure TS
 // with no DOM, so the default environment stays 'node' for speed; UI/hook tests
 // that need a DOM opt in per-file with a `// @vitest-environment jsdom` docblock.
+//
+// Split into two projects (see #1041): `pure` runs un-isolated on the threads
+// pool since it neither renders under jsdom nor calls `vi.mock`, so nothing
+// needs a fresh module graph per file; `isolated` keeps today's per-file
+// isolation for everything else. `pure`'s safety rests entirely on
+// `setupStore()` resetting the store and calendar caches between tests —
+// verify a change here stays green under `--sequence.shuffle` before landing.
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
   test: {
-    environment: 'node',
-    setupFiles: ['src/test-utils/setup.ts'],
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    projects: [
+      {
+        resolve: { alias },
+        test: {
+          name: 'pure',
+          environment: 'node',
+          pool: 'threads',
+          isolate: false,
+          setupFiles,
+          include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+          exclude: isolatedTestFiles,
+        },
+      },
+      {
+        resolve: { alias },
+        test: {
+          name: 'isolated',
+          environment: 'node',
+          setupFiles,
+          include: isolatedTestFiles,
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],
