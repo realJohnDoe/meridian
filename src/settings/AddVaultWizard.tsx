@@ -336,7 +336,7 @@ export default function AddVaultWizard() {
               disabled={signingIn}
               className="underline underline-offset-2 hover:text-foreground"
             >
-              Not you? Sign in with a different account
+              Missing a repository you just added, or want a different account? Sign in again
             </button>
           </p>
         </div>

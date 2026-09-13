@@ -295,12 +295,12 @@ describe('AddVaultWizard — GitHub step — reusing an existing sign-in', () =>
     expect(screen.getByText('octocat')).toBeInTheDocument()
   })
 
-  it('starts a fresh sign-in when the reused account is not the one the user wants', async () => {
+  it('starts a fresh sign-in — picking up a repo just added, or a different account — via the "sign in again" link', async () => {
     vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
     vi.mocked(fetchInstalledRepos).mockResolvedValue([])
     goToGitHubStep()
 
-    fireEvent.click(await screen.findByRole('button', { name: /Sign in with a different account/ }))
+    fireEvent.click(await screen.findByRole('button', { name: /Sign in again/ }))
 
     expect(startGitHubSignIn).toHaveBeenCalledTimes(1)
   })
