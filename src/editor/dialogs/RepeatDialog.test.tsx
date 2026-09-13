@@ -41,7 +41,7 @@ function clickSet() {
 }
 
 describe('RepeatDialog', () => {
-  it('round-trips a weekly repeat unchanged', () => {
+  it('seeds its form from `repeat` on the closed-to-open transition', () => {
     const repeat: Repeat = { type: 'schedule', freq: 'weekly', interval: 2, byweekday: ['mo', 'we', 'fr'] }
     const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '09:00' } })
 
@@ -60,29 +60,6 @@ describe('RepeatDialog', () => {
     expect(onConfirm).toHaveBeenCalledWith({ ...repeat, byweekday: ['mo', 'we', 'fr', 'sa'] })
   })
 
-  it('monthly same-day recomputes bymonthday from the scheduled date, not the input', () => {
-    // bymonthday deliberately mismatches scheduled.date's day-of-month (15) to prove
-    // the encoder recomputes it rather than carrying the decoded value through.
-    const repeat: Repeat = { type: 'schedule', freq: 'monthly', interval: 1, bymonthday: [1] }
-    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
-
-    clickSet()
-
-    expect(onConfirm).toHaveBeenCalledWith({ type: 'schedule', freq: 'monthly', interval: 1, bymonthday: [15] })
-  })
-
-  it('monthly weekday-pattern round-trips to the recomputed byweekday/bysetpos spec', () => {
-    const spec = monthlyWeekdaySpec(new Date(2026, 5, 15))
-    const repeat: Repeat = { type: 'schedule', freq: 'monthly', interval: 1, byweekday: spec.byweekday, bysetpos: spec.bysetpos }
-    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
-
-    clickSet()
-
-    expect(onConfirm).toHaveBeenCalledWith({
-      type: 'schedule', freq: 'monthly', interval: 1, byweekday: spec.byweekday, bysetpos: spec.bysetpos,
-    })
-  })
-
   it('switching monthly mode from same-day to weekday-pattern changes the encoded payload', () => {
     const spec = monthlyWeekdaySpec(new Date(2026, 5, 15))
     const repeat: Repeat = { type: 'schedule', freq: 'monthly', interval: 1, bymonthday: [15] }
@@ -94,15 +71,6 @@ describe('RepeatDialog', () => {
     expect(onConfirm).toHaveBeenCalledWith({
       type: 'schedule', freq: 'monthly', interval: 1, byweekday: spec.byweekday, bysetpos: spec.bysetpos,
     })
-  })
-
-  it('round-trips a plain yearly repeat unchanged', () => {
-    const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1 }
-    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
-
-    clickSet()
-
-    expect(onConfirm).toHaveBeenCalledWith(repeat)
   })
 
   it('selecting months on a yearly repeat encodes bymonth', () => {
@@ -140,16 +108,6 @@ describe('RepeatDialog', () => {
     expect(onConfirm).toHaveBeenCalledWith(repeat)
   })
 
-  it('yearly weekday-pattern round-trips to the recomputed byweekday/bysetpos spec', () => {
-    const spec = monthlyWeekdaySpec(new Date(2026, 5, 15))
-    const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1, byweekday: spec.byweekday, bysetpos: spec.bysetpos }
-    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
-
-    clickSet()
-
-    expect(onConfirm).toHaveBeenCalledWith(repeat)
-  })
-
   it('switching yearly mode from same-day to weekday-pattern changes the encoded payload', () => {
     const spec = monthlyWeekdaySpec(new Date(2026, 5, 15))
     const repeat: Repeat = { type: 'schedule', freq: 'yearly', interval: 1 }
@@ -161,24 +119,6 @@ describe('RepeatDialog', () => {
     expect(onConfirm).toHaveBeenCalledWith({
       type: 'schedule', freq: 'yearly', interval: 1, byweekday: spec.byweekday, bysetpos: spec.bysetpos,
     })
-  })
-
-  it('round-trips an "until" end condition', () => {
-    const repeat: Repeat = { type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'until', date: '2026-12-31' } }
-    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
-
-    clickSet()
-
-    expect(onConfirm).toHaveBeenCalledWith(repeat)
-  })
-
-  it('round-trips a "count" end condition', () => {
-    const repeat: Repeat = { type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['mo'], end: { type: 'count', occurrences: 10 } }
-    const { onConfirm } = renderOpen({ repeat, scheduled: { date: '2026-06-15', time: '' } })
-
-    clickSet()
-
-    expect(onConfirm).toHaveBeenCalledWith(repeat)
   })
 
   it('switching end type to "After N" and entering a count encodes it', () => {
@@ -203,6 +143,10 @@ describe('RepeatDialog', () => {
   })
 
   it('round-trips an after-completion repeat', () => {
+    // The only case that renders with tracked:true and freq === 'after_completion' —
+    // covers the after-completion sub-form branch, the Select's disabled/value
+    // ternary, and the "Both Schedule and Track Completion" hint text, none of
+    // which repeatForm.test.ts's pure round-trip can reach.
     const repeat: Repeat = { type: 'after_completion', interval: '3 weeks' }
     const { onConfirm } = renderOpen({ repeat, scheduled: null, tracked: true })
 
