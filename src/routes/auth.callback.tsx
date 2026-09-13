@@ -6,7 +6,7 @@ import {
   type InstalledRepo, type OAuthTokens,
 } from '@/vaultActions'
 import { Button } from '@/components/primitives/button'
-import { RepoPicker } from '@/components'
+import { RepoPicker } from '@/settings'
 import { useStore } from '@/store'
 
 /**
