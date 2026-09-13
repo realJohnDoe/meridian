@@ -2,21 +2,8 @@
 import { useState } from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, act } from '@testing-library/react'
-import TimeWheels from './TimeWheels'
+import TimeWheels, { ITEM_H, SETTLE_MS, geometry } from './TimeWheels'
 
-// These must match TimeWheels' own constants.
-const ITEM_H = 40
-const SETTLE_MS = 120
-const RUNWAY_PX = 2000
-
-// The list is repeated enough times to give a fling RUNWAY_PX of travel in
-// both directions, so a row's scroll offset is its index within that strip,
-// not within `items`. `home` is the start of the middle copy, where a column
-// sits at rest.
-function geometry(len: number) {
-  const periods = Math.ceil(RUNWAY_PX / (len * ITEM_H)) * 2 + 1
-  return { total: periods * len, home: Math.floor(periods / 2) * len }
-}
 const H = geometry(24)   // hours:   home 72
 const M = geometry(12)   // minutes: home 60
 
