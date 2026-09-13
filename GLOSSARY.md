@@ -1,6 +1,6 @@
 # Glossary
 
-Meridian's ubiquitous language: the ~35 terms that carry domain meaning, and
+Meridian's ubiquitous language: the 68 terms that carry domain meaning, and
 which word to reach for when two are close enough to confuse.
 
 ## How to use (and extend) this file
@@ -314,12 +314,10 @@ indicator.
 → `storage/cache/files.ts` · `cacheDirtyCount`
 
 ### unreadable file
-A file whose frontmatter Meridian refuses to parse — a broken YAML document, or
-a structural key (`date`, `time`, `repeat`, `excluded`, `instances`,
-`defaults`) written in a shape the model cannot read. It holds neither a root
-nor items, is named to the user in a toast and in the sync panel, and is never
-written back, so its bytes survive exactly as typed. Refusing is the *safe*
-outcome: the alternative to reading a schedule is guessing one.
+A file whose frontmatter Meridian refuses to parse — broken YAML, or a
+structural key (`date`, `time`, `repeat`, `excluded`, `instances`, `defaults`)
+in a shape the model cannot read. It holds neither root nor items, is named to
+the user, and is never written back, so its bytes survive as typed.
 → `storeBridge.ts` · `getUnreadableFiles`
 → `storage/parseReport.ts` · `parseFiles`, `reportParseFailures`
 → `model/fieldRegistry.ts` · `structuralShapeErrors`
@@ -347,64 +345,51 @@ unknown never archives.
 → `storage/cache/db.ts` · `DexieFileRow`
 
 ### base version / base content
-Two halves of the same ancestor, on one cache record with a change still
-pending. The **base version** is the backend's opaque token (GitHub blob SHA,
-FS content hash) — enough to detect that the remote drifted. The **base
-content** is the file at that token — enough to work out *what* each side
-changed, which is what a three-way merge needs and a version token alone can
-never supply, and what a version-less tombstone compares the path against
-before deleting it. Kept on dirty records and tombstones; never on a clean
-one, whose content is its own ancestor.
+Two halves of the same ancestor on a cache record with a change pending. The
+**base version** is the backend's opaque token (GitHub blob SHA, FS content
+hash), enough to detect that the remote drifted; the **base content** is the
+file at that token, enough to work out *what* each side changed. Kept on dirty
+records and tombstones, never on a clean one.
 → `storage/cache/db.ts` · `DexieFileRow`
 
 ### merge / conflict copy
 The two outcomes of a genuine divergence, in that order. A **merge** combines
-both sides when they touched different things (one reschedules, the other
-writes the description) and is silent — nothing was lost. A **conflict copy**
-is the fallback when they touched the same thing: the remote keeps the path,
-the local content lands beside it under a timestamped name, and the user is
-told. A merge needs a base content to work from; without one, every divergence
-is a conflict copy.
+sides that touched different things and is silent; a **conflict copy** is the
+fallback when they touched the same thing — the remote keeps the path, the
+local content lands beside it under a timestamped name. A merge needs a base
+content; without one, every divergence is a conflict copy.
 → `model/merge.ts` · `mergeFileContent`
 → `storage/conflictName.ts` · `conflictPath`
 
 ### touched fields
 The fields an editor actually changed, as opposed to the eleven it is holding.
-A save writes only these, leaving the rest at whatever the store holds by then
-— an editor never re-reads its fields, so writing them all reverts anything
-that moved underneath it. Same three-way rule as `merge`, one layer up.
+A save writes only these, because an editor never re-reads its fields — writing
+them all would revert anything that moved underneath it.
 → `model/merge.ts` · `mergeEditFields`
 
 ### second view / live reload
 A **second view** is another window onto the same vault on the same device — a
 second tab, or the installed PWA — sharing one IndexedDB but not one in-memory
-store, which is why it is not a second *device* and its divergence is not
-caught by the compare-and-swap. Every cache write that changes content is
-announced on a channel, and the views that hear re-read those rows into their
-own store: the **live reload**. An open editor takes from it only the fields
-its user has not touched; the ones both sides moved are the drift conflict
-below.
+store, which is why its divergence is *not* caught by the compare-and-swap.
+The **live reload** is the fix: content-changing cache writes are announced on
+a channel, and the views that hear re-read those rows.
 → `storage/cache/broadcast.ts` · `publishCacheChange`, `onCacheChange`
 → `storage/crossTabSync.ts` · `startCrossTabSync`
 → `editor/useLiveReload.ts` · `useLiveReload`
 
 ### drift conflict
-The editor-level counterpart of a conflict copy: one field, moved on both
-sides to different values, with no ancestor left to reconcile them. The user's
-version is the one written (`touched fields` decides that) and they are told
-which fields it happened to — the only signal that the other side's edit
-existed at all.
+The editor-level counterpart of a conflict copy: one field moved on both sides
+to different values, with no ancestor left to reconcile them. The user's
+version wins and they are told which fields it happened to.
 → `model/merge.ts` · `untouchedRemoteChanges`, `overlappingFields`
 → `editor/save.ts` · `untouchedStoreChanges`
 
 ### staged move / held delete
-A cross-vault move, which cannot be one transaction across two vault layers and
-two remotes, so it is ordered instead. The target's copy is made durable first;
-the source's tombstone is staged — hiding the entry there immediately — but its
-**held delete** is kept out of `pushDirty`'s outgoing set until the target's own
-remote confirms the copy. The entry is therefore in exactly one remote
-throughout, never both and never neither. If the target's copy turns out never
-to have become durable, the move is abandoned and the held delete dropped.
+A cross-vault move, which cannot be one transaction across two remotes, so it
+is ordered instead: the target's copy is made durable first, and the source's
+staged tombstone has its **held delete** kept out of `pushDirty`'s outgoing set
+until the target's remote confirms. The entry is in exactly one remote
+throughout, never both and never neither.
 → `storage/cache/pendingMoves.ts` · `PendingMove`, `heldDeletePaths`
 → `storage/moveEntry.ts` · `moveEntityInCache`
 
@@ -429,10 +414,9 @@ is already explained in its own header comment (`DayView`'s carousel seam,
 Three, chosen by context, all rendering the same `Occurrence`.
 `OccurrenceCard` is the **list** renderer (agenda, search, backlog, wikilink
 popup); `OccurrencePill` is the **compact grid** renderer (month cells, all-day
-strips); `TimedBlock` is the **timeline** renderer, placed by time geometry —
-and it wraps `OccurrenceCard` rather than replacing it. Named for the one
-thing it actually keys off (`!!o.time`), not for occurrence kind: a timed task
-renders here too, not just events.
+strips); `TimedBlock` is the **timeline** renderer, placed by time geometry, and
+it wraps `OccurrenceCard` rather than replacing it. `TimedBlock` keys off
+`!!o.time`, not occurrence kind — a timed task renders there too.
 → `components/OccurrenceCard.tsx` · `OccurrenceCard`
 → `calendar/OccurrencePill.tsx` · `OccurrencePill`
 → `calendar/TimedBlock.tsx` · `TimedBlock`
@@ -456,22 +440,18 @@ between them.
 
 ### MonthStrip
 Not a fourth term in the View/Pane/Grid family above, despite sitting beside
-`MonthView`/`MonthGrid` in the same directory: it's the topbar's quick-nav
-panel — a horizontally scrolling row of month chips, opened by tapping the
-topbar label (`quickNavOpen`) and closed automatically on a view switch. This
-is month view's own panel; day/week/agenda instead show `MiniMonth`.
+`MonthView`/`MonthGrid`: it's month view's topbar quick-nav panel, a
+horizontally scrolling row of month chips. Day/week/agenda show `MiniMonth`
+instead.
 → `calendar/MonthStrip.tsx` · `MonthStrip`
 → `calendar/viewState.ts` · `useQuickNavOpen`, `toggleQuickNav`, `closeQuickNav`
 
 ### MiniMonth
 Day/week/agenda's quick-nav panel — `MonthStrip`'s counterpart for those three
-views: a dotted mini month grid (its own plain button grid, sharing
-`monthGridCells`' date math with `MonthGrid` rather than a `react-day-picker`
-`Calendar` — too heavy for a widget swiped continuously with several panes
-mounted at once, see the file's own header comment) rather than a
-horizontally scrolling strip. Tapping a day navigates day/week view to it, or
-scrolls agenda to it; the grid's own caption arrows page its display only,
-never the main view.
+views: a dotted mini month grid rather than a scrolling strip, sharing
+`monthGridCells`' date math with `MonthGrid` (why it isn't a
+`react-day-picker` `Calendar` is in its own header comment). Its caption arrows
+page the grid's display only, never the main view.
 → `calendar/MiniMonth.tsx` · `MiniMonth`
 → `calendar/monthGridCells.ts` · `monthGridCells`
 
@@ -484,21 +464,15 @@ virtualized list (`header` / `month` / `week` / `occ` / `day-empty` /
 → `calendar/AgendaRow.tsx` · `AgendaRow`
 
 ### agenda chunk
-A fixed 28-day span of the agenda, indexed off the epoch and aligned to week
-starts, disjoint from its neighbours. The unit *both* of the agenda's
-expansion and of its sectioning: a chunk's occurrences, day sections and
-month/week divider rows are cached under its index, so a change costs the
-chunks it touched rather than the whole window. Absolute, not
-`agendaAnchor`-relative — a jump reuses every chunk still in range. Say
-"chunk" only of the agenda; Month/Day/Week key their caches by *window*.
+A fixed 28-day span of the agenda, epoch-indexed and week-aligned, and the
+cache unit of both its expansion and its sectioning. Say "chunk" only of the
+agenda — Month/Day/Week key their caches by *window*.
 → `calendar/agendaChunks.ts` · `CHUNK_DAYS`, `chunkIndexFor`, `chunkRange`, `agendaChunkRun`
 
 ### loaded run
-The agenda chunk-index range actually expanded and rendered, as opposed to
-how far it is *allowed* to grow (`EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS`).
-Session-scoped: seeds to three chunks around `agendaAnchor` on mount, widens a
-chunk at a time as the user scrolls or presses "Load earlier", and is capped
-so a long session doesn't accumulate it without bound.
+The agenda chunk-index range actually expanded and rendered, as opposed to how
+far it is *allowed* to grow (`EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS`).
+Session-scoped and capped.
 → `calendar/viewState.ts` · `useAgendaLoadedRun`, `growAgendaLoadedChunksForward`, `growAgendaLoadedChunksBackward`, `MAX_LOADED_CHUNKS`
 
 ### OverdueGroup

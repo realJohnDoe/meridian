@@ -22,8 +22,12 @@ YAML text
 ## Files and responsibilities
 
 ### `nodeSchema.ts`
-Zod schema and TypeScript type for `RawNode` — the unprocessed shape of a
-parsed YAML file.  Pure data definition; no logic.
+The TypeScript type for `RawNode` — the unprocessed shape of a parsed YAML file.
+Eleven lines, no logic. **There is no schema validation anywhere in the parse
+pipeline**: this file claimed a Zod schema until 2026-09-13 and `zod` is in
+neither `package.json`, so every coercion below is ad hoc and per-field. That
+absence is the root cause the fidelity findings of 2026-07 and 2026-09 shared —
+don't read the rest of this file as though a validator ran first.
 
 ### `inheritance.ts`
 **Field-agnostic inheritance engine.**
@@ -107,21 +111,19 @@ writes overrides keyed by expanded dates) treats it as a function of *(file)*.
 An override written under one viewer's reading then lands on a date another
 viewer's schedule never generates.
 
-This was violated exactly once, by a `weekStart` parameter threaded from
-`weekStartsOn(localePrefs)`, and it is worth knowing what it cost: a
-`freq: weekly` + `interval >= 2` + `byweekday` rule expanded to **disjoint**
-date sets for a Monday-first and a Sunday-first reader (data-integrity survey,
-finding #6). The fix grounds the week on the series' own anchor date and
-deletes the parameter, so the rule is now enforced by the signature rather than
-by review. `weekStartsOn` still exists and is still locale-driven — it belongs
-to *view layout* (month grid, date picker, weekday-checkbox order), which is a
-different concern that happens to share a helper.
+Violated exactly once, by a `weekStart` parameter threaded from
+`weekStartsOn(localePrefs)`: a `freq: weekly` + `interval >= 2` + `byweekday`
+rule expanded to **disjoint** date sets for a Monday-first and a Sunday-first
+reader (data-integrity survey, finding #6). The fix grounds the week on the
+series' own anchor date and deletes the parameter, so the signature enforces the
+rule rather than review. `weekStartsOn` still exists and is still locale-driven
+— it belongs to *view layout*, a different concern sharing a helper.
 
-Note the ambiguity was never in *naming* a weekday: `byweekday` is stored as
-words (`[mo, we, fr]`) and always was. It was in **bucketing** — which 7-day
-window a date belongs to — which only becomes observable once `interval >= 2`
-stops the windows tiling. Any future parameter should be checked against that
-distinction before assuming an encoding change would help.
+The ambiguity was never in *naming* a weekday (`byweekday` is stored as words,
+`[mo, we, fr]`, and always was) but in **bucketing** — which 7-day window a date
+belongs to — which only becomes observable once `interval >= 2` stops the windows
+tiling. Check any future parameter against that distinction before assuming an
+encoding change would help.
 
 *Main-app entry point* (domain-aware):
 - `expandRange(items, roots, from, to)` — takes a `StoreItem[]` and a `Roots`
@@ -157,11 +159,9 @@ distinction before assuming an encoding change would help.
   value (unknown keys included, by structural equality).  Knows nothing about
   YAML structure, dates, or series.
 
-  It replaced `hoistSharedMetadata`, which also returned a parallel
-  `localDefaults` array of per-item diffs.  That half is gone: each item is now
-  emitted with `occMetaToYaml(item.metadata, rootDefaults)`, which makes the
-  same decision without materialising an intermediate array that had to be kept
-  1:1 with the metadata list by index.
+  Each item is emitted with `occMetaToYaml(item.metadata, rootDefaults)` rather
+  than against a parallel per-item diff array kept 1:1 by index, which is what
+  the retired `hoistSharedMetadata` returned.
 
 - `serializeChildren(children, seriesMeta)` — serialises override instances,
   diffing each against the series metadata.
@@ -301,41 +301,16 @@ never mints one of its own either). Quoting style inside a *typed sequence*
 role covers scalars, and a sequence is not one.
 
 **Known open loss — not a non-goal.** Absent-vs-empty for required arrays is
-still lost, and it is a real defect, not something normalised away on purpose.
-It used to be the last clause of the paragraph above, which meant a live loss
-was sitting inside a list introduced as "*not* bugs" — the one place in this
-file a data-integrity run is most likely to read past it. It has its own
-heading now so that can't happen again. Anything genuinely deliberate belongs
-above; anything still open belongs here.
+still lost. It is a real defect, not something normalised away on purpose, and
+it has its own heading so it cannot be read as part of the "*not* bugs" list
+above. Anything genuinely deliberate belongs above; anything still open belongs
+here. Pinned by `__tests__/round-trip-totality.test.ts`.
 
-(Four items used to be in this list and no longer are:
-- **Quoting style**, in the cases above — see the section just above this one.
-- **Metadata on an excluded instance** — `serializeChildren` now diffs an
-  excluded child against the series metadata like any other override, so
-  exclusion only suppresses the occurrence, it no longer erases what was
-  written on it.
-- **Fields on nested container nodes** — a container's own remainder (no
-  `StoreItem` of its own to hang it on) is now carried down to its descendant
-  items instead of discarded; `computeSharedFields` collapses it back to a
-  shared `defaults:` block when every descendant agrees. See `storeItems.ts`'s
-  `containerOwnRemainder`.
-- **Markdown-body leading/trailing whitespace, and the file's line-ending
-  convention** — `fileIO.ts` used to `.trim()` the whole body (stripping
-  meaningful indentation on its first line along with the incidental blank
-  line Meridian's own separator inserts) and hardcode LF regardless of the
-  source, guaranteeing mixed `\r\n`/`\n` output for any CRLF-authored file.
-  `loadFile` now strips only the incidental leading blank line and the file's
-  own trailing newline, tracks the source's line-ending/trailing-newline
-  convention as `FileMetadata.fileConvention`, and `wrapFrontmatter` re-applies
-  it to the structural glue it generates — never to the body's own bytes,
-  which were never touched to begin with. `fileConvention` is carried forward
-  across edits by `editedEntry` in `storeOps.ts`, the same way `extra` is;
-  omitting that carry-forward is the trap that would silently revert a file to
-  LF on its next edit.
-
-See `__tests__/round-trip-totality.test.ts` and `__tests__/edits.test.ts`'s
-`excludeOccurrence` cases for the first; the same file's container-remainder
-and line-ending cases for the other two.)
+**One live trap from a closed loss.** `FileMetadata.fileConvention` (the
+source's line-ending and trailing-newline convention) must be carried forward
+across edits by `editedEntry` in `storeOps.ts`, the same way `extra` is.
+Omitting that carry-forward silently reverts a CRLF-authored file to LF on its
+next edit — a whole-file diff from a one-field change.
 
 **On the edit side, an edit never mints unknown keys** — they originate only at
 parse time and flow through. Every bag reaching `storeOps.ts` is therefore
