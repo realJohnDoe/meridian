@@ -271,6 +271,7 @@ class FakeBackend implements StorageBackend {
   private _writeReportsNoVersion = false
   private _writeFailPattern:  { pattern: RegExp; error: () => Error } | null = null
   private _afterNextReadFiles: (() => void) | null = null
+  private _readFilesErrorQueue: Error[] = []
   private _deleteErrorQueue:  Error[] = []
   private _statAllErrorQueue: Error[] = []
   private _hidden = new Set<string>()
@@ -303,6 +304,13 @@ class FakeBackend implements StorageBackend {
   /** Run `fn` once, immediately after the next readFiles() resolves — lets a
    *  test land a concurrent remote change inside a resolution's own window. */
   onNextReadFiles(fn: () => void): void { this._afterNextReadFiles = fn }
+  /**
+   * Fail the next readFiles() outright — a read that never reached the
+   * backend. Deliberately a throw and not an empty result: a shipping backend
+   * omits a path only when it is genuinely absent (#1062), so "I could not
+   * find out" has no representation in the return value.
+   */
+  queueReadFilesError(e: Error): void { this._readFilesErrorQueue.push(e) }
   queueDeleteError(e: Error): void { this._deleteErrorQueue.push(e) }
   queueStatAllError(e: Error): void { this._statAllErrorQueue.push(e) }
 
@@ -344,6 +352,7 @@ class FakeBackend implements StorageBackend {
 
   async readFiles(paths: string[]): Promise<RawFile[]> {
     this.readFilesCallCount++
+    if (this._readFilesErrorQueue.length) throw this._readFilesErrorQueue.shift()!
     if (this._pendingReadFilesGate) {
       const gate = this._pendingReadFilesGate
       this._pendingReadFilesGate = null
@@ -916,6 +925,40 @@ describe('pushDirty — a refused write that did not actually diverge', () => {
     expect(backend.get('new.md')?.content).toBe('second')
     expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
   })
+
+  // The other side of the repair read (#1062): it can fail, and a failure is
+  // not an answer. Leaving the row dirty against its old base version costs
+  // one extra round trip and reaches the right end state; stamping it clean
+  // with no version is the #738 shape that manufactures a conflict copy out of
+  // nothing on the next edit.
+  it('leaves the record dirty when the repair read fails, and settles it on the next cycle', async () => {
+    const backend = new FakeBackend()
+    backend.seed('note.md', 'v1', 'sha1')
+    mountBackend(backend)
+    backend.writeReportsNoVersion()
+    backend.queueReadFilesError(new TransientSyncError('Failed to fetch'))
+    seedDirty('fake-vault', 'note.md', 'my edit', 'sha1')
+
+    await syncToBackend()
+
+    // The write itself landed — only its token was lost.
+    expect(backend.get('note.md')?.content).toBe('my edit')
+    const afterDrop = cacheStore.get(vp('fake-vault', 'note.md'))
+    expect(afterDrop?.status).toBe('dirty')
+    expect(afterDrop?.version).toBe('sha1')
+    expect(syncOf().offline).toBe(true)
+
+    // Next cycle: the stale CAS is refused, the remote is found already
+    // holding exactly what we were pushing, and the row is stamped clean
+    // against the token it really has — no conflict copy.
+    await syncToBackend()
+
+    const settled = cacheStore.get(vp('fake-vault', 'note.md'))
+    expect(settled?.status).toBe('clean')
+    expect(settled?.version).toBe(backend.get('note.md')?.version)
+    expect(backend.listPaths()).toEqual(['note.md'])
+    expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
+  })
 })
 
 // ── Delete-conflict (tombstone) handling ────────────────────────────────
@@ -1033,6 +1076,46 @@ describe('pushDirty — a tombstone with no base version', () => {
 
     expect(cacheStore.has(vp('fake-vault', 'gone.md'))).toBe(false)
     expect(notifyFns.warn).not.toHaveBeenCalled()
+    expect(syncOf().error).toBeNull()
+  })
+
+  // #1062. The branch above reads an empty answer as "the path is empty", so
+  // a read that failed must never produce one. It used to: `readFiles`
+  // swallowed every per-path failure, the delete was confirmed against a file
+  // that was really there, and the user's delete had silently not stuck.
+  it('leaves the tombstone staged when the reread never reached the backend', async () => {
+    const backend = new FakeBackend()
+    backend.seed('plan.md', "another device's plan", 'sha1')
+    mountBackend(backend)
+    seedTombstone('fake-vault', 'plan.md', undefined, undefined)
+    backend.queueReadFilesError(new TransientSyncError('Failed to fetch'))
+
+    await syncToBackend()
+
+    // Nothing was deleted, nothing was decided, and the tombstone is still
+    // there for the next cycle to resolve against a read that works.
+    expect(backend.get('plan.md')?.content).toBe("another device's plan")
+    expect(backend.deleteCallCount).toBe(0)
+    expect(cacheStore.get(vp('fake-vault', 'plan.md'))?.status).toBe('deleted')
+    expect(syncOf().offline).toBe(true)
+  })
+
+  // The other half of #1062: the `absent` branch no longer suppresses the
+  // same-cycle reconcile for its path. The reread is authoritative about the
+  // instant it ran, but the listing is fetched after it — so when the two
+  // disagree, the listing is the fresher answer and this cycle acts on it
+  // instead of leaving the file unseen.
+  it('pulls a file that lands at the path between the reread and the listing', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedTombstone('fake-vault', 'gone.md', undefined, 'once ours')
+    backend.onNextReadFiles(() => { backend.seed('gone.md', 'theirs now', 'sha9') })
+
+    await syncToBackend()
+
+    const cached = cacheStore.get(vp('fake-vault', 'gone.md'))
+    expect(cached?.status).toBe('clean')
+    expect(cached?.content).toBe('theirs now')
     expect(syncOf().error).toBeNull()
   })
 })

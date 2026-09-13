@@ -61,6 +61,22 @@ export interface StorageBackend {
    */
   readonly hasRemote: boolean
   statAll():                               Promise<Map<string, string>>
+  /**
+   * Reads the given paths. **A path missing from the result means that path
+   * does not exist** — that is the contract, not a best-effort hint, and the
+   * one thing this must never do is answer "absent" because it could not find
+   * out (#1062). A file that is genuinely gone is omitted; every other failure
+   * throws, so a caller deciding something on a path's absence is deciding on
+   * a fact, and a caller that merely wants content gets an error it can retry
+   * (`isTransientSyncError` and the scheduler's backoff already handle it).
+   *
+   * Tolerance is still per path, not per batch: one absent file among fifty
+   * does not fail the read, which is what an incremental pull against an
+   * eventually-consistent listing needs. But a batch that could not be
+   * completed is an error rather than a shorter list — a partial answer
+   * applied as though it were complete silently drops the paths that never
+   * arrived.
+   */
   readFiles(paths: string[]):              Promise<RawFile[]>
   /**
    * Reads every file in the vault. `onProgress`, if given, may be called zero
