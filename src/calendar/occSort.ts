@@ -64,14 +64,9 @@ export function compareSortKeys(a: SortKey, b: SortKey): number {
   return a.title.localeCompare(b.title)
 }
 
-/** `occSortKey`'s `bucket` for an occurrence: active (0) vs dimmed (1). */
-export function occSortBucket(o: Occurrence, now: Date): number {
-  return isDimmed(o, now) ? 1 : 0
-}
-
 export function occSortKey(o: Occurrence, now: Date): SortKey {
   return {
-    bucket:   occSortBucket(o, now),
+    bucket:   isDimmed(o, now) ? 1 : 0,
     typeKey:  typeKey(o),
     prioKey:  priorityRank(o.metadata.priority),
     jsTimeMs: o.metadata.jsTime?.getTime() ?? 0,
