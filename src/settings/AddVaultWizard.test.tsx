@@ -240,6 +240,14 @@ describe('AddVaultWizard — GitHub step — reusing an existing sign-in', () =>
     expect(findReusableGitHubSession).toHaveBeenCalledWith(['v1'])
   })
 
+  it('falls back to the Sign in with GitHub button when the reuse check itself rejects', async () => {
+    vi.mocked(findReusableGitHubSession).mockRejectedValue(new Error('IndexedDB unavailable'))
+    goToGitHubStep()
+
+    expect(await screen.findByRole('button', { name: 'Sign in with GitHub' })).toBeInTheDocument()
+    expect(fetchInstalledRepos).not.toHaveBeenCalled()
+  })
+
   it('shows "Signed in as" and the live repo list instead of a sign-in button when a session is reused', async () => {
     vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
     vi.mocked(fetchInstalledRepos).mockResolvedValue([{ owner: 'acme', repo: 'journal', branch: 'main' }])
