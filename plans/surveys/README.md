@@ -218,25 +218,40 @@ long one built on speculation.
 
 ## Reporting
 
-**File the findings as issues, and the report as a file.** The split and its
-rationale are in `plans/CLAUDE.md` ("Findings and plan steps are issues; run
-reports are files"); this section states only what a survey run does.
+**File the run as a parent issue, and its findings as sub-issues.** The split
+and its rationale are in `plans/CLAUDE.md` ("State is an issue; documents are
+files"); this section states only what a survey run does.
 
-- **One issue per finding**, labelled `survey:<name>` (`survey:health`,
-  `survey:data-integrity`, …), using the fields below.
-  `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton. **Search that
-  label first** — a re-run mostly re-derives findings that are already open, and
+- **One parent issue per run**, titled with the survey and its scope
+  (`Codebase health survey — test code — 2026-09-12` is the worked example,
+  #1065), labelled with the survey-type label (`health`, `ui`, `performance`,
+  `product`, `data-integrity`). Its body carries the coverage statement, the
+  category verdicts and the summary table — with the table's rows linking to
+  each finding's sub-issue rather than restating it. This **replaces** the
+  report file the old convention wrote to `plans/reports/`: there is no
+  separate file for a survey run. The parent issue stays open, and its body
+  stays a live record, until every finding sub-issue is resolved — the same
+  way a plan's parent issue works.
+- **One sub-issue per finding**, attached to the run's parent issue via
+  GitHub's native sub-issue relationship, using the fields below.
+  `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton. Label each with:
+  - the survey's own `Category` tag(s) (the list each survey defines below,
+    e.g. `dry`, `srp`, `testing`, `security`);
+  - the same survey-type label as the parent issue;
+  - a model-tier label — exactly one of `haiku`, `sonnet`, `opus`,
+    `opus-plan` — matching the Recommended model field;
+  - `decision-required`, when the finding hinges on a product decision only
+    the maintainer can make.
+
+  **Search open parent issues (and their sub-issues) for the survey-type label
+  first** — a re-run mostly re-derives findings that are already open, and
   those get a comment carrying the new run's evidence rather than a second
   issue.
-- **One report file per run**, at `plans/reports/<survey-name>-<YYYY-MM-DD>.md`,
-  carrying the coverage statement, the category verdicts and the summary table
-  — with the table's rows pointing at issue numbers rather than restating each
-  finding. The report is a record of what was measured, so unlike the results
-  files it replaces it is **not** deleted when its findings close.
 - A finding closes when a PR saying `Fixes #N` merges. Do not edit a file to
   close one. Dropping one as invalid or won't-fix is a close with `not planned`
   plus a comment saying why; deferring one is an open issue with a `deferred`
-  label plus a comment.
+  label plus a comment. The parent issue itself closes once every finding
+  sub-issue is resolved.
 
 `data-integrity.md`'s "Known suspects" section, which appends a verdict to each
 suspect's hypothesis in-place, is unchanged: that survey keeps its suspects list

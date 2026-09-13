@@ -6,10 +6,21 @@ labels: ''
 ---
 
 <!--
-Label this `survey:<name>` (survey finding) or `plan:<name>` (plan step) —
-see plans/CLAUDE.md. Search that label before filing: a re-run mostly
-re-derives findings that are already open, and those get a comment with the
-new evidence rather than a second issue.
+Survey finding: attach this as a sub-issue of the run's parent issue (see
+plans/CLAUDE.md and plans/surveys/README.md) — do not label it `survey:<name>`,
+that label is retired. Label it instead with:
+  - the survey's own Category tag(s) (`dry`, `srp`, `testing`, `security`, …)
+  - the survey-type label matching the parent issue (`health`, `ui`,
+    `performance`, `product`, `data-integrity`)
+  - a model-tier label: exactly one of `haiku`, `sonnet`, `opus`, `opus-plan`
+  - `decision-required`, if the finding hinges on a product decision only the
+    maintainer can make
+Plan step (not a survey finding)? Label it `plan:<name>` instead and skip the
+above.
+
+Search the parent issue's sub-issues (or the survey-type label) before filing:
+a re-run mostly re-derives findings that are already open, and those get a
+comment with the new evidence rather than a second issue.
 
 Field definitions live in plans/surveys/README.md. The six below are shared by
 every survey; add whatever else your survey states (Category, Impact,
