@@ -14,9 +14,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.11",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "wrangler": "4.113.0"
   }
 }
