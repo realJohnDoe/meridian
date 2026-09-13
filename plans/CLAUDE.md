@@ -119,10 +119,17 @@ renumbered from #1 each time, so an old `finding #N` comment identifies nothing
 on its own. The old rule still applies to those: **never renumber an existing
 citation** — the old number is correct for the run it names. As of 2026-09-06
 there were 70 such citations in `src/`, 20 of them naming neither a survey nor a
-date. They are not mechanically fixable (the repo's history was squashed, so
-`git blame` attributes them all to one commit) and guessing wrong is worse than
-leaving them ambiguous. Qualify them opportunistically, when you touch the
-surrounding code and know the answer.
+date. **They are mechanically resolvable, contrary to what this paragraph said until
+2026-09-13.** The claim that the repo's history "was squashed, so `git blame`
+attributes them all to one commit" is false — the history is intact (3,225
+commits back to 2026-05-22, merge commits throughout), and `git blame` dates each
+citation to its run in one command: `src/editor/save.ts:219`'s "finding #1"
+blames to 2026-09-05, the data-integrity run. What made it *look* squashed is
+that a session's checkout is a **shallow clone** (`git fetch --unshallow` fixes
+it; `git rev-parse --is-shallow-repository` tells you). So qualifying them is
+cheap — do it when you touch the surrounding code, or in one sweep if you want
+them all. Guessing is still worse than ambiguity, but you no longer have to
+guess.
 
 ## Open product questions
 

@@ -7,6 +7,26 @@ ranking formula, category-verdict conventions, and how to report results —
 live in [the shared survey conventions](./README.md). Read that first; this
 file states only what's specific to this survey.
 
+## Scope — `src/` or the test suite, and say which
+
+The ten categories below apply to production code and to test code alike, but
+not in the same run, because the Budget does not: "the 15 largest source files",
+ranked "over non-generated **non-test** sources", assumes `src/`. Name the corpus
+in the first line of the coverage statement and re-point the Budget to match — a
+test-suite run ranks the largest *test* files, reads the test config, helpers and
+fixtures as its toolchain, and treats production modules as the thing under test
+rather than the thing surveyed.
+
+Say this explicitly, because leaving it implicit cost every prior run of this
+file: test code had never been surveyed at all — not because anyone judged it
+low-value, but because nothing said it was in scope. The 2026-09-12 run
+re-pointed these categories at the suite (#1065) and was the highest-yield run to
+date — ten findings, all ten fixed inside ~30 hours — and the categories
+transferred with no amendment at all:
+`dry` over duplicated fixtures and hand-rolled router mocks, `dead-code` over a
+232-line file whose subject was a hand-written copy of production, `performance`
+over the suite's own 226s of redundant isolation.
+
 ## Process
 
 Per [Running a survey](./README.md#running-a-survey): scan plan first, evaluate
@@ -23,8 +43,12 @@ from training data. Two rules are specific to this survey:
   its own finding, because it teaches every future reader to distrust a check
   that works. The 2026-09-06 run found `CLAUDE.md`'s "Route shells" section still
   warning that a new route escapes the layout checks until someone lists it,
-  when `scripts/layout-smoke.mjs` already carries an `assertRouteCoverage()` that
-  fails the build on exactly that.
+  when `e2e/layout-smoke.spec.ts` already carries a `findUncoveredRoutes()` whose
+  own test fails CI on exactly that. **Verify the path before citing it, here
+  included:** that check was `scripts/layout-smoke.mjs`/`assertRouteCoverage()`
+  when the paragraph was written, PR #1014 moved it to `@playwright/test`, and
+  this paragraph went on naming the old pair for a week — the survey file is as
+  liable to this rot as the docs it is telling you to distrust.
 - **Attribute a measured anomaly to the environment before you attribute it to
   the repo.** The measurement rules above make it easy to produce a number the
   repo did not cause. On 2026-09-12 every one of 126 e2e tests took a
@@ -41,31 +65,35 @@ from training data. Two rules are specific to this survey:
 ## Budget
 
 - Skim the full directory tree (listings + file names) so nothing is invisible to you.
-- Read closely: the entry points, the most-imported modules (measure this — don't guess), the 15 largest source files, and at least 2–3 representative files from every feature directory. **Rank "largest" by line count, over non-generated non-test sources** — byte-size ranking reshuffles the list (a file heavy on prose comments or inlined fixture content outranks denser code), and including tests or generated files fills the top of the list with material the categories below mostly don't apply to. State which files the ranking picked, so a reader can tell what the budget actually went to.
+- Read closely: the entry points, the most-imported modules (measure this — don't guess), the 15 largest source files, and at least 2–3 representative files from every feature directory. **Rank "largest" by line count, over non-generated non-test sources** — byte-size ranking reshuffles the list (a file heavy on prose comments or inlined fixture content outranks denser code), and including tests or generated files fills the top of the list with material the categories below mostly don't apply to. State which files the ranking picked, so a reader can tell what the budget actually went to. **On a test-suite run this bullet inverts** — rank the largest test files and read the production modules as context; see [Scope](#scope--src-or-the-test-suite-and-say-which).
 - **Read the toolchain, not just the source:** `package.json` (scripts _and_ the full dependency list), lint/formatter configs, CI workflows, test config, and any `.npmrc`/tsconfig strictness settings. For each dependency, know roughly what it's for and where it's used — this feeds the Library Fit category.
 - **Measure dependency currency against the registry, not memory:** run the package manager's outdated report (`pnpm outdated` / `npm outdated` / `cargo outdated` / …) in **every workspace**, including sub-workspaces like workers or serverless functions. Your knowledge of "the latest version" is stale by definition; only the registry answer counts. This is the evidence base for the version-currency bullets in category 8.
 - **Run the existing quality gates once** — build, lint, test (plus coverage, if configured), any dead-code check, and the dependency **audit** — and report each gate's pass/fail status in the coverage statement. A failing gate is itself a finding (usually a high-impact one), and the dry-run comparisons above need this green baseline to diff against. Run the audit **from inside each workspace directory** — `pnpm audit` takes no `--filter`, and reaching for one fails with an unrelated `Unknown option: 'recursive'` that reads like a broken tool rather than the wrong invocation. Run it at a **lower severity threshold than CI gates on**: advisories sitting just under the CI threshold are invisible from a green pipeline, and in a repo that already pins vulnerable transitives deliberately, an unpinned one is a gap in an established practice rather than a fresh judgement call.
-- **Re-measure the coverage floors against reality, not just against green.** A
-  per-file threshold passes as long as measured coverage is above it, so a floor
-  drifts further below the file it guards every time a test lands — and nothing
-  ever pulls it back. Run `pnpm run test:coverage` and diff each floor in
-  `vitest.config.ts` against the measured number: a floor more than ~10 points
-  under is guarding nothing, and is a finding. `src/storeCommit.ts` sat at
-  30/95/45/35 against a measured 100/100/100/100 until 2026-09-06 — the
-  persistence commit path, where two of five functions could go unexecuted with
-  CI green. Check the `exclude` list the same way, in the other direction: an
-  exclusion glob keeps matching whatever grows underneath it (an `_entry*.tsx`
-  glob had swallowed 258 lines of route logic, one file of it at 0% coverage).
-  `src/coverageConfig.test.ts` now guards both halves for `src/routes/`.
-  **Diff the global floors too, not only the per-file ones.** They drift by the
-  same mechanism and nothing in the paragraph above points at them, so two runs
-  in a row checked the 57 named files and skipped the four numbers above them:
-  on 2026-09-12 the globals sat at 68/62/59/70 against a measured
-  83.05/76.70/78.70/85.18 — 15 to 20 points of slack, the widest drift in the
-  file. Use `--coverage.reporter=json-summary` and compare programmatically
-  rather than reading the text table: the text reporter nests by directory and
-  repeats bare basenames, so matching threshold keys against it by eye (or by
-  basename) silently drops about half of them.
+- **The coverage floors are machine-checked now — audit the guard, don't redo it
+  by hand.** Floor drift was this budget's most expensive recurring item: three
+  runs in a row diffed `vitest.config.ts`'s 57 per-file floors against measured
+  coverage by hand, and the third one (2026-09-12) still had to re-derive the four
+  globals the first two had skipped. A floor more than ~10 points under the file
+  it guards is guarding nothing, and `src/coverageConfig.test.ts` now enforces
+  exactly that (its comment cites this line, so keep the wording) — it fails when
+  any floor **per-file or global** sits more than 10 points under measured, when a
+  threshold key names a file that no longer exists, and when a `src/routes/`
+  coverage exclusion has grown past 100 lines. `pnpm run test:coverage` runs it
+  (re-running that one file after the coverage pass, so the summary is fresh) and
+  CI runs `test:coverage`, so a drifted floor is now red rather than a survey
+  finding. Report the guard's own pass/fail in the gate
+  matrix and spend the budget on the three things it *cannot* see:
+  - a file with **no threshold key at all** — the guard only checks floors
+    someone remembered to write, so an unguarded integrity-critical file is
+    invisible to it, and that is the shape the 2026-09-06 `src/storeCommit.ts`
+    finding would take today;
+  - an `exclude` glob **outside `src/routes/`** — only that prefix is size-checked
+    (`src/components/ui/**` is excluded on authorship, deliberately), so any new
+    exclusion elsewhere is unwatched;
+  - whether the guard's own constants still fit the repo: the 10-point drift
+    tolerance and the 100-line "this is just route registration" bound are both
+    judgement calls hard-coded in a test, which is exactly the kind of expiry
+    condition the last Process bullet says to re-check.
 - **Measure the test suite per file, not just as a wall-clock total, and read
   the phase breakdown.** A slow file is invisible in wall-clock time when other
   workers absorb it — on 2026-09-12 one file was 27.2s of a 99s total (27% of
@@ -90,7 +118,7 @@ from training data. Two rules are specific to this survey:
   change it, rebuild, and diff the entry chunk's raw and gzip size. On the
   2026-09-06 run one import line in `routes/__root.tsx` was worth 53% of the
   entry chunk (465,525 → 218,894 bytes gzip).
-- **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition. **If the repo's history is shorter than your sampling window, say so and stop treating the numbers as comparative** — a squashed history returns the whole log for any window, so per-directory tallies show where the squash landed rather than where development is concentrated. Record the history's true span next to the tallies.
+- **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition. **Un-shallow the clone first** ([recipe](./README.md#running-a-survey)) — a session's checkout is shallow, so `git log` answers from a truncated graph and every commit older than the boundary collapses into it, making per-directory tallies show where the truncation landed rather than where development is concentrated. This paragraph blamed a squashed history for that until 2026-09-13; the history is not squashed (3,225 commits back to 2026-05-22, `git blame` intact) and the clone was shallow. Record the history's true span next to the tallies, and if the span you can see is still shorter than your sampling window, say so and stop treating the numbers as comparative.
 - **Identify where development is currently concentrated** — sample recent history over a meaningful window (e.g. `git log --since="60 days ago" --name-only`, or recent merged PRs if available) and tally which directories see the most commits/PRs. This is the evidence base for the activity weighting in the Scoring guidance: findings in "hot" directories are worth more to fix than equivalently-scored findings in dormant corners of the codebase, because more code keeps landing on top of the problem in the meantime.
 - Sample the rest. Do not skip a directory entirely without recording it in the coverage statement.
 
@@ -218,6 +246,18 @@ Examples (not exhaustive):
 - Core domain logic with no test coverage at all, or coverage concentrated on trivial code while the risky paths go untested
 - Tests that can't fail meaningfully — over-mocked tests, snapshot rot, assertions on implementation details, or a test whose *subject* is a copy of production rather than production itself. The tell is the import list: a test file that imports no function from the module named in its own header is asserting against a stand-in. Grep test files for comments admitting the coupling (`mirrors`, `must match`, `keep in sync`) — on 2026-09-12 that grep found a 232-line file whose nine tests all ran against a hand-written copy of `pushDirty`, and a test re-declaring three production constants plus a line-for-line copy of a layout function
 - The same behaviour asserted at more than one activation level — a pure function tested directly *and* through the component that calls it, or one code path covered by a fake-everything unit test, a partly-faked integration test, and a real end-to-end test. Not automatically a fault: levels that assert genuinely different things (the logic vs the wiring vs the real I/O) each earn their place, and the good ones say so in their headers. It is a fault when the expensive level asserts nothing the cheap one does not, which it usually does by taking a callback payload rather than inspecting rendered output — compare the per-test cost from the timing data (235ms through a React render against 0.6ms direct, in the case found on 2026-09-12), and check whether the cheap level's fixtures are byte-identical to the expensive one's
+- **Tests that fail nondeterministically.** Nothing in any of the five surveys
+  looked for this until 2026-09-13, and the repo paid for five of them in the
+  preceding fortnight: a fixed 120 ms real wait too tight under load (#1031, PR
+  #1050), a fixture date colliding with the test's own "today" (PR #897), an e2e
+  assertion racing layout (PR #887), and two harnesses accumulating state across
+  runs (#1023, plus fake-indexeddb retaining every transaction a soak opened,
+  under #1052). The greps that find the class: `setTimeout` or
+  `await new Promise` inside a test body (a *real* wait, not a fake timer),
+  `new Date()`/`Date.now()` with no `vi.setSystemTime` nearby, and a module-level
+  `let` or cache in a shared test helper that no `beforeEach` resets. Rate these
+  above their apparent size: a flake teaches everyone to re-run CI instead of
+  reading it, which disarms every other gate in the matrix
 - Swallowed errors — empty or log-only `catch` blocks, unhandled promise rejections, errors caught without surfacing to the user or a recovery path
 - No consistent error strategy — each layer inventing its own mix of throw / return-null / silent-default
 
