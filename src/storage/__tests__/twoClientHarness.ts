@@ -34,6 +34,7 @@ import { mountBackend } from '@/storage/backends'
 import { syncStateFor, dropSyncState, dropAllSyncState } from '@/storage/syncState'
 import { unmountAllBackends } from '@/storage/backends'
 import { cacheInit } from '@/storage/cache/db'
+import type { MeridianDB } from '@/storage/cache/db'
 import { syncToBackend } from '@/storage/syncScheduler'
 import { clearSyncJournal } from '@/storage/syncJournal'
 import { useStore } from '@/store'
@@ -371,6 +372,18 @@ let _generation = 0
 function currentGeneration(): number { return _generation }
 
 /**
+ * How many backend calls are in flight right now.
+ *
+ * A backend call is only ever made from inside a sync cycle, so a non-zero
+ * count means a live cycle. `quiesce()` answers the same question from the
+ * *bookkeeping* side (`syncing`/`pushTimer`/`pushQueued`), and `resetWorld`
+ * below reports where the two disagree — a run that ended with work still
+ * running, which is #1052's own shape caught one step before the generation
+ * guard sees it land.
+ */
+let _inFlight = 0
+
+/**
  * Wrap `backend`'s network methods so each remembers the generation it was
  * created in (`gen`) and asserts, both when called and when it resolves, that
  * `resetWorld()` has not run again since. A mismatch means exactly the shape
@@ -386,40 +399,38 @@ function taggedBackend(backend: StorageBackend, vaultId: string, gen: number): S
       )
     }
   }
+  /** Run `op` counted as in flight, so `pendingBackendCalls()` sees it. */
+  const tracked = async <T>(method: string, path: string, op: () => Promise<T>): Promise<T> => {
+    guard('called', method, path)
+    _inFlight++
+    try {
+      const r = await op()
+      guard('resolved', method, path)
+      return r
+    } finally {
+      _inFlight--
+    }
+  }
   return {
     get id()        { return backend.id },
     get name()      { return backend.name },
     get kind()      { return backend.kind },
     get readOnly()  { return backend.readOnly },
     get hasRemote() { return backend.hasRemote },
-    async statAll() {
-      guard('called', 'statAll', '')
-      const r = await backend.statAll()
-      guard('resolved', 'statAll', '')
-      return r
+    statAll() {
+      return tracked('statAll', '', () => backend.statAll())
     },
-    async readFiles(paths) {
-      guard('called', 'readFiles', paths.join(','))
-      const r = await backend.readFiles(paths)
-      guard('resolved', 'readFiles', paths.join(','))
-      return r
+    readFiles(paths) {
+      return tracked('readFiles', paths.join(','), () => backend.readFiles(paths))
     },
-    async readAll(onProgress) {
-      guard('called', 'readAll', '')
-      const r = await backend.readAll(onProgress)
-      guard('resolved', 'readAll', '')
-      return r
+    readAll(onProgress) {
+      return tracked('readAll', '', () => backend.readAll(onProgress))
     },
-    async write(path, content, expectedVersion) {
-      guard('called', 'write', path)
-      const r = await backend.write(path, content, expectedVersion)
-      guard('resolved', 'write', path)
-      return r
+    write(path, content, expectedVersion) {
+      return tracked('write', path, () => backend.write(path, content, expectedVersion))
     },
     async delete(path, expectedVersion) {
-      guard('called', 'delete', path)
-      await backend.delete(path, expectedVersion)
-      guard('resolved', 'delete', path)
+      await tracked('delete', path, () => backend.delete(path, expectedVersion))
     },
     ensurePermission(interactive) { return backend.ensurePermission(interactive) },
     ...(backend.refreshAuth ? { refreshAuth: () => backend.refreshAuth!() } : {}),
@@ -469,6 +480,7 @@ export function makeClient(vaultId: string, opts: { legacyDelete?: boolean } = {
 export function closeApp(client: Client): void {
   dropSyncState(client.vaultId)
 }
+
 
 /**
  * Simulate the device being closed and reopened: a brand-new `GitHubBackend`
@@ -635,7 +647,53 @@ export async function skipAhead(ms: number, vaultIds: readonly string[]): Promis
  * caller here — nothing reads `fetch`'s mock state — and is dropped the
  * instant the next `resetWorld` overwrites the stub.
  */
+/**
+ * Drop the finished transactions `fake-indexeddb` never lets go of — the
+ * other half of #1023, and the reason a long soak still slowed to a crawl
+ * after that issue's own fix landed.
+ *
+ * Its `Database` holds every transaction ever opened against a connection in
+ * one array (`transactions.push(tx)` in `FDBDatabase`, with no removal
+ * anywhere in the library), and `processTransactions` re-`filter`s that whole
+ * array on every transaction creation and every complete/abort. Across a soak
+ * that is two compounding problems and not one: an unbounded **retention** —
+ * each finished transaction keeps its scope and request objects alive — and an
+ * O(n) **scan per transaction event** over an array that grows by two per
+ * `resetWorld`, which makes the harness quadratic in the number of runs.
+ *
+ * Measured over 1,200 `resetWorld()` calls: 69MB climbing to 91MB without
+ * this, flat at 65MB with it; the fixed-sequence probe in
+ * `twoClientHarnessLeak.test.ts` goes from 2,400 runs costing 4.2x the
+ * per-run cost of the first 400 to holding roughly steady. That per-run climb
+ * is what `#1023` read as "ordinary GC behavior at a growing live heap" — it
+ * is neither ordinary nor GC's doing, it is this.
+ *
+ * Only records already marked `finished` go, so a transaction still running
+ * or waiting is left for the library's own scheduler. Nothing else releases
+ * these: `cacheInit()`'s database is deliberately a process singleton (it is
+ * only ever `.clear()`ed, never rebuilt), and production runs against a real
+ * IndexedDB where the question doesn't arise.
+ */
+function pruneFinishedTransactions(db: MeridianDB): void {
+  const raw = (db.backendDB() as unknown as {
+    _rawDatabase?: { transactions: { _state?: string }[] }
+  })._rawDatabase
+  if (!raw) return
+  raw.transactions = raw.transactions.filter(t => t._state !== 'finished')
+}
+
 export async function resetWorld(): Promise<FakeGitHub> {
+  // The run boundary itself (#1052). Anything still in flight here is work the
+  // *previous* run never drained, which `quiesce` should have made impossible —
+  // the leak named where it happens rather than one generation later, where
+  // `taggedBackend`'s guard would otherwise report only its landing. A warning
+  // and not a throw: the run that would fail is the innocent one starting now.
+  if (_inFlight > 0) {
+    console.warn(
+      `#1052: resetWorld() entered with ${String(_inFlight)} backend call(s) still in ` +
+      `flight from generation ${String(currentGeneration())}`,
+    )
+  }
   _generation++
   const remote = new FakeGitHub()
   vi.stubGlobal('fetch', remote.handler)
@@ -646,6 +704,7 @@ export async function resetWorld(): Promise<FakeGitHub> {
   const db = await cacheInit()
   await db.files.clear()
   await db.meta.clear()
+  pruneFinishedTransactions(db)
   return remote
 }
 
