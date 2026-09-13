@@ -46,15 +46,19 @@ type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
 // so this list reads by the same logic as every calendar view instead of a
 // second, drifting copy of it. The two row shapes sortOccs never has to
 // handle get an equivalent key by hand: a plain checklist-text task has no
-// type/priority/time of its own, so it sorts as a bare, unprioritized task
-// (bucket matches its own done state); a broken link resolves to nothing at
-// all, so it gets a bucket of its own past both active and done items.
+// priority field of its own to carry — unlike a linked occurrence, which can
+// genuinely have no priority *set* — so it's ranked one past
+// priorityRank(undefined), sorting past every linked item of its type
+// (typeKey 3), no-priority ones included, rather than tying with them and
+// falling back to alphabetical order between the two row shapes (bucket
+// matches its own done state); a broken link resolves to nothing at all, so
+// it gets a bucket of its own past both active and done items.
 export function rowSortKey({ entry, occ }: Row, now: Date): SortKey {
   if (entry.kind === 'link') {
     if (!occ) return { bucket: 2, typeKey: 0, prioKey: 0, jsTimeMs: 0, title: entry.ref }
     return occSortKey(occ, now)
   }
-  return { bucket: entry.done ? 1 : 0, typeKey: 3, prioKey: priorityRank(undefined), jsTimeMs: 0, title: entry.text }
+  return { bucket: entry.done ? 1 : 0, typeKey: 3, prioKey: priorityRank(undefined) + 1, jsTimeMs: 0, title: entry.text }
 }
 
 export default function ItemsList({ items, onChange, roots, currentKey, vaultId, onPromote, onOpenWikilink, onToggleDone }: Props) {

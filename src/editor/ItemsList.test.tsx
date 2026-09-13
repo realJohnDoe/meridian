@@ -67,8 +67,8 @@ describe('rowSortKey', () => {
     expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 0, typeKey: 3, prioKey: rank, jsTimeMs: 0, title: 'Task' })
   })
 
-  it('groups an open string task as an active, unprioritized task-typed row — sorted by its own text', () => {
-    expect(rowSortKey(taskRow(7, '[ ] buy milk'), NOW)).toEqual({ bucket: 0, typeKey: 3, prioKey: 3, jsTimeMs: 0, title: 'buy milk' })
+  it('groups an open string task as an active, task-typed row past no-priority links, sorted by its own text', () => {
+    expect(rowSortKey(taskRow(7, '[ ] buy milk'), NOW)).toEqual({ bucket: 0, typeKey: 3, prioKey: 4, jsTimeMs: 0, title: 'buy milk' })
   })
 
   it('groups a done task-link into the dimmed bucket, same type/priority key as an open task', () => {
@@ -82,7 +82,7 @@ describe('rowSortKey', () => {
   })
 
   it('groups a done string task into the dimmed bucket', () => {
-    expect(rowSortKey(taskRow(0, '[x] buy milk'), NOW)).toEqual({ bucket: 1, typeKey: 3, prioKey: 3, jsTimeMs: 0, title: 'buy milk' })
+    expect(rowSortKey(taskRow(0, '[x] buy milk'), NOW)).toEqual({ bucket: 1, typeKey: 3, prioKey: 4, jsTimeMs: 0, title: 'buy milk' })
   })
 
   it('groups a link with no resolvable occurrence into its own trailing bucket — broken link', () => {
@@ -125,12 +125,14 @@ describe('ItemsList sort order (end-to-end via rowSortKey)', () => {
     )
 
     // Timed events (typeKey 2) by time, then unprioritized/task-typed rows
-    // (typeKey 3 — tasks and notes alike) by priority then title, then the
+    // (typeKey 3 — tasks and notes alike): prioritized links, then the
+    // no-priority link, then plain checklist-text tasks last (their own
+    // prio rank sits past every link's), each tier by title — then the
     // same rule again for the dimmed bucket, then the broken link last.
     expect(titles).toEqual([
       'Sooner', 'Later',
       'High prio', 'Low prio',
-      'first stored task', 'Note', 'second stored task',
+      'Note', 'first stored task', 'second stored task',
       'Done link', 'done string task',
       undefined, // broken link has no title
     ])
