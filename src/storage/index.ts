@@ -26,9 +26,9 @@ export { resetSyncBackoff } from './syncState'
 export { cacheDirtyCount } from './cache/files'
 
 export {
-  startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos,
+  startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos, findReusableGitHubSession,
   OAuthCallbackError, GITHUB_APP_INSTALL_URL, APP_URL,
 } from './githubOAuth'
-export type { OAuthTokens, InstalledRepo } from './githubOAuth'
+export type { OAuthTokens, InstalledRepo, ReusableGitHubSession } from './githubOAuth'
 
 export type { VaultRef } from '@/vaultRef'

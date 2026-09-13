@@ -520,6 +520,7 @@ export default [
       'src/storage/__tests__/fs.test.ts',
       'src/storage/__tests__/vaultRegistry.test.ts',
       'src/storage/__tests__/githubOAuth.test.ts',
+      'src/storage/__tests__/githubOAuth.reuse.test.ts',
     ],
     rules: {
       '@typescript-eslint/require-await': 'off',

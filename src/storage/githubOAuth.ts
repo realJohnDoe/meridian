@@ -389,21 +389,104 @@ type InstallationsResponse = { installations: Installation[] }
 type InstalledRepository = { name: string; default_branch: string; owner: { login: string } }
 type RepositoriesResponse = { repositories: InstalledRepository[] }
 
+// GitHub paginates both endpoints below at 30 results per page by default.
+// Asking for the max page size still leaves a real cap for an account with
+// many installations or a single installation with many repos selected, so
+// each loop keeps paging until a page comes back short of it — the standard
+// "short page means last page" signal for an endpoint that reports its total
+// only via a `Link` header this plain `octokit.request` call doesn't parse.
+const PER_PAGE = 100
+
 /** Repos the GitHub App is installed on, across all of the user's installations. */
 export async function fetchInstalledRepos(accessToken: string): Promise<InstalledRepo[]> {
   const { makeOctokit } = await import('./githubApi')
   const octokit = makeOctokit(accessToken)
-  const { data: installData } = await octokit.request('GET /user/installations')
-  const installations = (installData as InstallationsResponse).installations
+
+  const installations: Installation[] = []
+  for (let page = 1; ; page++) {
+    const { data } = await octokit.request('GET /user/installations', { per_page: PER_PAGE, page })
+    const batch = (data as InstallationsResponse).installations
+    installations.push(...batch)
+    if (batch.length < PER_PAGE) break
+  }
 
   const repos: InstalledRepo[] = []
   for (const installation of installations) {
-    const { data: repoData } = await octokit.request('GET /user/installations/{installation_id}/repositories', {
-      installation_id: installation.id,
-    })
-    for (const r of (repoData as RepositoriesResponse).repositories) {
-      repos.push({ owner: r.owner.login, repo: r.name, branch: r.default_branch })
+    for (let page = 1; ; page++) {
+      const { data } = await octokit.request('GET /user/installations/{installation_id}/repositories', {
+        installation_id: installation.id,
+        per_page:        PER_PAGE,
+        page,
+      })
+      const batch = (data as RepositoriesResponse).repositories
+      for (const r of batch) repos.push({ owner: r.owner.login, repo: r.name, branch: r.default_branch })
+      if (batch.length < PER_PAGE) break
     }
   }
   return repos
+}
+
+/** The GitHub account an access token authenticates as. */
+interface GitHubIdentity {
+  login: string
+}
+
+/**
+ * `GET /user` for the account behind `accessToken` — used to label a reused
+ * sign-in ("Signed in as …"). Not exported past this file: `findReusableGitHubSession`
+ * is the only caller, and knip flags an export with no consumer outside its module.
+ */
+async function fetchAuthenticatedUser(accessToken: string): Promise<GitHubIdentity> {
+  const { makeOctokit } = await import('./githubApi')
+  const octokit = makeOctokit(accessToken)
+  const { data } = await octokit.request('GET /user')
+  return { login: (data as { login: string }).login }
+}
+
+/** A GitHub credential good enough to hand straight to `addGitHubVaultOAuth` for a *different* vault. */
+export interface ReusableGitHubSession {
+  accessToken:  string
+  refreshToken: string
+  expiresAt:    number
+  /** The account these tokens authenticate as, for a "Signed in as …" label. */
+  login: string
+}
+
+/**
+ * Looks for a still-usable GitHub credential among `vaultIds` (an existing
+ * account's GitHub vaults) so a second (or third…) vault can be added without
+ * sending the user through `startGitHubSignIn`'s full-page redirect again.
+ *
+ * This is sound because a GitHub App user-access-token grant authorizes the
+ * *account*, not a single repository: the same tokens that back one vault are
+ * equally good for connecting another repo that account's installations can
+ * reach. Skipping the redirect also keeps the picker honest — the repo list
+ * still comes from a live `fetchInstalledRepos` call, so a repository
+ * installed a moment ago shows up without any GitHub round trip at all.
+ *
+ * Tries each id in turn and returns the first credential that both
+ * `ensureFreshAccessToken` still calls good *and* `GET /user` accepts (an
+ * access token can outlive its own revocation on GitHub's side by up to a
+ * few minutes, so the identity call is what actually proves it live); `null`
+ * once none do, telling the caller to fall back to a fresh sign-in.
+ */
+export async function findReusableGitHubSession(vaultIds: string[]): Promise<ReusableGitHubSession | null> {
+  for (const vaultId of vaultIds) {
+    const result = await ensureFreshAccessToken(vaultId)
+    if (result.status !== 'ok') continue
+
+    // A vault predating the OAuth flow (see the no-refresh-token branch of
+    // ensureFreshAccessToken) has nothing reusable — its token is a personal
+    // access token, not a GitHub App grant these calls know how to rotate.
+    const [refreshToken, expiresAt] = await Promise.all([refreshTokenLoad(vaultId), tokenExpiryLoad(vaultId)])
+    if (!refreshToken || expiresAt === null) continue
+
+    try {
+      const { login } = await fetchAuthenticatedUser(result.token)
+      return { accessToken: result.token, refreshToken, expiresAt, login }
+    } catch {
+      continue
+    }
+  }
+  return null
 }

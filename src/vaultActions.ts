@@ -21,7 +21,7 @@ export function exportVaultIcs(vaultId: string): string {
 }
 
 export {
-  startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos,
+  startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos, findReusableGitHubSession,
   OAuthCallbackError, GITHUB_APP_INSTALL_URL, APP_URL,
 } from '@/storage'
-export type { OAuthTokens, InstalledRepo } from '@/storage'
+export type { OAuthTokens, InstalledRepo, ReusableGitHubSession } from '@/storage'

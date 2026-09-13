@@ -4,7 +4,10 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useStore } from '@/store'
 import { setupStore } from '@/test-utils'
 import type * as VaultActions from '@/vaultActions'
-import { addLocalVault, addExampleVault, addIcalVault, startGitHubSignIn, previewIcalFeed } from '@/vaultActions'
+import {
+  addLocalVault, addExampleVault, addIcalVault, addGitHubVaultOAuth, startGitHubSignIn,
+  findReusableGitHubSession, fetchInstalledRepos, previewIcalFeed,
+} from '@/vaultActions'
 import AddVaultWizard from './AddVaultWizard'
 
 const navigate = vi.fn()
@@ -20,7 +23,10 @@ vi.mock('@/vaultActions', async (importOriginal) => ({
   addLocalVault: vi.fn(),
   addExampleVault: vi.fn(),
   addIcalVault: vi.fn(),
+  addGitHubVaultOAuth: vi.fn(),
   startGitHubSignIn: vi.fn(() => Promise.resolve()),
+  findReusableGitHubSession: vi.fn(() => Promise.resolve(null)),
+  fetchInstalledRepos: vi.fn(),
   previewIcalFeed: vi.fn(),
 }))
 
@@ -212,5 +218,90 @@ describe('AddVaultWizard — GitHub step', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
 
     expect(screen.getByRole('button', { name: /GitHub repository/ })).toBeInTheDocument()
+  })
+})
+
+describe('AddVaultWizard — GitHub step — reusing an existing sign-in', () => {
+  const githubVault = {
+    id: 'v1', name: 'acme/notes', kind: 'github' as const,
+    github: { owner: 'acme', repo: 'notes', branch: 'main' },
+  }
+  const session = { accessToken: 'at', refreshToken: 'rt', expiresAt: Date.now() + 3_600_000, login: 'octocat' }
+
+  function goToGitHubStep() {
+    useStore.setState({ vaults: [githubVault] })
+    render(<AddVaultWizard />)
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+  }
+
+  it('checks for a reusable session against the account\'s existing GitHub vaults', () => {
+    goToGitHubStep()
+
+    expect(findReusableGitHubSession).toHaveBeenCalledWith(['v1'])
+  })
+
+  it('falls back to the Sign in with GitHub button when the reuse check itself rejects', async () => {
+    vi.mocked(findReusableGitHubSession).mockRejectedValue(new Error('IndexedDB unavailable'))
+    goToGitHubStep()
+
+    expect(await screen.findByRole('button', { name: 'Sign in with GitHub' })).toBeInTheDocument()
+    expect(fetchInstalledRepos).not.toHaveBeenCalled()
+  })
+
+  it('shows "Signed in as" and the live repo list instead of a sign-in button when a session is reused', async () => {
+    vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
+    vi.mocked(fetchInstalledRepos).mockResolvedValue([{ owner: 'acme', repo: 'journal', branch: 'main' }])
+    goToGitHubStep()
+
+    expect(await screen.findByRole('button', { name: 'acme/journal' })).toBeInTheDocument()
+    expect(screen.getByText('octocat')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sign in with GitHub' })).not.toBeInTheDocument()
+    expect(fetchInstalledRepos).toHaveBeenCalledWith('at')
+  })
+
+  it('falls back to the Sign in with GitHub button when no session can be reused', async () => {
+    vi.mocked(findReusableGitHubSession).mockResolvedValue(null)
+    goToGitHubStep()
+
+    expect(await screen.findByRole('button', { name: 'Sign in with GitHub' })).toBeInTheDocument()
+    expect(fetchInstalledRepos).not.toHaveBeenCalled()
+  })
+
+  it('connects the picked repo with the reused tokens and navigates away, without a fresh sign-in', async () => {
+    vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
+    vi.mocked(fetchInstalledRepos).mockResolvedValue([{ owner: 'acme', repo: 'journal', branch: 'main' }])
+    goToGitHubStep()
+    const repoButton = await screen.findByRole('button', { name: 'acme/journal' })
+
+    await act(async () => {
+      fireEvent.click(repoButton)
+      await Promise.resolve()
+    })
+
+    expect(navigate).toHaveBeenCalledWith({ to: '/settings' })
+    expect(addGitHubVaultOAuth).toHaveBeenCalledWith({
+      owner: 'acme', repo: 'journal', branch: 'main',
+      accessToken: 'at', refreshToken: 'rt', expiresAt: session.expiresAt,
+    })
+    expect(startGitHubSignIn).not.toHaveBeenCalled()
+  })
+
+  it('shows an error, but keeps the "Signed in as" label, when the repo list fails to load', async () => {
+    vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
+    vi.mocked(fetchInstalledRepos).mockRejectedValue(new Error('Could not list repositories.'))
+    goToGitHubStep()
+
+    expect(await screen.findByText('Could not list repositories.')).toBeInTheDocument()
+    expect(screen.getByText('octocat')).toBeInTheDocument()
+  })
+
+  it('starts a fresh sign-in when the reused account is not the one the user wants', async () => {
+    vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
+    vi.mocked(fetchInstalledRepos).mockResolvedValue([])
+    goToGitHubStep()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Sign in with a different account/ }))
+
+    expect(startGitHubSignIn).toHaveBeenCalledTimes(1)
   })
 })
