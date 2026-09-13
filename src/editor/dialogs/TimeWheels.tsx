@@ -9,10 +9,10 @@ import { cn } from '@/lib/cn'
 // drawn at. A viewport height that isn't a multiple of ITEM_H shifts every snap
 // point by half the remainder, which leaves the wheel permanently resting off
 // its highlight.
-const ITEM_H = 40 // px per visible row
+export const ITEM_H = 40 // px per visible row
 
 // How long the scroller has to be quiet before we consider it settled.
-const SETTLE_MS = 120
+export const SETTLE_MS = 120
 
 // How far a single fling may travel before it runs out of strip. The list is
 // repeated enough times to cover this in both directions from the middle, so
@@ -28,7 +28,7 @@ const mod = (n: number, m: number) => ((n % m) + m) % m
 
 // Enough whole repeats on each side of the middle to cover the runway, plus
 // the middle itself — always an odd count, so `home` is genuinely centred.
-function geometry(len: number) {
+export function geometry(len: number) {
   const periods = Math.ceil(RUNWAY_PX / (len * ITEM_H)) * 2 + 1
   return { total: periods * len, home: Math.floor(periods / 2) * len }
 }
