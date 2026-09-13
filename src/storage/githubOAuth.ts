@@ -459,10 +459,20 @@ export interface ReusableGitHubSession {
  *
  * This is sound because a GitHub App user-access-token grant authorizes the
  * *account*, not a single repository: the same tokens that back one vault are
- * equally good for connecting another repo that account's installations can
- * reach. Skipping the redirect also keeps the picker honest — the repo list
- * still comes from a live `fetchInstalledRepos` call, so a repository
- * installed a moment ago shows up without any GitHub round trip at all.
+ * equally good for connecting another repo that account's installations
+ * already reached *as of that grant*.
+ *
+ * That last clause matters: a user access token's repository visibility is
+ * fixed at the moment it was issued (authorization or refresh both preserve
+ * it) — it does **not** track later changes to the installation's repository
+ * selection. Configuring the GitHub App to add a new repository updates the
+ * installation immediately, but an existing token has no way to learn that;
+ * only a fresh `startGitHubSignIn` round trip re-evaluates the current
+ * selection and mints a token that can see it. So `fetchInstalledRepos` on a
+ * *reused* session is live only with respect to repositories the token could
+ * already see, never a guarantee of "every repo the installation currently
+ * grants" — the wizard's "sign in again" link on the picker is the intended
+ * escape hatch for a repository that is missing for exactly this reason.
  *
  * Tries each id in turn and returns the first credential that both
  * `ensureFreshAccessToken` still calls good *and* `GET /user` accepts (an
