@@ -362,6 +362,41 @@ export default [
     },
   },
 
+  // e2e/ is Playwright test code — its own tsconfig (tsconfig.e2e.json), runs
+  // under Node rather than the browser bundle, and imports no `@/` aliases
+  // (it deliberately re-derives a few constants from src/ by reading the
+  // source as text instead — see contrast-sweep.spec.ts and
+  // layout-smoke.spec.ts's findUncoveredRoutes() — so the module-boundary/
+  // import-x rules below don't apply here). Same shape as the worker/src
+  // block above (own tsconfig, own runtime, no React/jsx-a11y/import-
+  // boundary rules), but deliberately only the `recommended-type-checked`
+  // tier rather than worker/src's extended strict-tier set: a dry run of
+  // the strict tier here (#1046) found nothing beyond cosmetic noise, so
+  // there's no assessed case yet for going further than recommended.
+  {
+    files: ['e2e/**/*.ts', 'playwright.config.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: './tsconfig.e2e.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: 'error',
+    },
+    plugins: {
+      '@typescript-eslint': tsPlugin,
+    },
+    rules: {
+      ...tsRecommendedTypeCheckedRules,
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+
   // src/debug/ is developer-only tooling (never shipped to end users), so
   // jsx-a11y's recommended checks don't apply there.
   {
