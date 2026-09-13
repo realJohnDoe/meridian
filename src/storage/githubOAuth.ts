@@ -427,12 +427,16 @@ export async function fetchInstalledRepos(accessToken: string): Promise<Installe
 }
 
 /** The GitHub account an access token authenticates as. */
-export interface GitHubIdentity {
+interface GitHubIdentity {
   login: string
 }
 
-/** `GET /user` for the account behind `accessToken` — used to label a reused sign-in ("Signed in as …"). */
-export async function fetchAuthenticatedUser(accessToken: string): Promise<GitHubIdentity> {
+/**
+ * `GET /user` for the account behind `accessToken` — used to label a reused
+ * sign-in ("Signed in as …"). Not exported past this file: `findReusableGitHubSession`
+ * is the only caller, and knip flags an export with no consumer outside its module.
+ */
+async function fetchAuthenticatedUser(accessToken: string): Promise<GitHubIdentity> {
   const { makeOctokit } = await import('./githubApi')
   const octokit = makeOctokit(accessToken)
   const { data } = await octokit.request('GET /user')
