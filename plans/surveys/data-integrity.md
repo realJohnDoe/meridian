@@ -1,13 +1,13 @@
 # Data Integrity & Durability Survey
 
-Survey this codebase for ways it can **lose, corrupt, or silently mangle the user's content**. Meridian owns a directory of plain Markdown files that the user may also edit by hand, on more than one device, through three different backends. The goal: find the **top 8 integrity risks**, each with a **reproduction** so the fix can be verified by re-running it.
+Survey this codebase for ways it can **lose, corrupt, or silently mangle the user's content**. Meridian owns a directory of plain Markdown files that the user may also edit by hand, on more than one device, through three different backends. Find the **top 8 integrity risks**, each with a **reproduction** so the fix can be verified by re-running it.
 
-Shared process, scoring, and reporting rules — model-tier ratings, the
-ranking formula, category-verdict conventions, and how to report results —
-live in [the shared survey conventions](./README.md). Read that first; this
-file states only what's specific to this survey.
+Shared process, scoring, and reporting rules — model-tier ratings, the ranking
+formula, category-verdict conventions, and how to report results — live in [the
+shared survey conventions](./README.md). Read that first; this file states only
+what's specific to this survey.
 
-This survey is about correctness under adversity, not about code aesthetics. A finding that makes the code nicer but cannot lose a byte belongs in the general health survey, not here.
+This survey is about correctness under adversity, not code aesthetics. A finding that makes the code nicer but cannot lose a byte belongs in the general health survey.
 
 ## Target invariants (the things that must never break)
 
@@ -15,261 +15,153 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 
 1. **Round-trip fidelity** — parsing a vault file and serializing it back without an edit preserves everything the user wrote. Editing one field changes only that field.
 2. **Edit locality** — an edit to one occurrence never rewrites, reorders, or drops an unrelated occurrence, file, or frontmatter key.
-3. **Expansion ↔ collapse agreement** — `collapseToYaml(expand(x)) ≡ x` in store terms; the compaction/hoisting round-trip is lossless, including across the four `applyEdit` scopes (`all`, `single`, `future`, `add`).
+3. **Expansion ↔ collapse agreement** — `collapseToYaml(expand(x)) ≡ x` in store terms, including across the four `applyEdit` scopes (`all`, `single`, `future`, `add`).
 4. **No lost update** — a compare-and-swap write never silently overwrites a change it did not see. Concurrent or interleaved writes either merge, conflict visibly, or fail loudly.
-5. **Cache coherence** — the IndexedDB cache, the in-memory store, and the backend never disagree in a way that survives a reload. A stale cache must never win over fresher remote content.
-6. **Durability of accepted writes** — once the UI says "saved," the content survives a reload, a crashed tab, an offline period, and a later sync.
-7. **Recoverability of destruction** — deletes, series splits, and conflict resolutions are undoable or leave a recoverable artifact. Nothing user-authored disappears with no trace.
-8. **Temporal correctness** — dates, times, durations, and repeat rules mean the same thing across timezones, DST boundaries, and locales. An occurrence never silently moves days.
+5. **Cache coherence** — the IndexedDB cache, the in-memory store and the backend never disagree in a way that survives a reload. A stale cache must never win over fresher remote content.
+6. **Durability of accepted writes** — once the UI says "saved", the content survives a reload, a crashed tab, an offline period, and a later sync.
+7. **Recoverability of destruction** — deletes, series splits and conflict resolutions are undoable or leave a recoverable artifact. Nothing user-authored disappears with no trace.
+8. **Temporal correctness** — dates, times, durations and repeat rules mean the same thing across timezones, DST boundaries and locales. An occurrence never silently moves days.
 
 ## Process
 
-- **Probe first, reproduce, then write.** Three phases, in order:
-  1. **Threat plan.** For each invariant above, name the code that is supposed to uphold it (function, file) and the inputs or interleavings that could break it. State this plan before you start.
-  2. **Reproduction pass.** Attempt to break each invariant against the real code — adversarial inputs, hand-authored files, interleaved sync operations, simulated failures. Capture concrete reproductions _before_ forming conclusions.
-  3. **Report.** Only after both passes, write the findings. Do not draft the verdict early and select repros to confirm it.
-- **Probe both round trips, and say which one you probed.** "Parse → serialize"
-  and "parse → edit → serialize" are different checks that fail for different
-  reasons, and the repo's own runtime guard (`roundTripLoss`) only performs the
-  first — its doc comment says so. A file can round-trip byte-perfectly while
-  untouched and lose three hand-authored keys on the first editor save; that is
-  where three of the 2026-09-05 run's four fidelity findings lived. The cheap
-  harness for the second is a no-op save: derive `EditFields` from an expanded
-  occurrence via `entryFromOccurrence`, run it back through
-  `mergeEditFields` → `applyEdit` → `serializeEntry`, and diff against the
-  unedited serialization, for every fixture × every scope.
-- **Ask what the repo's own guard can see.** Whenever you find a loss, run
-  `roundTripLoss` over the same input and record its verdict in the finding. A
-  loss the guard reports is a different — and much smaller — problem from one it
-  calls clean, and a guard that is blind to a whole class is itself a finding.
-- **Every finding needs a reproduction.** A suspicion without one is at most an "unverified" note in the coverage statement — not a finding. For each finding record:
-  - **Repro:** the starting vault state (file content, verbatim), the exact operation sequence, and the **observed** wrong result versus the expected one. "Observed" means you ran it.
-  - The cheapest repro is usually a failing test against the existing Vitest setup. Where that works, **quote the test verbatim in the report** so it can be committed alongside the fix — a finding here should arrive with its own regression test.
-  - Scratch tests and instrumentation are temporary: run them, capture the output, and leave the working tree clean.
-- **Weight silence over noise.** A malformed file that throws a visible parse error is a far better outcome than one that quietly drops a frontmatter key. When scoring impact, a failure the user can see and recover from is worth several points less than one that corrupts on save and is only discovered weeks later in a git diff. Say explicitly, for each finding, whether it fails loudly or silently.
-- **Separate normalization from corruption, and say which the project intends.** Reformatting (key reordering, quote style, indentation) is not automatically a bug — but this project's README promises hand-created files are picked up, so files the user wrote by hand are in scope for fidelity, not just files Meridian generated. Where you find lossy normalization, state whether it is a deliberate product choice or an accident, and put the question to the user rather than assuming.
-- **Existing tests are the raw material, not the verdict.** `src/model/` and `src/storage/` both sit near a 1:1 test-to-source line ratio, so "there are tests" is not an answer. The question is what the tests *don't* assert: which inputs never appear in the fixtures, which interleavings are never exercised, which assertions are loose enough to pass over a real defect. Read `src/model/__tests__/` (including `yaml-roundtrip.test.ts`) and `src/storage/__tests__/` (including `sync-collision.test.ts` and `reconcile.test.ts`) and report the **gap**, not the count. Pay particular attention to `src/model/__tests__/__snapshots__/`: a snapshot asserts only that output hasn't *changed*, not that it is *correct*, so a snapshot accepted with `-u` can bake corruption into the baseline and defend it forever. Check whether the round-trip fixtures assert real equivalence or just stability.
+**Probe, reproduce, then write** — three phases, in order. (1) **Threat plan:** for each invariant, name the code that is supposed to uphold it and the inputs or interleavings that could break it, in writing, before you start. (2) **Reproduction pass:** try to break each invariant against the real code — adversarial inputs, hand-authored files, interleaved sync operations, simulated failures. (3) Only then write the findings.
+
+- **Every finding needs a reproduction.** A suspicion without one is at most an "unverified" note in the coverage statement. Record the starting vault state (file content, verbatim), the exact operation sequence, and the **observed** wrong result against the expected one — "observed" means you ran it. The cheapest repro is usually a failing Vitest test; where that works, quote it verbatim so it can be committed alongside the fix. Scratch tests and instrumentation are temporary — leave the tree clean.
+- **Probe both round trips, and say which one you probed.** "Parse → serialize" and "parse → edit → serialize" are different checks that fail for different reasons, and the repo's own runtime guard (`roundTripLoss`) only performs the first — its doc comment says so. A file can round-trip byte-perfectly while untouched and lose three hand-authored keys on the first editor save; that is where three of the 2026-09-05 run's four fidelity findings lived. The cheap harness for the second is a **no-op save**: derive `EditFields` from an expanded occurrence via `entryFromOccurrence`, run it back through `mergeEditFields` → `applyEdit` → `serializeEntry`, and diff against the unedited serialization — for every fixture × every scope.
+- **Ask what the repo's own guard can see.** Whenever you find a loss, run `roundTripLoss` over the same input and record its verdict. A loss the guard reports is a much smaller problem than one it calls clean, and a guard blind to a whole class is itself a finding.
+- **Weight silence over noise.** A malformed file that throws a visible parse error is a far better outcome than one that quietly drops a frontmatter key. A failure the user can see and recover from is worth several points less than one that corrupts on save and surfaces weeks later in a git diff. Say explicitly, per finding, whether it fails loudly or silently.
+- **Separate normalization from corruption, and say which the project intends.** Reformatting (key reordering, quote style, indentation) is not automatically a bug — but the README promises hand-created files are picked up, so files the user wrote by hand are in scope for fidelity. Where you find lossy normalization, state whether it is a deliberate product choice or an accident, and put the question to the user rather than assuming.
+- **Existing tests are the raw material, not the verdict.** `src/model/` and `src/storage/` both sit near a 1:1 test-to-source line ratio, so "there are tests" is not an answer. Ask what they *don't* assert: which inputs never appear in the fixtures, which interleavings are never exercised, which assertions are loose enough to pass over a real defect. Pay particular attention to `src/model/__tests__/__snapshots__/` — a snapshot asserts only that output hasn't *changed*, not that it is *correct*, so one accepted with `-u` can bake corruption into the baseline and defend it forever.
 - Evaluate the code on its merits, per [Running a survey](./README.md#running-a-survey) — here `src/model/AGENTS.md` is the doc that matters most, and "round-trips back to the same store state" and "this is atomic" are the claims to break.
 
 ## Known suspects
 
-> **Surveyed 2026-09-05 — verdicts below.** Its full report with reproductions
-> is in git history: that run's findings are all fixed, which is why
-> `plans/data-integrity-results.md` is gone (`git log -- plans/`).
-> Each suspect's original hypothesis is kept verbatim, with the verdict appended.
-> Verdicts are re-issued on each run and describe the code as of that run;
-> the finding numbers in them are that run's — as are the ones in code comments
-> citing "data-integrity survey, finding #N", which span two runs now and have
-> never been renumbered. (The 2026-07-31 run's verdicts are likewise in git
-> history, for the same reason.)
+> **Standing hypotheses, each with the date it was last checked.** This survey keeps its
+> memory here rather than in the tracker, and the [shared conventions](./README.md#reporting)
+> allow that as its one exception. Re-issue and re-date each verdict per run;
+> the findings-by-number in old verdicts and in `src/`'s
+> "data-integrity survey, finding #N" comments are per-run numbers whose reports
+> are in git history — per `plans/CLAUDE.md`, don't renumber them.
 
-- **The `collapseToYaml` contract is the central claim of the whole model layer.** `src/model/AGENTS.md` describes its output as "the most compact `Record<string, unknown>` that round-trips back to the same store state." Verify that claim adversarially — especially the three hoisting branches (simple, single-series-with-instances, multi-series/container) and the `hoistSharedMetadata` diffing — rather than trusting it.
-  - **2026-09-05: still false, but for entirely different reasons.** All three 2026-07 losses are fixed and pinned, and the hoisting remains sound — `computeSharedFields` / `occMetaToYaml` / `emitExtra` were re-read end to end and a no-op-save sweep over all 20 fixtures × 3 scopes × 3 occurrences found no hoisting defect. What still breaks the "round-trips back to the same store state" claim now sits on either side of collapse rather than inside it: a **structural** key in a shape the parser can't type (`date: [...]`, `excluded: "yes"`, `instances: {…}`) has no `extra` home at all and is deleted (finding #4), and a scalar the *parser* already flattened (`zip: 01234`, an ID past 2⁵³, `phone: +49…`) is re-emitted from its JS value and comes back changed (finding #6). Collapse is doing the right thing with what it is handed; it is handed less than the file contained.
+- **The `collapseToYaml` contract is the central claim of the whole model layer.** `src/model/AGENTS.md` describes its output as "the most compact `Record<string, unknown>` that round-trips back to the same store state". Verify that adversarially — especially the three hoisting branches (simple, single-series-with-instances, multi-series/container) and `hoistSharedMetadata`'s diffing — rather than trusting it.
+  - **2026-09-05:** the hoisting itself is sound (a no-op-save sweep over 20 fixtures × 3 scopes × 3 occurrences found no hoisting defect). What broke the claim sat on either side of collapse: a structural key the parser can't type had no `extra` home and was deleted, and a scalar the parser had already flattened (`zip: 01234`, an ID past 2⁵³) came back changed. Both fixed (#982, #979). Collapse was doing the right thing with what it was handed; it was handed less than the file contained — so re-probe the *handoff*, not just the function.
 
-- **Unknown / hand-authored frontmatter.** A user's own keys, comments, anchors, aliases, multi-line block scalars, and key order all pass through `fileIO.ts` and `inheritance.ts`'s `serializeRawNode`. Determine what survives an edit-and-save cycle and what does not.
-  - **2026-09-05: the LOAD side is sound; the EDIT side is not.** Genuinely unknown keys survive both an unedited save and an edit — the `extra`-bag design works, and the 2026-07 holes (non-root `title`/`tags`/`items`, container-node keys, body whitespace, CRLF) are all fixed. Two new holes, both on paths the earlier run did not separate:
-    - **A *known* key in an unrepresentable shape survives the load and is deleted by the first editor save** (finding #1). `occMeta`/`editedEntry` strip all seven registry keys out of `extra` unconditionally, not just the field being written, so renaming a title deletes `tags: shopping`, `done: yes` and `priority: 1`. 13 of 18 probed hand-authored shapes are affected.
-    - **A *structural* key in an unrepresentable shape is deleted on any save** (finding #4) — `RESERVED_KEYS` keeps it out of `extra` and `malformedKnownFields` only covers `INLINE_FIELDS`, so it lands nowhere. A scalar `defaults:` is additionally exploded into per-character keys.
-    Comments, anchors/aliases and key order are still lost, deliberately per `AGENTS.md`. Quoting is **not** purely cosmetic after all: `defaultStringType: 'PLAIN'` turns `x: "yes"` into `x: yes`, which YAML 1.1 readers (Obsidian, PyYAML) read as boolean `true` — see finding #6.
+- **Unknown / hand-authored frontmatter.** A user's own keys, comments, anchors, aliases, multi-line block scalars and key order all pass through `fileIO.ts` and `inheritance.ts`'s `serializeRawNode`. Determine what survives an edit-and-save cycle.
+  - **2026-09-05: the load side was sound, the edit side was not.** Genuinely unknown keys survive both an unedited save and an edit — the `extra`-bag design works. The holes were on the edit path: a *known* key in an unrepresentable shape survived the load and was deleted by the first save (13 of 18 probed hand-authored shapes), and quoting turned out not to be cosmetic — `defaultStringType: 'PLAIN'` rewrites `x: "yes"` as `x: yes`, which YAML 1.1 readers (Obsidian, PyYAML) read as boolean `true`. Fixed (#975, #979). Comments, anchors/aliases and key order are still lost, deliberately per `AGENTS.md`.
 
-- **`src/model/AGENTS.md`'s layering table is stale** — it points persistence at `src/meridian.ts` and React state at `src/App.tsx`, neither of which exists (persistence now lives in `src/storage/cache.ts`, state in `src/store.ts`). Treat that as a warning that the documented invariants in that file may also have drifted from the code, and check rather than cite them.
-  - **2026-09-05: mostly fixed; one stale claim left, and it is the load-bearing one.** The layering table now points at `src/storage/cache/` and `src/store.ts` correctly, and `storeItems.ts`'s documented exports match the code. But `AGENTS.md:25` still says `nodeSchema.ts` holds a **Zod schema and TypeScript type for `RawNode`** — it is 11 lines of `type RawNode` and `grep zod package.json worker/package.json` returns nothing, so **there is still no validation layer anywhere in the parse pipeline**. That is not merely a doc bug: it is precisely why findings #1, #4 and #6 exist, since nothing between `yamlParse` and the store ever asks whether a value has the shape the model assumes. Everything else in the file held up under adversarial probing, including the "Unknown-key preservation" invariants and the exactly-once emission table.
+- **There is no validation layer anywhere in the parse pipeline.** `src/model/AGENTS.md` claims `nodeSchema.ts` holds a Zod schema and type for `RawNode`; it is 11 lines of `type RawNode`, and `zod` is in neither `package.json`. **Still true as of 2026-09-13** — and it is the root cause the fidelity findings above kept sharing, since nothing between `yamlParse` and the store ever asks whether a value has the shape the model assumes. Every coercion is ad hoc and per-field.
 
-### Two suspects the survey adds
-
-- **`src/storage/cache.ts` is at 3.73% statement / 0% branch coverage.** Every real Dexie transaction (`recordLocalEdit`, `markPushed`, `applyRemoteBatch`, `recordLocalDelete`, `confirmDeleted`) is exercised only through **hand-written re-implementations** in `sync.test.ts`'s `vi.mock('@/storage/cache')`. Mock and real code agree today only because someone kept them in sync by hand. This is the least-defended integrity-critical file in the repo.
-  - **2026-09-05: REFUTED — fixed since.** The file is now `src/storage/cache/`, and `src/storage/__tests__/cache.test.ts` (718 lines) runs the *real* Dexie code against `fake-indexeddb`, pinning both the persisted `dirty` 0/1/2 representation and the read-then-conditional-write preconditions. `vitest.config.ts` floors `cache/files.ts` at 95/92/95/95. `sync.test.ts` still uses a hand-written fake, which is the right call there, and it is now backed by real tests rather than being the only coverage. One divergence is visible by inspection and worth closing: the fake's `applyRemoteBatch` drops `lastModified`, which the real one carries through via `...r`, so no sync test can catch a regression in the retention sweep's age signal.
-- **Two tabs of one vault have no coherence mechanism at all.** No `BroadcastChannel`, `storage` event or Dexie `liveQuery` anywhere in `src/`. Tab B's in-memory store never learns of Tab A's edits, so B's next `writeEntityToCache` collapses from a stale store and overwrites A. **Unverified** — settling it needs a two-store harness the current test-utils don't support.
-  - **2026-09-05: CONFIRMED, and worse than the hypothesis.** Reproduced against the *real* Dexie cache (`fake-indexeddb`) plus a CAS backend — no two-store harness was needed, because the loss is entirely in the cache's version bookkeeping (finding #2). The hypothesis assumed the overwrite would at least be *caught* by CAS; it is not. `recordLocalEdit` inherits `existing.version` — which Tab A's push just refreshed in the **shared** cache — so Tab B's precondition matches the backend, the write succeeds, and `resolveCollision` is never entered: no conflict copy, no three-way merge (even though `baseContent` correctly holds A's content), no toast, no journal `push-conflict`. No later reconcile can repair Tab B either, since the cache row now agrees with the backend. `grep -rn "BroadcastChannel\|liveQuery\|addEventListener('storage'" src/` is still **zero hits**.
+- **Two tabs of one vault.** Tab B's in-memory store learning nothing of Tab A's edits, so B's next write collapses from a stale store and overwrites A.
+  - **2026-09-05: CONFIRMED and worse than hypothesized** — the loss was in the cache's version bookkeeping, not the stores, so CAS never even caught it: `recordLocalEdit` inherited a version Tab A's push had just refreshed in the *shared* cache, so B's precondition matched the backend and `resolveCollision` was never entered. No conflict copy, no merge, no toast. Fixed (#977); `src/storage/cache/broadcast.ts` and `src/storage/crossTabSync.ts` now exist, where a 2026-09-05 grep for `BroadcastChannel|liveQuery|storage` event returned zero hits. **Re-probe the new mechanism rather than the old gap** — and note #1031's flake in its tests, which is a sign this area is timing-sensitive.
 
 ## Budget
 
 - **Read closely, end to end:**
-  - The parse/serialize pipeline: `src/fileIO.ts`, `src/model/nodeSchema.ts`, `src/model/inheritance.ts`, `src/model/storeItems.ts`, `src/model/collapse.ts`.
-  - The edit and commit path: `src/model/storeOps.ts` (`applyEdit` and all four scopes), `src/storeCommit.ts`, `src/persistencePort.ts`, `src/occurrenceActions.ts` (including the delete-undo toast).
-  - The sync and cache path: `src/storage/sync.ts` (`planReconcile`, `reconcileWithBackend`, `applyRemoteBatch`, `runSync`), `src/storage/syncScheduler.ts` (`syncToBackend`, `autoSyncTick`, `flushPendingPush`), `src/storage/syncState.ts`, `src/storage/entityWrites.ts` and `src/storage/inFlight.ts` (the in-flight path tracking), `src/storage/cache/` — `files.ts` (`recordLocalEdit`, `recordLocalDelete`, `cacheGetDirty`, `markPushed`, `markMerged`, `confirmDeleted`, tombstones), `db.ts`, `pendingMoves.ts` — `src/storage/conflictError.ts`, `src/storage/conflictName.ts`.
-  - The teardown path, which is where "the UI said saved" is decided:
-    `src/editor/useAutoSave.ts`'s debounce and every call site of its flush,
-    against the `visibilitychange`/`pagehide` handlers in
-    `src/routes/__root.tsx`. A commit that only fires on React unmount is not
-    durable — unmount effects do not run when a tab is closed.
-  - The backend contract in `src/storage/backend.ts` — in particular whether every implementation actually honours the documented CAS semantics of `write(path, content, expectedVersion)` and the `ConflictError` it promises.
-  - The temporal engine: `src/model/expansion.ts` (`expandNode`, `mergeNode`, `expandRange`, multiday), `src/model/repeat.ts`, `src/model/dateUtils.ts`, `src/model/duration.ts`, and `src/model/expansionCache.ts` (a cache over derived temporal data is a coherence risk in its own right — check its invalidation keys).
-- **The cache layer can be exercised for real — do it rather than reasoning
-  about it.** `src/storage/__tests__/cache.test.ts` shows the recipe: import
-  `fake-indexeddb/auto`, `vi.resetModules()` per test, and drive the genuine
-  Dexie code. Pairing that with a twenty-line in-memory CAS backend is enough to
-  reproduce whole classes this Budget otherwise calls un-exercisable — the
-  2026-07-31 run parked the two-tab suspect as "unverified, needs a two-store
-  harness", and the 2026-09-05 run settled it with no second store at all,
-  because the defect was in the cache's version bookkeeping rather than in the
-  stores.
-- **Run the temporal probes under other timezones.** Category 6 is unreachable
-  from a single `TZ`. `TZ=<zone> pnpm exec vitest run <file>` is the whole
-  recipe; a differential sweep — same rules, several zones, diff the emitted
-  occurrence sets — finds in one pass what no single-zone assertion will. Zones
-  worth including, and why: **America/New_York** and **Europe/Berlin** (ordinary
-  one-hour spring-forward, the two halves of the user base), **Antarctica/Troll**
-  (a *two*-hour jump, which catches an off-by-one-hour fix that a one-hour zone
-  hides), **Australia/Lord_Howe** (a 30-minute DST shift), **Pacific/Chatham**
-  (a :45 offset), and **America/Santiago** (a transition at midnight, so the
-  skipped wall-clock hour is `00:00`, not `02:00`). Sweep every half-hour of the
-  day rather than a handful of times: the 2026-09-05 temporal finding fires only
-  for anchors inside the skipped hour, which is 2 of 48 times in most zones.
-- **Compare the three backends against the same contract.** `localBackend.ts`, `githubBackend.ts` (+ `githubApi.ts`), and `exampleBackend.ts` each implement `StorageBackend`. Differences in version-token semantics, CAS enforcement, and delete behaviour are prime lost-update territory. Only the example backend is exercisable here, so record the other two as probed statically or through their unit tests — see [what this environment can and cannot do](./README.md#what-this-environment-can-and-cannot-do).
-- **Exercise realistic scale where it matters** ([generator recipe](./README.md#what-this-environment-can-and-cannot-do)) — for anything where volume changes behaviour: batch writes, partial failure, reconcile over many files.
-- **Run the quality gates once** — `pnpm run build`, `pnpm run lint`, `pnpm test` — and report each gate's status in the coverage statement. Generate the gitignored types first, per the same section.
-- **Check coverage where it is cheap:** `pnpm run test:coverage` is already configured. Use it to find integrity-critical branches with no coverage at all — but treat the number as a pointer to look, never as a finding by itself.
-- Skim the rest of the tree so nothing is invisible. UI presentation, styling, and render performance are **out of scope** — they have their own surveys ([health-ui.md](health-ui.md), [performance.md](performance.md)) — except where a UI affordance causes an integrity failure (e.g. a save path that reports success before the write is durable, or a destructive gesture with no undo).
+  - Parse/serialize: `src/fileIO.ts`, `src/model/nodeSchema.ts`, `inheritance.ts`, `storeItems.ts`, `collapse.ts`.
+  - Edit and commit: `src/model/storeOps.ts` (`applyEdit`, all four scopes), `src/storeCommit.ts`, `src/persistencePort.ts`, `src/occurrenceActions.ts` (including the delete-undo toast).
+  - Sync and cache: `src/storage/sync.ts` (`planReconcile`, `reconcileWithBackend`, `applyRemoteBatch`, `runSync`), `syncScheduler.ts` (`syncToBackend`, `autoSyncTick`, `flushPendingPush`), `syncState.ts`, `entityWrites.ts`, `inFlight.ts`, `crossTabSync.ts`, `cache/` (`files.ts`, `db.ts`, `pendingMoves.ts`, `broadcast.ts`), `conflictError.ts`, `conflictName.ts`.
+  - The teardown path, where "the UI said saved" is decided: `src/editor/useAutoSave.ts`'s debounce and every call site of its flush, against the `visibilitychange`/`pagehide` handlers in `src/routes/__root.tsx`. A commit that only fires on React unmount is not durable — unmount effects don't run when a tab closes.
+  - The backend contract in `src/storage/backend.ts` — whether every implementation honours the documented CAS semantics of `write(path, content, expectedVersion)` and the `ConflictError` it promises.
+  - The temporal engine: `expansion.ts` (`expandNode`, `mergeNode`, `expandRange`, multiday), `repeat.ts`, `dateUtils.ts`, `duration.ts`, and `expansionCache.ts` (a cache over derived temporal data is a coherence risk in its own right — check its invalidation keys).
+- **The cache layer can be exercised for real — do that rather than reasoning about it.** `src/storage/__tests__/cache.test.ts` has the recipe: import `fake-indexeddb/auto`, `vi.resetModules()` per test, drive the genuine Dexie code. Pairing that with a twenty-line in-memory CAS backend reproduces whole classes this Budget would otherwise call un-exercisable — the 2026-07-31 run parked the two-tab suspect as needing a two-store harness, and the 2026-09-05 run settled it with no second store at all.
+- **Run the temporal probes under other timezones.** Category 6 is unreachable from a single `TZ`; `TZ=<zone> pnpm exec vitest run <file>` is the whole recipe, and a differential sweep — same rules, several zones, diff the emitted occurrence sets — finds in one pass what no single-zone assertion will. Zones worth including, and why: **America/New_York** and **Europe/Berlin** (ordinary one-hour spring-forward, the two halves of the user base), **Antarctica/Troll** (a *two*-hour jump, which catches an off-by-one-hour fix that a one-hour zone hides), **Australia/Lord_Howe** (30-minute DST shift), **Pacific/Chatham** (a :45 offset), **America/Santiago** (a midnight transition, so the skipped wall-clock hour is `00:00`). Sweep every half-hour of the day rather than a few times: the 2026-09-05 temporal finding fires only for anchors inside the skipped hour, 2 of 48 times in most zones.
+- **Compare the three backends against the same contract.** `localBackend.ts`, `githubBackend.ts` (+ `githubApi.ts`) and `exampleBackend.ts` each implement `StorageBackend`; differences in version-token semantics, CAS enforcement and delete behaviour are prime lost-update territory. Only the example backend is exercisable here — record the other two as probed statically or through their unit tests.
+- **Exercise realistic scale where volume changes behaviour** ([generator recipe](./README.md#what-this-environment-can-and-cannot-do)): batch writes, partial failure, reconcile over many files.
+- **Run the quality gates once** — `pnpm run build`, `pnpm run lint`, `pnpm test` — and report each in the coverage statement. `pnpm run test:coverage` is configured; use it to find integrity-critical branches with no coverage at all, but treat the number as a pointer to look, never a finding by itself.
+- Skim the rest so nothing is invisible. UI presentation, styling and render performance are **out of scope** ([health-ui.md](health-ui.md), [performance.md](performance.md)) except where a UI affordance causes an integrity failure — a save path that reports success before the write is durable, a destructive gesture with no undo.
 
 ## Output structure
 
-**Reporting:** this survey's results live in-place in the "Known suspects"
-section above (verdicts appended per suspect), plus the full report per the
-[shared reporting conventions](./README.md#reporting) — see that section for
-the existing pattern. Also append suggested improvements to this survey file
-itself, per the same conventions.
+**Reporting:** per the [shared reporting conventions](./README.md#reporting), plus the in-place suspect verdicts above, plus suggested improvements to this survey file itself.
 
-**Finding numbers used to restart every run, and the wreckage is still in the
-tree.** Findings are issues now, so a number is permanent and this trap is
-closed going forward. It is not closed backwards: the suspect verdicts above,
-and a dozen `data-integrity survey, finding #N` comments in `src/`, still point
-at per-run numbers whose report no longer exists. So: date every verdict you
-re-issue above, and do **not** renumber the old code comments — per
-`plans/CLAUDE.md`, an old number is correct for the run it names.
+1. **Integrity verdict** (~5 sentences) — can this app lose the user's writing, and if so how? Name the worst one or two invariants with the headline repro, and the single biggest structural theme (e.g. "the cache is treated as authoritative in three places where the backend version token is the only real source of truth").
+2. **Coverage statement** — which invariants you probed with real reproductions, which you only reasoned about, which you skipped and why; which backends you exercised versus traced; the vault(s) used; each quality gate's status; roughly what fraction of the integrity-critical surface this rests on; anything unverified, and what would settle it.
+3. **Category verdicts** — one line per category (1–7), per the [shared convention](./README.md#category-verdicts); here "the plan" means the threat plan and "scanning" means probing.
+4. **Findings — top 8.**
 
-### 1. Integrity verdict (~5 sentences)
+Findings carry the [shared fields](./README.md#finding-fields) — `Breadth` here is very often a *condition* rather than a file set ("every entry, whenever two tabs are open"; "every series whose time falls in the DST gap"), which the shared rule allows, and `Fix` must say **how the repro should behave afterwards**. This survey adds:
 
-Plain-language summary: can this app lose the user's writing, and if so, how? Name the **worst one or two invariants** (with the headline repro) and the **single biggest structural theme** (e.g. "the cache is treated as authoritative in three places where the backend version token is the only real source of truth"). This is the headline; the findings are the evidence.
-
-### 2. Coverage statement
-
-- Which invariants you probed with real reproductions, which you only reasoned about statically, and which you skipped — with the reason.
-- Which backends you exercised versus traced only, and the vault(s) used (size, how generated).
-- The pass/fail status of each quality gate from the single run required in the Budget section.
-- Roughly what fraction of the integrity-critical surface this report is based on.
-- Anything you suspect but could not reproduce — flag it as "unverified." Say what would be needed to settle it.
-
-### 3. Category verdicts
-
-One line per category (1–7). Verdicts follow the
-[shared convention](./README.md#category-verdicts): **clean** /
-**findings: #N, #M** / **partially assessed** (here, "the plan" means the
-threat plan, and "scanning" means probing).
-
-### 4. Findings — top 8
-
-`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
-the [shared finding fields](./README.md#finding-fields) — note that `Breadth`
-here is very often a *condition* rather than a file set ("every entry, whenever
-two tabs are open"; "every series whose time falls in the DST gap"), which the
-shared rule allows, and `Fix` must say **how the repro should behave
-afterwards**. This survey adds:
-
-- **Invariant violated** — which of the numbered invariants above, and under what conditions (every save / only on hand-authored files / only with two devices / only offline)
+- **Invariant violated** — which numbered invariant, and under what conditions (every save / only hand-authored files / only with two devices / only offline)
 - **Category** — one or more of: `round-trip` `edit-locality` `lost-update` `cache-coherence` `durability` `recoverability` `temporal` `validation` `atomicity` `testing-gap`
 - **Failure mode** — **silent** or **loud**, stated explicitly; if silent, say how a user would ever notice
-- **Impact** — 1–10, where 10 = silent, unrecoverable loss or corruption of user-authored content on a common path; 5 = recoverable or visible corruption, or silent loss on a rare path; 1 = cosmetic normalization the user would not miss
-- **Repro** — the starting file content (verbatim), the operation sequence, the observed result, and the expected result. Include the failing test verbatim where you wrote one
+- **Impact** — 1–10 (10 = silent, unrecoverable loss of user-authored content on a common path; 5 = recoverable or visible corruption, or silent loss on a rare path; 1 = cosmetic normalization the user wouldn't miss)
+- **Repro** — starting file content verbatim, operation sequence, observed result, expected result, and the failing test where you wrote one
 
-**Fails silently here** is especially nasty, because the obvious "fix" often
-just moves the corruption: a round-trip assertion loosened until it passes, a
-conflict resolved by always preferring local, a cache invalidation that works on
-one device and rots on the second, a repeat-rule fix correct in the author's
-timezone only. Reserve plan mode + multi-PR for a structural change **or** a
-product decision (e.g. "preserve comments" vs "declare the file format
-normalized on save"). Example hazard note: "Sonnet 5 if the CAS precondition to
-preserve is spelled out in the task; else Opus 5."
-
-Rank and report findings per the [shared convention](./README.md#ranking-findings) — here the summary table adds `invariant` and `failure mode` columns (finding → invariant → failure mode → recommended model). "Confirming" a fix means re-running a repro or the test suite.
-
-Per [Don't pad the findings list](./README.md#dont-pad-the-findings-list) and
-[prefer systemic findings](./README.md#finding-fields): "every save path drops
-unknown frontmatter keys" beats "this one date helper is off by one", and a
-short report backed by real reproductions beats a long one built on suspicion.
+**Fails silently here** is especially nasty, because the obvious "fix" often just moves the corruption: a round-trip assertion loosened until it passes, a conflict resolved by always preferring local, a cache invalidation that works on one device and rots on the second, a repeat-rule fix correct in the author's timezone only. Reserve plan mode + multi-PR for a structural change **or** a product decision ("preserve comments" vs "declare the file format normalized on save"). Hazard note example: "Sonnet 5 if the CAS precondition to preserve is spelled out in the task; else Opus 5." The summary table adds `invariant` and `failure mode` columns; "confirming" a fix means re-running a repro or the test suite.
 
 ---
 
 ## Categories to probe — ranked by priority
 
-Ranking and bullets: see [Running a survey](./README.md#running-a-survey).
+Bullets are illustrations, not your search space — see [Running a survey](./README.md#running-a-survey).
 
 ### 1. Round-trip fidelity & edit locality _(highest weight)_
 
 **Scope:** what a parse → edit → serialize cycle does to bytes the user wrote.
 
-- Frontmatter keys Meridian doesn't know about, dropped or reordered on save
-- Comments, anchors/aliases, block scalars, explicit quoting, or intentional formatting destroyed by re-serialization
-- The Markdown body below the frontmatter altered, re-wrapped, or losing trailing whitespace/newline conventions
-- Unicode, emoji, RTL text, or CRLF line endings normalized destructively
-- An edit to one occurrence rewriting sibling occurrences, hoisting fields that were deliberately per-instance, or collapsing a structure the user hand-authored
+- Frontmatter keys Meridian doesn't know about, dropped or reordered on save; comments, anchors/aliases, block scalars or explicit quoting destroyed by re-serialization
+- The Markdown body altered, re-wrapped, or losing trailing-whitespace/newline conventions; Unicode, emoji, RTL or CRLF normalized destructively
+- An edit to one occurrence rewriting siblings, hoisting fields that were deliberately per-instance, or collapsing a structure the user hand-authored
 - `hoistSharedMetadata` promoting a field to `defaults:` such that a later per-instance edit changes the wrong set of occurrences
 
 ### 2. Lost updates & conflict handling
 
 **Scope:** two writers, one file — across devices, tabs, or a hand edit outside the app.
 
-- CAS preconditions omitted, weakened, or passed a stale `expectedVersion`, so a write clobbers unseen remote content
+- CAS preconditions omitted, weakened, or passed a stale `expectedVersion`
 - `ConflictError` caught and swallowed, retried blindly, or resolved by a silent "local wins"
-- Backends that differ in whether they actually enforce `expectedVersion` — a contract honoured by one implementation and ignored by another
+- Backends that differ in whether they actually enforce `expectedVersion`
 - Conflict artifacts (`conflictName.ts`) that collide, overwrite each other, or are themselves picked up as vault files and re-synced
-- Delete-versus-edit races, and tombstones resurrecting or suppressing a legitimately recreated file
+- Delete-versus-edit races; tombstones resurrecting or suppressing a legitimately recreated file
 - Two tabs of the same vault, or a sync tick overlapping an in-flight write
 
 ### 3. Cache coherence & durability
 
-**Scope:** disagreement between IndexedDB, the in-memory store, and the backend.
+**Scope:** disagreement between IndexedDB, the in-memory store and the backend.
 
-- A stale cached version winning over fresher remote content after reload, or dirty-flag bookkeeping (`recordLocalEdit` → `markPushed`) that can drop an edit if interrupted between the two
-- Writes acknowledged in the UI before they are durable anywhere — the "saved" indicator as a lie
-- Content that exists only in memory across a reload, tab crash, or backgrounded PWA
-- Offline edits queued but lost on eviction, quota exhaustion, or a failed replay; IndexedDB quota/`QuotaExceededError` unhandled
-- `expansionCache.ts` invalidation keyed on something that can miss a real change, serving derived data that no longer matches the store
-- Vault registry / active-vault state disagreeing with what is actually cached, so a sync targets the wrong vault
+- A stale cached version winning over fresher remote content after reload, or `recordLocalEdit` → `markPushed` bookkeeping that can drop an edit if interrupted between the two
+- Writes acknowledged in the UI before they are durable anywhere — the "saved" indicator as a lie; content that exists only in memory across a reload, tab crash or backgrounded PWA
+- Offline edits queued but lost on eviction, quota exhaustion or a failed replay; `QuotaExceededError` unhandled
+- `expansionCache.ts` invalidation keyed on something that can miss a real change
+- Vault registry / active-vault state disagreeing with what is cached, so a sync targets the wrong vault
 
 ### 4. Atomicity & partial failure
 
 **Scope:** what the vault looks like when an operation stops halfway.
 
-- Multi-file operations (series split via `applyEdit` scope `future`, rename/retitle, batch sync) that are not atomic and leave a half-applied vault
+- Multi-file operations (a `future`-scope series split, rename/retitle, batch sync) that leave a half-applied vault
 - Failures mid-`applyRemoteBatch` leaving some files updated and others not, with no record of where it stopped
-- Error paths that abandon in-flight bookkeeping (`markInFlight` without a guaranteed `clearInFlight`), stranding files as permanently "in flight"
-- Retry/backoff logic that re-sends a write whose first attempt actually succeeded
+- Error paths that abandon in-flight bookkeeping (`markInFlight` with no guaranteed `clearInFlight`), stranding files as permanently "in flight"
+- Retry/backoff that re-sends a write whose first attempt actually succeeded
 
 ### 5. Destruction & recoverability
 
 **Scope:** whether anything user-authored can vanish with no way back.
 
-- Deletes, swipe-deletes, series truncation (`deleteFollowing`), and exclusion paths without undo, confirmation, or a recoverable artifact
-- Undo windows that can be outlived by a sync, so the undo restores nothing or restores a stale copy
-- Destructive resolution of a conflict without preserving the losing side
+- Deletes, swipe-deletes, series truncation (`deleteFollowing`) and exclusion paths without undo, confirmation or a recoverable artifact
+- Undo windows that a sync can outlive, so the undo restores nothing or restores a stale copy
+- Destructive conflict resolution that doesn't preserve the losing side
 - Bulk operations whose blast radius is larger than the UI implies
 
 ### 6. Temporal correctness
 
-**Scope:** the meaning of a date surviving the environment it's read in.
+**Scope:** the meaning of a date surviving the environment it's read in. Unreachable from one `TZ` — see the sweep recipe in Budget.
 
-- Timezone/DST handling in `expansion.ts` and `repeat.ts` — occurrences shifting by a day near a DST boundary, or for a user east/west of the author
-- Date parsing/serialization asymmetries (`fmtISO`, `parseDateString`) that round-trip a date to a different day
+- DST/timezone handling in `expansion.ts` and `repeat.ts` — occurrences shifting a day near a boundary, or for a user east/west of the author
+- Date parse/serialize asymmetries (`fmtISO`, `parseDateString`) that round-trip a date to a different day
 - Duration and multiday arithmetic across month/year ends and leap days
-- Repeat rules whose expansion depends on the window queried — the same rule yielding different occurrences depending on the range asked for
-- `stableOccId` collisions or instability, causing an override to attach to the wrong occurrence
+- Repeat rules whose expansion depends on the window queried — the same rule yielding different occurrences for different ranges
+- `stableOccId` collisions or instability, attaching an override to the wrong occurrence
 
 ### 7. Input validation & untrusted files
 
-**Scope:** what happens when a vault file isn't what the app expects.
+**Scope:** what happens when a vault file isn't what the app expects. Note the standing suspect above: there is **no** validation layer, so every coercion is ad hoc.
 
-- Values that reach the model in a shape it does not expect. There is **no**
-  validation layer — `nodeSchema.ts` is a bare `type RawNode` and Zod is not a
-  dependency, whatever `src/model/AGENTS.md` still says — so every coercion is
-  ad hoc and per-field. Check both halves: an *inline* field (where
-  `malformedKnownFields` routes the raw value into `extra`) and a *structural*
-  key (`date`, `time`, `repeat`, `excluded`, `instances`, `defaults`), which
-  `RESERVED_KEYS` keeps out of `extra` and nothing else catches
-- Malformed YAML, wrong types, deeply nested or cyclic structures, enormous files — and whether a single bad file can prevent the rest of the vault from loading
-- Path handling in `pathToSlug` / `slugToPath` / `titleToSlug`: collisions between distinct titles, traversal-ish paths, case-insensitive filesystems, or characters a backend rejects — any of which can make two entries fight over one file
-- Files added out of band (hand-created, synced by a desktop client) that the app then normalizes destructively on first save
+- Check both halves of the gap: an *inline* field, where `malformedKnownFields` routes the raw value into `extra`, and a *structural* key (`date`, `time`, `repeat`, `excluded`, `instances`, `defaults`), which `RESERVED_KEYS` keeps out of `extra` and nothing else catches
+- Malformed YAML, wrong types, deeply nested or cyclic structures, enormous files — and whether one bad file can stop the rest of the vault loading
+- Path handling in `pathToSlug` / `slugToPath` / `titleToSlug`: collisions between distinct titles, traversal-ish paths, case-insensitive filesystems, characters a backend rejects — any of which can make two entries fight over one file
+- Files added out of band (hand-created, synced by a desktop client) that the app normalizes destructively on first save
 
 ---
 
-**Scoring guidance:** Silent beats loud, common beats rare, unrecoverable beats recoverable — in that order. A defect that corrupts one file per thousand saves with no error message outranks one that throws a visible exception on every malformed file. A structural fix that upholds an invariant across all three backends or all four edit scopes scores like the class of failures it prevents, not like one callsite. Skip findings that are merely untidy: if you cannot describe the byte the user loses, it belongs in the general health survey.
+**Scoring guidance:** Silent beats loud, common beats rare, unrecoverable beats recoverable — in that order. A defect that corrupts one file per thousand saves with no error message outranks one that throws visibly on every malformed file. A structural fix that upholds an invariant across all three backends or all four edit scopes scores like the class of failures it prevents, not one callsite. Skip findings that are merely untidy: if you cannot describe the byte the user loses, it belongs in the general health survey.

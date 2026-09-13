@@ -1,309 +1,114 @@
 # Survey conventions
 
-Shared process, scoring, and reporting rules used by every survey in this
-directory (`health.md`, `performance.md`, `health-ui.md`,
-`data-integrity.md`, `product-niche.md`). Each survey states only what's
-specific to it — its categories, its findings cap, its target
-invariants/flows/niches — and points back here for the rest.
-Finished reports live in `plans/reports/` beside this directory rather than in
-it, so everything here is a runnable survey and none of it needs an exception.
-A survey *run* produces no file at all — it is a parent issue with its findings
-as sub-issues; see **Reporting** below.
+Shared process, scoring, and reporting rules used by every survey here
+(`health.md`, `performance.md`, `health-ui.md`, `data-integrity.md`,
+`product-niche.md`). Each survey states only what's specific to it — its
+categories, its findings cap, its target invariants/flows/niches — and points
+back here for the rest.
+
+Standing reports live in `plans/reports/` beside this directory rather than in
+it, so everything here is a runnable survey. A survey *run* produces no file at
+all: it is a parent issue with its findings as sub-issues, per **Reporting**
+below.
 
 Read this once before running (or editing) any survey.
 
 ## Running a survey
 
-These four rules held identically in every survey and are stated once here.
-
-- **Survey first, write second.** State your plan before you start — scan
-  plan, trace plan, threat plan, or Phase 0, whichever the survey calls for —
-  complete it, and only then write the report. For each category say what
-  you'll look for *beyond* the listed examples: the bullets are illustrations,
-  not your search space. Do not draft the verdict early and select findings to
-  confirm it.
-- **Evaluate the code on its merits.** Treat claims in `CLAUDE.md`, `AGENTS.md`
-  files, READMEs and code comments — "this exception is deliberate", "this is
-  debounced", "a refactor is planned", "round-trips back to the same store
-  state" — as hypotheses to verify, not settled exceptions. A documented
-  rationale that no longer holds is itself a finding, and so is an invariant
-  asserted in a doc but neither enforced nor tested.
-- **Verify capability claims by inspection, not memory.** Check the *installed*
-  version of a plugin or library — its actual rule set, exports, component
-  inventory or API — against what the config enables; never infer it from a
-  version number, and never let "latest" come from training data instead of a
-  registry query. Where cheap, verify by dry-run: run the tool with the
-  candidate config and report the real count and distribution. Clean up temp
-  files and instrumentation afterwards; leave the working tree clean.
-- **The category ranking is a tiebreaker, not a filter.** A serious finding in
-  any category outranks a minor finding in a higher-priority one. Never omit a
-  high-impact issue because its category ranks lower.
-- **Un-shallow the clone before you read any git history.** A session's checkout
-  is a **shallow clone**, so `git log` silently answers from a truncated graph:
-  on 2026-09-13 it reported 148 commits spanning one week and three separate root
-  commits, against a real history of 3,225 commits back to 2026-05-22 with one
-  root. Nothing warns you — the truncation boundary looks exactly like the start
-  of the project. Three of these surveys ask you to sample history (co-change,
-  churn weighting, activity concentration) and all three get silently wrong
-  answers from it, since every commit outside the window collapses into the
-  boundary. Check and fix it first, in one line each:
+- **Survey first, write second.** State your plan before you start — scan plan, trace plan, threat plan, or Phase 0, whichever the survey calls for — complete it, and only then write the report. For each category say what you'll look for *beyond* the listed examples: the bullets are illustrations, not your search space. Do not draft the verdict early and select findings to confirm it.
+- **Evaluate the code on its merits.** Treat claims in `CLAUDE.md`, `AGENTS.md`, READMEs and code comments — "this exception is deliberate", "this is debounced", "a refactor is planned", "round-trips back to the same store state" — as hypotheses to verify, not settled exceptions. A documented rationale that no longer holds is itself a finding, and so is an invariant asserted in a doc but neither enforced nor tested.
+- **Verify capability claims by inspection, not memory.** Check the *installed* version of a plugin or library — its actual rule set, exports, component inventory or API — against what the config enables. Never infer it from a version number, and never let "latest" come from training data instead of a registry query. Where cheap, verify by dry-run: run the tool with the candidate config and report the real count and distribution. Clean up temp files and instrumentation afterwards.
+- **The category ranking is a tiebreaker, not a filter.** A serious finding in any category outranks a minor finding in a higher-priority one. Never omit a high-impact issue because its category ranks lower.
+- **Un-shallow the clone before you read any git history.** A session's checkout is a **shallow clone**, so `git log` silently answers from a truncated graph: on 2026-09-13 it reported 148 commits spanning one week and three separate root commits, against a real history of 3,225 commits back to 2026-05-22 with one root. Nothing warns you — the truncation boundary looks exactly like the start of the project. Three surveys ask you to sample history (co-change, churn weighting, activity concentration) and all three get silently wrong answers from it.
 
   ```bash
-  git rev-parse --is-shallow-repository   # true  → the history you can see is a lie
+  git rev-parse --is-shallow-repository   # true → the history you can see is a lie
   git fetch --unshallow                   # then re-run anything that read git log
   ```
 
-  Record the history's true span next to any tally you report. And treat the
-  repo's own claims about its history the same way — `plans/CLAUDE.md` asserted
-  for weeks that the history "was squashed", which is false and is what sent the
-  2026-09-13 review down this path in the first place; `git blame` works fine.
-  That claim was in a `CLAUDE.md`, which the rule two bullets up already tells
-  you to verify rather than inherit.
-- **Read the merged-PR history for defect classes, not just for churn.** Commits
-  tell you what changed; PR titles tell you what was *wrong*, which is the
-  question a survey is actually asking. Sample the last ~200 and tally what was
-  being fixed, not just which directories were touched. Every gap the 2026-09-13
-  review of these survey files found was visible there first: a nine-PR cluster
-  of view-state desync that no category names, five test flakes that no survey
-  mentions, and a measurement harness `performance.md` had never heard of. A
-  class the repo keeps paying for that no category names is a finding *about the
-  survey* — fix it with a diff on the survey file, per the last section here.
+  Record the history's true span next to any tally. And treat the repo's own claims about its history the same way — `plans/CLAUDE.md` asserted for weeks that the history "was squashed", which is false and is what sent the 2026-09-13 review down this path; `git blame` works fine. That claim was in a `CLAUDE.md`, which the second rule above already tells you to verify rather than inherit.
+- **Read the merged-PR history for defect classes, not just for churn.** Commits tell you what changed; PR titles tell you what was *wrong*, which is the question a survey is asking. Sample the last ~200 and tally what was being fixed. Every gap the 2026-09-13 review of these files found was visible there first: a nine-PR cluster of view-state desync that no category named, five test flakes that no survey mentioned, and a measurement harness `performance.md` had never heard of. A class the repo keeps paying for that no category names is a finding *about the survey* — fix it with a diff on the survey file, per the last section here.
 
 ### What this environment can and cannot do
 
-Three constraints bit more than one run mid-pass. Record them in the coverage
-statement up front rather than discovering them:
+Three constraints bit more than one run mid-pass. Record them in the coverage statement up front rather than discovering them:
 
-- **Generate the gitignored types before trusting lint.** On a fresh worktree,
-  `pnpm install`, then `pnpm run build` (for `src/routeTree.gen.ts`) and
-  `pnpm --filter meridian-oauth-worker run cf-typegen` (for the worker types).
-  Without them the type-aware rules flood with ~150 spurious errors that are
-  **not** a finding. See `CLAUDE.md`'s linting section.
-- **Only the example (Tutorial) backend is reachable.** The automated browser
-  cannot grant File System Access permissions or complete the GitHub OAuth
-  flow, so the local-FS and GitHub backends can only be traced statically or
-  through their unit tests. Say so up front, not mid-pass.
-- **A large vault already exists — do not write a generator.** Deterministic,
-  at `src/storage/devFixtures/testVaultGen.ts`: run
-  `localStorage.setItem('meridian_bigvault', '300')` in the console, then
-  reload the Tutorial vault, and note the size you passed in the coverage
-  statement. It is dev-only (`import.meta.env.DEV`) and absent from production
-  builds, so it cannot be used against a prod build.
+- **Generate the gitignored types before trusting lint.** On a fresh worktree: `pnpm install`, then `pnpm run build` (for `src/routeTree.gen.ts`) and `pnpm --filter meridian-oauth-worker run cf-typegen` (for the worker types). Without them the type-aware rules flood with ~150 spurious errors that are **not** a finding. See `CLAUDE.md`'s linting section.
+- **Only the example (Tutorial) backend is reachable.** The automated browser cannot grant File System Access permissions or complete the GitHub OAuth flow, so the local-FS and GitHub backends can only be traced statically or through their unit tests. Say so up front, not mid-pass.
+- **A large vault already exists — do not write a generator.** Deterministic, at `src/storage/devFixtures/testVaultGen.ts`: run `localStorage.setItem('meridian_bigvault', '300')` in the console, then reload the Tutorial vault, and note the size you passed in the coverage statement. It is dev-only (`import.meta.env.DEV`) and absent from production builds, so it cannot be used against a prod build.
 
-`CLAUDE.md`'s "don't proactively drive the dev server" rule does not apply to
-a survey run — the surveys that require a measurement or screenshot pass say
-so explicitly, and that pass is the ask.
+`CLAUDE.md`'s "don't proactively drive the dev server" rule does not apply to a survey run — the surveys that require a measurement or screenshot pass say so explicitly, and that pass is the ask.
 
 ## Recommended model tiers
 
-Every finding is tagged with a **Recommended model** — the cheapest tier
-capable of doing the fix well: **Haiku 4.5** / **Sonnet 5** / **Opus 5** /
-**Opus 5 in plan mode, for a plan spanning multiple PRs** (or the current
-equivalent tier, if these names have moved on).
+Every finding is tagged with a **Recommended model** — the cheapest tier capable of doing the fix well: **Haiku 4.5** / **Sonnet 5** / **Opus 5** / **Opus 5 in plan mode, for a plan spanning multiple PRs** (or the current equivalent, if these names have moved on).
 
-Judge by how much of the fix is load-bearing judgment versus mechanical edit,
-and by **how the fix fails**. A wrong-but-plausible change that breaks the
-build, a type-check, or a test is far safer to hand down-tier than one that
-fails silently — each survey below names what "fails silently" looks like in
-its own domain. Reserve plan mode + multi-PR for findings that need an
-architecture change **or** a product decision only the user should make.
+Judge by how much of the fix is load-bearing judgment versus mechanical edit, and by **how the fix fails**. A wrong-but-plausible change that breaks the build, a type-check or a test is far safer to hand down-tier than one that fails silently — each survey names what "fails silently" looks like in its own domain. Reserve plan mode + multi-PR for findings needing an architecture change **or** a product decision only the user should make.
 
-**Always state the specific hazard that sets the tier** — the trap that would
-void the fix, the invariant that fails quietly, the interacting call site
-that's easy to miss. A tier without a named hazard is not useful. If naming
-that hazard would let a lower tier do the job, say so explicitly (e.g.
-"Sonnet 5 if the cache key is specified in the task; else Opus 5") — that
-turns the field into a prompt-writing hint, not just a rating.
+**Always state the specific hazard that sets the tier** — the trap that would void the fix, the invariant that fails quietly, the interacting call site that's easy to miss. A tier without a named hazard is not useful. If naming that hazard would let a lower tier do the job, say so explicitly ("Sonnet 5 if the cache key is specified in the task; else Opus 5") — that turns the field into a prompt-writing hint rather than a rating.
 
 ## Write findings down to Sonnet 5 where you honestly can
 
-The tier is not a fixed property of a finding — it is a property of the
-finding *as written*. Most Opus-tier ratings are really "Opus, because the
-report withheld what the fixer would need". So for every finding, give it a
-**Task context** block carrying the specifics that let the named tier work
-without re-deriving them, and rate the tier against the finding *with* that
-block. Aim to land as much of the report as possible at **Sonnet 5 or below**.
+The tier is not a fixed property of a finding — it is a property of the finding *as written*. Most Opus-tier ratings are really "Opus, because the report withheld what the fixer would need". So give every finding a **Task context** block carrying the specifics that let the named tier work without re-deriving them, and rate the tier against the finding *with* that block. Aim to land as much of the report as possible at **Sonnet 5 or below**.
 
-What belongs in a Task context block — whatever the finding actually needs,
-but in practice:
+What belongs in a Task context block — whatever the finding actually needs, but in practice:
 
-- **Exact locations.** File plus line or line range for every site to change,
-  and the list of call sites to update. Verify the numbers before writing them
-  down; a confidently wrong line number is worse than none.
-- **The enumerated work.** If the fix is "add the missing N things", list all
-  N with the values they should take. If it is a move, say what moves and —
-  just as important — **what stays**.
-- **Measured numbers** the fixer would otherwise have to re-derive (coverage
-  percentages for a new threshold, a dry-run's error count and distribution,
-  a benchmark baseline). Say when they should be re-measured rather than
-  trusted.
-- **The trap, located.** Not "watch out for the animation" but "`Foo.tsx:57`
-  branches on this prop being `undefined`, so a no-op is not equivalent".
-  A hazard with a file and line is context; a hazard without one is a warning.
-- **The precedent.** If the repo has already solved this shape somewhere,
-  name the file and the commit — copying an in-repo pattern is far more
-  reliable than inventing one.
-- **The seam, verified in both directions.** For any extraction, state what
-  the moved code depends on *and* what still depends on it, and say you
-  checked. This is what turns "split this file" from a design task into an
-  edit.
+- **Exact locations.** File plus line or line range for every site to change, and the list of call sites to update. Verify the numbers before writing them; a confidently wrong line number is worse than none.
+- **The enumerated work.** If the fix is "add the missing N things", list all N with the values they should take. If it's a move, say what moves and — just as important — **what stays**.
+- **Measured numbers** the fixer would otherwise re-derive (coverage percentages for a new threshold, a dry-run's error count, a benchmark baseline). Say when they should be re-measured rather than trusted.
+- **The trap, located.** Not "watch out for the animation" but "`Foo.tsx:57` branches on this prop being `undefined`, so a no-op is not equivalent". A hazard with a file and line is context; one without is a warning.
+- **The precedent.** If the repo has already solved this shape somewhere, name the file and the commit — copying an in-repo pattern is far more reliable than inventing one.
+- **The seam, verified in both directions.** For any extraction, state what the moved code depends on *and* what still depends on it, and say you checked. That is what turns "split this file" from a design task into an edit.
 
-**Do not fake the downgrade.** Some findings are expensive because they need a
-judgement call — a shared mutable singleton with no obvious owner, a product
-decision about intended behaviour, an abstraction whose right shape isn't
-determined by the code. Adding words does not make those Sonnet-able. When a
-finding genuinely stays at Opus 5, say so *and say why the context doesn't
-help*, so a reader can tell a real decision from a gap in the report. Where a
-finding splits cleanly, split it: rate the specified half down and leave the
-decision half where it belongs, rather than averaging the two into one
-misleading tier.
+**Do not fake the downgrade.** Some findings are expensive because they need a judgement call — a shared mutable singleton with no obvious owner, a product decision about intended behaviour, an abstraction whose right shape isn't determined by the code. Adding words does not make those Sonnet-able. When a finding genuinely stays at Opus 5, say so *and say why the context doesn't help*, so a reader can tell a real decision from a gap in the report. Where a finding splits cleanly, split it: rate the specified half down and leave the decision half where it belongs.
 
 Two knock-on effects to handle rather than ignore:
 
-- **Re-rank after writing the blocks.** `effort` feeds the ranking formula, so
-  moving a finding down a tier moves it up the order. Rank the final tiers,
-  not the first-draft ones.
-- **Rank is a column, not an identity.** A finding's identity is its issue
-  number, which never changes; the category verdicts reference it and so does
-  any code comment citing the finding. So carry rank as its own column in the
-  parent issue's summary table and re-sort that, rather than reordering anything
-  that looks like an id.
+- **Re-rank after writing the blocks.** `effort` feeds the formula, so moving a finding down a tier moves it up the order. Rank the final tiers, not the first-draft ones.
+- **Rank is a column, not an identity.** A finding's identity is its issue number, which never changes; the category verdicts reference it and so does any code comment citing it. Carry rank as its own column in the parent issue's summary table and re-sort that, rather than reordering anything that looks like an id.
 
 ## Ranking findings
 
-Rank by `(impact × breadth) ÷ effort`, where `effort` is the recommended-model
-tier read as an ordinal — Haiku 4.5 = 1, Sonnet 5 = 2, Opus 5 = 3, Opus 5
-plan-mode/multi-PR = 5 — but report impact, breadth, and recommended model as
-separate fields rather than collapsing them into one number, so the reader
-can re-sort by what they care about. Add a short **summary table** above the
-findings (finding → recommended model, plus whichever other columns that
-survey's findings carry) so the tiers can be read at a glance without
-scrolling the full entries.
+Rank by `(impact × breadth) ÷ effort`, where `effort` is the recommended-model tier read as an ordinal — Haiku 4.5 = 1, Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode/multi-PR = 5 — but report impact, breadth and recommended model as **separate fields** rather than collapsing them into one number, so the reader can re-sort by what they care about. Add a short **summary table** above the findings so the tiers can be read at a glance.
 
-The tier rates **the fix**, not confirming it: re-running the build, lint, a
-test suite, a measurement recipe, or a repro to verify a landed fix is fully
-scripted and suits the cheapest tier regardless of which tier the fix itself
-needed. Where findings touch the same code, add a one-line **sequencing
-note** saying which order avoids rebasing the same file twice.
+The tier rates **the fix**, not confirming it: re-running the build, lint, a test suite, a measurement recipe or a repro to verify a landed fix is fully scripted and suits the cheapest tier regardless of which tier the fix needed. Where findings touch the same code, add a one-line **sequencing note** saying which order avoids rebasing the same file twice.
 
 ## Finding fields
 
-Six fields are the same in every survey and are defined once here. Each survey
-adds its own — its `Category` tag list, its `Impact` scale, and whatever its
-domain needs (`Baseline measurement`, `Repro`, `Invariant violated`, `Gap`, …)
-— and states only those.
+Six fields are the same in every survey. Each survey adds its own — its `Category` tag list, its `Impact` scale, and whatever its domain needs (`Baseline measurement`, `Repro`, `Invariant violated`, `Gap`, …).
 
 - **Title** — short label.
-- **Breadth** — the number of **files** affected. Counts must come from an
-  actual search (grep/glob) and you should be able to name the search you ran;
-  if you estimated instead, write "est." next to the number. Where the exposure
-  is a *condition* rather than a file set ("every entry, whenever two tabs are
-  open"), say that instead of forcing a file count — but still name the search
-  that established it, including a grep that returned **zero** hits where
-  absence is the point.
-- **Recommended model** — tier per the [rubric above](#recommended-model-tiers),
-  rated against the finding *with* its Task context block present. **How the
-  fix fails is the tell:** a wrong-but-plausible change that breaks the build, a
-  type-check or a test is far safer to hand down-tier than one that fails
-  silently. Each survey names what "fails silently" looks like in its domain and
-  gives an example hazard note. Reserve plan mode + multi-PR for findings that
-  need an architecture change **or** a product decision only the user should
-  make.
-- **Evidence** — at least one file path plus a short **verbatim quote** from
-  that file (line number optional). Copy-pasted, not paraphrased — this gets
-  spot-checked by grepping, so quotes must be grep-safe: quote a span that lives
-  on one line, or say so and give the line range where the source is hard-wrapped
-  prose. A quote that silently spans a line break reads as fabricated when the
-  spot-check fails. For toolchain findings a config quote plus a dry-run result
-  is evidence.
+- **Breadth** — the number of **files** affected. Counts must come from an actual search (grep/glob) and you should be able to name the search you ran; if you estimated, write "est." next to the number. Where the exposure is a *condition* rather than a file set ("every entry, whenever two tabs are open"), say that instead of forcing a file count — but still name the search that established it, including a grep that returned **zero** hits where absence is the point.
+- **Recommended model** — tier per the [rubric above](#recommended-model-tiers), rated against the finding *with* its Task context block present.
+- **Evidence** — at least one file path plus a short **verbatim quote** from that file. Copy-pasted, not paraphrased — this gets spot-checked by grepping, so quotes must be grep-safe: quote a span that lives on one line, or say so and give the line range where the source is hard-wrapped prose. A quote that silently spans a line break reads as fabricated when the spot-check fails. For toolchain findings a config quote plus a dry-run result is evidence.
 - **Problem** — one sentence: what is wrong and why it matters.
-- **Fix** — one sentence: what the concrete change is. Where the survey
-  measures something (a baseline, a repro), also say how that measurement
-  should read afterwards.
+- **Fix** — one sentence: what the concrete change is. Where the survey measures something, also say how that measurement should read afterwards.
 
-**Prefer systemic and structural findings over isolated, line-level ones.** A
-pattern across 10 files beats one misused function. Cite real code — no generic
-observations.
+**Prefer systemic and structural findings over isolated, line-level ones.** A pattern across 10 files beats one misused function. Cite real code — no generic observations.
 
 ## Category verdicts
 
-Every survey's output includes one line per category, using exactly one of
-three verdicts:
+Every survey's output includes one line per category, using exactly one of three verdicts:
 
-- **clean** — the scan/trace/probe plan for this category was fully executed
-  and nothing worth reporting turned up
-- **findings: #N, #M** — pointing at the numbered findings below
-- **partially assessed** — state what part of the plan was skipped and why
+- **clean** — the plan for this category was fully executed and nothing worth reporting turned up
+- **findings: #N, #M** — pointing at the numbered findings
+- **partially assessed** — state what part of the plan was skipped, and why
 
-This makes the absence of findings distinguishable from the absence of
-scanning. A category may only be called **clean** if its plan was actually
-executed — never as a default for categories that ran out of budget.
+This makes the absence of findings distinguishable from the absence of scanning. A category may only be called **clean** if its plan was actually executed — never as a default for categories that ran out of budget.
 
 ## Don't pad the findings list
 
-Every survey caps its findings at a stated top-N. Include everything that
-makes the cut regardless of how low its score is — a trivial finding with
-high breadth still earns its slot, and its low score speaks for itself. Do
-not pad the list to reach N: a short report grounded in real evidence beats a
-long one built on speculation.
+Every survey caps its findings at a stated top-N. Include everything that makes the cut regardless of how low its score is — a trivial finding with high breadth still earns its slot, and its low score speaks for itself. Do not pad to reach N: a short report grounded in real evidence beats a long one built on speculation.
 
 ## Reporting
 
-**File the run as a parent issue, and its findings as sub-issues.** The split
-and its rationale are in `plans/CLAUDE.md` ("State is an issue; documents are
-files"); this section states only what a survey run does.
+**File the run as a parent issue, and its findings as sub-issues.** The split and its rationale are in `plans/CLAUDE.md` ("State is an issue; documents are files"); this section states only what a survey run does.
 
-- **One parent issue per run**, titled with the survey and its scope
-  (`Codebase health survey — test code — 2026-09-12` is the worked example,
-  #1065), labelled with the survey-type label (`health`, `ui`, `performance`,
-  `product`, `data-integrity`). Its body carries the coverage statement, the
-  category verdicts and the summary table — with the table's rows linking to
-  each finding's sub-issue rather than restating it. This **replaces** the
-  report file the old convention wrote to `plans/reports/`: there is no
-  separate file for a survey run. The parent issue stays open, and its body
-  stays a live record, until every finding sub-issue is resolved — the same
-  way a plan's parent issue works.
-- **One sub-issue per finding**, attached to the run's parent issue via
-  GitHub's native sub-issue relationship, using the fields below.
-  `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton. Label each with:
-  - the survey's own `Category` tag(s) (the list each survey defines below,
-    e.g. `dry`, `srp`, `testing`, `security`);
-  - the same survey-type label as the parent issue;
-  - a model-tier label — exactly one of `haiku`, `sonnet`, `opus`,
-    `opus-plan` — matching the Recommended model field;
-  - `decision-required`, when the finding hinges on a product decision only
-    the maintainer can make.
+- **One parent issue per run**, titled with the survey and its scope (`Codebase health survey — test code — 2026-09-12` is the worked example, #1065), labelled with the survey-type label (`health`, `ui`, `performance`, `product`, `data-integrity`). Its body carries the coverage statement, the category verdicts and the summary table, with the table's rows linking to each finding's sub-issue rather than restating it. There is no separate report file. The parent issue stays open, and its body stays a live record, until every finding sub-issue is resolved.
+- **One sub-issue per finding**, attached via GitHub's native sub-issue relationship. `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton. Label each with the survey's own `Category` tag(s), the same survey-type label as the parent, a model-tier label (exactly one of `haiku`, `sonnet`, `opus`, `opus-plan`) matching the Recommended model field, and `decision-required` when the finding hinges on a product decision only the maintainer can make.
+- **Search open parent issues (and their sub-issues) for the survey-type label first** — a re-run mostly re-derives findings that are already open, and those get a comment carrying the new run's evidence rather than a second issue.
+- A finding closes when a PR saying `Fixes #N` merges. Never close one by editing a file. Dropping one as invalid or won't-fix is a close with `not planned` plus a comment saying why; deferring one is an open issue with a `deferred` label plus a comment. The parent closes once every sub-issue is resolved.
 
-  **Search open parent issues (and their sub-issues) for the survey-type label
-  first** — a re-run mostly re-derives findings that are already open, and
-  those get a comment carrying the new run's evidence rather than a second
-  issue.
-- A finding closes when a PR saying `Fixes #N` merges. Do not edit a file to
-  close one. Dropping one as invalid or won't-fix is a close with `not planned`
-  plus a comment saying why; deferring one is an open issue with a `deferred`
-  label plus a comment. The parent issue itself closes once every finding
-  sub-issue is resolved.
+`data-integrity.md`'s "Known suspects" section is the one exception: that survey keeps its standing hypotheses and their per-run verdicts in the survey file itself.
 
-`data-integrity.md`'s "Known suspects" section, which appends a verdict to each
-suspect's hypothesis in-place, is unchanged: that survey keeps its suspects list
-live in the survey file itself. Survey files (`health.md`, `performance.md`,
-etc.) stay in `plans/surveys/`.
-
-**Suggest improvements to the survey itself, as a diff on the survey file.**
-These survey files are themselves living specs, and a real run is evidence
-about where they're unclear, stale, or wrong in a way a cold read never
-surfaces — an ambiguous instruction, a budget item that turned out to be
-unmeasurable, a category boundary that didn't hold, a scoring rule that
-produced a counterintuitive order, a "known suspect" that's now stale. After
-finishing a run, edit the survey `.md` file directly with the proposed
-improvements, as its own commit separate from filing the run and from any
-fixes to the product itself — that way the suggestion shows up as an
-ordinary reviewable diff in the PR (GitHub's review UI, comments,
-approve/request-changes) instead of prose the user has to re-transcribe by
-hand to apply it. Keep the edit scoped to genuine process learnings, not
-findings, which are issues. Still propose rather than silently commit past
-review: keep it on the branch the session is already working on — a remote
-session is *assigned* its branch name, so the `survey-run/<name>` branch this
-paragraph used to ask for was never available to follow and no such branch has
-ever existed here — and note in the run's parent issue, in one line, that the
-survey file was updated and why, so the two stay linked.
+**Suggest improvements to the survey itself, as a diff on the survey file.** These files are living specs, and a real run is evidence about where they're unclear, stale or wrong in a way a cold read never surfaces — an ambiguous instruction, a budget item that turned out to be unmeasurable, a category boundary that didn't hold, a scoring rule that produced a counterintuitive order, a "known suspect" that's now stale. After finishing a run, edit the `.md` directly, as its own commit separate from filing the run and from any fixes to the product — that way the suggestion arrives as an ordinary reviewable diff instead of prose the user must re-transcribe. Keep it scoped to genuine process learnings, not findings, which are issues. Still propose rather than silently commit past review: keep it on the branch the session is already working on — a remote session is *assigned* its branch name, so the `survey-run/<name>` branch this paragraph used to ask for was never available to follow — and note in the run's parent issue, in one line, that the survey file was updated and why, so the two stay linked.
