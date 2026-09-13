@@ -38,17 +38,36 @@ These four rules held identically in every survey and are stated once here.
 - **The category ranking is a tiebreaker, not a filter.** A serious finding in
   any category outranks a minor finding in a higher-priority one. Never omit a
   high-impact issue because its category ranks lower.
-- **Read the merged-PR history for defect classes, not just for churn.** This
-  repo's git history is squashed — 148 commits spanning one week, as of
-  2026-09-13 — so `git log` cannot tell you where bugs actually come from. The PR
-  titles can, and they are the only record of it that survives; sample the last
-  ~200 and tally what was being fixed, not just which directories were touched.
-  Every gap the 2026-09-13 review of these survey files found was visible there
-  and nowhere else: a nine-PR cluster of view-state desync that no category
-  names, three test flakes that no survey mentions, and a measurement harness
-  `performance.md` had never heard of. A class the repo keeps paying for that no
-  category names is a finding *about the survey* — fix it with a diff on the
-  survey file, per the last section here.
+- **Un-shallow the clone before you read any git history.** A session's checkout
+  is a **shallow clone**, so `git log` silently answers from a truncated graph:
+  on 2026-09-13 it reported 148 commits spanning one week and three separate root
+  commits, against a real history of 3,225 commits back to 2026-05-22 with one
+  root. Nothing warns you — the truncation boundary looks exactly like the start
+  of the project. Three of these surveys ask you to sample history (co-change,
+  churn weighting, activity concentration) and all three get silently wrong
+  answers from it, since every commit outside the window collapses into the
+  boundary. Check and fix it first, in one line each:
+
+  ```bash
+  git rev-parse --is-shallow-repository   # true  → the history you can see is a lie
+  git fetch --unshallow                   # then re-run anything that read git log
+  ```
+
+  Record the history's true span next to any tally you report. And treat the
+  repo's own claims about its history the same way — `plans/CLAUDE.md` asserted
+  for weeks that the history "was squashed", which is false and is what sent the
+  2026-09-13 review down this path in the first place; `git blame` works fine.
+  That claim was in a `CLAUDE.md`, which the rule two bullets up already tells
+  you to verify rather than inherit.
+- **Read the merged-PR history for defect classes, not just for churn.** Commits
+  tell you what changed; PR titles tell you what was *wrong*, which is the
+  question a survey is actually asking. Sample the last ~200 and tally what was
+  being fixed, not just which directories were touched. Every gap the 2026-09-13
+  review of these survey files found was visible there first: a nine-PR cluster
+  of view-state desync that no category names, five test flakes that no survey
+  mentions, and a measurement harness `performance.md` had never heard of. A
+  class the repo keeps paying for that no category names is a finding *about the
+  survey* — fix it with a diff on the survey file, per the last section here.
 
 ### What this environment can and cannot do
 

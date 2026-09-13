@@ -21,7 +21,8 @@ as given.
 
 The material: every merged sync/cache/conflict/reconcile fix in the tracker,
 read for *what claim it restored* rather than what code it touched. The
-repository's history is squashed, so the PR bodies are the record.
+repository's history is intact, but a session's checkout is a shallow clone
+(`git fetch --unshallow`), so the PR bodies are the easier record to read.
 
 ## The six
 

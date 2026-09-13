@@ -19,9 +19,10 @@ rather than the thing surveyed.
 
 Say this explicitly, because leaving it implicit cost every prior run of this
 file: test code had never been surveyed at all — not because anyone judged it
-low-value, but because nothing said it was in scope. The 2026-09-12 run re-pointed these categories at
-the suite (#1065) and was the highest-yield run to date — ten findings, all ten
-fixed inside ~30 hours — and the categories transferred with no amendment at all:
+low-value, but because nothing said it was in scope. The 2026-09-12 run
+re-pointed these categories at the suite (#1065) and was the highest-yield run to
+date — ten findings, all ten fixed inside ~30 hours — and the categories
+transferred with no amendment at all:
 `dry` over duplicated fixtures and hand-rolled router mocks, `dead-code` over a
 232-line file whose subject was a hand-written copy of production, `performance`
 over the suite's own 226s of redundant isolation.
@@ -117,7 +118,7 @@ from training data. Two rules are specific to this survey:
   change it, rebuild, and diff the entry chunk's raw and gzip size. On the
   2026-09-06 run one import line in `routes/__root.tsx` was worth 53% of the
   entry chunk (465,525 → 218,894 bytes gzip).
-- **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition. **If the repo's history is shorter than your sampling window, say so and stop treating the numbers as comparative** — a squashed history returns the whole log for any window, so per-directory tallies show where the squash landed rather than where development is concentrated. Record the history's true span next to the tallies.
+- **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition. **Un-shallow the clone first** ([recipe](./README.md#running-a-survey)) — a session's checkout is shallow, so `git log` answers from a truncated graph and every commit older than the boundary collapses into it, making per-directory tallies show where the truncation landed rather than where development is concentrated. This paragraph blamed a squashed history for that until 2026-09-13; the history is not squashed (3,225 commits back to 2026-05-22, `git blame` intact) and the clone was shallow. Record the history's true span next to the tallies, and if the span you can see is still shorter than your sampling window, say so and stop treating the numbers as comparative.
 - **Identify where development is currently concentrated** — sample recent history over a meaningful window (e.g. `git log --since="60 days ago" --name-only`, or recent merged PRs if available) and tally which directories see the most commits/PRs. This is the evidence base for the activity weighting in the Scoring guidance: findings in "hot" directories are worth more to fix than equivalently-scored findings in dormant corners of the codebase, because more code keeps landing on top of the problem in the meantime.
 - Sample the rest. Do not skip a directory entirely without recording it in the coverage statement.
 
