@@ -6,7 +6,7 @@
 
 **Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 
-**And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins. Tag people on entries, filter the calendar down to one person.
+**And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins, and no event owned by whoever happened to create it. Write access is a GitHub collaborator invite, so the people you share *with* need a (free) GitHub account. The people you *name* on entries need nothing at all: participants are just names in a file, so a child or a partner can be on the calendar without being a user of anything.
 
 **[Open the app →](https://realjohndoe.github.io/meridian/)** — try the Tutorial vault first, nothing to sign up for.
 
@@ -23,7 +23,7 @@ That's what I used, and TaskNotes is good. The limit isn't the plugin — it's t
 | Plain Markdown files you own | ✅ | ✅ | ❌ |
 | Tasks + calendar first-class, no plugin | ✅ | Plugin-mediated | ✅ |
 | Built phone-first | ✅ | Desktop-first | ✅ |
-| Usable by someone who won't configure a vault | ✅ | ❌ | ✅ |
+| Second person needs no vault, no plugin, no install | ✅ | ❌ | ✅ |
 
 Only one column has all four.
 
