@@ -27,13 +27,13 @@ That's what I used, and TaskNotes is good. The limit isn't the plugin — it's t
 
 Only one column has all four.
 
-The row that costs the most to earn isn't in the table, because every app claims it: **the files have to still be right tomorrow, on the other device.** That is where most of the work in this repository has actually gone — see [keeping them intact across devices](#keeping-them-intact-across-devices).
+The first row is the one that can't be added later. Google Calendar and Todoist could ship every other row tomorrow; what they can't do is hand you the files — which is what decides whether your calendar is still yours in five years. [Why files, and not an account →](#why-files-and-not-an-account)
 
 ---
 
 ## ✨ What it does
 
-**The one thing to judge us on: sync you can check, not just "offline-first."** Every entry is a plain `.md` file, and the app's real job is getting your edits to your other devices without dropping or mangling one. The sync layer is held to [six written invariants](plans/reports/sync-invariants.md) — *no acknowledged write is lost*, *settled devices agree* — that a generated test suite re-checks after **every single operation** of randomised two-device interleavings. It works offline and syncs when you're back online; what's unusual is that the promise it makes while doing so is written down and machine-checked. [How that works, and what it doesn't promise →](#keeping-them-intact-across-devices)
+**The one thing to judge us on: it's your files, not our database.** Every entry is a plain `.md` file with YAML frontmatter, in a GitHub repo or a folder you picked. Meridian is a static web app with no backend of its own — no Meridian account, no server of ours holding your calendar, no telemetry. And there's no export feature, because there's nothing to export *from*: the storage format **is** the interchange format, so you can grep it, diff it, keep it in git, open it in Obsidian, or leave for another tool with your history intact. Google Calendar and Todoist can match nearly every bullet below; none of them can match this one. [Why files, and not an account →](#why-files-and-not-an-account)
 
 Everything else:
 
@@ -44,6 +44,7 @@ Everything else:
 - **Wikilinks** — connect entries with `[[Note Title]]` links that render as inline chips with a preview popover.
 - **Participants** — tag people on entries and filter the whole calendar to show only their items.
 - **Calendar subscriptions** — subscribe to an iCal feed (Google, Outlook, Apple, or anywhere else) and see its events alongside your own, read-only; export a vault back out as a single `.ics` file to plug into another calendar.
+- **Offline-first, and held to it** — the app works without a network connection and syncs when you're back online. Table stakes for anything multi-device, so it's treated that way: [six written invariants](plans/reports/sync-invariants.md) and a generated two-device suite that re-checks them after every operation.
 - Plus what you'd expect of any of these apps: **search** across every entry's title and content, and **priority and duration** as first-class fields on any task or event.
 
 ---
@@ -61,19 +62,19 @@ Meridian doesn't run a server that holds your notes. You choose where your files
 
 Files are plain `.md` files. Open them in any text editor, check them into git, sync them with any tool you already use.
 
-### Keeping them intact across devices
+### Why files, and not an account
 
-Owning the files is the easy half. The hard half is the four layers between a keystroke and a file on GitHub — the UI, the in-memory store, an on-device cache, and the backend — each a fresh chance for two of them to quietly disagree. That is the largest single investment in this repository: roughly **2,000 lines of sync, conflict and merge logic behind 10,000 lines of tests**.
+Two things you can't get from a calendar that lives in someone else's account:
 
-What those tests enforce is [written down as six invariants](plans/reports/sync-invariants.md). Two of them read the same to a user as they do to the test suite:
+**Privacy.** Meridian is a static web app: it runs in your browser and talks to your storage, and that's the whole of it. There's no Meridian account, no server of ours holding your calendar, and no analytics or telemetry anywhere in the app — a private repo stays exactly as private as that repo is. (The one piece of backend is a stateless Worker that trades a GitHub OAuth code for a token and relays iCal feeds a browser can't fetch directly. Your notes never pass through it.)
 
-> **No acknowledged write is lost.** Content the app said was saved stays reachable until a client that had *seen* it acts to replace or delete it.
+**Portability.** There's no export button because there's nothing to export *from* — the storage format is the interchange format. A vault is a directory of `.md` files with YAML frontmatter that a text editor, `grep`, `git`, Obsidian, or the next app you try can all read today, with your edit history in the repo rather than in someone's database. If Meridian stops being what you want, your data is already out.
 
-> **Settled clients agree.** Two devices with nothing left to push hold the same content for every path.
+Neither is a feature that can be retrofitted onto a hosted calendar, which is why it leads the comparison at the top of this file, and is the last thing we'd trade away.
 
-They aren't checked by hand-written scenarios alone. A generator builds random two-device interleavings — writes, deletes, syncs, page reloads, a tab closing inside the autosave debounce, a write whose acknowledgement never arrives — and asserts the four safety invariants after *every operation* in the sequence, and the two liveness ones once the world goes quiet.
+### Getting your edits between devices
 
-**None of which is a guarantee.** "No acknowledged write is lost" is precisely the sentence this project has broken most often — sixteen separate defects between 11 June and 6 September 2026, some of them found by the generated suite rather than by anyone using the app. So the claim is narrower than "your data is safe", and more useful: the promise is written in English, it was re-derived from every sync bug that got through, it is machine-checked on every CI run, and each escape becomes a permanent case in the corpus so that failure can't come back. And when one does get through, one file per entry means two devices only ever collide on *the same entry* — never on the whole calendar.
+Files you own only stay yours if your edits actually arrive. That plumbing is table stakes for anything multi-device, so it's treated that way rather than advertised: the sync layer is held to [six written invariants](plans/reports/sync-invariants.md) — *no acknowledged write is lost*, *settled devices agree* — four of them asserted after *every operation* of randomised two-device interleavings (page reloads, a tab closing inside the autosave debounce, a write whose acknowledgement never arrives), and the two liveness ones once the world settles. Not a guarantee: invariant 1 is the sentence this project has broken most often, sixteen separate defects between 11 June and 6 September 2026. The claim is that it's written down and machine-checked, not that it can't happen — and that one file per entry keeps any collision to *that entry*, never the whole calendar.
 
 ---
 
