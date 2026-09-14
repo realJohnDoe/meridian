@@ -7,6 +7,7 @@ import { toggleDone } from '@/model/storeOps'
 import type { StoreItem, Roots, Occurrence, Entries, Entry } from '@/types'
 import type { StoreData } from '@/model'
 import { firstOccurrenceFrom, expandRange, fmtISO } from '@/model'
+import { occState } from '@/occView'
 import type { EntryKey } from '@/fileIO'
 import { entryKey } from '@/fileIO'
 import { TEST_VAULT, keyOf, itemsOf, rootsIn } from './helpers'
@@ -686,6 +687,27 @@ instances:
     const occ = map.get(keyOf('old-events'))
     expect(occ).toBeDefined()
     expect(occ!.date).toBe(older)
+  })
+
+  it('rule 6 fallback for a timed event past OVERDUE_LOOKBACK_DAYS still sets jsTime, so occState reports it as past', () => {
+    // Reproduces a real report: a single-instance timed event 393 days old
+    // (older than the 365-day back window) fell to rule 6, whose fallback used
+    // to return the raw item without a computed jsTime — occState() then had
+    // nothing to compare against `now` and defaulted to 'event-future'.
+    const longAgo = fmtISO(addDays(new Date(), -393))
+    const yaml = `---
+title: Old iCal Meeting
+date: "${longAgo}"
+time: "13:45"
+duration: "90 minutes"
+---
+`
+    const data = makeStore([{ slug: 'old-ical-meeting', yaml }])
+    const map = buildFom(data.entries, rootsIn(data))
+    const occ = map.get(keyOf('old-ical-meeting'))
+    expect(occ).toBeDefined()
+    expect(occ!.metadata.jsTime).toBeDefined()
+    expect(occState(occ!)).toBe('event-past')
   })
 
   it('rule 2 finds an undone task 11 months overdue via the fixed back window', () => {
