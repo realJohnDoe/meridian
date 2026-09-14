@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react'
-import { useStore } from '@/store'
+import { useStore, vaultLayer } from '@/store'
 import { VaultIcon } from '@/components'
 import { SettingsSection, SettingsLinkRow } from './SettingsSection'
 import { vaultSummary, attentionLabel } from './vaultSummary'
@@ -18,6 +18,9 @@ export default function VaultList() {
   const vaults         = useStore(s => s.vaults)
   const syncByVault    = useStore(s => s.syncByVault)
   const defaultVaultId = useStore(s => s.defaultVaultId)
+  // Read once and slice per vault below — vaultLayer memoizes on `entries`
+  // identity, so this costs nothing beyond the one subscription.
+  const entries        = useStore(s => s.entries)
 
   return (
     <SettingsSection
@@ -33,7 +36,7 @@ export default function VaultList() {
             params={{ vaultId: vault.id }}
             icon={<VaultIcon kind={vault.kind} className="size-4.5 shrink-0 stroke-[1.7] text-muted-foreground" />}
             label={vault.name}
-            description={vaultSummary(vault)}
+            description={vaultSummary(vault, vaultLayer(entries, vault.id).size)}
             badge={
               <>
                 {vault.id === defaultVaultId && (
