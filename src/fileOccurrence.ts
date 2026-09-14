@@ -1,5 +1,5 @@
 import { startOfToday, addDays } from 'date-fns'
-import { expandRange, firstOccurrenceFrom, joinFileMeta, stableOccId, buildItemIndex, OVERDUE_LOOKBACK_DAYS } from '@/model'
+import { expandRange, firstOccurrenceFrom, joinFileMeta, stableOccId, buildItemIndex, parseDateTime, OVERDUE_LOOKBACK_DAYS } from '@/model'
 import { buildResolveIndex, unwrapRef } from './wikilinks'
 import { isSeries, isStandaloneOcc, isTracked } from './types'
 import { occKind, isArchived } from './occView'
@@ -158,11 +158,18 @@ function resolveOneKey(
   if (latestDone) return latestDone
 
   // 6. Fallback: standalone as-is, or a synthesized anchor for an out-of-window series.
+  // Every other path that produces an Occurrence (expandRange, expandWithMultiday,
+  // firstOccurrenceFrom) sets metadata.jsTime from the occurrence's own date/time —
+  // occState() and every calendar/agenda consumer treat its absence as "no time
+  // to compare against" and fall back to 'event-future', so an item old enough to
+  // fall outside every window above (backWindow/AHEAD) must still get one here.
   for (const item of keyItems) {
     if (isStandaloneOcc(item)) {
-      return { ...item, metadata: joinFileMeta(entryKey, item.metadata, roots) }
+      const jsTime = parseDateTime(item.date, item.time) ?? undefined
+      return { ...item, metadata: { ...joinFileMeta(entryKey, item.metadata, roots), jsTime } }
     }
     if (isSeries(item)) {
+      const jsTime = parseDateTime(item.date, item.time) ?? undefined
       return {
         date:     item.date,
         time:     item.time,
@@ -170,7 +177,7 @@ function resolveOneKey(
         entryKey: item.entryKey,
         id:       stableOccId(`${item.entryKey}|${item.id}|anchor`),
         ownerId:  item.id,
-        metadata: joinFileMeta(item.entryKey, item.metadata, roots),
+        metadata: { ...joinFileMeta(item.entryKey, item.metadata, roots), jsTime },
       }
     }
   }
