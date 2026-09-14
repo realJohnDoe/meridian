@@ -8,7 +8,7 @@ import {
 } from './agendaSections'
 import { estimateRow, type ExtraMetaProbe } from './agendaRowHeights'
 import type { FilterOccs } from './useCalendarFilter'
-import { agendaChunkRun, chunkIndexFor, chunkRange, chunkIndicesFor, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS } from './agendaChunks'
+import { agendaChunkRun, chunkIndexFor, chunkRange, chunkIndicesFor } from './agendaChunks'
 import { weekStartFor } from './weekRange'
 import { sortOccs } from './occSort'
 import type { OverdueGroup } from './overduePool'
@@ -20,17 +20,22 @@ const NOW = new Date(2026, 5, 15, 9, 0)
 const noFilter: FilterOccs = occs => occs
 
 /**
- * The run these tests default to when a span doesn't specify its own — the
- * old fixed [anchor-EXPAND_PAST_DAYS, anchor+EXPAND_FUTURE_DAYS] window,
- * reproduced locally rather than via `agendaChunkRun` (which now just turns
- * an already-decided `{first, last}` range into an index list; the loaded
- * run itself is session-scoped state owned by `calendar/viewState.ts`). What
- * this file actually tests, `computeAgendaSections`, takes `chunkOccs`
- * directly and has never cared how the run was decided — a wide run is simply
- * the one that best exercises the chunk-boundary invariants below.
+ * The run these tests default to when a span doesn't specify its own: a wide
+ * band around the anchor, spelled out locally rather than derived from the
+ * production bounds. What this file actually tests,
+ * `computeAgendaSections`, takes `chunkOccs` directly and has never cared how
+ * the run was decided — a wide run is simply the one that best exercises the
+ * chunk-boundary invariants below, so these numbers answer to nothing but
+ * that. (They were the old fixed expansion window, back when one existed;
+ * backward growth is unbounded now and forward growth is a ceiling on a
+ * session-scoped run owned by `calendar/viewState.ts`, neither of which is a
+ * span this file can borrow.)
  */
+const TEST_RUN_PAST_DAYS = 365
+const TEST_RUN_FUTURE_DAYS = 90
+
 function testRun(anchor: Date, ws: 0 | 1 | 6): number[] {
-  return chunkIndicesFor(addDays(anchor, -EXPAND_PAST_DAYS), addDays(anchor, EXPAND_FUTURE_DAYS), ws)
+  return chunkIndicesFor(addDays(anchor, -TEST_RUN_PAST_DAYS), addDays(anchor, TEST_RUN_FUTURE_DAYS), ws)
 }
 
 // The overdue block is no longer derived from the agenda's occurrences — it

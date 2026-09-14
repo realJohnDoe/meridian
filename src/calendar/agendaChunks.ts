@@ -21,30 +21,44 @@ import { weekStartFor } from './weekRange'
 export const CHUNK_DAYS = 28
 
 /**
- * The bound on how far the agenda's *loaded run* may grow from
- * `agendaAnchor` — no longer the window itself. First paint seeds only three
- * chunks (the one containing the anchor, plus one on each side; see
+ * The ceiling on how far forward the agenda's *loaded run* may grow from
+ * `agendaAnchor` — not a window expanded up front. First paint seeds only
+ * three chunks (the one containing the anchor, plus one on each side; see
  * `calendar/viewState.ts`'s `agendaLoadedChunks`), and the run then grows
  * incrementally: forward as the user scrolls, backward on the explicit "Load
- * earlier" action. These two constants are the ceiling on each direction of
- * that growth (see `minLoadableChunk`/`maxLoadableChunk` below), not a span
- * that gets expanded up front.
+ * earlier" action.
  *
- * Asymmetric on purpose: the agenda is a near-term view, and planning further
- * ahead than a season belongs in month view rather than in an endlessly
- * scrolling list. It reaches further back because a scrolled-past day is
- * cheaper to keep than to explain, *not* because overdue work lives there —
- * that is `@/model`'s OVERDUE_LOOKBACK_DAYS (read by overduePool.ts), which is
- * a separate number with a separate reason to change.
+ * **Backward growth has no matching bound** — "Load earlier" reaches
+ * arbitrarily far into the past, one chunk per press. Nothing is saved by
+ * stopping it: `expandRange` seeks analytically from a series' anchor to the
+ * query window rather than walking it (see `iterScheduledDates`' skip-ahead in
+ * model/expansion.ts), so a chunk's cost is set by its own width, not by its
+ * distance from today, and `MAX_LOADED_CHUNKS` caps what's held either way.
  *
- * There used to be a third pair, WALK_PAST_DAYS/WALK_FUTURE_DAYS, for the
- * day-by-day render walk, plus a test asserting the expansion covered it — a
- * day the walk visited but the expansion never reached rendered empty,
- * silently. The walk now covers exactly the chunks that were expanded (see
- * agendaSections.ts's computeChunkRows, which walks one chunk's own 28 days),
- * so that relationship holds structurally and the pair is gone.
+ * Forward is bounded because the growth it feeds is automatic rather than
+ * user-driven, and this constant is its **only termination condition**.
+ * AgendaView's grow-forward effect re-runs on every `rows` change, including
+ * the one growth itself causes; its "did this add anything?" guard compares
+ * `rows.length`, and `walkChunk` emits week/month dividers unconditionally, so
+ * even a chunk with nothing scheduled in it adds ~4-5 rows and the guard never
+ * fires. Past the last occurrence a sparse tail also keeps the virtualizer's
+ * range pinned to the end of `rows`, so the range check never fires either.
+ * Remove this and the agenda walks itself into the far future, trimming real
+ * content off the back edge as it goes. Stopping instead at the first chunk
+ * with no occurrences doesn't work: an indefinite series (no `end`) puts a real
+ * occurrence in every future chunk, forever.
+ *
+ * Neither bound is about where overdue work lives — that is `@/model`'s
+ * OVERDUE_LOOKBACK_DAYS (read by overduePool.ts), a separate number with a
+ * separate reason to change.
+ *
+ * There used to be a pair, WALK_PAST_DAYS/WALK_FUTURE_DAYS, for the day-by-day
+ * render walk, plus a test asserting the expansion covered it — a day the walk
+ * visited but the expansion never reached rendered empty, silently. The walk
+ * now covers exactly the chunks that were expanded (see agendaSections.ts's
+ * computeChunkRows, which walks one chunk's own 28 days), so that relationship
+ * holds structurally and the pair is gone.
  */
-export const EXPAND_PAST_DAYS = 365
 export const EXPAND_FUTURE_DAYS = 90
 
 /**
@@ -88,11 +102,6 @@ export function agendaChunkRun(range: { first: number; last: number }): number[]
   const out: number[] = []
   for (let i = range.first; i <= range.last; i++) out.push(i)
   return out
-}
-
-/** How far back the loaded run may grow via "Load earlier" — see EXPAND_PAST_DAYS. */
-export function minLoadableChunk(anchor: Date, ws: 0 | 1 | 6): number {
-  return chunkIndexFor(addDays(anchor, -EXPAND_PAST_DAYS), ws)
 }
 
 /** How far forward the loaded run may grow as the user scrolls — see EXPAND_FUTURE_DAYS. */

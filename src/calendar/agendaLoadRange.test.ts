@@ -77,7 +77,7 @@ describe('growAgendaLoadedChunksForward / growAgendaLoadedChunksBackward', () =>
   it('bumps the backward edge by one chunk without moving the forward edge', () => {
     calendarView.setState({ agendaLoadedChunks: { first: 10, last: 12 } })
 
-    growAgendaLoadedChunksBackward(-100)
+    growAgendaLoadedChunksBackward()
 
     expect(calendarView.getState().agendaLoadedChunks).toEqual({ first: 9, last: 12 })
   })
@@ -90,19 +90,24 @@ describe('growAgendaLoadedChunksForward / growAgendaLoadedChunksBackward', () =>
     expect(calendarView.getState().agendaLoadedChunks).toEqual({ first: 10, last: 12 })
   })
 
-  it('does not grow backward past minFirst', () => {
-    calendarView.setState({ agendaLoadedChunks: { first: 10, last: 12 } })
+  // Unlike forward growth there is no floor: "Load earlier" reaches
+  // arbitrarily far back, one press at a time. The run stays capped at
+  // MAX_LOADED_CHUNKS the whole way — what moves is which chunks it holds.
+  it('grows backward without limit, past any fixed floor', () => {
+    calendarView.setState({ agendaLoadedChunks: { first: 0, last: 2 } })
 
-    growAgendaLoadedChunksBackward(10)
+    for (let i = 0; i < 100; i++) growAgendaLoadedChunksBackward()
 
-    expect(calendarView.getState().agendaLoadedChunks).toEqual({ first: 10, last: 12 })
+    const after = calendarView.getState().agendaLoadedChunks!
+    expect(after.first).toBe(-100)
+    expect(after.last - after.first + 1).toBe(MAX_LOADED_CHUNKS)
   })
 
   it('no-ops before the run has been seeded', () => {
     calendarView.setState({ agendaLoadedChunks: null })
 
     growAgendaLoadedChunksForward(100)
-    growAgendaLoadedChunksBackward(-100)
+    growAgendaLoadedChunksBackward()
 
     expect(calendarView.getState().agendaLoadedChunks).toBeNull()
   })
@@ -125,7 +130,7 @@ describe('growAgendaLoadedChunksForward / growAgendaLoadedChunksBackward', () =>
   it('caps the loaded run in the other direction for backward growth', () => {
     calendarView.setState({ agendaLoadedChunks: { first: -(MAX_LOADED_CHUNKS - 1), last: 0 } })
 
-    growAgendaLoadedChunksBackward(-1000)
+    growAgendaLoadedChunksBackward()
 
     const after = calendarView.getState().agendaLoadedChunks!
     expect(after.first).toBe(-MAX_LOADED_CHUNKS)

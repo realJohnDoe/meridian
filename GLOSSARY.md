@@ -494,11 +494,11 @@ chunks it touched rather than the whole window. Absolute, not
 → `calendar/agendaChunks.ts` · `CHUNK_DAYS`, `chunkIndexFor`, `chunkRange`, `agendaChunkRun`
 
 ### loaded run
-The agenda chunk-index range actually expanded and rendered, as opposed to
-how far it is *allowed* to grow (`EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS`).
-Session-scoped: seeds to three chunks around `agendaAnchor` on mount, widens a
-chunk at a time as the user scrolls or presses "Load earlier", and is capped
-so a long session doesn't accumulate it without bound.
+The agenda chunk-index range actually expanded and rendered, as opposed to how
+far forward it is *allowed* to grow (`EXPAND_FUTURE_DAYS`; backward is
+unbounded). Session-scoped: seeds to three chunks around `agendaAnchor` on
+mount, widens a chunk at a time as the user scrolls or presses "Load earlier",
+and is capped so a long session doesn't accumulate it without bound.
 → `calendar/viewState.ts` · `useAgendaLoadedRun`, `growAgendaLoadedChunksForward`, `growAgendaLoadedChunksBackward`, `MAX_LOADED_CHUNKS`
 
 ### OverdueGroup
@@ -542,7 +542,9 @@ asserts none of these have come back.
 | `useVisualViewportHeight` / `useVisualViewportOffsetTop` | `useVisibleViewport` (one snapshot, with the Firefox-Android fallback) |
 | `useShellMode` / `ShellMode` | removed — `_app` and `_entry` each own their own layout chain, so nothing needs to release a shared one |
 | `SettingsDialog` | removed — Settings is a route (`routes/_app.settings.*`), not a modal |
-| `PAST_WINDOW_DAYS` / `FUTURE_WINDOW_DAYS` | split into `EXPAND_PAST_DAYS`/`EXPAND_FUTURE_DAYS` (the agenda's window, `calendar/agendaChunks.ts`) and `OVERDUE_LOOKBACK_DAYS` (the overdue pass) |
+| `PAST_WINDOW_DAYS` / `FUTURE_WINDOW_DAYS` | split into the agenda's own forward ceiling (`EXPAND_FUTURE_DAYS`, `calendar/agendaChunks.ts`) and `OVERDUE_LOOKBACK_DAYS` (the overdue pass) |
+| `EXPAND_PAST_DAYS` | removed — the agenda reaches arbitrarily far back, so backward growth has no ceiling to name |
+| `minLoadableChunk` | removed — the backward counterpart of `maxLoadableChunk` had no bound left to compute |
 | `WALK_PAST_DAYS` / `WALK_FUTURE_DAYS` | removed — the render walk covers exactly the chunks that were expanded (`agendaChunkRun`), so it is no longer a span of its own |
 | `requestVaultSettings` / `onVaultSettingsRequested` | removed — a vault's settings screen has a URL, so callers link to it |
 | `DotCategory` / `dotCategory` | `OccHue` (`occView.ts`), derived by `typeHue` or `OccPainter.hue` — the dots follow the `colorBy` preference now |
