@@ -236,15 +236,14 @@ A \`repeat\` block defines the schedule; \`instances\` override individual occur
 See [[team-standup]] — a Mon/Wed/Fri event where the past occurrences are ticked done
 while future ones stay open. Tasks repeat the same way: [[morning-run]].
 
-**Editing one occurrence.** When you change a recurring item, Meridian asks how far the
-change should reach:
+**Editing one occurrence.** Recurring items support the same per-occurrence edit scopes
+as any calendar app — when you change one, Meridian asks how far the change should reach:
 - **This event** — only this one occurrence
 - **This and future** — split the series from here onward
 - **All events** — the whole series
 
-So you can shift a single occurrence, cancel one, or change the entire series — without
-breaking the rest. You can even mix patterns in one item, like *first and second Friday*
-of the month.`,
+That part is standard. What isn't: you can mix multiple patterns in one item, like
+*first and second Friday* of the month, instead of being locked to a single rule.`,
     },
 
     // ── team-standup: recurring event ──
