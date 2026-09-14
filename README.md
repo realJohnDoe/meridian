@@ -33,7 +33,7 @@ The first row is the one that can't be added later. Google Calendar and Todoist 
 
 ## ✨ What it does
 
-**The one thing to judge us on: it's your files, not our database.** Every entry is a plain `.md` file with YAML frontmatter, in a GitHub repo or a folder you picked. Meridian is a static web app with no backend of its own — no Meridian account, no server of ours holding your calendar, no telemetry. And there's no export feature, because there's nothing to export *from*: the storage format **is** the interchange format, so you can grep it, diff it, keep it in git, open it in Obsidian, or leave for another tool with your history intact. Google Calendar and Todoist can match nearly every bullet below; none of them can match this one. [Why files, and not an account →](#why-files-and-not-an-account)
+**The one thing to judge us on: it's your files, not our database.** Every entry is a plain `.md` file with YAML frontmatter, in a GitHub repo or a folder you picked. Meridian is a static web app with no backend of its own — no Meridian account, no server of ours holding your calendar, no telemetry. Leaving isn't an export feature you have to trust: the storage format **is** the interchange format, so you can grep it, diff it, keep it in git, open it in Obsidian, or hand the folder to whatever you use next — and if that next thing is a calendar rather than a Markdown tool, a vault exports as a single `.ics`. Google Calendar and Todoist can match nearly every bullet below; none of them can match this one. [Why files, and not an account →](#why-files-and-not-an-account)
 
 Everything else:
 
@@ -68,9 +68,11 @@ Two things you can't get from a calendar that lives in someone else's account:
 
 **Privacy.** Meridian is a static web app: it runs in your browser and talks to your storage, and that's the whole of it. There's no Meridian account, no server of ours holding your calendar, and no analytics or telemetry anywhere in the app — a private repo stays exactly as private as that repo is. (The one piece of backend is a stateless Worker that trades a GitHub OAuth code for a token and relays iCal feeds a browser can't fetch directly. Your notes never pass through it.)
 
-**Portability.** There's no export button because there's nothing to export *from* — the storage format is the interchange format. A vault is a directory of `.md` files with YAML frontmatter that a text editor, `grep`, `git`, Obsidian, or the next app you try can all read today, with your edit history in the repo rather than in someone's database. If Meridian stops being what you want, your data is already out.
+**Portability.** The usual question for an app like this is whether its export is any good. Here the export isn't the escape route — there's nothing to export *from*, because the storage format is the interchange format. A vault is a directory of `.md` files with YAML frontmatter that a text editor, `grep`, `git`, Obsidian, or the next app you try can all read today, with your edit history in the repo rather than in someone's database. If Meridian stops being what you want, your data is already out.
 
-Neither is a feature that can be retrofitted onto a hosted calendar, which is why it leads the comparison at the top of this file, and is the last thing we'd trade away.
+There is still an `.ics` export, for the case Markdown doesn't cover: moving your schedule into a calendar app that can't read a vault. It's a calendar's-eye view rather than a copy of your notes — titles, bodies, dates and repeat rules, but not priorities, participants, done state, or "repeat N days after completion" series, which `RRULE` has no way to say.
+
+Neither privacy nor portability can be retrofitted onto a hosted calendar — which is why they lead the comparison at the top of this file, and are the last things here we'd trade away.
 
 ### Getting your edits between devices
 
