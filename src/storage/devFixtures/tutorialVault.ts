@@ -82,7 +82,7 @@ items:
 date: "${d(0)}"
 ---
 
-Welcome! Meridian keeps your notes, events, and tasks as plain Markdown files in a
+Welcome! Meridian keeps your tasks, events, and notes as plain Markdown files in a
 folder you own — no database, no lock-in.
 
 The one idea behind all of it: **everything is a list with items.** This very note is a
