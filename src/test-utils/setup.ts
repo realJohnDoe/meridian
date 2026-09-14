@@ -1,5 +1,11 @@
 import { afterEach } from 'vitest'
 
+// Stands in for the `define` in vite.config.ts (AboutSettings.tsx reads
+// __APP_VERSION__ as a bare global, replaced at build time). This standalone
+// vitest.config.ts doesn't go through that build step, so without this the
+// identifier is simply undeclared and throws a ReferenceError at render time.
+;(globalThis as unknown as { __APP_VERSION__: string }).__APP_VERSION__ = 'test'
+
 // Runs for every test file. Guarded so node-env (non-DOM) tests, which are
 // most of the suite, pay no cost here.
 if (typeof window !== 'undefined') {

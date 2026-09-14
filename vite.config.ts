@@ -7,7 +7,23 @@ import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
 import { resolve } from 'path'
 import fs from 'fs'
+import { execSync } from 'child_process'
 import type { Plugin } from 'vite'
+
+/**
+ * Short commit SHA, baked in at build time for the About section (settings/AboutSettings.tsx).
+ * package.json's version is still the un-bumped placeholder 0.1.0, so printing
+ * it would be misleading — the commit is the only thing that actually
+ * identifies what was built. Falls back to 'dev' rather than failing the
+ * build when there's no git metadata to read (e.g. a tarball checkout).
+ */
+function getCommitSha(): string {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim()
+  } catch {
+    return 'dev'
+  }
+}
 
 /**
  * Serves debug.html at /meridian/debug.html (and /meridian/debug/) in dev mode.
@@ -128,6 +144,9 @@ function spaFallbackPlugin(): Plugin {
 
 export default defineConfig({
   base: '/meridian/',
+  define: {
+    __APP_VERSION__: JSON.stringify(getCommitSha()),
+  },
   plugins: [
     debugPagePlugin(),
     cspPlugin(),
