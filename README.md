@@ -70,8 +70,6 @@ Two things you can't get from a calendar that lives in someone else's account:
 
 **Portability.** The usual question for an app like this is whether its export is any good. Here the export isn't the escape route — there's nothing to export *from*, because the storage format is the interchange format. A vault is a directory of `.md` files with YAML frontmatter that a text editor, `grep`, `git`, Obsidian, or the next app you try can all read today, with your edit history in the repo rather than in someone's database. If Meridian stops being what you want, your data is already out.
 
-There is still an `.ics` export, for the case Markdown doesn't cover: moving your schedule into a calendar app that can't read a vault. It's a calendar's-eye view rather than a copy of your notes — titles, bodies, dates and repeat rules, but not priorities, participants, done state, or "repeat N days after completion" series, which `RRULE` has no way to say.
-
 Neither privacy nor portability can be retrofitted onto a hosted calendar — which is why they lead the comparison at the top of this file, and are the last things here we'd trade away.
 
 ### Getting your edits between devices
@@ -180,12 +178,11 @@ Four principles, in the order they build on each other: the file format first, t
 
 ### 1. Everything is a plain Markdown file
 
-Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. Everything below is built on top of this one, and it buys four concrete things:
+Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. Everything below is built on top of this one, and it buys three concrete things:
 
 - **It's yours.** Open, edit, grep, or back up your files with any tool. No lock-in, no proprietary database.
 - **It's easy to debug.** When something looks off, you can read the file and see exactly why.
 - **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
-- **It's LLM-friendly.** Markdown with YAML frontmatter is the format nearly every LLM tool and workflow already reads and writes natively — no bespoke parser needed. Google Cloud's newly proposed [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/) follows the same pattern: a bundle of markdown files with YAML frontmatter as a vendor-neutral way to give AI agents curated context.
 
 ### 2. Different concepts, different lifespans
 
