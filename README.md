@@ -27,20 +27,24 @@ That's what I used, and TaskNotes is good. The limit isn't the plugin — it's t
 
 Only one column has all four.
 
+The row that costs the most to earn isn't in the table, because every app claims it: **the files have to still be right tomorrow, on the other device.** That is where most of the work in this repository has actually gone — see [keeping them intact across devices](#keeping-them-intact-across-devices).
+
 ---
 
 ## ✨ What it does
 
+**The one thing to judge us on: sync you can check, not just "offline-first."** Every entry is a plain `.md` file, and the app's real job is getting your edits to your other devices without dropping or mangling one. The sync layer is held to [six written invariants](plans/reports/sync-invariants.md) — *no acknowledged write is lost*, *settled devices agree* — that a generated test suite re-checks after **every single operation** of randomised two-device interleavings. It works offline and syncs when you're back online; what's unusual is that the promise it makes while doing so is written down and machine-checked. [How that works, and what it doesn't promise →](#keeping-them-intact-across-devices)
+
+Everything else:
+
+- **Built for the phone** — one-handed capture and navigation, not a desktop layout squeezed narrow. Add it to your home screen or desktop like any native app (it's a PWA).
+- **Recurrence that bends to real life** — daily, weekly, monthly, yearly, custom intervals, weekday-specific patterns, and "repeat N days after completion" — plus per-occurrence overrides and several patterns in one entry, without fiddling with a wizard. [The full model →](#4-a-recurrence-model-that-bends-to-real-life)
 - **Agenda, day, and month views** — see your tasks and events in whatever layout suits the moment.
 - **Tasks, events, and notes in one place** — all the same kind of thing, all on one timeline.
-- **Rich recurrence** — daily, weekly, monthly, yearly, custom intervals, weekday-specific patterns, and "repeat N days after completion" — without fiddling with a wizard.
 - **Wikilinks** — connect entries with `[[Note Title]]` links that render as inline chips with a preview popover.
 - **Participants** — tag people on entries and filter the whole calendar to show only their items.
-- **Priority and duration** — first-class metadata on every task or event.
-- **Search** — find any entry by title or content across your entire vault.
 - **Calendar subscriptions** — subscribe to an iCal feed (Google, Outlook, Apple, or anywhere else) and see its events alongside your own, read-only; export a vault back out as a single `.ics` file to plug into another calendar.
-- **Offline-first** — the app works without a network connection and syncs automatically when you're back online.
-- **Installable** — add Meridian to your home screen or desktop like any native app (it's a PWA).
+- Plus what you'd expect of any of these apps: **search** across every entry's title and content, and **priority and duration** as first-class fields on any task or event.
 
 ---
 
@@ -57,6 +61,20 @@ Meridian doesn't run a server that holds your notes. You choose where your files
 
 Files are plain `.md` files. Open them in any text editor, check them into git, sync them with any tool you already use.
 
+### Keeping them intact across devices
+
+Owning the files is the easy half. The hard half is the four layers between a keystroke and a file on GitHub — the UI, the in-memory store, an on-device cache, and the backend — each a fresh chance for two of them to quietly disagree. That is the largest single investment in this repository: roughly **2,000 lines of sync, conflict and merge logic behind 10,000 lines of tests**.
+
+What those tests enforce is [written down as six invariants](plans/reports/sync-invariants.md). Two of them read the same to a user as they do to the test suite:
+
+> **No acknowledged write is lost.** Content the app said was saved stays reachable until a client that had *seen* it acts to replace or delete it.
+
+> **Settled clients agree.** Two devices with nothing left to push hold the same content for every path.
+
+They aren't checked by hand-written scenarios alone. A generator builds random two-device interleavings — writes, deletes, syncs, page reloads, a tab closing inside the autosave debounce, a write whose acknowledgement never arrives — and asserts the four safety invariants after *every operation* in the sequence, and the two liveness ones once the world goes quiet.
+
+**None of which is a guarantee.** "No acknowledged write is lost" is precisely the sentence this project has broken most often — sixteen separate defects between 11 June and 6 September 2026, some of them found by the generated suite rather than by anyone using the app. So the claim is narrower than "your data is safe", and more useful: the promise is written in English, it was re-derived from every sync bug that got through, it is machine-checked on every CI run, and each escape becomes a permanent case in the corpus so that failure can't come back. And when one does get through, one file per entry means two devices only ever collide on *the same entry* — never on the whole calendar.
+
 ---
 
 ## 🚀 Getting started
@@ -67,48 +85,6 @@ Files are plain `.md` files. Open them in any text editor, check them into git, 
    - **GitHub** (recommended) — click "Connect GitHub repo", **Sign in with GitHub**, and pick the repository to use — no token to create by hand. Meridian reads and writes files directly, so you can reach your vault from any device.
    - **Local folder** — click "Connect local folder" and pick a directory. Chrome or Edge, desktop or Android; not available in Safari or Firefox.
 4. Create your first entry with the **+** button and start building your calendar.
-
----
-
-## 💡 The ideas behind Meridian
-
-Four principles shape everything in Meridian.
-
-### 1. Different concepts, different lifespans
-
-Tasks, projects, calendar events, notes, and tags stay relevant for different amounts of time: tasks and projects until they're marked done, calendar events until their fixed time passes, and notes and tags indefinitely. Meridian doesn't force these different lifespans into separate apps — it models all of them the same way underneath.
-
-### 2. Lists model hierarchies
-
-Lists are a flexible way to model hierarchies: the more abstract concept sits higher in the hierarchy, as a **list**, and lists the more concrete concepts below it, as **items**. Unlike a classical hierarchy, an item can sit on more than one list at once — a task can be a subtask of one project and still be tagged, or show up as a follow-up on an event — because these are references, not exclusive parent-child slots.
-
-| Entry | Is a list with… | Its items are usually… |
-|---|---|---|
-| **Task** | a `done` property | subtasks |
-| **Project** | a `done` property | tasks |
-| **Event** | a `date`, plus optional `time` and `duration` | agenda points or follow-up tasks |
-| **Tag** | — | everything tagged with it |
-| **Note** | no special properties | related entries |
-
-There are more ways to read this, and that's the point: one simple idea bends to fit how *you* think, instead of locking you into separate "task" and "event" and "note" silos.
-
-### 3. Everything is a plain Markdown file
-
-Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. That gives you the best of both worlds, and three concrete benefits:
-
-- **It's yours.** Open, edit, grep, or back up your files with any tool. No lock-in, no proprietary database.
-- **It's easy to debug.** When something looks off, you can read the file and see exactly why.
-- **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
-- **It's LLM-friendly.** Markdown with YAML frontmatter is the format nearly every LLM tool and workflow already reads and writes natively — no bespoke parser needed. Google Cloud's newly proposed [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/) follows the same pattern: a bundle of markdown files with YAML frontmatter as a vendor-neutral way to give AI agents curated context.
-
-### 4. A recurrence model that bends to real life
-
-Real schedules aren't tidy, so Meridian's recurrence model goes well beyond "repeats weekly":
-
-- **Per-occurrence overrides come standard** — cancel or shift a single occurrence without touching the rest of the series.
-- **Irregular schedules** — pin one-off occurrences alongside a repeating pattern in the same entry.
-- **Multiple series in one entry** — e.g. something on the *first and second Friday* of every month, or a daily check-in that later switches to "2 days after I finish it."
-- **Weekday-specific, set-position, interval, and after-completion** rules, in any combination.
 
 ---
 
@@ -192,6 +168,48 @@ To be honest about the comparison: Meridian supports notes, but it doesn't try t
 **[Google Calendar](https://calendar.google.com)** set the bar for what recurring events and multi-view calendar navigation should feel like.
 
 **[GitHub Issues and Projects](https://github.com/features/issues)** showed how linking, labelling, and filtering structured entries can work without getting in the way of actual writing.
+
+---
+
+## 💡 The ideas behind Meridian
+
+Four principles shape everything in Meridian. They sit below the pitch rather than in it: they explain *why* the app behaves the way it does, which matters more once you're using it than while you're deciding to. The exception is #4 — the recurrence model is a reason to switch, not just a principle.
+
+### 1. Different concepts, different lifespans
+
+Tasks, projects, calendar events, notes, and tags stay relevant for different amounts of time: tasks and projects until they're marked done, calendar events until their fixed time passes, and notes and tags indefinitely. Meridian doesn't force these different lifespans into separate apps — it models all of them the same way underneath.
+
+### 2. Lists model hierarchies
+
+Lists are a flexible way to model hierarchies: the more abstract concept sits higher in the hierarchy, as a **list**, and lists the more concrete concepts below it, as **items**. Unlike a classical hierarchy, an item can sit on more than one list at once — a task can be a subtask of one project and still be tagged, or show up as a follow-up on an event — because these are references, not exclusive parent-child slots.
+
+| Entry | Is a list with… | Its items are usually… |
+|---|---|---|
+| **Task** | a `done` property | subtasks |
+| **Project** | a `done` property | tasks |
+| **Event** | a `date`, plus optional `time` and `duration` | agenda points or follow-up tasks |
+| **Tag** | — | everything tagged with it |
+| **Note** | no special properties | related entries |
+
+One idea instead of separate "task" and "event" and "note" silos — and the reason you never have to decide which of those a thing is. The longer version is in [the post about building it](blog/1-meridian-why-i-built-a-markdown-first-calendar/meridian-why-i-built-a-markdown-first-calendar.md).
+
+### 3. Everything is a plain Markdown file
+
+Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. That gives you the best of both worlds, and three concrete benefits:
+
+- **It's yours.** Open, edit, grep, or back up your files with any tool. No lock-in, no proprietary database.
+- **It's easy to debug.** When something looks off, you can read the file and see exactly why.
+- **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
+- **It's LLM-friendly.** Markdown with YAML frontmatter is the format nearly every LLM tool and workflow already reads and writes natively — no bespoke parser needed. Google Cloud's newly proposed [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/) follows the same pattern: a bundle of markdown files with YAML frontmatter as a vendor-neutral way to give AI agents curated context.
+
+### 4. A recurrence model that bends to real life
+
+Real schedules aren't tidy, so Meridian's recurrence model goes well beyond "repeats weekly":
+
+- **Per-occurrence overrides come standard** — cancel or shift a single occurrence without touching the rest of the series.
+- **Irregular schedules** — pin one-off occurrences alongside a repeating pattern in the same entry.
+- **Multiple series in one entry** — e.g. something on the *first and second Friday* of every month, or a daily check-in that later switches to "2 days after I finish it."
+- **Weekday-specific, set-position, interval, and after-completion** rules, in any combination.
 
 ---
 
