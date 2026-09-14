@@ -281,19 +281,22 @@ export function growAgendaLoadedChunksForward(maxLast: number): void {
 
 /**
  * Bumps the loaded run's backward edge by one chunk — the "Load earlier"
- * control's click handler. No-ops once `first` reaches `minFirst` (see
- * agendaChunks.ts's `minLoadableChunk`) or before the run has been seeded.
+ * control's click handler. No-ops only before the run has been seeded.
  * Mirrors growAgendaLoadedChunksForward, trimming the future edge instead
  * when the cap is exceeded.
+ *
+ * Takes no floor, unlike its forward twin: the past is reachable without
+ * limit, one press at a time. See agendaChunks.ts's EXPAND_FUTURE_DAYS for why
+ * only the automatic direction needs a stop.
  *
  * Needs no scroll compensation of its own: prepending a chunk changes
  * `rows`' identity, which useAnchoredAgendaScroll (computeAgendaScrollRestore.ts)
  * already reacts to for the same reason a background sync landing rows above
  * the viewport does — nothing here has to know that.
  */
-export function growAgendaLoadedChunksBackward(minFirst: number): void {
+export function growAgendaLoadedChunksBackward(): void {
   const current = calendarView.getState().agendaLoadedChunks
-  if (!current || current.first <= minFirst) return
+  if (!current) return
   let { first, last } = current
   first -= 1
   const span = last - first + 1

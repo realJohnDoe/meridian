@@ -18,7 +18,7 @@ import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useScrollabilityWarning } from './agendaScrollability'
 import { useToday, useOccPainter } from '@/hooks'
 import { useNow } from './useNow'
-import { minLoadableChunk, maxLoadableChunk } from './agendaChunks'
+import { maxLoadableChunk } from './agendaChunks'
 import { useCalendarWeekStartsOn } from './calendarLocale'
 import {
   useAgendaAnchor, useAgendaScrollTarget, setAgendaTopDate, markAgendaScrolled, toggleOverdueCollapsed,
@@ -70,13 +70,13 @@ export default function AgendaView({ onOpen }: Props) {
 
   // The loaded run's current bounds (seeded by useAgendaSections' own call to
   // useAgendaLoadedRun above, so this is never null once rows exist) and how
-  // far growth may still take it in each direction — see agendaChunks.ts's
-  // minLoadableChunk/maxLoadableChunk.
+  // far forward growth may still take it — see agendaChunks.ts's
+  // maxLoadableChunk. Backward has no ceiling, so "Load earlier" stays
+  // available for as long as there is a seeded run to extend.
   const loadedChunks = useAgendaLoadedChunks()
-  const minFirst = useMemo(() => minLoadableChunk(anchor, ws), [anchor, ws])
   const maxLast = useMemo(() => maxLoadableChunk(anchor, ws), [anchor, ws])
-  const canLoadEarlier = loadedChunks !== null && loadedChunks.first > minFirst
-  const handleLoadEarlier = useCallback(() => growAgendaLoadedChunksBackward(minFirst), [minFirst])
+  const canLoadEarlier = loadedChunks !== null
+  const handleLoadEarlier = useCallback(() => growAgendaLoadedChunksBackward(), [])
 
   // AgendaRow is memoized with React's default shallow compare, so these
   // handlers are genuinely part of its props comparison: an unstable reference

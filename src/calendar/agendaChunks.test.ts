@@ -5,7 +5,7 @@ import type { Roots } from '@/types'
 import { makeOcc, makeSeries, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import {
   CHUNK_DAYS, chunkIndexFor, chunkRange, chunkIndicesFor, agendaChunkRun,
-  minLoadableChunk, maxLoadableChunk, EXPAND_PAST_DAYS, EXPAND_FUTURE_DAYS,
+  maxLoadableChunk, EXPAND_FUTURE_DAYS,
 } from './agendaChunks'
 import { weekStartFor } from './weekRange'
 
@@ -132,11 +132,20 @@ describe('agendaChunkRun', () => {
   })
 })
 
-describe('minLoadableChunk / maxLoadableChunk', () => {
-  it.each(WS_VALUES)('bound the loaded run to [anchor - EXPAND_PAST_DAYS, anchor + EXPAND_FUTURE_DAYS] (ws=%i)', (ws) => {
+describe('maxLoadableChunk', () => {
+  it.each(WS_VALUES)('bounds the loaded run forward at anchor + EXPAND_FUTURE_DAYS (ws=%i)', (ws) => {
     const anchor = new Date(2026, 5, 15)
 
-    expect(minLoadableChunk(anchor, ws)).toBe(chunkIndexFor(addDays(anchor, -EXPAND_PAST_DAYS), ws))
     expect(maxLoadableChunk(anchor, ws)).toBe(chunkIndexFor(addDays(anchor, EXPAND_FUTURE_DAYS), ws))
+  })
+
+  // The backward direction deliberately has no counterpart — "Load earlier"
+  // reaches arbitrarily far back, so there is no minLoadableChunk to assert.
+  // See agendaChunks.ts's EXPAND_FUTURE_DAYS for why only forward is bounded.
+  it('has no backward counterpart exported', async () => {
+    const mod: Record<string, unknown> = await import('./agendaChunks')
+
+    expect(Object.keys(mod)).not.toContain('minLoadableChunk')
+    expect(Object.keys(mod)).not.toContain('EXPAND_PAST_DAYS')
   })
 })
