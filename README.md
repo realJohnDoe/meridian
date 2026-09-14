@@ -39,8 +39,8 @@ Everything else:
 
 - **Built for the phone** — one-handed capture and navigation, not a desktop layout squeezed narrow. Add it to your home screen or desktop like any native app (it's a PWA).
 - **Recurrence that bends to real life** — daily, weekly, monthly, yearly, custom intervals, weekday-specific patterns, and "repeat N days after completion" — plus per-occurrence overrides and several patterns in one entry, without fiddling with a wizard. [The full model →](#4-a-recurrence-model-that-bends-to-real-life)
-- **Agenda, day, and month views** — see your tasks and events in whatever layout suits the moment.
-- **Tasks, events, and notes in one place** — all the same kind of thing, all on one timeline.
+- **One kind of entry, on as many lists as you like** — tasks, events and notes are all the same kind of thing, so you never have to decide whether something is a task, a subtask or a project. "Pizza" can sit on *This Week* and on *Cooking* at once; a task can be a subtask of a project and still be tagged, and still hang off an event. [How that works →](#3-lists-model-hierarchies)
+- **Agenda, day, and month views** — tasks and events together, in whatever layout suits the moment.
 - **Wikilinks** — connect entries with `[[Note Title]]` links that render as inline chips with a preview popover.
 - **Participants** — tag people on entries and filter the whole calendar to show only their items.
 - **Calendar subscriptions** — subscribe to an iCal feed (Google, Outlook, Apple, or anywhere else) and see its events alongside your own, read-only; export a vault back out as a single `.ics` file to plug into another calendar.
@@ -116,7 +116,7 @@ Notes about this task go here, in plain Markdown.
 ```
 
 The `items` list is the task's subtasks — wikilink references to other
-entries, just like philosophy #2 describes. Meridian fills it in for you
+entries, just like *Lists model hierarchies* below describes. Meridian fills it in for you
 as you link entries in the editor.
 
 Because an entry is a list, recurrence lives in its **occurrences**. You can override or skip any one of them, and even mix several patterns in the same entry — here, exercise repeats every Monday/Wednesday/Friday, with one occurrence already marked done:
@@ -176,15 +176,24 @@ To be honest about the comparison: Meridian supports notes, but it doesn't try t
 
 ## 💡 The ideas behind Meridian
 
-Four principles shape everything in Meridian. They sit below the pitch rather than in it: they explain *why* the app behaves the way it does, which matters more once you're using it than while you're deciding to. The exception is #4 — the recurrence model is a reason to switch, not just a principle.
+Four principles, in the order they build on each other: the file format first, then what a file can be, then what one can do over time. They sit below the pitch rather than in it — they explain *why* the app behaves the way it does, which matters more once you're using it than while you're deciding to. Two exceptions: #3 and #4 are reasons to switch in their own right, and both show up in the list at the top.
 
-### 1. Different concepts, different lifespans
+### 1. Everything is a plain Markdown file
+
+Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. Everything below is built on top of this one, and it buys four concrete things:
+
+- **It's yours.** Open, edit, grep, or back up your files with any tool. No lock-in, no proprietary database.
+- **It's easy to debug.** When something looks off, you can read the file and see exactly why.
+- **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
+- **It's LLM-friendly.** Markdown with YAML frontmatter is the format nearly every LLM tool and workflow already reads and writes natively — no bespoke parser needed. Google Cloud's newly proposed [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/) follows the same pattern: a bundle of markdown files with YAML frontmatter as a vendor-neutral way to give AI agents curated context.
+
+### 2. Different concepts, different lifespans
 
 Tasks, projects, calendar events, notes, and tags stay relevant for different amounts of time: tasks and projects until they're marked done, calendar events until their fixed time passes, and notes and tags indefinitely. Meridian doesn't force these different lifespans into separate apps — it models all of them the same way underneath.
 
-### 2. Lists model hierarchies
+### 3. Lists model hierarchies
 
-Lists are a flexible way to model hierarchies: the more abstract concept sits higher in the hierarchy, as a **list**, and lists the more concrete concepts below it, as **items**. Unlike a classical hierarchy, an item can sit on more than one list at once — a task can be a subtask of one project and still be tagged, or show up as a follow-up on an event — because these are references, not exclusive parent-child slots.
+That one model is a list. The more abstract concept sits higher, as a **list**, and lists the more concrete concepts below it, as **items** — and because those are references rather than exclusive parent-child slots, an item can sit on more than one list at once.
 
 | Entry | Is a list with… | Its items are usually… |
 |---|---|---|
@@ -194,16 +203,7 @@ Lists are a flexible way to model hierarchies: the more abstract concept sits hi
 | **Tag** | — | everything tagged with it |
 | **Note** | no special properties | related entries |
 
-One idea instead of separate "task" and "event" and "note" silos — and the reason you never have to decide which of those a thing is. The longer version is in [the post about building it](blog/1-meridian-why-i-built-a-markdown-first-calendar/meridian-why-i-built-a-markdown-first-calendar.md).
-
-### 3. Everything is a plain Markdown file
-
-Every entry is a `.md` file with YAML frontmatter — free text for your notes, structured fields for the metadata. That gives you the best of both worlds, and three concrete benefits:
-
-- **It's yours.** Open, edit, grep, or back up your files with any tool. No lock-in, no proprietary database.
-- **It's easy to debug.** When something looks off, you can read the file and see exactly why.
-- **It syncs cleanly.** Each item is its own file, so two devices only conflict when they edit *the very same item* — not the whole calendar.
-- **It's LLM-friendly.** Markdown with YAML frontmatter is the format nearly every LLM tool and workflow already reads and writes natively — no bespoke parser needed. Google Cloud's newly proposed [Open Knowledge Format](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing/) follows the same pattern: a bundle of markdown files with YAML frontmatter as a vendor-neutral way to give AI agents curated context.
+What that looks like in use: we keep a **This Week** list for things to finish this week without pinning them to a day, so "Pizza" sits on *This Week* and on *Cooking* at the same time. A strict hierarchy would make Pizza live in exactly one place; a tag could do it, which is why tags are a list here too. Subtasks, projects, backlinks and tags all turn out to be the same idea — a task is a list of subtasks, a backlink is "the lists this appears on" — so you never have to answer "is this a task, a subtask, or a project?" The only question left is whether you want to track it as done. The longer version is in [the post about building it](blog/1-meridian-why-i-built-a-markdown-first-calendar/meridian-why-i-built-a-markdown-first-calendar.md).
 
 ### 4. A recurrence model that bends to real life
 
