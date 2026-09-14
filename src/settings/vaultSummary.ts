@@ -8,12 +8,20 @@ import type { AttentionKind } from '@/store'
  * is now the only place all vaults are visible at once, and "which of these
  * two GitHub vaults is the work one?" has to be answerable without opening
  * each. Kept pure and separate from the row so it can be tested directly.
+ *
+ * `fileCount`, when given, is appended as "N Markdown files" — a size hint
+ * (how much is in this vault, at a glance, across all of them) that doubles
+ * as the one place this list names the storage format. Omitted for `ical`:
+ * a calendar subscription has no backing files to count. See #1083.
  */
-export function vaultSummary(vault: VaultRef): string {
-  if (vault.kind === 'github') return `${vault.github.owner}/${vault.github.repo} · ${vault.github.branch}`
-  if (vault.kind === 'ical')   return 'Calendar subscription · read-only'
-  if (vault.kind === 'local')  return 'Folder on this device'
-  return 'Sample notes · safe to remove'
+export function vaultSummary(vault: VaultRef, fileCount?: number): string {
+  const base =
+    vault.kind === 'github' ? `${vault.github.owner}/${vault.github.repo} · ${vault.github.branch}` :
+    vault.kind === 'ical'   ? 'Calendar subscription · read-only' :
+    vault.kind === 'local'  ? 'Folder on this device' :
+    'Sample notes · safe to remove'
+  if (vault.kind === 'ical' || fileCount === undefined) return base
+  return `${base} · ${fileCount} Markdown file${fileCount === 1 ? '' : 's'}`
 }
 
 /**

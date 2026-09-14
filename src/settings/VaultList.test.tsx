@@ -2,8 +2,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { useStore, emptySyncStatus } from '@/store'
-import { setupStore } from '@/test-utils'
+import { setupStore, makeOcc, makeRootMeta } from '@/test-utils'
+import { entryKey } from '@/fileIO'
 import type { VaultRef } from '@/vaultRef'
+import type { Entries } from '@/types'
 import VaultList from './VaultList'
 
 // No router is mounted, so `Link` is stubbed as the anchor it renders, with
@@ -80,6 +82,19 @@ describe('VaultList', () => {
       expect.stringContaining('Work'),
       expect.stringContaining('Add vault'),
     ])
+  })
+
+  it('names the Markdown file count as a size hint, not for a read-only calendar subscription', () => {
+    const key = (slug: string) => entryKey(GITHUB_VAULT.id, slug)
+    const entries: Entries = new Map([
+      [key('a'), { key: key('a'), root: makeRootMeta('a'), items: [makeOcc({ entryKey: key('a') })] }],
+      [key('b'), { key: key('b'), root: makeRootMeta('b'), items: [makeOcc({ entryKey: key('b') })] }],
+    ])
+    useStore.setState({ vaults: [GITHUB_VAULT, ICAL_VAULT], entries })
+    render(<VaultList />)
+
+    expect(screen.getByRole('link', { name: /Work/ })).toHaveTextContent('2 Markdown files')
+    expect(screen.getByRole('link', { name: /Team calendar/ })).not.toHaveTextContent('Markdown')
   })
 
   it('distinguishes same-named vaults by their source', () => {
