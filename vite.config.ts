@@ -170,7 +170,7 @@ export default defineConfig({
       manifest: {
         name: 'Meridian',
         short_name: 'Meridian',
-        description: 'Tasks and a calendar on plain Markdown files you own — fast on a phone.',
+        description: 'Tasks and a calendar that are actually good on your phone — plain Markdown files you own.',
         // theme_color is deliberately absent — do not add it back without
         // reading this. Firefox for Android paints an installed app's status
         // bar from this field and ignores the theme-color meta tag, including
