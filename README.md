@@ -105,7 +105,7 @@ Every entry is a `.md` file with YAML frontmatter — free text for your notes, 
 
 Real schedules aren't tidy, so Meridian's recurrence model goes well beyond "repeats weekly":
 
-- **Cancel or shift a single occurrence** without touching the rest of the series.
+- **Per-occurrence overrides come standard** — cancel or shift a single occurrence without touching the rest of the series.
 - **Irregular schedules** — pin one-off occurrences alongside a repeating pattern in the same entry.
 - **Multiple series in one entry** — e.g. something on the *first and second Friday* of every month, or a daily check-in that later switches to "2 days after I finish it."
 - **Weekday-specific, set-position, interval, and after-completion** rules, in any combination.
@@ -180,7 +180,7 @@ Meridian was heavily inspired by tools we already loved, and tries to fill the g
 | Task management | ✅ | ✅ (TaskNotes plugin) | Limited | ✅ | ✅ | Partial |
 | Wikilinks between entries | ✅ | ✅ | ❌ | ✅ (`#123` issue links) | ❌ | ❌ |
 | Advanced note-taking (plugin ecosystem, graph view, deep linking) | Partial | ✅ | ❌ | ❌ | ❌ | Partial |
-| Multiple series + one-off overrides in one entry | ✅ | ❌ (single rule per task) | ❌ (single rule per event) | ❌ | ❌ (single rule per task) | ❌ |
+| Several recurrence rules in a single entry | ✅ | ❌ (single rule per task) | ❌ (single rule per event) | ❌ | ❌ (single rule per task) | ❌ |
 | Multiple participants / assignees | ✅ | Partial | ❌ | ✅ | Partial (one assignee per task) | ❌ |
 | Free & open source | ✅ | Partially (plugin only) | ❌ | ❌ | ❌ | ❌ |
 | Works in the browser | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ |
