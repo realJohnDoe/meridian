@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet } from '@tanstack/react-router'
+import { createRootRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
@@ -157,6 +157,51 @@ function VisibleViewportVars() {
   return null
 }
 
+/**
+ * Global "open search" shortcut: Cmd/Ctrl+K everywhere, plus a bare "/"
+ * outside text-editing surfaces (the GitHub/Slack convention — a bare "/"
+ * still has to type as a literal slash inside inputs, textareas and
+ * CodeMirror's contenteditable).
+ *
+ * Mounted once at the root rather than in `_app.tsx` (where the search bar
+ * itself lives) because `_entry.*` and `settings.*` don't stack under
+ * `_app` and Root is the one component that stays mounted across all three
+ * shells. `sq` (the search overlay's open flag) is only ever read by
+ * `-searchBar.tsx`, which is `_app` furniture — so a shortcut fired from
+ * outside the app shell navigates to `/` to reach it, while one fired from
+ * within it stays on the current view (matching `-searchBar.tsx`'s own
+ * `openSearch`), same as clicking the search field from Day/Week/Month/etc.
+ * would.
+ */
+function SearchShortcut() {
+  const navigate = useNavigate()
+  const inAppShell = useRouterState({ select: s => s.matches.some(m => m.routeId === '/_app') })
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const mod = e.metaKey || e.ctrlKey
+      const isModK = mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k'
+      const isSlash = e.key === '/' && !mod && !e.shiftKey && !e.altKey
+      if (!isModK && !isSlash) return
+
+      const target = e.target as HTMLElement | null
+      const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      if (isSlash && typing) return
+
+      e.preventDefault()
+      if (inAppShell) {
+        void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: (prev.sq as string | undefined) ?? '' }) })
+      } else {
+        void navigate({ to: '/', search: { sq: '' } })
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [navigate, inAppShell])
+
+  return null
+}
+
 function Root() {
   // Tracks the calendar day the app was last known to be on, so a resume
   // after a multi-day background suspend (mobile PWAs freeze timers rather
@@ -252,6 +297,7 @@ function Root() {
     >
       <ThemeColorSync />
       <VisibleViewportVars />
+      <SearchShortcut />
       <div id="app" className="flex flex-col">
         <Outlet />
       </div>

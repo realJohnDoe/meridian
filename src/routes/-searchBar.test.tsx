@@ -97,6 +97,22 @@ describe('SearchBar — open state', () => {
     expect(screen.getByTestId('overlay-query')).toHaveTextContent('')
   })
 
+  it('focuses the docked field on desktop once search opens, for opens that were not a click (e.g. a keyboard shortcut)', () => {
+    searchMock.mockReturnValue({ sq: '' })
+    setMobile(false)
+    renderSearchBar()
+
+    expect(screen.getByPlaceholderText('Search or create…')).toHaveFocus()
+  })
+
+  it('does not steal focus on mobile — the full-screen overlay focuses its own field', () => {
+    searchMock.mockReturnValue({ sq: '' })
+    setMobile(true)
+    renderSearchBar()
+
+    expect(screen.getByPlaceholderText('Search or create…')).not.toHaveFocus()
+  })
+
   it('buffers typed input locally and replaces the URL query as it changes', () => {
     searchMock.mockReturnValue({ sq: '' })
     renderSearchBar()

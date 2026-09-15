@@ -9,7 +9,7 @@
  * `components → calendar → components`): a leaf-UI directory that features
  * import, importing those features back.
  */
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
@@ -36,6 +36,18 @@ export default function SearchBar() {
 
   const searchOpen = sq !== undefined
   const urlQuery = sq ?? ''
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Desktop only: clicking this field is normally what opens search, so
+  // focus already lands here as a side effect of the click. A non-click open
+  // (the global Cmd/Ctrl+K and "/" shortcuts in __root.tsx, or restoring
+  // `sq` from browser history) has no such side effect, so it's driven here
+  // instead. Mobile's own full-screen overlay handles its focus itself (see
+  // SearchOverlay's useFocusTrap) — doing it again here would steal focus
+  // from its input onto this now-hidden one.
+  useEffect(() => {
+    if (searchOpen && !isMobile) inputRef.current?.focus()
+  }, [searchOpen, isMobile])
 
   // The input's displayed value is buffered in local state rather than read
   // straight from `sq`, because router search-param updates land through an
@@ -138,6 +150,7 @@ export default function SearchBar() {
            * Desktop: typing directly updates sq via onChange (router replace).
            */}
           <Input
+            ref={inputRef}
             id="filterInput"
             variant="ghost"
             className="flex-1 min-w-0 placeholder:text-card-foreground"
