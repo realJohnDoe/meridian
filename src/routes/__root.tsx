@@ -1,4 +1,4 @@
-import { createRootRoute, Outlet } from '@tanstack/react-router'
+import { createRootRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
@@ -157,6 +157,46 @@ function VisibleViewportVars() {
   return null
 }
 
+/**
+ * Global "open search" shortcut: Cmd/Ctrl+K, plus a bare "/" outside
+ * text-editing surfaces (the GitHub/Slack convention — a bare "/" still has
+ * to type as a literal slash inside inputs, textareas and CodeMirror's
+ * contenteditable).
+ *
+ * Mounted once at the root rather than in `_app.tsx` (where the search bar
+ * itself lives) because Root is the one component mounted across all three
+ * route shells, and a document-level keydown listener has to sit somewhere
+ * that's always around to catch it. It only acts under `/_app` though — the
+ * search bar is `_app` furniture (see -searchBar.tsx), so on `_entry.*` or
+ * `settings.*` there is nothing on screen for the shortcut to open, and it
+ * no-ops rather than jumping the user off the page they're on.
+ */
+function SearchShortcut() {
+  const navigate = useNavigate()
+  const inAppShell = useRouterState({ select: s => s.matches.some(m => m.routeId === '/_app') })
+
+  useEffect(() => {
+    if (!inAppShell) return
+    function onKeyDown(e: KeyboardEvent) {
+      const mod = e.metaKey || e.ctrlKey
+      const isModK = mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k'
+      const isSlash = e.key === '/' && !mod && !e.shiftKey && !e.altKey
+      if (!isModK && !isSlash) return
+
+      const target = e.target as HTMLElement | null
+      const typing = !!target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      if (isSlash && typing) return
+
+      e.preventDefault()
+      void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: (prev.sq as string | undefined) ?? '' }) })
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [navigate, inAppShell])
+
+  return null
+}
+
 function Root() {
   // Tracks the calendar day the app was last known to be on, so a resume
   // after a multi-day background suspend (mobile PWAs freeze timers rather
@@ -252,6 +292,7 @@ function Root() {
     >
       <ThemeColorSync />
       <VisibleViewportVars />
+      <SearchShortcut />
       <div id="app" className="flex flex-col">
         <Outlet />
       </div>

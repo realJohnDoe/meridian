@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type * as ReactRouter from '@tanstack/react-router'
-import { render, act } from '@testing-library/react'
+import { render, act, fireEvent } from '@testing-library/react'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { THEMES } from '@/settings'
@@ -9,7 +9,7 @@ import { THEMES } from '@/settings'
 const {
   restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
   resetCalendarOnVaultChange, onVaultChanged, triggerVaultChanged, startCrossTabSync, stopCrossTabSync,
-  flushActiveAutoSave, callOrder,
+  flushActiveAutoSave, callOrder, navigateMock, routeIds,
 } = vi.hoisted(() => {
   const listeners = new Set<(change: { contentReplaced: boolean }) => void>()
   const stopCrossTabSync = vi.fn()
@@ -31,18 +31,27 @@ const {
       return () => listeners.delete(fn)
     }),
     triggerVaultChanged: (change: { contentReplaced: boolean }) => { listeners.forEach(fn => fn(change)) },
+    navigateMock: vi.fn(),
+    // Mutable so tests can flip between "inside the app shell" and "outside
+    // it" (e.g. /_entry, /settings) without re-mocking per test.
+    routeIds: { current: ['/_app'] as string[] },
   }
 })
 
 // createFileRoute is mocked to hand back the component directly — the real
 // root route is bound to the generated tree. Outlet needs router context it
-// would not have here, so it is stubbed too.
+// would not have here, so it is stubbed too. useNavigate/useRouterState are
+// stubbed for the same reason (no RouterProvider here) and to drive the
+// search-shortcut tests below without a real route tree.
 vi.mock('@tanstack/react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactRouter>()
   return {
     ...actual,
     createRootRoute: (opts: Record<string, unknown>) => ({ ...opts }),
     Outlet: () => <div data-testid="outlet" />,
+    useNavigate: () => navigateMock,
+    useRouterState: <T,>({ select }: { select: (s: { matches: { routeId: string }[] }) => T }) =>
+      select({ matches: routeIds.current.map(routeId => ({ routeId })) }),
   }
 })
 
@@ -68,6 +77,7 @@ beforeEach(() => {
   setVisibility('visible')
   vi.clearAllMocks()
   callOrder.length = 0
+  routeIds.current = ['/_app']
 })
 
 afterEach(() => { vi.useRealTimers() })
@@ -474,6 +484,127 @@ describe('__root — resuming', () => {
 
     expect(requestScrollToToday).not.toHaveBeenCalled()
     expect(setCurrentDate).not.toHaveBeenCalled()
+  })
+})
+
+describe('__root — search shortcut', () => {
+  /** Recovers the object a `useNavigate` call's functional `search` option would produce. */
+  function searchResultOf(call: unknown, prev: Record<string, unknown> = {}) {
+    const { search } = call as { search: (p: Record<string, unknown>) => unknown }
+    return typeof search === 'function' ? search(prev) : search
+  }
+
+  it('opens search in place when Ctrl+K fires from inside the app shell', () => {
+    render(<Root />)
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    const call = navigateMock.mock.calls[0]![0] as { to: string }
+    expect(call.to).toBe('.')
+    expect(searchResultOf(call, { date: '2026-06-15' })).toEqual({ date: '2026-06-15', sq: '' })
+  })
+
+  it('opens search in place when Cmd+K (metaKey) fires', () => {
+    render(<Root />)
+    fireEvent.keyDown(document, { key: 'k', metaKey: true })
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('preserves an in-progress query instead of resetting it', () => {
+    render(<Root />)
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+    const call = navigateMock.mock.calls[0]![0] as unknown
+    expect(searchResultOf(call, { sq: 'groceries' })).toEqual({ sq: 'groceries' })
+  })
+
+  it('does nothing when the shortcut fires outside the app shell (e.g. the entry editor), where there is no search bar to open', () => {
+    routeIds.current = ['/_entry', '/_entry/entry/$vault/$slug']
+    render(<Root />)
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    fireEvent.keyDown(document, { key: '/' })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  it('does nothing outside the app shell even inside a text input, i.e. it never blocks "/" from being typed there', () => {
+    routeIds.current = ['/settings']
+    render(<Root />)
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+
+    fireEvent.keyDown(input, { key: '/' })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+    document.body.removeChild(input)
+  })
+
+  it('opens search on a bare "/" outside of any text-editing surface', () => {
+    render(<Root />)
+    fireEvent.keyDown(document, { key: '/' })
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('lets "/" type normally inside a text input instead of opening search', () => {
+    render(<Root />)
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+
+    fireEvent.keyDown(input, { key: '/' })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+    document.body.removeChild(input)
+  })
+
+  it('lets "/" type normally inside a contenteditable surface (the CodeMirror editor)', () => {
+    render(<Root />)
+    const editable = document.createElement('div')
+    // jsdom doesn't implement the isContentEditable getter that
+    // `contenteditable="true"` alone would set in a real browser, so it's
+    // stubbed directly to exercise the same branch the production check reads.
+    Object.defineProperty(editable, 'isContentEditable', { value: true })
+    document.body.appendChild(editable)
+
+    fireEvent.keyDown(editable, { key: '/' })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+    document.body.removeChild(editable)
+  })
+
+  it('still opens search on Ctrl+K while typing in a text input', () => {
+    render(<Root />)
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+
+    fireEvent.keyDown(input, { key: 'k', ctrlKey: true })
+
+    expect(navigateMock).toHaveBeenCalledTimes(1)
+    document.body.removeChild(input)
+  })
+
+  it('ignores a bare "k" without a modifier', () => {
+    render(<Root />)
+    fireEvent.keyDown(document, { key: 'k' })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  it('ignores Ctrl+Shift+K and Ctrl+/', () => {
+    render(<Root />)
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true, shiftKey: true })
+    fireEvent.keyDown(document, { key: '/', ctrlKey: true })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  it('stops listening after unmount', () => {
+    const { unmount } = render(<Root />)
+    unmount()
+    fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+
+    expect(navigateMock).not.toHaveBeenCalled()
   })
 })
 
