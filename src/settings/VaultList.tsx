@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { useStore, vaultLayer } from '@/store'
 import { VaultIcon } from '@/components'
+import { sortVaults } from '@/vaultActions'
 import { SettingsSection, SettingsLinkRow } from './SettingsSection'
 import { vaultSummary, attentionLabel } from './vaultSummary'
 
@@ -27,7 +28,7 @@ export default function VaultList() {
       title="Vaults"
       description="Where your entries live. Every vault stays mounted and syncing."
     >
-      {[...vaults].sort((a, b) => a.name.localeCompare(b.name)).map(vault => {
+      {sortVaults(vaults).map(vault => {
         const attention = syncByVault.get(vault.id)?.needsAttention ?? null
         return (
           <SettingsLinkRow
