@@ -50,9 +50,9 @@ const PAST   = new Date('2000-01-01T09:00:00')
 const NOW    = new Date('2020-06-15T12:00:00')
 
 describe('rowSortKey', () => {
-  it('groups an undone link to a note as an active, unprioritized task-typed row', () => {
+  it('groups an undone link to a note as active, typeKey -1, ahead of events and tasks', () => {
     const occ = makeOcc({ date: '', metadata: { fileSlug: 'note', title: 'My Note' } })
-    expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 0, typeKey: 3, prioKey: 3, jsTimeMs: 0, title: 'My Note' })
+    expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 0, typeKey: -1, prioKey: 3, jsTimeMs: 0, title: 'My Note' })
   })
 
   it('groups an undone link to a future timed event as active, typeKey 2, by time', () => {
@@ -124,15 +124,15 @@ describe('ItemsList sort order (end-to-end via rowSortKey)', () => {
       entry.kind === 'link' ? occ?.metadata.title : entry.text,
     )
 
-    // Timed events (typeKey 2) by time, then unprioritized/task-typed rows
-    // (typeKey 3 — tasks and notes alike): prioritized links, then the
-    // no-priority link, then plain checklist-text tasks last (their own
-    // prio rank sits past every link's), each tier by title — then the
-    // same rule again for the dimmed bucket, then the broken link last.
+    // Notes (typeKey -1) lead, then timed events (typeKey 2) by time, then
+    // unprioritized/task-typed rows (typeKey 3): prioritized links, then
+    // plain checklist-text tasks last (their own prio rank sits past every
+    // link's), each tier by title — then the same rule again for the
+    // dimmed bucket, then the broken link last.
     expect(titles).toEqual([
+      'Note',
       'Sooner', 'Later',
-      'High prio', 'Low prio',
-      'Note', 'first stored task', 'second stored task',
+      'High prio', 'Low prio', 'first stored task', 'second stored task',
       'Done link', 'done string task',
       undefined, // broken link has no title
     ])
