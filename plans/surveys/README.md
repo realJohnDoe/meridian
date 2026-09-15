@@ -307,3 +307,25 @@ session is *assigned* its branch name, so the `survey-run/<name>` branch this
 paragraph used to ask for was never available to follow and no such branch has
 ever existed here — and note in the run's parent issue, in one line, that the
 survey file was updated and why, so the two stay linked.
+
+**Bias the diff toward shrinking, not just adding.** A single run's evidence
+naturally produces an addition — one more caveat, one more bullet, one more
+worked example — and nothing pushes back the other way, so these files have
+only ever grown. Before proposing an addition, spend a moment checking
+whether it should instead be a cut or a merge:
+
+- **Superseded.** A caveat whose failure mode has since been fixed elsewhere
+  (a lint rule, a CI check, a test) is no longer pulling its weight as prose
+  — cut it, or shrink it to the one line that says what now enforces it.
+- **Redundant.** Two passages making the same point in different words
+  (often from two different runs) should become one, at whichever is more
+  precise.
+- **Better said briefly.** A worked example that was needed to make an
+  abstract rule land the first time may not need to stay at full length once
+  the rule itself is well understood — a shorter restatement can preserve the
+  lesson without the full narrative.
+
+Net line count is not a target to hit for its own sake, and a real new
+failure mode still earns its bullet. But treat a survey file that only ever
+grows, run after run, as itself a finding about the survey — look for
+something to cut or fold before adding.

@@ -13,6 +13,16 @@ When an implementation decision isn't covered by this doc or explicitly
 discussed with the user, default to industry standards rather than
 inventing a bespoke approach.
 
+## Code size
+
+Given two implementations with essentially equivalent behavior, prefer the
+one with less code. A shorter diff that does the same job is worth more than
+a longer one that merely feels more thorough — don't pad a change with extra
+abstraction, options, or handling the task doesn't need just to make it look
+more complete. This applies to edits to this file and to the survey files in
+`plans/surveys/` as much as to source: see that directory's `README.md` for
+the same principle applied to keeping survey files from growing unchecked.
+
 ## Package manager
 
 This project uses **pnpm**. Always use `pnpm` — never `npm` or `yarn`.
