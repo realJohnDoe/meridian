@@ -519,12 +519,25 @@ describe('__root — search shortcut', () => {
     expect(searchResultOf(call, { sq: 'groceries' })).toEqual({ sq: 'groceries' })
   })
 
-  it('navigates to / when the shortcut fires outside the app shell (e.g. the entry editor)', () => {
+  it('does nothing when the shortcut fires outside the app shell (e.g. the entry editor), where there is no search bar to open', () => {
     routeIds.current = ['/_entry', '/_entry/entry/$vault/$slug']
     render(<Root />)
     fireEvent.keyDown(document, { key: 'k', ctrlKey: true })
+    fireEvent.keyDown(document, { key: '/' })
 
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/', search: { sq: '' } })
+    expect(navigateMock).not.toHaveBeenCalled()
+  })
+
+  it('does nothing outside the app shell even inside a text input, i.e. it never blocks "/" from being typed there', () => {
+    routeIds.current = ['/settings']
+    render(<Root />)
+    const input = document.createElement('input')
+    document.body.appendChild(input)
+
+    fireEvent.keyDown(input, { key: '/' })
+
+    expect(navigateMock).not.toHaveBeenCalled()
+    document.body.removeChild(input)
   })
 
   it('opens search on a bare "/" outside of any text-editing surface', () => {

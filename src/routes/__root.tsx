@@ -158,26 +158,25 @@ function VisibleViewportVars() {
 }
 
 /**
- * Global "open search" shortcut: Cmd/Ctrl+K everywhere, plus a bare "/"
- * outside text-editing surfaces (the GitHub/Slack convention — a bare "/"
- * still has to type as a literal slash inside inputs, textareas and
- * CodeMirror's contenteditable).
+ * Global "open search" shortcut: Cmd/Ctrl+K, plus a bare "/" outside
+ * text-editing surfaces (the GitHub/Slack convention — a bare "/" still has
+ * to type as a literal slash inside inputs, textareas and CodeMirror's
+ * contenteditable).
  *
  * Mounted once at the root rather than in `_app.tsx` (where the search bar
- * itself lives) because `_entry.*` and `settings.*` don't stack under
- * `_app` and Root is the one component that stays mounted across all three
- * shells. `sq` (the search overlay's open flag) is only ever read by
- * `-searchBar.tsx`, which is `_app` furniture — so a shortcut fired from
- * outside the app shell navigates to `/` to reach it, while one fired from
- * within it stays on the current view (matching `-searchBar.tsx`'s own
- * `openSearch`), same as clicking the search field from Day/Week/Month/etc.
- * would.
+ * itself lives) because Root is the one component mounted across all three
+ * route shells, and a document-level keydown listener has to sit somewhere
+ * that's always around to catch it. It only acts under `/_app` though — the
+ * search bar is `_app` furniture (see -searchBar.tsx), so on `_entry.*` or
+ * `settings.*` there is nothing on screen for the shortcut to open, and it
+ * no-ops rather than jumping the user off the page they're on.
  */
 function SearchShortcut() {
   const navigate = useNavigate()
   const inAppShell = useRouterState({ select: s => s.matches.some(m => m.routeId === '/_app') })
 
   useEffect(() => {
+    if (!inAppShell) return
     function onKeyDown(e: KeyboardEvent) {
       const mod = e.metaKey || e.ctrlKey
       const isModK = mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k'
@@ -189,11 +188,7 @@ function SearchShortcut() {
       if (isSlash && typing) return
 
       e.preventDefault()
-      if (inAppShell) {
-        void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: (prev.sq as string | undefined) ?? '' }) })
-      } else {
-        void navigate({ to: '/', search: { sq: '' } })
-      }
+      void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: (prev.sq as string | undefined) ?? '' }) })
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
