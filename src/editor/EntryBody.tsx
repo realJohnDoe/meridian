@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, drawSelection } from '@codemirror/view'
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { indentUnit } from '@codemirror/language'
 import type { Roots, StoreItem } from '@/types'
 import {
   rootsField, setRootsEffect,
@@ -126,6 +127,7 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
       doc: seedBody,
       extensions: [
         markdownLanguage,
+        indentUnit.of('  '),
         markdownHighlight,
         markdownListTheme,
         markdownListDecos,
@@ -152,7 +154,7 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
         // outright rather than fighting the popup.
         EditorView.contentAttributes.of({ spellcheck: 'false', autocorrect: 'off', autocapitalize: 'off' }),
         history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
         // Drive the [[…]] autocomplete popup and report body changes
         EditorView.updateListener.of(update => {
           if (update.docChanged) onChangeRef.current(update.state.doc.toString().trimEnd())
