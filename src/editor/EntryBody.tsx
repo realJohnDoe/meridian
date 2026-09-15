@@ -11,7 +11,7 @@ import {
   createWikilinkExtension, wikilinkTheme,
 } from './cm/wikilinkDecorations'
 import { createTaskExtension, taskTheme } from './cm/taskDecorations'
-import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme } from './cm/markdownFormatting'
+import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme, insertMarkdownLink } from './cm/markdownFormatting'
 import { emptyPlaceholder, emptyPlaceholderTheme } from './cm/emptyPlaceholder'
 import { emptyLineCaret, emptyLineCaretTheme } from './cm/emptyLineCaret'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
@@ -154,7 +154,7 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
         // outright rather than fighting the popup.
         EditorView.contentAttributes.of({ spellcheck: 'false', autocorrect: 'off', autocapitalize: 'off' }),
         history(),
-        keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap]),
+        keymap.of([indentWithTab, { key: 'Mod-k', run: insertMarkdownLink }, ...defaultKeymap, ...historyKeymap]),
         // Drive the [[…]] autocomplete popup and report body changes
         EditorView.updateListener.of(update => {
           if (update.docChanged) onChangeRef.current(update.state.doc.toString().trimEnd())
