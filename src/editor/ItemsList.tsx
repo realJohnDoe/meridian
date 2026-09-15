@@ -9,6 +9,7 @@ import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, MarkdownTaskCard, TagChip, FlipList } from '@/components'
 import { isDimmed, priorityRank, occSortKey, compareSortKeys } from '@/calendar'
 import type { SortKey } from '@/calendar'
+import { occKind } from '@/occView'
 import { IconButton } from '@/components/primitives/icon-button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
@@ -53,10 +54,20 @@ type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
 // falling back to alphabetical order between the two row shapes (bucket
 // matches its own done state); a broken link resolves to nothing at all, so
 // it gets a bucket of its own past both active and done items.
+//
+// occSort.ts's shared typeKey groups notes with tasks (both fall to 3) —
+// harmless for every calendar view, which pre-filters to a single kind
+// before sorting (see UndatedListView), so the two never actually appear
+// side by side there. This list is the one place a note-link and a task can
+// land in the same sort: without a key of its own, a note would interleave
+// with tasks by priority/title (priorityRank(undefined) ties it with every
+// no-priority task) instead of reading as its own group. So a linked note
+// gets typeKey -1, ahead of every event (0-2) and task (3).
 export function rowSortKey({ entry, occ }: Row, now: Date): SortKey {
   if (entry.kind === 'link') {
     if (!occ) return { bucket: 2, typeKey: 0, prioKey: 0, jsTimeMs: 0, title: entry.ref }
-    return occSortKey(occ, now)
+    const key = occSortKey(occ, now)
+    return occKind(occ) === 'note' ? { ...key, typeKey: -1 } : key
   }
   return { bucket: entry.done ? 1 : 0, typeKey: 3, prioKey: priorityRank(undefined) + 1, jsTimeMs: 0, title: entry.text }
 }
