@@ -9,8 +9,9 @@ import {
   type DecorationSet,
   EditorView,
   type ViewUpdate,
+  type Command,
 } from '@codemirror/view'
-import { RangeSetBuilder } from '@codemirror/state'
+import { RangeSetBuilder, EditorSelection } from '@codemirror/state'
 import { focusedCursorLines } from './viewUtils'
 import { buildTaskLineMap } from './taskLines'
 import { isSafeUrl } from '../urlSafety'
@@ -73,6 +74,29 @@ class LinkWidget extends WidgetType {
   }
 
   override ignoreEvent(): boolean { return false }
+}
+
+// ── Insert-link command (Mod-k) ──────────────────────────────────
+// Wraps the selection as `[label](url)`. A selection that's already a URL
+// becomes the href instead of the label — pasting/typing a bare link and
+// hitting Mod-k shouldn't produce `[https://x](https://x)`. Either way the
+// caret lands in whichever slot is still empty, ready to type into.
+
+export const insertMarkdownLink: Command = view => {
+  const { state } = view
+  const tr = state.changeByRange(range => {
+    const selected = state.sliceDoc(range.from, range.to)
+    const asUrl = selected !== '' && isSafeUrl(selected)
+    const label = asUrl ? '' : selected
+    const url   = asUrl ? selected : ''
+    const caret = label === '' ? range.from + 1 : range.from + 3 + label.length
+    return {
+      changes: { from: range.from, to: range.to, insert: `[${label}](${url})` },
+      range: EditorSelection.cursor(caret),
+    }
+  })
+  view.dispatch(state.update(tr, { scrollIntoView: true, userEvent: 'input' }))
+  return true
 }
 
 // ── Marker widgets ────────────────────────────────────────────────

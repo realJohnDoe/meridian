@@ -7,6 +7,7 @@ import {
   markdownLanguage,
   markdownLivePreview,
   markdownListDecos,
+  insertMarkdownLink,
 } from './markdownFormatting'
 
 const views: EditorView[] = []
@@ -257,6 +258,37 @@ describe('markdownListDecos — hanging indent', () => {
     view.dispatch({ selection: { anchor: 2 } })
     // Indentation is cursor-independent, unlike the mark-hiding plugin.
     expect(lineRanges(view).map(r => r.class)).toEqual(['cm-ul-item'])
+  })
+})
+
+describe('insertMarkdownLink', () => {
+  it('wraps a plain-text selection as a link, caret in the empty url slot', () => {
+    const view = mkView('hello world')
+    view.dispatch({ selection: { anchor: 0, head: 5 } })
+
+    insertMarkdownLink(view)
+
+    expect(view.state.doc.toString()).toBe('[hello]() world')
+    expect(view.state.selection.main.head).toBe(8)
+  })
+
+  it('puts a URL selection into the href, caret in the empty label', () => {
+    const view = mkView('https://example.com')
+    view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } })
+
+    insertMarkdownLink(view)
+
+    expect(view.state.doc.toString()).toBe('[](https://example.com)')
+    expect(view.state.selection.main.head).toBe(1)
+  })
+
+  it('inserts an empty link with no selection, caret in the label', () => {
+    const view = mkView('')
+
+    insertMarkdownLink(view)
+
+    expect(view.state.doc.toString()).toBe('[]()')
+    expect(view.state.selection.main.head).toBe(1)
   })
 })
 
