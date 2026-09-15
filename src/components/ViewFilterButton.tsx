@@ -10,7 +10,7 @@ import { VaultIcon } from './vaultIcon'
 import { cn } from '@/lib/cn'
 import { keyVaultId } from '@/fileIO'
 import type { StoreItem } from '@/types'
-import type { VaultRef } from '@/vaultActions'
+import { sortVaults, type VaultRef } from '@/vaultActions'
 
 /** One vault's row in the tree: the vault, and the people who appear in it. */
 interface VaultGroup {
@@ -48,7 +48,9 @@ function useVaultGroups(items: StoreItem[], vaults: VaultRef[]): VaultGroup[] {
     }
     // Driven by `vaults`, not by the map: a registered vault with no entries
     // yet must still be listed, or there would be no way to un-hide it.
-    return vaults.map(vault => {
+    // Sorted the same way Settings' vault list is, so the two never disagree
+    // on calendar order.
+    return sortVaults(vaults).map(vault => {
       const bucket = byVault.get(vault.id)
       return {
         vault,
