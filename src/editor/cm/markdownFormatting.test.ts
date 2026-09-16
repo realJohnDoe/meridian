@@ -231,6 +231,25 @@ describe('markdownLivePreview — links', () => {
     expect(open).not.toHaveBeenCalled()
     expect(event.defaultPrevented).toBe(true)
   })
+
+  it('sizes an inline link inside a heading to match the heading level', () => {
+    const view = mkView('## [text](https://example.com)')
+    // First range hides `## `; the link widget is the second.
+    const [, link] = hideRanges(view)
+    expect(link!.widget!.toDOM(view).className).toBe('cm-md-link cm-md-link-h2')
+  })
+
+  it('sizes a bare autolink inside a heading to match the heading level', () => {
+    const view = mkView('# https://example.com')
+    const [, link] = hideRanges(view)
+    expect(link!.widget!.toDOM(view).className).toBe('cm-md-link cm-md-link-h1')
+  })
+
+  it('leaves a link outside a heading at the base size', () => {
+    const view = mkView('[text](https://example.com)\n\n## Heading')
+    const [deco] = hideRanges(view)
+    expect(deco!.widget!.toDOM(view).className).toBe('cm-md-link')
+  })
 })
 
 describe('markdownListDecos — hanging indent', () => {
