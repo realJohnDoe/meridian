@@ -11,7 +11,7 @@ import {
   createWikilinkExtension, wikilinkTheme,
 } from './cm/wikilinkDecorations'
 import { createTaskExtension, taskTheme } from './cm/taskDecorations'
-import { markdownLanguage, markdownHighlight, markdownLivePreview, markdownListDecos, markdownListTheme, insertMarkdownLink } from './cm/markdownFormatting'
+import { markdownLanguage, markdownHighlight, markdownLinkTheme, markdownLivePreview, markdownListDecos, markdownListTheme, insertMarkdownLink } from './cm/markdownFormatting'
 import { emptyPlaceholder, emptyPlaceholderTheme } from './cm/emptyPlaceholder'
 import { emptyLineCaret, emptyLineCaretTheme } from './cm/emptyLineCaret'
 import WikilinkPopup, { type WlPopupState } from './WikilinkPopup'
@@ -129,6 +129,7 @@ export default function EntryBody({ body, roots, vaultId, items, viewRef, onOpen
         markdownLanguage,
         indentUnit.of('  '),
         markdownHighlight,
+        markdownLinkTheme,
         markdownListTheme,
         markdownListDecos,
         markdownLivePreview,

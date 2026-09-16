@@ -24,16 +24,34 @@ export const markdownLanguage = markdown({ extensions: [Autolink] })
 
 // ── Highlight style ───────────────────────────────────────────────
 
+// Shared with markdownLinkTheme below: a link widget inside a heading takes
+// on the same size/weight as the heading text around it, the way an <a>
+// inherits font-size/weight from its <h1>/<h2>/<h3> parent in rendered HTML.
+const headingStyle: Record<1 | 2 | 3, { fontWeight: string; fontSize: string }> = {
+  1: { fontWeight: '700', fontSize: '1.5em' },
+  2: { fontWeight: '700', fontSize: '1.25em' },
+  3: { fontWeight: '600', fontSize: '1.1em' },
+}
+
 export const markdownHighlight = syntaxHighlighting(
   HighlightStyle.define([
-    { tag: t.heading1, fontWeight: '700', fontSize: '1.5em' },
-    { tag: t.heading2, fontWeight: '700', fontSize: '1.25em' },
-    { tag: t.heading3, fontWeight: '600', fontSize: '1.1em' },
+    { tag: t.heading1, ...headingStyle[1] },
+    { tag: t.heading2, ...headingStyle[2] },
+    { tag: t.heading3, ...headingStyle[3] },
     { tag: t.strong,   fontWeight: '700' },
     { tag: t.emphasis, fontStyle: 'italic' },
     { tag: t.monospace, fontFamily: 'monospace' },
   ]),
 )
+
+// A Link/URL node is replaced wholesale by LinkWidget (see below), so the tree
+// has no text left there for markdownHighlight to tag — it needs its own copy
+// of the same sizing, keyed off the modifier class LinkWidget adds.
+export const markdownLinkTheme = EditorView.theme({
+  '.cm-md-link-h1': headingStyle[1],
+  '.cm-md-link-h2': headingStyle[2],
+  '.cm-md-link-h3': headingStyle[3],
+})
 
 // ── List item indentation theme ───────────────────────────────────
 // hanging-indent so wrapped lines align with the text start, not the marker
@@ -56,12 +74,12 @@ const markDigits = (label: string) => label.replace(/\D/g, '').length
 // ── Link widget ───────────────────────────────────────────────────
 
 class LinkWidget extends WidgetType {
-  constructor(readonly label: string, readonly url: string) { super() }
+  constructor(readonly label: string, readonly url: string, readonly headingLevel?: 1 | 2 | 3) { super() }
 
   toDOM(): HTMLElement {
     const span = document.createElement('span')
     span.textContent = this.label
-    span.className = 'cm-md-link'
+    span.className = this.headingLevel ? `cm-md-link cm-md-link-h${this.headingLevel}` : 'cm-md-link'
     span.addEventListener('mousedown', e => {
       e.preventDefault()
       if (isSafeUrl(this.url)) window.open(this.url, '_blank', 'noopener,noreferrer')
@@ -70,10 +88,20 @@ class LinkWidget extends WidgetType {
   }
 
   override eq(other: LinkWidget): boolean {
-    return other.label === this.label && other.url === this.url
+    return other.label === this.label && other.url === this.url && other.headingLevel === this.headingLevel
   }
 
   override ignoreEvent(): boolean { return false }
+}
+
+// Link/URL nodes sit directly under their enclosing ATXHeadingN/SetextHeadingN
+// node (headings have no intermediate Paragraph), so one parent check suffices —
+// no need to walk further up the tree. Typed structurally off `.name` alone,
+// matching the rest of this file's avoidance of a direct @lezer/common import
+// (see taskLines.ts).
+function enclosingHeadingLevel(parent: { name: string } | null): 1 | 2 | 3 | undefined {
+  const m = parent && /^(?:ATX|Setext)Heading([1-3])$/.exec(parent.name)
+  return m ? (Number(m[1]) as 1 | 2 | 3) : undefined
 }
 
 // ── Insert-link command (Mod-k) ──────────────────────────────────
@@ -195,7 +223,8 @@ function buildHideDecorations(view: EditorView): DecorationSet {
         const href = /^[a-z][-\w+.]*:/i.test(raw) ? raw
           : raw.includes('@') ? `mailto:${raw}`
           : `https://${raw}`
-        builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(raw, href) }))
+        const level = enclosingHeadingLevel(node.node.parent)
+        builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(raw, href, level) }))
         return false
       } else if (node.name === 'Link') {
         // Inline link `[text](url)`: lezer emits LinkMark for each of [ ] ( ),
@@ -210,7 +239,8 @@ function buildHideDecorations(view: EditorView): DecorationSet {
             ? doc.sliceString(marks[0]!.to, marks[1]!.from)  // length >= 2 checked
             : ''
           const url = doc.sliceString(urlNode.from, urlNode.to)
-          builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(label || url, url) }))
+          const level = enclosingHeadingLevel(node.node.parent)
+          builder.add(node.from, node.to, Decoration.replace({ widget: new LinkWidget(label || url, url, level) }))
           return false  // skip children — whole node is replaced
         }
         return  // no URL: fall through, leave children to render normally
