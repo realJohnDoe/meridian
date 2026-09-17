@@ -35,8 +35,8 @@ function Checkbox({
       )}>
         <CheckboxPrimitive.Indicator data-slot="checkbox-indicator" className="flex w-full h-full items-center justify-center">
           {props.checked === 'indeterminate'
-            ? <Minus className="size-[55%] stroke-white fill-none" strokeWidth={3} />
-            : <Check className="size-[55%] stroke-white fill-none" strokeWidth={2.5} />}
+            ? <Minus className="size-[55%] stroke-task-foreground fill-none" strokeWidth={3} />
+            : <Check className="size-[55%] stroke-task-foreground fill-none" strokeWidth={2.5} />}
         </CheckboxPrimitive.Indicator>
       </span>
     </CheckboxPrimitive.Root>
