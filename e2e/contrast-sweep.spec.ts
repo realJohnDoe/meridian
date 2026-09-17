@@ -171,10 +171,23 @@ const ROUTES = [
  *    catch (WCAG doesn't model chip-on-row compositing — see the on-accent
  *    text comments throughout this file), so it wants a deliberate look
  *    rather than a reflexive token nudge.
+ *
+ * meridian rose separately (0 to 2 on the six app routes, from its own
+ * baseline, not #1026): src/index.css's --primary-foreground for .meridian
+ * moved from ink-dark to ink-light so occurrence pills/priority buttons on
+ * event/priority-1/priority-2 read with the same light ink as event's own
+ * "alias of primary" comment implies (WCAG's luminance math prefers dark ink
+ * there too, but light reads better in practice — see index.css). --primary
+ * itself moved with it, so anything painted bg-primary/text-primary-foreground
+ * now reads white-on-indigo at 3.25-3.48:1 rather than dark-on-indigo at
+ * 5.79:1 — the mini-month's "today" day-badge and CoachTour's "Next →"
+ * button, both only present on the app-shell routes. Same call as
+ * rose-pine-dawn's own white-on-purple today-badge above: a deliberate
+ * design tradeoff, not something a token nudge should silently claw back.
  */
 const FLOOR: Record<string, Record<string, number>> = {
   meridian: {
-    '/': 0, '/backlog': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09': 0,
+    '/': 2, '/backlog': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
     '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
   'meridian-light': {

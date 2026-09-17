@@ -56,7 +56,12 @@
 
   /* Domain tokens */
   --color-backdrop:       var(--backdrop);
-  --color-event:          var(--event);
+  /* event is a domain-color name for the same swatch as primary — every
+     theme's --event literal was byte-identical to its --primary (see git
+     history), so this points straight at primary instead of restating that
+     value a 10th time per theme. Same move as --color-destructive-foreground
+     below aliasing primary-foreground rather than carrying its own token. */
+  --color-event:          var(--primary);
   --color-task:           var(--task);
   --color-note:           var(--note);
   --color-brand-cyan:     var(--brand-cyan);
@@ -66,8 +71,11 @@
   /* On-accent text for solid domain-color chips — each theme picks whichever
      of its two ink colors (--ink-light/--ink-dark) contrasts best against
      that specific swatch, so swatches can stay at their vivid brand hue
-     instead of being darkened/lightened to fit one universal ink. */
-  --color-event-foreground:      var(--event-foreground);
+     instead of being darkened/lightened to fit one universal ink.
+     event-foreground aliases primary-foreground for the same reason
+     --color-event does above — every theme already picked the same ink for
+     both. */
+  --color-event-foreground:      var(--primary-foreground);
   --color-task-foreground:       var(--task-foreground);
   --color-note-foreground:       var(--note-foreground);
   --color-priority-1-foreground: var(--priority-1-foreground);
@@ -150,7 +158,17 @@
 
   /* Brand */
   --primary:            oklch(0.68 0.22 278);   /* indigo — balanced for text on dark surfaces and filled button bg */
-  --primary-foreground: var(--ink-dark);        /* near-black ink, like tokyo-night/dracula — reads better on our light pastel accents than white */
+  /* ink-light, not ink-dark: WCAG's luminance-only math prefers dark ink here
+     (measured against the compiled bg-primary/text-primary-foreground utility
+     classes in a real Chromium — dark clears 5.79:1 vs light's 3.25:1, and
+     only dark clears AA's 4.5:1 body-text floor outright), but light reads
+     better in practice on this theme's indigo/red/orange family — kept per
+     design call, same kind of override .rose-pine-dawn/.solarized-light/
+     .solarized-dark/.catppuccin-latte make for their own light-surface chips
+     (see those blocks' comments). This is what event/priority-1/priority-2
+     inherit below via --color-event/-foreground aliasing --primary/
+     -foreground, so all four move together. */
+  --primary-foreground: var(--ink-light);
 
   /* On-accent ink pair — see --*-foreground assignments below */
   --ink-dark:  var(--background);
@@ -160,8 +178,8 @@
   --border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 92%);   /* slate at ~8% */
   --input:  color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);   /* slate at ~15% */
 
-  /* Domain colors (no shadcn home) */
-  --event:        oklch(0.71 0.20 278);   /* indigo — alias of primary */
+  /* Domain colors (no shadcn home). event isn't listed here — it aliases
+     --primary/--primary-foreground directly (see the @theme inline block). */
   --task:         oklch(0.84 0.17 145);   /* green */
   --note:         oklch(0.75 0.17 215);   /* sky blue */
   --brand-cyan:   oklch(0.77 0.14 208);   /* sky blue — gradient accent */
@@ -169,21 +187,15 @@
   --priority-2:   oklch(0.76 0.17 48);    /* orange */
   --priority-3:   oklch(0.88 0.18 82);    /* yellow */
 
-  /* On-accent text — all domain colors here are light pastels, so dark ink
-     wins on every swatch (same pattern as .tokyo-night/.dracula/
-     .catppuccin-mocha — see those blocks). Was ink-light on event/
-     priority-1/priority-2 (a mistake this theme didn't share with any other
-     dark theme, and contradicted its own --primary-foreground: var(--ink-dark)
-     despite --event being described as "alias of primary" two lines up):
-     measured in a real Chromium against these exact compiled utility classes,
-     that pairing cleared only 2.33–2.85:1 (event, priority-1, priority-2),
-     failing AA's 4.5:1 outright, while ink-dark clears 5.79–8.08:1 on the
-     same three swatches. */
-  --event-foreground:      var(--ink-dark);
+  /* On-accent text — task/note/priority-3 are light pastels where dark ink
+     wins outright (WCAG agrees). priority-1/priority-2 get the same
+     light-ink design call as --primary-foreground above, for the same
+     reason (measured 2.79-2.85:1 for light vs 6.74-8.08:1 for dark on
+     these two — WCAG prefers dark, light reads better in practice). */
   --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-dark);
-  --priority-1-foreground: var(--ink-dark);
-  --priority-2-foreground: var(--ink-dark);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
   /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
@@ -241,8 +253,10 @@
      above just toned down for a resting (non-floating) element. */
   --shadow-card: 0 1px 3px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
 
-  /* event-border used in EntryBody wikilink underline */
-  --event-border: color-mix(in oklab, var(--event), transparent 68%);
+  /* event-border used in EntryBody wikilink underline. var(--primary), not
+     var(--event) — event no longer exists as its own custom property, see
+     the @theme inline block's --color-event. */
+  --event-border: color-mix(in oklab, var(--primary), transparent 68%);
 
   /* Layout & fonts (not themed) */
   --control-h: 1.75rem;
@@ -355,8 +369,9 @@
   --border: color-mix(in oklab, oklch(0.51 0.038 250), transparent 78%);
   --input:  color-mix(in oklab, oklch(0.51 0.038 250), transparent 68%);
 
-  /* Domain colors — .meridian's hues, darkened for a light ground */
-  --event:        oklch(0.52 0.20 278);   /* indigo — alias of primary */
+  /* Domain colors — .meridian's hues, darkened for a light ground. event
+     isn't listed here — it aliases --primary/--primary-foreground directly
+     (see the @theme inline block). */
   --task:         oklch(0.53 0.15 145);   /* green */
   --note:         oklch(0.53 0.13 215);   /* sky blue */
   --brand-cyan:   oklch(0.53 0.12 208);   /* sky blue — gradient accent */
@@ -369,7 +384,6 @@
      orange/yellow and so take dark ink instead. Unlike the borrowed light
      themes, this is not a judgment call against the metric: each choice
      wins on merit for its own swatch. */
-  --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
@@ -439,8 +453,8 @@
   --border: color-mix(in oklab, #565f89, transparent 80%);
   --input:  color-mix(in oklab, #565f89, transparent 70%);
 
-  /* Domain colors */
-  --event:        #bb9af7;   /* purple — alias of primary */
+  /* Domain colors. event isn't listed here — it aliases
+     --primary/--primary-foreground directly (see the @theme inline block). */
   --task:         #9ece6a;   /* green */
   --note:         #7dcfff;   /* cyan */
   --brand-cyan:   #7dcfff;   /* cyan */
@@ -449,7 +463,6 @@
   --priority-3:   #e0af68;   /* yellow */
 
   /* On-accent text — all domain colors here are light pastels, so dark ink wins */
-  --event-foreground:      var(--ink-dark);
   --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-dark);
   --priority-1-foreground: var(--ink-dark);
@@ -516,8 +529,10 @@
   --border: color-mix(in oklab, #9893a5, transparent 78%);
   --input:  color-mix(in oklab, #9893a5, transparent 68%);
 
-  /* Domain colors — vivid, undarkened brand hues */
-  --event:        #907aa9;   /* iris */
+  /* Domain colors — vivid, undarkened brand hues. event isn't listed here —
+     it aliases --primary/--primary-foreground directly (see the @theme
+     inline block); --primary above is this same iris, so it picks up the
+     same light-ink call as task below. */
   --task:         #6a8c3a;   /* olive green */
   --note:         #286983;   /* pine */
   --brand-cyan:   #56949f;   /* foam */
@@ -530,7 +545,6 @@
      WCAG's luminance-only math prefers dark ink for event/task too (this
      theme sits chips on a light row background, which the metric doesn't
      model), but light reads better in practice here; kept per design call. */
-  --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
@@ -572,8 +586,9 @@
   --primary:            #6c71c4;
   --primary-foreground: var(--ink-light);
 
-  /* Domain colors — vivid, undarkened brand hues */
-  --event:        #6c71c4;   /* violet */
+  /* Domain colors — vivid, undarkened brand hues. event isn't listed here —
+     it aliases --primary/--primary-foreground directly (see the @theme
+     inline block); --primary above is this same violet. */
   --task:         #859900;   /* green */
   --note:         #2aa198;   /* cyan */
   --brand-cyan:   #2aa198;
@@ -586,7 +601,6 @@
      luminance-only math (see .solarized-light's own --ink-dark comment,
      below), but light ink reads better in practice here (this theme sits
      chips on a light row background, which the metric doesn't model). */
-  --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
@@ -753,8 +767,8 @@
   --border: color-mix(in oklab, #6272a4, transparent 80%);
   --input:  color-mix(in oklab, #6272a4, transparent 70%);
 
-  /* Domain colors */
-  --event:        #bd93f9;   /* purple — alias of primary */
+  /* Domain colors. event isn't listed here — it aliases
+     --primary/--primary-foreground directly (see the @theme inline block). */
   --task:         #50fa7b;   /* green */
   --note:         #8be9fd;   /* cyan */
   --brand-cyan:   #8be9fd;   /* cyan */
@@ -763,7 +777,6 @@
   --priority-3:   #f1fa8c;   /* yellow */
 
   /* On-accent text — all domain colors here are light pastels, so dark ink wins */
-  --event-foreground:      var(--ink-dark);
   --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-dark);
   --priority-1-foreground: var(--ink-dark);
@@ -831,8 +844,10 @@
   --border: color-mix(in oklab, #9ca0b0, transparent 78%);
   --input:  color-mix(in oklab, #9ca0b0, transparent 68%);
 
-  /* Domain colors — vivid Catppuccin hues, dark enough to read on light bg */
-  --event:        #8839ef;   /* mauve — alias of primary */
+  /* Domain colors — vivid Catppuccin hues, dark enough to read on light bg.
+     event isn't listed here — it aliases --primary/--primary-foreground
+     directly (see the @theme inline block); --primary above is this same
+     mauve. */
   --task:         #40a02b;   /* green */
   --note:         #179299;   /* teal */
   --brand-cyan:   #179299;
@@ -848,7 +863,6 @@
      WCAG's luminance-only math prefers dark ink for task/note/priority-2
      too (this theme sits chips on a light row background, which the
      metric doesn't model), but light reads better in practice here. */
-  --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-light);
   --note-foreground:       var(--ink-light);
   --priority-1-foreground: var(--ink-light);
@@ -916,8 +930,9 @@
   --border: color-mix(in oklab, #6c7086, transparent 80%);
   --input:  color-mix(in oklab, #6c7086, transparent 70%);
 
-  /* Domain colors — vivid Catppuccin Mocha hues */
-  --event:        #cba6f7;   /* mauve — alias of primary */
+  /* Domain colors — vivid Catppuccin Mocha hues. event isn't listed here —
+     it aliases --primary/--primary-foreground directly (see the @theme
+     inline block); --primary above is this same mauve. */
   --task:         #a6e3a1;   /* green */
   --note:         #94e2d5;   /* teal */
   --brand-cyan:   #94e2d5;
@@ -927,7 +942,6 @@
 
   /* On-accent text — all domain colors here are light pastels, so dark
      ink wins on every swatch (same pattern as .tokyo-night/.dracula). */
-  --event-foreground:      var(--ink-dark);
   --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-dark);
   --priority-1-foreground: var(--ink-dark);
