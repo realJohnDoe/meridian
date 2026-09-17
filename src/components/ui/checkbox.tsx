@@ -34,9 +34,16 @@ function Checkbox({
         visualClassName,
       )}>
         <CheckboxPrimitive.Indicator data-slot="checkbox-indicator" className="flex w-full h-full items-center justify-center">
+          {/* var(--ink-light), not chip-tint-foreground: chip-tint-foreground
+              flips to dark ink in light themes (measurably better contrast —
+              7-10:1 there vs ink-light's 1.95-2.59:1, under the 3:1 icon-
+              contrast floor — see git history), but a checkmark that's light
+              in dark themes and dark in light themes read as inconsistent.
+              Kept uniformly light per design call, same kind of override as
+              the on-accent text choices in index.css. */}
           {props.checked === 'indeterminate'
-            ? <Minus className="size-[55%] stroke-chip-tint-foreground fill-none" strokeWidth={3} />
-            : <Check className="size-[55%] stroke-chip-tint-foreground fill-none" strokeWidth={2.5} />}
+            ? <Minus className="size-[55%] stroke-[var(--ink-light)] fill-none" strokeWidth={3} />
+            : <Check className="size-[55%] stroke-[var(--ink-light)] fill-none" strokeWidth={2.5} />}
         </CheckboxPrimitive.Indicator>
       </span>
     </CheckboxPrimitive.Root>
