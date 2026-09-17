@@ -169,21 +169,23 @@
   --priority-2:   oklch(0.76 0.17 48);    /* orange */
   --priority-3:   oklch(0.88 0.18 82);    /* yellow */
 
-  /* On-accent text — all domain colors here are light pastels, so dark ink
-     wins on every swatch (same pattern as .tokyo-night/.dracula/
-     .catppuccin-mocha — see those blocks). Was ink-light on event/
-     priority-1/priority-2 (a mistake this theme didn't share with any other
-     dark theme, and contradicted its own --primary-foreground: var(--ink-dark)
-     despite --event being described as "alias of primary" two lines up):
-     measured in a real Chromium against these exact compiled utility classes,
-     that pairing cleared only 2.33–2.85:1 (event, priority-1, priority-2),
-     failing AA's 4.5:1 outright, while ink-dark clears 5.79–8.08:1 on the
-     same three swatches. */
-  --event-foreground:      var(--ink-dark);
+  /* On-accent text — task/note/priority-3 are light pastels where dark ink
+     wins outright. WCAG's luminance-only math prefers dark ink on event/
+     priority-1/priority-2 too (measured against the actual compiled utility
+     classes in a real Chromium: light ink clears only 2.33-2.85:1 on these
+     three, under AA's 4.5:1, vs 5.79-8.08:1 for dark), but light reads
+     better in practice on this theme's purple/red/orange — kept per design
+     call, same override .rose-pine-dawn/.solarized-light/.solarized-dark/
+     .catppuccin-latte make for their own light-surface chips (see those
+     blocks' comments). Unlike those four, this is a dark theme, so it's the
+     one dark theme where event/priority-1/priority-2 diverge from
+     --primary-foreground's ink-dark despite --event being primary's own
+     alias — that divergence is the deliberate part, not a bug. */
+  --event-foreground:      var(--ink-light);
   --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-dark);
-  --priority-1-foreground: var(--ink-dark);
-  --priority-2-foreground: var(--ink-dark);
+  --priority-1-foreground: var(--ink-light);
+  --priority-2-foreground: var(--ink-light);
   --priority-3-foreground: var(--ink-dark);
 
   /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
