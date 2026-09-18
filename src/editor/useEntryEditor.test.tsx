@@ -139,6 +139,28 @@ describe('useEntryEditor', () => {
     return occ
   }
 
+  it('a brand-new entry keeps what was typed once its first save creates the file', () => {
+    // The form derives every untouched field from the store, and a brand-new
+    // entry has no store row until its first save makes one. If the edit set
+    // were emptied before the view switched onto that row, the form would fall
+    // back to the seed and blank the title the save had just written.
+    const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy milk'))
+
+    act(() => { result.current.scheduleAutoSave('some notes') })
+    act(() => { vi.advanceTimersByTime(1500) })
+
+    expect(result.current.entry.title).toBe('Buy milk')
+    expect(result.current.entry.body).toBe('some notes')
+    expect(result.current.createdKey).not.toBeNull()
+
+    // And a later edit still lands on the same file rather than a second one.
+    act(() => { result.current.dialogHandlers.onPriority('high') })
+    const key = result.current.createdKey!
+    expect(persistence.contentByKey.get(key) ?? '').toContain('priority: high')
+    expect(persistence.contentByKey.get(key) ?? '').toContain('Buy milk')
+    expect(new Set(persistence.writes).size).toBe(1)
+  })
+
   it('a second "future" save edits the series the first one split off', () => {
     // Splitting again off the stale owner capped an already-capped series and
     // stood a second new one beside it, so the split day grew an occurrence

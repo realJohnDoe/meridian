@@ -216,7 +216,7 @@ describe('saveNode — writes only the fields the editor changed', () => {
     const { occ, base } = openEditorOn('')
     seedStore([rawItem(occ)], makeRoots('essensplan', { title: 'Essensplan', body: 'Nudeln am Dienstag' }))
 
-    saveNode(occ, 'single', { ...base, priority: 'high' }, { base })
+    saveNode(occ, 'single', { ...base, priority: 'high' }, { edits: { priority: 'high' } })
 
     expect(storedBody()).toBe('Nudeln am Dienstag')
     const saved = useStore.getState().items.find(i => i.id === 'occ-1') as { metadata: { priority?: string } } | undefined
@@ -226,7 +226,7 @@ describe('saveNode — writes only the fields the editor changed', () => {
   it('still writes the body when the editor is the one that changed it', () => {
     const { occ, base } = openEditorOn('old text')
 
-    saveNode(occ, 'single', { ...base, body: 'new text' }, { base })
+    saveNode(occ, 'single', { ...base, body: 'new text' }, { edits: { body: 'new text' } })
 
     expect(storedBody()).toBe('new text')
   })
@@ -234,14 +234,15 @@ describe('saveNode — writes only the fields the editor changed', () => {
   it('lets the editor clear a field it actually cleared', () => {
     const { occ, base } = openEditorOn('old text')
 
-    saveNode(occ, 'single', { ...base, body: '' }, { base })
+    saveNode(occ, 'single', { ...base, body: '' }, { edits: { body: '' } })
 
     expect(storedBody()).toBe('')
   })
 
-  it('writes every field when no base is supplied, as before', () => {
-    // The compatibility path: callers with no snapshot to compare against
-    // (a brand-new entry, a promoted checklist line) keep the old behaviour.
+  it('writes every field when no edit record is supplied, as before', () => {
+    // The compatibility path: callers with no record of what the user touched
+    // (a brand-new entry, a promoted checklist line, the debug view) keep the
+    // old write-the-lot behaviour.
     const { occ, base } = openEditorOn('')
     seedStore([rawItem(occ)], makeRoots('essensplan', { title: 'Essensplan', body: 'added elsewhere' }))
 
@@ -254,7 +255,7 @@ describe('saveNode — writes only the fields the editor changed', () => {
     const { occ, base } = openEditorOn('')
     seedStore([rawItem(occ)], makeRoots('essensplan', { title: 'Essensplan KW35' }))
 
-    saveNode(occ, 'single', { ...base, priority: 'high' }, { base })
+    saveNode(occ, 'single', { ...base, priority: 'high' }, { edits: { priority: 'high' } })
 
     expect((useStore.getState().roots.get(testKey('essensplan')) as { title?: string } | undefined)?.title).toBe('Essensplan KW35')
   })
@@ -265,7 +266,7 @@ describe('saveNode — writes only the fields the editor changed', () => {
     const { occ, base } = openEditorOn('some text')
     useStore.getState().setData(new Map())
 
-    saveNode(occ, 'single', { ...base, priority: 'high' }, { base })
+    saveNode(occ, 'single', { ...base, priority: 'high' }, { edits: { priority: 'high' } })
 
     expect(storedBody()).toBe('some text')
   })
@@ -293,7 +294,7 @@ Buy milk.
     const [occ] = expandRange(parsed.items, new Map([[parsed.key, parsed.root]]), new Date(2020, 0, 1), new Date(2030, 0, 1))
     const base = entryFromOccurrence(occ!, 'all')
 
-    saveNode(occ!, 'all', { ...base, title: 'Groceries (weekly)' }, { base })
+    saveNode(occ!, 'all', { ...base, title: 'Groceries (weekly)' }, { edits: { title: 'Groceries (weekly)' } })
 
     // `tags` is a file-level field (fieldRegistry.ts's FILE_LEVEL_SPECS), so a
     // malformed value for it lands on the root's extra, not the item's — see
@@ -340,15 +341,16 @@ instances:
 
     // useEntryEditor's useState initialiser — pinned for the whole session.
     const pinned = occ
-    let base = entryFromOccurrence(pinned, 'single')
+    const base = entryFromOccurrence(pinned, 'single')
 
     // Move it (the date-picker save).
-    const moved = { ...base, scheduled: { date: '2026-07-24', time: '' } }
-    saveNode(pinned, 'single', moved, { base })
-    base = moved // useEntryEditor's commitEntry advances baseRef.current on a successful save
+    const scheduled = { date: '2026-07-24', time: '' }
+    saveNode(pinned, 'single', { ...base, scheduled }, { edits: { scheduled } })
 
-    // Later in the same session: tick it done, without touching the date.
-    saveNode(pinned, 'single', { ...base, done: true }, { base })
+    // Later in the same session: tick it done, without touching the date. The
+    // editor's edit set is empty again after the save above, so this save
+    // names `done` and nothing else.
+    saveNode(pinned, 'single', { ...base, scheduled, done: true }, { edits: { done: true } })
 
     const key = testKey('plants')
     const items = useStore.getState().items.filter(i => i.entryKey === key)
