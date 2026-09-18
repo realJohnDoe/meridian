@@ -332,6 +332,20 @@ export function useEntryEditor(
    * Scope 'add' has always been exempt from the meta save for the same reason
    * (`saveMeta`), just expressed one layer down: choosing "add new occurrence"
    * must not add one. The rule is the same for every scope.
+   *
+   * The base moves with the form, because `applyScope` reads those two fields
+   * out of the store: at the new scope they are what the store holds, which is
+   * exactly what `baseRef` means. Left behind, it went on describing the old
+   * scope — and since 'single' drops the repeat, opening a recurring entry
+   * (the default scope) and switching to "Edit repeat pattern" left a base
+   * saying `repeat: null`. The next save then read its own scope switch as a
+   * third writer: base null, editor's new rule, store's old one, all
+   * different, which is `overlappingFields`' definition of a conflict. Every
+   * repeat change made that way warned "the repeat also changed somewhere
+   * else" with nobody else on the vault. Not a `done` switch too: that one is
+   * a form-only nicety for 'add' (a scope that never merges against the base
+   * at all — see `touchedFieldsOnly`), and adopting it would let a scope
+   * switch swallow a real edit.
    */
   const handleScopeChange = (scope: EditScope) => {
     if (!entry.item) return
@@ -342,6 +356,7 @@ export function useEntryEditor(
     // switched from happened to be done.
     const done = scope === 'add' ? false : entry.done
     setEntry({ ...entry, editScope: scope, scheduled, repeat, done })
+    baseRef.current = { ...baseRef.current, editScope: scope, scheduled, repeat }
   }
 
   const handleTypeChange = (t: ItemType) => {

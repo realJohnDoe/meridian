@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { toast } from 'sonner'
 import type * as ReactRouter from '@tanstack/react-router'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
 import type { FileMetadata, Roots } from '@/types'
@@ -120,6 +121,32 @@ describe('useEntryEditor', () => {
     act(() => { result.current.handleScopeChange('future') })
 
     expect(result.current.entry.repeat).toEqual({ type: 'schedule', freq: 'daily' })
+  })
+
+  it('changing the repeat after a scope switch does not report a conflict with nobody', () => {
+    // The reported flow: an after_completion task, its interval changed from 2
+    // days to 3, on a vault only this device writes to — and a toast saying
+    // "the repeat also changed somewhere else". The repeat is only editable at
+    // 'all' scope, so the scope switch always precedes the change; it left
+    // `baseRef` describing 'single' scope, where `applyScope` drops the repeat
+    // entirely. The save then saw base `null`, editor '3 days' and store
+    // '2 days' — three different values for one field, which is what
+    // `overlappingFields` calls a conflict.
+    const series = makeSeries({
+      id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+      repeat: { type: 'after_completion', interval: '2 days' },
+    })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-09-10', time: null, metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
+    seedStore([series, occ], makeRoots('note.md'))
+    const warning = vi.spyOn(toast, 'warning').mockImplementation(() => '')
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('all') })
+    act(() => { result.current.dialogHandlers.onRepeatConfirm({ type: 'after_completion', interval: '3 days' }) })
+
+    expect(warning).not.toHaveBeenCalled()
+    expect(persistence.contentByKey.get(testKey('note.md')) ?? '').toContain('interval: 3 days')
+    warning.mockRestore()
   })
 
   it('autosave debounces body writes by 1500ms and commits the latest scheduled body', () => {
