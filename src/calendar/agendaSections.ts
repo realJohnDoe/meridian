@@ -70,6 +70,17 @@ function occRowKey(dateKey: string, o: Occurrence): string {
 }
 
 /**
+ * The row key `o`'s own day row would carry, computed without walking the
+ * built rows — for a caller (AgendaView's done-toggle) that needs to name a
+ * specific occurrence's row before the rebuild it's about to trigger has
+ * happened. Null for an occurrence with no instant, which never gets a day
+ * row of its own.
+ */
+export function occRowKeyFor(o: Occurrence): string | null {
+  return o.metadata.jsTime ? occRowKey(fmtISO(o.metadata.jsTime), o) : null
+}
+
+/**
  * Overdue's grouped rows — one per series, carrying its representative
  * occurrence's own date on the card (`showDate` in the renderer) rather than a
  * gutter day badge, since a group spans many different days.
