@@ -29,3 +29,24 @@ export function parseItemEntry(raw: string): ItemEntry {
 export function serializeTaskEntry(text: string, done: boolean): string {
   return `${done ? '[x]' : '[ ]'} ${text}`
 }
+
+/**
+ * A stable identity per entry, in `items` order.
+ *
+ * The array index cannot serve as one: removing an item re-indexes every later
+ * item, so index-keyed rows trade identities behind the animation layer, which
+ * then glides each surviving row from wherever its *neighbour* used to be — the
+ * list appears to shuffle on a removal that moved nothing. The content is
+ * stable under the one field the user changes in place (a task's done state
+ * lives outside the key; a link's target file owns its own), with a counter
+ * appended so the duplicates a hand-edited file may hold stay distinct.
+ */
+export function itemKeys(entries: readonly ItemEntry[]): string[] {
+  const seen = new Map<string, number>()
+  return entries.map(e => {
+    const base = e.kind === 'link' ? `link:${e.ref}` : `task:${e.text}`
+    const n = seen.get(base) ?? 0
+    seen.set(base, n + 1)
+    return n === 0 ? base : `${base}#${n}`
+  })
+}

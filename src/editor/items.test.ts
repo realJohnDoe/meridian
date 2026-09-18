@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseItemEntry, serializeTaskEntry, TASK_ITEM_RE } from './items'
+import { parseItemEntry, itemKeys, serializeTaskEntry, TASK_ITEM_RE } from './items'
 
 describe('TASK_ITEM_RE', () => {
   it('matches unchecked task', () => {
@@ -99,5 +99,29 @@ describe('serializeTaskEntry', () => {
     roundTrip('buy milk', false)
     roundTrip('buy milk', true)
     roundTrip('multi word task with spaces', false)
+  })
+})
+
+describe('itemKeys', () => {
+  const keysOf = (raws: string[]) => itemKeys(raws.map(parseItemEntry))
+
+  it('identifies a row by its content, not its position', () => {
+    expect(keysOf(['[[note]]', '[ ] buy milk'])).toEqual(['link:note', 'task:buy milk'])
+  })
+
+  it('keeps every surviving key unchanged when an earlier item is removed', () => {
+    const before = keysOf(['[ ] first', '[[note]]', '[ ] last'])
+    const after  = keysOf(['[[note]]', '[ ] last'])
+    expect(after).toEqual(before.slice(1))
+  })
+
+  it('keeps a task\'s key unchanged when it is ticked done', () => {
+    expect(keysOf(['[x] buy milk'])).toEqual(keysOf(['[ ] buy milk']))
+  })
+
+  it('distinguishes duplicate entries with a counter', () => {
+    expect(keysOf(['[ ] dup', '[x] dup', '[[note]]', '[[note]]'])).toEqual([
+      'task:dup', 'task:dup#1', 'link:note', 'link:note#1',
+    ])
   })
 })
