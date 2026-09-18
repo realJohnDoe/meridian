@@ -740,6 +740,22 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields, touch
  * Cap the existing series at the day before occDate and start a new sibling
  * series from occDate onward. Falls back to `applyAll` when occ is not part of
  * a series (standalone occurrence edited with scope 'future').
+ *
+ * **A series is never split at its own first occurrence.** Every occurrence of
+ * such a series is at or after occDate, so "this and all following" is the
+ * whole series — `applyAll`. Splitting anyway capped the series the day before
+ * it began and stood a second one beside it, which is what a *second* 'future'
+ * save in one editor session used to do: `applyEdit` re-homes the pinned
+ * occurrence onto the series the first split made, that series starts on
+ * occDate, and without this guard the split day grew an extra occurrence per
+ * edit. It stands on its own too — opening a series' own first occurrence and
+ * picking 'future' left the same dead leg.
+ *
+ * (An override dragged to a date *before* its series' anchor is the one case
+ * this over-reaches: `applyAll` reaches it where a split would have left it
+ * behind. Strictly better than the dead leg it replaces, and the alternative —
+ * splitting at a date no occurrence starts on — is not a rule anyone could
+ * predict.)
  */
 function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touched?: TouchedKeys): StoreData {
   const { scheduled, repeat } = fields
@@ -749,6 +765,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
     ? (entry.items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined)
     : undefined
   if (!series) return applyAll(data, occ, fields, touched)
+  if (series.date === occ.date) return applyAll(data, occ, fields, touched)
 
   const occDate = occ.date
   const newSeriesId = crypto.randomUUID()
@@ -885,13 +902,41 @@ export function applyEdit(
     const items: Entry['items'] = [freshItem(occ.entryKey, fields, occ.ownerId ?? occ.id)]
     return { ...data, entries: withEntry(data.entries, editedEntry(undefined, occ.entryKey, fields, items)) }
   }
+  const live = withLiveOwner(existing, occ)
   switch (scope) {
-    case 'all':    return applyAll(data, occ, fields, touchedKeys)
-    case 'single': return applySingle(data, occ, fields, touchedKeys)
-    case 'future': return applyFuture(data, occ, fields, touchedKeys)
-    case 'add':    return applyAdd(data, occ, fields, touchedKeys)
+    case 'all':    return applyAll(data, live, fields, touchedKeys)
+    case 'single': return applySingle(data, live, fields, touchedKeys)
+    case 'future': return applyFuture(data, live, fields, touchedKeys)
+    case 'add':    return applyAdd(data, live, fields, touchedKeys)
     default:       return data
   }
+}
+
+/**
+ * `occ` with its `ownerId` re-read from the store.
+ *
+ * An editor pins the occurrence it opened for the whole session (see
+ * `useEntryEditor`'s `useState` initialiser, and `applySingle`'s pre-move id
+ * reuse for the date-shaped half of the same staleness). Ownership is not
+ * stable across that session: a 'future' save re-homes every override from
+ * occDate onward onto the series it splits off, so the *next* save arrives
+ * naming a series this occurrence has left.
+ *
+ * Every scope below keys off `ownerId` and each one breaks differently on a
+ * stale one — `upsertOverride` matches `ownerId` *and* `id`, so it misses the
+ * override that already exists and appends a duplicate on the same date;
+ * `applyFuture` splits a series that is no longer this occurrence's. Asking the
+ * store who owns it now, once, in front of the dispatch, is the fix for all
+ * four at once, and it is the same question `editor/save.ts`'s `applyScope`
+ * asks so that the editor's own view agrees with what lands here.
+ *
+ * A generated occurrence has no stored item to read, and its `ownerId` cannot
+ * be stale for the same reason — nothing has re-homed it — so it passes
+ * through untouched.
+ */
+function withLiveOwner(entry: Entry, occ: Occurrence): Occurrence {
+  const stored = entry.items.find((i): i is OccurrenceEntry<OccurrenceMetadata> => !isSeries(i) && i.id === occ.id)
+  return stored && stored.ownerId !== occ.ownerId ? { ...occ, ownerId: stored.ownerId } : occ
 }
 
 // ── Toggle done ───────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { startOfToday } from 'date-fns'
 import { toast } from 'sonner'
 import { fmtISO, applyEdit, mergeEditFields, changedEditFields, untouchedRemoteChanges, overlappingFields, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
-import type { Occurrence, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
+import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
 import { getSnapshot, getSlugSnapshot, getEntries, getItems, getDefaultVaultId } from '@/storeBridge'
 import { keyVaultId } from '@/fileIO'
@@ -72,8 +72,18 @@ export function applyScope(
   items?: StoreItem[],
 ): { scheduled: Scheduled | null; repeat: Repeat | null } {
   const allItems = items ?? getItems()
-  const parentSeries = item.ownerId
-    ? (allItems.find(i => isSeries(i) && i.id === item.ownerId) ?? null)
+  // Whose series this occurrence belongs to is a question for the store, not
+  // for `item`. An editor pins its occurrence for the whole session, so after
+  // anything re-homes the occurrence — a 'future' save splitting the series is
+  // the one that happens — `item.ownerId` names a series it has left. Reading
+  // it off the live item keeps one answer: `currentFields` already derives the
+  // store's side from that item, so a stale `ownerId` here made base and
+  // current disagree about which series' repeat they were even describing, and
+  // the next repeat edit reported a conflict with nobody.
+  const live = allItems.find((i): i is OccurrenceEntry<OccurrenceMetadata> => !isSeries(i) && i.id === item.id)
+  const ownerId = live?.ownerId ?? item.ownerId
+  const parentSeries = ownerId
+    ? (allItems.find(i => isSeries(i) && i.id === ownerId) ?? null)
     : null
   const seriesRepeat = parentSeries && isSeries(parentSeries) ? parentSeries.repeat : null
   const occDate  = item.date || null

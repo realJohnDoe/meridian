@@ -4,6 +4,7 @@ import { renderHook, act } from '@testing-library/react'
 import { toast } from 'sonner'
 import type * as ReactRouter from '@tanstack/react-router'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
+import { isSeries } from '@/types'
 import type { FileMetadata, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
 import type { VaultRef } from '@/vaultRef'
@@ -121,6 +122,53 @@ describe('useEntryEditor', () => {
     act(() => { result.current.handleScopeChange('future') })
 
     expect(result.current.entry.repeat).toEqual({ type: 'schedule', freq: 'daily' })
+  })
+
+  // The next two were found by `singleWriter.test.tsx`'s generated sequences,
+  // and pinned here as the flows a person would actually perform. Both are the
+  // same staleness: `useEntryEditor` pins `entry.item` for the session, a
+  // 'future' save re-homes that occurrence onto the series it splits off, and
+  // every later save arrived still naming the series it had left.
+  const dailySeriesAndOverride = () => {
+    const series = makeSeries({
+      id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+      repeat: { type: 'schedule', freq: 'daily' },
+    })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-09-10', time: null, metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
+    seedStore([series, occ], makeRoots('note.md'))
+    return occ
+  }
+
+  it('a second "future" save edits the series the first one split off', () => {
+    // Splitting again off the stale owner capped an already-capped series and
+    // stood a second new one beside it, so the split day grew an occurrence
+    // per edit.
+    const occ = dailySeriesAndOverride()
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('future') })
+    act(() => { result.current.dialogHandlers.onRepeatConfirm({ type: 'schedule', freq: 'weekly' }) })
+    act(() => { result.current.dialogHandlers.onDurConfirm('1 hour') })
+
+    const onSplitDay = useStore.getState().items.filter(i => isSeries(i) && i.date === '2026-09-10')
+    expect(onSplitDay).toHaveLength(1)
+    expect(onSplitDay[0]?.metadata.duration).toBe('1 hour')
+  })
+
+  it('a "single" save after a split updates the override instead of adding one', () => {
+    // `upsertOverride` matches ownerId *and* id, so a stale ownerId missed the
+    // override that was already there and appended a duplicate on its date.
+    const occ = dailySeriesAndOverride()
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('future') })
+    act(() => { result.current.dialogHandlers.onDurConfirm('1 hour') })
+    act(() => { result.current.handleScopeChange('single') })
+    act(() => { result.current.dialogHandlers.onPriority('low') })
+
+    const onDay = useStore.getState().items.filter(i => !isSeries(i) && i.date === '2026-09-10')
+    expect(onDay).toHaveLength(1)
+    expect(onDay[0]?.metadata.priority).toBe('low')
   })
 
   it('a there-and-back through "add" scope does not un-tick a completed task', () => {
