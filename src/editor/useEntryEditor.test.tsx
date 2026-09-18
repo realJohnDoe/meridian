@@ -123,6 +123,27 @@ describe('useEntryEditor', () => {
     expect(result.current.entry.repeat).toEqual({ type: 'schedule', freq: 'daily' })
   })
 
+  it('a there-and-back through "add" scope does not un-tick a completed task', () => {
+    // Same shape as the repeat conflict below, cashed out as data loss instead
+    // of a toast: 'add' blanks `done` in the form, and switching back read the
+    // blank back as the current state. The next ordinary edit — a priority, a
+    // typed character — then carried `done: false` to disk for a task nobody
+    // had unticked.
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Task', done: true } })
+    seedStore([occ], makeRoots('note.md', { title: 'Task' }))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('add') })
+    expect(result.current.entry.done).toBe(false) // the 'add' view's own blank
+    act(() => { result.current.handleScopeChange('single') })
+    expect(result.current.entry.done).toBe(true)
+
+    act(() => { result.current.dialogHandlers.onPriority('high') })
+
+    expect(useStore.getState().items.find(i => i.id === 'occ-1')?.metadata.done).toBe(true)
+    expect(persistence.contentByKey.get(testKey('note.md')) ?? '').toContain('done: true')
+  })
+
   it('changing the repeat after a scope switch does not report a conflict with nobody', () => {
     // The reported flow: an after_completion task, its interval changed from 2
     // days to 3, on a vault only this device writes to — and a toast saying

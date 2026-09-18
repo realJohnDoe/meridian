@@ -354,7 +354,17 @@ export function useEntryEditor(
     // must not inherit that occurrence's done state — carrying it over is what
     // made a freshly added occurrence show up checked when the one it was
     // switched from happened to be done.
-    const done = scope === 'add' ? false : entry.done
+    //
+    // Leaving 'add' puts it back, from the base rather than from the form: that
+    // `false` was a property of the view, not an edit (no save happens at 'add'
+    // scope — see `saveMeta`), so `entry.done` no longer knows what the store
+    // holds and `baseRef` still does. Reading it off the form instead let a
+    // there-and-back through "Add new occurrence" carry the view's `false` into
+    // the next ordinary save, silently un-ticking a completed task.
+    const done =
+      scope === 'add'            ? false
+      : entry.editScope === 'add' ? baseRef.current.done
+      : entry.done
     setEntry({ ...entry, editScope: scope, scheduled, repeat, done })
     baseRef.current = { ...baseRef.current, editScope: scope, scheduled, repeat }
   }
