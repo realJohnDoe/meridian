@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
 import type { Occurrence, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
-import { parseItemEntry, serializeTaskEntry } from './items'
+import { parseItemEntry, itemKeys, serializeTaskEntry } from './items'
 import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
@@ -39,7 +39,11 @@ interface Props {
  */
 const ROW_GAP = '0.375rem'
 
-type ParsedEntry = ReturnType<typeof parseItemEntry> & { idx: number }
+// `idx` is where the entry sits in `items` — what every mutation below writes
+// through. `key` is the row's identity (see itemKeys): the two are deliberately
+// separate, because a removal renumbers every later `idx` while leaving each
+// row's `key` alone.
+type ParsedEntry = ReturnType<typeof parseItemEntry> & { idx: number; key: string }
 type Row = { entry: ParsedEntry; occ: Occurrence | undefined }
 
 // Reuses sortOccs' own rule (type, then priority, then time, then title —
@@ -82,7 +86,9 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   const occBySlug = useFileOccurrenceMap()
   const backlinks = useStore(s => s.backlinks)
 
-  const entries: ParsedEntry[] = items.map((raw, idx) => ({ ...parseItemEntry(raw), idx }))
+  const parsed = items.map(parseItemEntry)
+  const keys = itemKeys(parsed)
+  const entries: ParsedEntry[] = parsed.map((entry, idx) => ({ ...entry, idx, key: keys[idx]! }))
 
   // Files already linked from this entry have no business appearing in "Link
   // file" again — a wikilink's stored ref is always the bare fileSlug (see
@@ -136,8 +142,11 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
     setPickerOpen(false)
   }
 
-  const remove = (idx: number) => {
-    onChange(items.filter((_, i) => i !== idx))
+  // Animate out, exactly as ticking a row done does — a removal is the same
+  // shape of change, so it reads the same way instead of snapping out.
+  const remove = (row: Row) => {
+    beginLeave(row)
+    onChange(items.filter((_, i) => i !== row.entry.idx))
   }
 
   function startEdit(idx: number, text: string) {
@@ -175,7 +184,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   // back here to have anything left to animate. `rows` is `activeRows` with the
   // held ones spliced back where they were, each flagged `leaving`.
   const { rows: activeRenderRows, beginLeave, endLeave, anyLeaving } =
-    useLeavingRows(activeRows, row => row.entry.idx)
+    useLeavingRows(activeRows, row => row.entry.key)
 
   const donePickerRows = (() => {
     const q = pickerQuery.toLowerCase()
@@ -242,7 +251,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
           <IconButton
             label="Remove"
             className="mt-2.5 p-1 text-muted-foreground hover:text-foreground"
-            onClick={() => remove(idx)}
+            onClick={() => remove(row)}
           >
             <X size={13} />
           </IconButton>
@@ -270,7 +279,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
         <IconButton
           label="Remove"
           className="mt-2.5 p-1 text-muted-foreground hover:text-foreground"
-          onClick={() => remove(idx)}
+          onClick={() => remove(row)}
         >
           <X size={13} />
         </IconButton>
@@ -283,13 +292,13 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   // A leaving row also drops its `data-item-key`, which takes it out of the
   // FlipList's diff: it is being animated by CSS, not glided.
   function renderRow(row: Row, leaving = false) {
-    const idx = row.entry.idx
+    const { key } = row.entry
     return (
       <CollapseRow
-        key={idx}
-        {...(leaving ? {} : { 'data-item-key': idx })}
+        key={key}
+        {...(leaving ? {} : { 'data-item-key': key })}
         collapsed={leaving}
-        onCollapsed={() => endLeave(idx)}
+        onCollapsed={() => endLeave(key)}
         gap={ROW_GAP}
       >
         <div className="flex items-start gap-1">
