@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import { toast } from 'sonner'
 import type * as ReactRouter from '@tanstack/react-router'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
+import { isSeries } from '@/types'
 import type { FileMetadata, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
 import type { VaultRef } from '@/vaultRef'
@@ -120,6 +122,122 @@ describe('useEntryEditor', () => {
     act(() => { result.current.handleScopeChange('future') })
 
     expect(result.current.entry.repeat).toEqual({ type: 'schedule', freq: 'daily' })
+  })
+
+  // The next two were found by `singleWriter.test.tsx`'s generated sequences,
+  // and pinned here as the flows a person would actually perform. Both are the
+  // same staleness: `useEntryEditor` pins `entry.item` for the session, a
+  // 'future' save re-homes that occurrence onto the series it splits off, and
+  // every later save arrived still naming the series it had left.
+  const dailySeriesAndOverride = () => {
+    const series = makeSeries({
+      id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+      repeat: { type: 'schedule', freq: 'daily' },
+    })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-09-10', time: null, metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
+    seedStore([series, occ], makeRoots('note.md'))
+    return occ
+  }
+
+  it('a brand-new entry keeps what was typed once its first save creates the file', () => {
+    // The form derives every untouched field from the store, and a brand-new
+    // entry has no store row until its first save makes one. If the edit set
+    // were emptied before the view switched onto that row, the form would fall
+    // back to the seed and blank the title the save had just written.
+    const { result } = renderHook(() => useEntryEditor(null, 'all', 'Buy milk'))
+
+    act(() => { result.current.scheduleAutoSave('some notes') })
+    act(() => { vi.advanceTimersByTime(1500) })
+
+    expect(result.current.entry.title).toBe('Buy milk')
+    expect(result.current.entry.body).toBe('some notes')
+    expect(result.current.createdKey).not.toBeNull()
+
+    // And a later edit still lands on the same file rather than a second one.
+    act(() => { result.current.dialogHandlers.onPriority('high') })
+    const key = result.current.createdKey!
+    expect(persistence.contentByKey.get(key) ?? '').toContain('priority: high')
+    expect(persistence.contentByKey.get(key) ?? '').toContain('Buy milk')
+    expect(new Set(persistence.writes).size).toBe(1)
+  })
+
+  it('a second "future" save edits the series the first one split off', () => {
+    // Splitting again off the stale owner capped an already-capped series and
+    // stood a second new one beside it, so the split day grew an occurrence
+    // per edit.
+    const occ = dailySeriesAndOverride()
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('future') })
+    act(() => { result.current.dialogHandlers.onRepeatConfirm({ type: 'schedule', freq: 'weekly' }) })
+    act(() => { result.current.dialogHandlers.onDurConfirm('1 hour') })
+
+    const onSplitDay = useStore.getState().items.filter(i => isSeries(i) && i.date === '2026-09-10')
+    expect(onSplitDay).toHaveLength(1)
+    expect(onSplitDay[0]?.metadata.duration).toBe('1 hour')
+  })
+
+  it('a "single" save after a split updates the override instead of adding one', () => {
+    // `upsertOverride` matches ownerId *and* id, so a stale ownerId missed the
+    // override that was already there and appended a duplicate on its date.
+    const occ = dailySeriesAndOverride()
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('future') })
+    act(() => { result.current.dialogHandlers.onDurConfirm('1 hour') })
+    act(() => { result.current.handleScopeChange('single') })
+    act(() => { result.current.dialogHandlers.onPriority('low') })
+
+    const onDay = useStore.getState().items.filter(i => !isSeries(i) && i.date === '2026-09-10')
+    expect(onDay).toHaveLength(1)
+    expect(onDay[0]?.metadata.priority).toBe('low')
+  })
+
+  it('a there-and-back through "add" scope does not un-tick a completed task', () => {
+    // Same shape as the repeat conflict below, cashed out as data loss instead
+    // of a toast: 'add' blanks `done` in the form, and switching back read the
+    // blank back as the current state. The next ordinary edit — a priority, a
+    // typed character — then carried `done: false` to disk for a task nobody
+    // had unticked.
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Task', done: true } })
+    seedStore([occ], makeRoots('note.md', { title: 'Task' }))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('add') })
+    expect(result.current.entry.done).toBe(false) // the 'add' view's own blank
+    act(() => { result.current.handleScopeChange('single') })
+    expect(result.current.entry.done).toBe(true)
+
+    act(() => { result.current.dialogHandlers.onPriority('high') })
+
+    expect(useStore.getState().items.find(i => i.id === 'occ-1')?.metadata.done).toBe(true)
+    expect(persistence.contentByKey.get(testKey('note.md')) ?? '').toContain('done: true')
+  })
+
+  it('changing the repeat after a scope switch does not report a conflict with nobody', () => {
+    // The reported flow: an after_completion task, its interval changed from 2
+    // days to 3, on a vault only this device writes to — and a toast saying
+    // "the repeat also changed somewhere else". The repeat is only editable at
+    // 'all' scope, so the scope switch always precedes the change; it left
+    // `baseRef` describing 'single' scope, where `applyScope` drops the repeat
+    // entirely. The save then saw base `null`, editor '3 days' and store
+    // '2 days' — three different values for one field, which is what
+    // `overlappingFields` calls a conflict.
+    const series = makeSeries({
+      id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+      repeat: { type: 'after_completion', interval: '2 days' },
+    })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-09-10', time: null, metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: false } })
+    seedStore([series, occ], makeRoots('note.md'))
+    const warning = vi.spyOn(toast, 'warning').mockImplementation(() => '')
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('all') })
+    act(() => { result.current.dialogHandlers.onRepeatConfirm({ type: 'after_completion', interval: '3 days' }) })
+
+    expect(warning).not.toHaveBeenCalled()
+    expect(persistence.contentByKey.get(testKey('note.md')) ?? '').toContain('interval: 3 days')
+    warning.mockRestore()
   })
 
   it('autosave debounces body writes by 1500ms and commits the latest scheduled body', () => {
