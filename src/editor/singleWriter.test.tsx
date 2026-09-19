@@ -165,7 +165,15 @@ describe('single-writer editor invariants', () => {
         fc.property(fc.array(fc.constantFrom(...OPS), { minLength: 1, maxLength: 6 }), ops => {
           warning.mockClear()
           const { result, unmount } = freshEditor()
-          for (const op of ops) act(() => { op.run(result.current) })
+          for (const op of ops) {
+            act(() => { op.run(result.current) })
+            // `repeat:remove` asks before deleting the fixture's override. The
+            // generated sequence always says yes, so the op is the removal it
+            // claims to be rather than a dialog that quietly cancels itself —
+            // an op that no-ops would make every invariant vacuous for it.
+            const pending = result.current.dialogHandlers.pendingRepeatRemove
+            if (pending) act(() => { pending.onConfirm(); result.current.dialogHandlers.onRepeatRemoveClose() })
+          }
           unmount()
 
           // Invariant 1 — nobody else is writing, so nothing can have conflicted.
@@ -191,36 +199,19 @@ describe('single-writer editor invariants', () => {
   }, 30_000)
 
   /**
-   * KNOWN DEFECT, found by the property above and pinned here rather than
-   * dropped: **removing a repeat does nothing to a series.**
+   * Found by the property above, as `future → repeat:remove → repeat:3 days`,
+   * and pinned here as the plain statement of what it turned up: removing a
+   * repeat used to do nothing at all.
    *
-   * `applyFieldsToItem` and `applyFuture` both read the incoming rule as
+   * `applyFieldsToItem` and `applyFuture` read the incoming rule as
    * `repeat ?? existing`, because `applyScope` hands them a null `repeat` for
    * every 'single'/'add'-scope save and treating that as a deletion would wipe
-   * a series whenever the user edited one of its occurrences. The cost is that
-   * a null which really does mean "stop repeating" is swallowed with it: the
-   * RepeatDialog's remove button (wired through `onRepeatRemove`) reports
-   * success and the series keeps going.
-   *
-   * The property found it as `future → repeat:remove → repeat:3 days`, which
-   * under the old form-and-base pair also poisoned everything after it: the
-   * base advanced to the null the store had refused, so the next repeat edit
-   * saw base null, the form's new rule and the store's old one, and reported a
-   * conflict with nobody. A derived form cannot carry that damage — the next
-   * render shows the repeat still there, which is at least honest — so
-   * `repeat:remove` is back in `OPS` and only the no-op itself is left.
-   *
-   * Fixing it is a model change with a shape to decide, not an oversight: the
-   * leg that stops repeating has to stop being a series, so `applyFuture` and
-   * `applyAll` need to be able to emit a standalone occurrence and rehome the
-   * override children hanging off the series. Short of that, an explicit intent
-   * — distinguishing "no repeat at this scope" from "delete the repeat" —
-   * would at least stop the silent no-op.
-   *
-   * `it.fails` on purpose: whoever fixes this gets a failing test telling them
-   * to drop the `.fails`.
+   * a series whenever the user edited one of its occurrences. A null that
+   * really did mean "stop repeating" was swallowed with it, so the
+   * RepeatDialog's remove button reported success and the series kept going.
+   * `repeatRemoved` tells the two apart from the touched-key set.
    */
-  it.fails('removing a repeat stops the series repeating', () => {
+  it('removing a repeat stops the series repeating', () => {
     const { result } = freshEditor()
     act(() => { result.current.handleScopeChange('all') })
     act(() => { result.current.dialogHandlers.onRepeatRemove() })

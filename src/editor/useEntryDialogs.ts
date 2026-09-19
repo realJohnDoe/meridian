@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { overridesLostToRepeatRemoval } from '@/model'
+import { getItems } from '@/storeBridge'
 import type { SeriesSheetConfig } from './save'
 import type { Priority } from '@/types'
 import type { EntryState } from './state'
@@ -17,6 +19,10 @@ export interface DialogHandlers {
   onDurRemove: () => void
   onRepeatConfirm: (repeat: EntryState['repeat']) => void
   onRepeatRemove: () => void
+  /** How many changed occurrences removing the repeat would delete, once the
+   *  user has been asked. Null while nothing is pending. */
+  pendingRepeatRemove: { title: string; lost: number; onConfirm: () => void } | null
+  onRepeatRemoveClose: () => void
   onSeriesClose: () => void
   onDeleteClose: () => void
 }
@@ -24,6 +30,7 @@ export interface DialogHandlers {
 export function useEntryDialogs(entry: EntryState, updateEntry: (next: EntryState) => void) {
   const [activeDialog, setActiveDialog] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<{ title: string; onConfirm: () => void; onArchive: () => void } | null>(null)
+  const [pendingRepeatRemove, setPendingRepeatRemove] = useState<{ title: string; lost: number; onConfirm: () => void } | null>(null)
   const [seriesSheetConfig, setSeriesSheetConfig] = useState<SeriesSheetConfig | null>(null)
 
   // No document-level Escape listener here on purpose. Every dialog in
@@ -70,9 +77,25 @@ export function useEntryDialogs(entry: EntryState, updateEntry: (next: EntryStat
     setActiveDialog(null)
   }
 
+  /**
+   * Stop this entry repeating.
+   *
+   * The rule cannot go on its own: an override is a change *to an occurrence
+   * of a series*, so without the series there is nothing for it to be an
+   * override of, and `applyAll`/`applyFuture` drop them with it. That is a
+   * deletion the user cannot undo, so it is asked about first — but only when
+   * there is something to lose. A series nobody has customised (the common
+   * case: a repeat set up and never touched) just stops repeating, with no
+   * dialog in the way of an ordinary edit.
+   *
+   * Exclusion stubs do not count — see `overridesLostToRepeatRemoval`.
+   */
   const handleRepeatRemove = () => {
-    updateEntry({ ...entry, repeat: null })
     setActiveDialog(null)
+    const remove = () => { updateEntry({ ...entry, repeat: null }) }
+    const lost = entry.item ? overridesLostToRepeatRemoval(getItems(), entry.item, entry.editScope).length : 0
+    if (lost === 0) { remove(); return }
+    setPendingRepeatRemove({ title: entry.title, lost, onConfirm: remove })
   }
 
   const handlePriority = (p: Priority | null) => {
@@ -97,6 +120,8 @@ export function useEntryDialogs(entry: EntryState, updateEntry: (next: EntryStat
     onDurRemove: handleDurRemove,
     onRepeatConfirm: handleRepeatConfirm,
     onRepeatRemove: handleRepeatRemove,
+    pendingRepeatRemove,
+    onRepeatRemoveClose: () => { setPendingRepeatRemove(null) },
     onSeriesClose: handleSeriesClose,
     onDeleteClose: handleDeleteClose,
   }

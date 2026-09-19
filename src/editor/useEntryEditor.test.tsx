@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import type * as ReactRouter from '@tanstack/react-router'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
 import { isSeries } from '@/types'
-import type { FileMetadata, Roots } from '@/types'
+import type { FileMetadata, Roots, StoreItem } from '@/types'
 import type { EntryKey } from '@/fileIO'
 import type { VaultRef } from '@/vaultRef'
 import { entriesOf } from '@/test-utils'
@@ -138,6 +138,117 @@ describe('useEntryEditor', () => {
     seedStore([series, occ], makeRoots('note.md'))
     return occ
   }
+
+  describe('removing a repeat', () => {
+    // An override is a change *to an occurrence of a series*, so it cannot
+    // outlive the rule — `applyAll` drops the children with it. The user is
+    // asked first, but only where that costs them something.
+    const seriesWith = (children: StoreItem[]) => {
+      const series = makeSeries({
+        id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+        repeat: { type: 'schedule', freq: 'daily' },
+      })
+      seedStore([series, ...children], makeRoots('note.md', { title: 'Standup' }))
+      return makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-05-26', time: null, source: 'generated', metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Standup', done: false } })
+    }
+    const override = (id: string, date: string) => makeOcc({
+      id, entryKey: testKey('note.md'), ownerId: 'series-1', date, time: null,
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', done: true },
+    })
+
+    it('an untouched series just stops repeating, with nothing to confirm', () => {
+      const occ = seriesWith([])
+      const { result } = renderHook(() => useEntryEditor(occ))
+
+      act(() => { result.current.handleScopeChange('all') })
+      act(() => { result.current.dialogHandlers.onRepeatRemove() })
+
+      expect(result.current.dialogHandlers.pendingRepeatRemove).toBeNull()
+      const items = useStore.getState().items
+      expect(items).toHaveLength(1)
+      expect(isSeries(items[0]!)).toBe(false)
+      // On the series' anchor — which is the date the form was showing, since
+      // that is what `applyScope` puts there at 'all' scope. The surviving
+      // occurrence is the one the user could see while they removed the rule.
+      expect(items[0]?.date).toBe('2026-05-26')
+      expect(persistence.contentByKey.get(testKey('note.md')) ?? '').not.toContain('repeat')
+    })
+
+    it('asks first when changed occurrences would go with the rule', () => {
+      const occ = seriesWith([override('o-1', '2026-06-02'), override('o-2', '2026-06-09')])
+      const { result } = renderHook(() => useEntryEditor(occ))
+
+      act(() => { result.current.handleScopeChange('all') })
+      act(() => { result.current.dialogHandlers.onRepeatRemove() })
+
+      // Nothing written until the question is answered.
+      expect(result.current.dialogHandlers.pendingRepeatRemove?.lost).toBe(2)
+      expect(persistence.writes).toEqual([])
+      expect(useStore.getState().items).toHaveLength(3)
+
+      act(() => { result.current.dialogHandlers.pendingRepeatRemove?.onConfirm() })
+
+      const items = useStore.getState().items
+      expect(items).toHaveLength(1)
+      expect(isSeries(items[0]!)).toBe(false)
+    })
+
+    it('cancelling leaves the series exactly as it was', () => {
+      const occ = seriesWith([override('o-1', '2026-06-02')])
+      const { result } = renderHook(() => useEntryEditor(occ))
+
+      act(() => { result.current.handleScopeChange('all') })
+      act(() => { result.current.dialogHandlers.onRepeatRemove() })
+      act(() => { result.current.dialogHandlers.onRepeatRemoveClose() })
+
+      expect(persistence.writes).toEqual([])
+      expect(useStore.getState().items).toHaveLength(2)
+      expect(result.current.entry.repeat).toEqual({ type: 'schedule', freq: 'daily' })
+    })
+
+    it('an exclusion stub is not something to confirm losing', () => {
+      // A stub records "don't generate this slot", which means nothing once
+      // nothing is generated — dropping it costs the user nothing they could
+      // point at, so it must not put a dialog in the way.
+      const stub = { ...override('o-1', '2026-06-02'), excluded: true }
+      const occ = seriesWith([stub])
+      const { result } = renderHook(() => useEntryEditor(occ))
+
+      act(() => { result.current.handleScopeChange('all') })
+      act(() => { result.current.dialogHandlers.onRepeatRemove() })
+
+      expect(result.current.dialogHandlers.pendingRepeatRemove).toBeNull()
+      expect(useStore.getState().items).toHaveLength(1)
+    })
+
+    it('at "future" scope the earlier occurrences keep repeating', () => {
+      const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-06-10', time: null, source: 'generated', metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Standup', done: false } })
+      const series = makeSeries({
+        id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+        repeat: { type: 'schedule', freq: 'daily' },
+      })
+      seedStore([series, override('o-1', '2026-06-02'), override('o-2', '2026-06-17')], makeRoots('note.md', { title: 'Standup' }))
+      const { result } = renderHook(() => useEntryEditor(occ))
+
+      act(() => { result.current.handleScopeChange('future') })
+      act(() => { result.current.dialogHandlers.onRepeatRemove() })
+
+      // Only the override at/after the cut is at stake; the earlier one is not.
+      expect(result.current.dialogHandlers.pendingRepeatRemove?.lost).toBe(1)
+      act(() => { result.current.dialogHandlers.pendingRepeatRemove?.onConfirm() })
+
+      const items = useStore.getState().items
+      const stillSeries = items.filter(isSeries)
+      expect(stillSeries).toHaveLength(1)
+      expect(stillSeries[0]?.repeat).toMatchObject({ end: { type: 'until', date: '2026-06-09' } })
+      // The cut occurrence survives as a standalone; the one after it does not.
+      const standalone = items.filter(i => !isSeries(i) && !i.ownerId)
+      expect(standalone.map(i => i.date)).toEqual(['2026-06-10'])
+      expect(items.some(i => i.date === '2026-06-17')).toBe(false)
+      // …and the one before the cut is untouched.
+      expect(items.some(i => i.date === '2026-06-02')).toBe(true)
+    })
+  })
 
   it('a brand-new entry keeps what was typed once its first save creates the file', () => {
     // The form derives every untouched field from the store, and a brand-new
