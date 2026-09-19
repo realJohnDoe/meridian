@@ -79,7 +79,7 @@ interface Edit {
 export type Edits = Partial<Record<keyof EditFields, Edit | undefined>>
 
 /** Whether anything is actually edited — see `Edits` on why a key can be a hole. */
-export function hasEdits(edits: Edits): boolean {
+function hasEdits(edits: Edits): boolean {
   return Object.values(edits).some(Boolean)
 }
 
