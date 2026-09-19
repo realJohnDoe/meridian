@@ -1,6 +1,6 @@
 import { startOfToday } from 'date-fns'
 import { toast } from 'sonner'
-import { fmtISO, applyEdit, mergeEditFields, changedEditFields, untouchedRemoteChanges, overlappingFields, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
+import { fmtISO, applyEdit, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
@@ -9,6 +9,7 @@ import { keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { commitNext, commitDelete } from '@/storeCommit'
 import type { EntryState, ItemType } from './state'
+import { editFieldsOf } from './edits'
 
 // ── BACKLINK HELPERS ──────────────────────────────────────────
 
@@ -133,23 +134,6 @@ type SaveFields = EntryState & { body: string }
 /** The key of the file that was written, or null when nothing was (empty title). */
 export type SaveResult = EntryKey | null
 
-/** The eleven store-owned fields an editor save carries. */
-function editFieldsOf(fields: SaveFields): EditFields {
-  return {
-    title:        fields.title,
-    tags:         fields.tags,
-    items:        fields.items,
-    participants: fields.participants,
-    body:         fields.body,
-    tracked:      fields.tracked,
-    done:         fields.done,
-    priority:     fields.priority     ?? null,
-    scheduled:    fields.scheduled    ?? null,
-    duration:     fields.duration,
-    repeat:       fields.repeat       ?? null,
-  }
-}
-
 /**
  * The eleven fields as the store holds them *right now* for `item`.
  *
@@ -195,57 +179,53 @@ function currentFields(item: Occurrence, editScope: EditScope, next: EditFields)
   return editFieldsOf(entryFromOccurrence({ ...live, metadata: joined }, editScope, getItems()))
 }
 
-/** `touchedFieldsOnly`'s result: the fields to write, plus which `EditFields`
- *  keys the diff against `base` actually named — see `applyEdit`'s
- *  `touchedKeys` parameter for what the second half is for. */
-interface TouchedFields {
-  fields: EditFields
-  touchedKeys: ReturnType<typeof changedEditFields> | undefined
-}
-
 /**
- * Narrow a save to the fields the user actually touched, leaving every other
- * field at whatever the store holds *now*.
+ * Widen an editor's patch into the whole field set to write.
  *
- * An editor loads its fields once and never re-reads them (by design — a live
- * re-read would move the cursor and reshuffle the form under the user's
- * hands). So the longer it stays open, the staler the fields nobody is editing
- * become, and a blind full-entry write turns every one of them into a
- * regression: the reschedule that arrived from another device, the checkbox
- * ticked from the agenda, the description someone else finished writing. On a
- * synced vault each of those regressions is also a push, which the other device
- * sees as a change worth pushing back — the loop that turns one conflict into a
- * run of conflict copies.
+ * `edits` is what the user actually changed — recorded as they changed it, in
+ * `editor/edits.ts`, rather than inferred by diffing two snapshots. Everything
+ * else is taken from what the store holds *now*, so a field nobody here
+ * touched keeps whatever arrived from the agenda, another tab or a sync while
+ * this editor sat open.
+ *
+ * An editor loads its fields once and never re-reads them into CodeMirror (by
+ * design — a live re-read would move the cursor), so without this a blind
+ * full-entry write turns every untouched field into a regression: the
+ * reschedule from another device, the checkbox ticked from the agenda, the
+ * description someone else finished. On a synced vault each of those is also a
+ * push, which the other device sees as a change worth pushing back — the loop
+ * that turns one conflict into a run of conflict copies.
+ *
+ * The key set travels with the values because `applyEdit` needs it for a
+ * second purpose: scoping its `extra`-bag strip to the fields this save is
+ * actually rewriting, rather than every registry field regardless (data-
+ * integrity survey, finding #1). A save that renamed only the title must not
+ * delete an unrelated hand-authored `tags`/`done`/`priority` the model cannot
+ * type. Under the patch that set is exact rather than reconstructed.
  *
  * Not applied to `add` scope: that save creates a *new* occurrence rather than
  * updating the one the editor is holding, so "what this entry looks like now"
  * is not the right base for it — `entryFromOccurrence` deliberately answers
  * with today's date and a cleared `done` for that scope.
- *
- * `touchedKeys` travels alongside the merged fields for the same reason this
- * function exists in the first place: `applyEdit` uses it to scope its
- * `extra`-bag strip to the field actually being written, rather than every
- * registry field regardless of whether this edit touched it (data-integrity
- * survey, finding #1) — a save that renamed only the title must not delete an
- * unrelated hand-authored `tags`/`done`/`priority` the model can't type.
- * `undefined` in the two short-circuit cases below means "no such distinction
- * to offer", which `applyEdit` treats as "strip everything", matching the
- * behaviour before this parameter existed.
  */
-function touchedFieldsOnly(
+function widenEdits(
   item:      Occurrence,
   editScope: EditScope,
   next:      EditFields,
-  base:      SaveFields | null | undefined,
+  edits:     Partial<EditFields> | undefined,
 ): TouchedFields {
-  if (!base || editScope === 'add') return { fields: next, touchedKeys: undefined }
-  const baseFields = editFieldsOf(base)
-  const current    = currentFields(item, editScope, next)
-  reportDriftConflicts(overlappingFields(baseFields, next, current))
+  if (!edits || editScope === 'add') return { fields: next, touchedKeys: undefined }
   return {
-    fields: mergeEditFields(baseFields, next, current),
-    touchedKeys: changedEditFields(baseFields, next),
+    fields: { ...currentFields(item, editScope, next), ...edits },
+    touchedKeys: new Set(Object.keys(edits) as Array<keyof EditFields>),
   }
+}
+
+/** `widenEdits`' result: the fields to write, plus which `EditFields` keys the
+ *  save actually named — see `applyEdit`'s `touchedKeys` parameter. */
+interface TouchedFields {
+  fields: EditFields
+  touchedKeys: ReadonlySet<keyof EditFields> | undefined
 }
 
 /** How each field is named to the user. Not derived from the key: `tracked`
@@ -269,9 +249,9 @@ const FIELD_LABELS: Record<keyof EditFields, string> = {
  * Tell the user that a field they were editing had also been changed
  * elsewhere, and that theirs is the version that was written.
  *
- * These are the genuine overlaps and the only ones: the same field, moved on
- * both sides, to different values. Everything else the merge above settles
- * without anyone losing anything. The other writer is usually a second view of
+ * Which fields those are is `contestedFields`' call (`editor/edits.ts`): the
+ * store has moved off the value it held when the user started editing, and not
+ * to where they were taking it. The other writer is usually a second view of
  * this same vault — another tab, or the installed PWA, whose writes reach this
  * store through `startCrossTabSync` — but a sync pulling another device's
  * change produces the identical situation and deserves the identical notice.
@@ -280,10 +260,13 @@ const FIELD_LABELS: Record<keyof EditFields, string> = {
  * mirrors: the loser here is one field rather than a whole file, and there is
  * nowhere sensible to put a timestamped copy of one. What matters is that the
  * user hears about it — the loss is otherwise completely invisible.
+ *
+ * With a single writer this cannot fire at all, which is not a hope but a
+ * checked property: see `singleWriter.test.tsx`.
  */
-function reportDriftConflicts(conflicts: Array<keyof EditFields>): void {
-  if (conflicts.length === 0) return
-  const labels = conflicts.map(f => FIELD_LABELS[f])
+export function reportContested(contested: Array<keyof EditFields>): void {
+  if (contested.length === 0) return
+  const labels = contested.map(f => FIELD_LABELS[f])
   const named = labels.length === 1
     ? labels[0]
     : `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)!}`
@@ -291,28 +274,25 @@ function reportDriftConflicts(conflicts: Array<keyof EditFields>): void {
 }
 
 /**
- * The fields the store has moved that an open editor has not — the ones it can
- * adopt on the spot without overriding anything the user did.
+ * What the store says about `item` at `editScope`, as an `EntryState`.
  *
- * `touchedFieldsOnly` above asks the same three-way question at the last
- * possible moment: it makes a *save* correct and says nothing to anyone. This
- * asks it continuously, so the editor can show a change while the entry is
- * still open rather than holding a value the file stopped having minutes ago.
- * See `useLiveReload`, its only caller, for what it does and does not take.
+ * The editor's whole form is this plus whatever the user has typed over it
+ * (`editor/edits.ts`), which is why it has to answer from the store rather
+ * than from `item`: an editor pins its occurrence for the session, so
+ * `item.metadata` is a mount-time photograph and goes stale the moment the
+ * agenda ticks a checkbox or a sync lands. `currentFields` is the same
+ * derivation a save already used to decide what *not* to overwrite — sharing
+ * it is the point, since a form and a save that disagreed about what the store
+ * holds is exactly the class of bug this replaced.
  *
- * `local` is the editor's live state, which for the description means whatever
- * CodeMirror holds right now rather than the `body` on the last render.
+ * `itemType` is re-derived rather than carried over, because `tracked` and
+ * `scheduled` may have come back different from the pinned occurrence's.
  */
-export function untouchedStoreChanges(
-  item:      Occurrence,
-  editScope: EditScope,
-  base:      SaveFields,
-  local:     SaveFields,
-): Partial<EditFields> {
-  const localFields = editFieldsOf(local)
-  return untouchedRemoteChanges(
-    editFieldsOf(base), localFields, currentFields(item, editScope, localFields),
-  )
+export function storeView(item: Occurrence, editScope: EditScope, items: StoreItem[]): EntryState {
+  const pinned = entryFromOccurrence(item, editScope, items)
+  const fields = currentFields(item, editScope, editFieldsOf(pinned))
+  const itemType: ItemType = fields.tracked ? 'task' : fields.scheduled ? 'event' : 'note'
+  return { ...pinned, ...fields, itemType }
 }
 
 /** Everything `saveNode` needs beyond the item and its fields. */
@@ -326,13 +306,14 @@ export interface SaveOpts {
   /** Where a brand-new entry lands when the editor's vault chip picked a vault. */
   targetVaultId?: string | null
   /**
-   * The fields as the editor last knew them to agree with the store — its
-   * load-time snapshot, advanced to each save it makes. Everything `fields`
-   * changes relative to this is written; everything it doesn't is left alone.
-   * See `touchedFieldsOnly`. Omitted for a brand-new entry, which has no
-   * ancestor and no other writer to lose a race with.
+   * The fields the user actually changed, straight from the editor's own
+   * record of them (`editor/edits.ts`) rather than inferred from a snapshot.
+   * These are written; every other field is left at whatever the store holds
+   * by the time the save lands. See `widenEdits`. Omitted for a brand-new
+   * entry, which has no store row to leave anything at, and by callers with
+   * no such record to offer (the debug view), which write the lot.
    */
-  base?: SaveFields | null
+  edits?: Partial<EditFields>
 }
 
 /**
@@ -363,7 +344,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   const snapshot = getSlugSnapshot()
   const edited = editFieldsOf(fields)
   const { fields: toWrite, touchedKeys } = item
-    ? touchedFieldsOnly(item, editScope, edited, opts.base)
+    ? widenEdits(item, editScope, edited, opts.edits)
     : { fields: edited, touchedKeys: undefined }
   const nextData = applyEdit(
     snapshot, item, editScope, toWrite,

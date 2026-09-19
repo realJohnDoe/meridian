@@ -38,7 +38,7 @@ import type { EditFields } from './storeOps'
  * equal to `undefined`, which is what makes "absent on both sides" a
  * non-change rather than a conflict.
  */
-function sameValue(a: unknown, b: unknown): boolean {
+export function sameValue(a: unknown, b: unknown): boolean {
   if (a === b) return true
   if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false
   if (Array.isArray(a) !== Array.isArray(b)) return false

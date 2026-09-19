@@ -10,20 +10,23 @@
  * editor had no equivalent, and its defects turn out to have the same shape
  * one layer down: a statement about an order of events across one *session*.
  *
- * The editor keeps two complete snapshots — `entry` (what is on screen) and
- * `baseRef` (what it last knew the store to agree with) — and infers "what did
- * the user change" by diffing them. That inference is only sound if every code
- * path that moves the form for a reason that is *not* a user edit also moves
- * the base. Nothing in the types says so, and the two bugs this file was
- * written after were both a broken pairing, in opposite directions:
+ * The editor used to keep two complete snapshots — `entry` (what is on screen)
+ * and `baseRef` (what it last knew the store to agree with) — and infer "what
+ * did the user change" by diffing them, which is only sound if every code path
+ * that moves the form for a reason that is *not* a user edit also moves the
+ * base. Nothing said so, and the bugs this file was written after were all a
+ * broken pairing: a scope switch that moved the form and not the base (so the
+ * next save saw three values for one field and reported a conflict with
+ * nobody), an 'add'-scope view that blanked `done` and read the blank back as
+ * the truth (so an unrelated later edit un-ticked a completed task), and a
+ * pinned occurrence whose ownership the store had moved on from (so a second
+ * 'future' save split an already-split series and a later 'single' save
+ * appended a duplicate override).
  *
- *  - a scope switch moved the form and not the base, so the next save saw
- *    three values for one field and reported a conflict with nobody;
- *  - 'add' scope blanked `done` in the form, and switching back read the blank
- *    as the truth, so an unrelated later edit un-ticked a completed task.
- *
- * Both are invisible to an example test that does not happen to walk that
- * exact order. Both are caught by the invariants below.
+ * The editor now derives the form and records the edits (`edits.ts`), which is
+ * what those failures argued for. These invariants stay because they are what
+ * says so: every one of them was found here first, and the structure that
+ * makes them hold is only worth having while something checks that it does.
  *
  * ## The two invariants
  *
@@ -43,9 +46,7 @@
  * are left out because they own *several* fields on purpose and would need
  * their own model: `onDateRemove` (clears the duration with the date) and
  * `handleTypeChange` (clears the priority and the schedule on the way to a
- * note). A third, `onRepeatRemove`, is left out because it does not work — see
- * the known defect pinned at the bottom of this file. All three are a gap
- * here, not a claim that they are safe.
+ * note). Both are a gap here, not a claim that they are safe.
  *
  * Content is derived, not generated: the values an op writes are fixed
  * constants distinct from the fixture's, so a counterexample shrinks to a
@@ -123,8 +124,7 @@ const OPS: Op[] = [
   { label: 'duration:1 hour', target: 'duration', run: h => { h.dialogHandlers.onDurConfirm('1 hour') } },
   { label: 'duration:remove', target: 'duration', run: h => { h.dialogHandlers.onDurRemove() } },
   { label: 'repeat:3 days',   target: 'repeat',   run: h => { h.dialogHandlers.onRepeatConfirm({ type: 'after_completion', interval: '3 days' }) } },
-  // `onRepeatRemove` is deliberately absent — see the known defect pinned
-  // below. It cannot participate until removing a repeat does something.
+  { label: 'repeat:remove',   target: 'repeat',   run: h => { h.dialogHandlers.onRepeatRemove() } },
   { label: 'done:toggle',     target: 'done',     run: h => { h.handleDoneToggle() } },
 ]
 
@@ -202,10 +202,13 @@ describe('single-writer editor invariants', () => {
    * RepeatDialog's remove button (wired through `onRepeatRemove`) reports
    * success and the series keeps going.
    *
-   * The editor then carries the damage forward — its base advances to the null
-   * the store refused, so the *next* repeat edit sees base null, the form's new
-   * rule and the store's old one, and reports a conflict with nobody. That is
-   * the sequence the property found: `future → repeat:remove → repeat:3 days`.
+   * The property found it as `future → repeat:remove → repeat:3 days`, which
+   * under the old form-and-base pair also poisoned everything after it: the
+   * base advanced to the null the store had refused, so the next repeat edit
+   * saw base null, the form's new rule and the store's old one, and reported a
+   * conflict with nobody. A derived form cannot carry that damage — the next
+   * render shows the repeat still there, which is at least honest — so
+   * `repeat:remove` is back in `OPS` and only the no-op itself is left.
    *
    * Fixing it is a model change with a shape to decide, not an oversight: the
    * leg that stops repeating has to stop being a series, so `applyFuture` and
@@ -215,7 +218,7 @@ describe('single-writer editor invariants', () => {
    * would at least stop the silent no-op.
    *
    * `it.fails` on purpose: whoever fixes this gets a failing test telling them
-   * to drop the `.fails` and put `repeat:remove` back in `OPS`.
+   * to drop the `.fails`.
    */
   it.fails('removing a repeat stops the series repeating', () => {
     const { result } = freshEditor()

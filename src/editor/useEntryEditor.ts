@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { startOfToday } from 'date-fns'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useStore } from '@/store'
-import { applyScope, entryFromOccurrence, saveNode, deleteNode, addItemLink, removeItemLink, archiveEntry } from './save'
+import { storeView, entryFromOccurrence, saveNode, deleteNode, addItemLink, removeItemLink, archiveEntry, reportContested } from './save'
 import type { Occurrence, EditScope } from '@/types'
 import { fmtISO, seriesContext } from '@/model'
 import { useToday } from '@/hooks'
@@ -11,14 +11,14 @@ import { resolveWikilink } from '@/wikilinks'
 import { keySlug } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { toggleOccDone } from '@/occurrenceActions'
-import { getFom } from '@/storeBridge'
+import { getFom, getItems } from '@/storeBridge'
 import { readVaultStringArray } from '@/lib/vaultStorage'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 import { usePendingLinks } from './usePendingLinks'
 import { useAutoSave } from './useAutoSave'
-import { useLiveReload } from './useLiveReload'
 import { useVaultTarget, initialTargetVault } from './useVaultTarget'
+import { foldEdits, applyEdits, editedFields, contestedFields, dropScopedEdits, type Edits } from './edits'
 
 export type { DialogHandlers } from './useEntryDialogs'
 
@@ -64,13 +64,31 @@ export function useEntryEditor(
   // last cached: with the vault chip able to point a new entry elsewhere, the
   // seed has to match where the entry actually lands. `useVaultTarget` below
   // seeds its own state from the same helper, in this same mount render.
-  const [entry, setEntry] = useState<EntryState>(() => {
+  //
+  // ── The form is derived, not stored ──────────────────────────────────────
+  //
+  // `view` is what the store says about this occurrence at this scope, and
+  // `edits` is what the user has changed on top of it. The form is the two
+  // laid together. Nothing here caches a field the user has not touched, so
+  // there is no second copy of one to go stale — see `edits.ts` for the three
+  // bugs that cost, and `state.ts`'s note on why `EntryState` survived as the
+  // render-facing shape.
+  //
+  const [editScope, setEditScope] = useState<EditScope>(initialScope)
+  const [edits, setEdits] = useState<Edits>({})
+
+  /**
+   * A brand-new entry's starting point. It has no store row to read, so unlike
+   * every other view this one is a constant: seeded once from the route's
+   * params and this vault's default participants, then only moved by `edits`.
+   */
+  const [newEntryView] = useState<EntryState>(() => {
     const target = initialTargetVault(!initialOcc, seed?.vault)
     const defaultParticipants = target
       ? readVaultStringArray('meridian_default_participants', target)
       : []
-    const base = entryFromItem(initialOcc, initialScope, seed)
-    const seeded = (!initialOcc && defaultParticipants.length > 0)
+    const base = entryFromItem(null, initialScope, seed)
+    const seeded = defaultParticipants.length > 0
       ? { ...base, participants: [...defaultParticipants] }
       : base
     return initialTitle ? { ...seeded, title: initialTitle } : seeded
@@ -84,6 +102,85 @@ export function useEntryEditor(
   // slug another file already owns gets placed on a free one instead. Kept in state
   // (not a ref) because it feeds the favourite button and the "listed on" target.
   const [createdKey, setCreatedKey] = useState<EntryKey | null>(null)
+
+  // Once a brand-new item's first save creates its file, this holds the resulting
+  // occurrence so later commits in the same session upsert onto it (see commitEntry)
+  // instead of calling applyNew again. Deliberately NOT surfaced as `entry.item` —
+  // EntryEditor derives `bodyKey`/scope-row visibility/etc. from that field, and
+  // flipping it mid-session would remount the CodeMirror body editor under the user.
+  const createdItemRef = useRef<Occurrence | null>(null)
+
+  const storeRoots = useStore(s => s.roots)
+  const storeItems = useStore(s => s.items)
+
+  /**
+   * The store's answer for this occurrence, at this scope, right now.
+   *
+   * Recomputed whenever the store or the scope moves, which is what makes a
+   * field the user has not touched *live* rather than a mount-time copy —
+   * the job `useLiveReload` used to do by subscribing and writing the change
+   * into two places at once.
+   *
+   * `initialOcc` is pinned for the session on purpose (see `createdItemRef`),
+   * and that is safe here for the same reason it is safe in `applyScope`,
+   * which this calls: ownership and metadata are re-read from `storeItems`,
+   * so only the occurrence's *identity* comes from the pinned value.
+   */
+  /**
+   * The occurrence a brand-new entry's first save created, resolved from state
+   * rather than from `createdItemRef`, which a render may not read. Same row
+   * either way; the ref exists for the imperative paths that need it within
+   * the tick that created it, before this render happens.
+   */
+  const createdItem = useMemo(
+    () => {
+      void storeItems // re-resolve when the store moves, not only when the key lands
+      return createdKey ? (getFom().get(createdKey) ?? null) : null
+    },
+    [createdKey, storeItems],
+  )
+
+  const view = useMemo(
+    () => {
+      const item = initialOcc ?? createdItem
+      if (!item) return newEntryView
+      const derived = storeView(item, editScope, storeItems)
+      // A brand-new entry's created row backs the view, but is deliberately
+      // not surfaced as `entry.item` — see `createdItemRef` above: EntryEditor
+      // keys the CodeMirror body off that field, so filling it in mid-session
+      // would remount the editor under the user.
+      return initialOcc ? derived : { ...derived, item: null }
+    },
+    [initialOcc, createdItem, editScope, storeItems, newEntryView],
+  )
+
+  /**
+   * The description CodeMirror and the store last agreed on — what it was
+   * mounted with, then whatever each save writes.
+   *
+   * The one field the form does *not* re-derive. A CodeMirror document has a
+   * cursor, a selection and an undo history in it, and replacing that under
+   * the user is the disruption the editor's never-re-read rule exists to
+   * prevent — "they weren't typing just now" does not make it safe. So the
+   * form keeps showing what CodeMirror holds, whatever the store now says.
+   *
+   * Correctness does not depend on the adoption: an untouched description is
+   * not in `edits`, so `widenEdits` leaves it at the store's value and the
+   * other side's survives. The one case that is not enough — both sides typing
+   * prose — is a genuine overlap, and `contestedFields` still sees it, because
+   * it is measured against `view` (the real store) rather than against this.
+   *
+   * It advances on save rather than staying at the mount value because a save
+   * is the moment the two *do* agree again — left behind, the next fold would
+   * read the already-written description as a fresh edit.
+   */
+  const [bodyBase, setBodyBase] = useState(() => (initialOcc ? storeView(initialOcc, initialScope, getItems()).body : ''))
+
+  /** What the fold and the form are built on: the view, minus that one field. */
+  const formView = useMemo(() => ({ ...view, body: bodyBase }), [view, bodyBase])
+
+  /** The form: the store's view with the user's edits laid over it. */
+  const entry = useMemo(() => applyEdits(formView, edits), [formView, edits])
 
   // Mirrors the latest autosave flush for `useVaultTarget`, which stages a
   // move against the store and so must not count a link still sitting in
@@ -101,26 +198,35 @@ export function useEntryEditor(
   const flushLinksRef = useRef(flushOnSave)
   useEffect(() => { flushLinksRef.current = flushOnSave })
 
-  // What this editor last knew the store to agree with: the fields as loaded,
-  // then advanced to each save it makes. `saveNode` writes only what `entry`
-  // changes relative to this, so a field nobody here touched is left at
-  // whatever the store holds by then rather than reverted to what was on
-  // screen when the editor opened — see `touchedFieldsOnly`.
-  //
-  // Advanced on save rather than left at the mount-time values: after a commit
-  // the editor and the store agree again, and a base that never moves would
-  // keep re-writing every field of every earlier edit forever.
-  const baseRef = useRef(entry)
-
-  // Always points to the latest entry so timer callbacks don't close over stale state
+  // Always points to the latest form/view so timer callbacks don't close over
+  // stale state.
   const entryRef = useRef(entry)
   useEffect(() => { entryRef.current = entry }, [entry])
-  // Once a brand-new item's first save creates its file, this holds the resulting
-  // occurrence so later commits in the same session upsert onto it (see commitEntry)
-  // instead of calling applyNew again. Deliberately NOT stored on `entry.item` —
-  // EntryEditor derives `bodyKey`/scope-row visibility/etc. from that field, and
-  // flipping it mid-session would remount the CodeMirror body editor under the user.
-  const createdItemRef = useRef<Occurrence | null>(null)
+  const viewRef = useRef(view)
+  useEffect(() => { viewRef.current = view }, [view])
+  const formViewRef = useRef(formView)
+  useEffect(() => { formViewRef.current = formView }, [formView])
+  const editsRef = useRef(edits)
+  useEffect(() => { editsRef.current = edits }, [edits])
+
+  /**
+   * Record what the caller just changed, rather than replacing the form with
+   * it. The difference between what the form shows and what it is asked to
+   * show is exactly the user's intent; everything else in `next` is whatever
+   * the view happened to supply and must not be mistaken for an edit.
+   *
+   * Same `setEntry(next)` signature the call sites always had, so a component
+   * that wants to change a field still just says so.
+   */
+  const setEntry = (update: EntryState | ((prev: EntryState) => EntryState)) => {
+    const from = entryRef.current
+    const next = typeof update === 'function' ? update(from) : update
+    if (next.editScope !== from.editScope) setEditScope(next.editScope)
+    const folded = foldEdits(editsRef.current, from, next, formViewRef.current)
+    editsRef.current = folded
+    entryRef.current = applyEdits(formViewRef.current, folded)
+    setEdits(folded)
+  }
   // Identity of this editor session's draft, stamped on the item its first save
   // creates. It's what lets applyNew tell a repeat commit for *this* draft (upsert)
   // from a different entry landing on a taken slug (allocate a free slug) — the
@@ -132,8 +238,6 @@ export function useEntryEditor(
   // second one that lands beside it on a `-2` slug.
   const [draftId] = useState(() => sessionDraftId ?? crypto.randomUUID())
 
-  const storeRoots = useStore(s => s.roots)
-  const storeItems = useStore(s => s.items)
   const navigate = useNavigate()
   const router = useRouter()
 
@@ -148,41 +252,64 @@ export function useEntryEditor(
   // title) — the link handlers below need a slug of their own to write
   // `[[this-entry]]` into another file, and only a commit can produce one.
   const commitEntry = (next: EntryState): EntryKey | null => {
+    // Whatever the caller is proposing beyond what the form already shows is
+    // itself an edit — an autosave's body, a dialog's field — so fold it in
+    // before deciding what to write.
+    const pending = foldEdits(editsRef.current, entryRef.current, next, formViewRef.current)
     const item = next.item ?? createdItemRef.current
     if (item) {
-      const key = saveNode(item, next.editScope, next, { base: baseRef.current })
+      // Say out loud that a race happened, before resolving it in the user's
+      // favour by writing. Only reachable with a second writer: with one, the
+      // store cannot have left `storeWas` behind the user's back.
+      reportContested(contestedFields(pending, viewRef.current))
+      const key = saveNode(item, next.editScope, next, { edits: editedFields(pending) })
       setTitleMissing(key === null)
       // No-op once `next.item` itself is set (usePendingLinks already flushes
       // immediately in that case) — but while item only lives in
       // createdItemRef, entry.item is still null, so pending "listed on" links
       // added after creation would otherwise never get flushed again.
-      if (key) { baseRef.current = next; flushLinksRef.current(keySlug(key)) }
+      if (key) { clearEdits(next); flushLinksRef.current(keySlug(key)) }
       return key
     }
     if (!next.title) return null
     const key = saveNode(null, next.editScope, next, { draftId, targetVaultId })
     if (key === null) { setTitleMissing(true); return null }
     setTitleMissing(false)
-    baseRef.current = next
     flushLinksRef.current(keySlug(key))
     setCreatedKey(key)
     createdItemRef.current = getFom().get(key) ?? null
+    // The edits are in the store now, so the view carries them and the set
+    // starts empty again. Deliberately *after* `createdItemRef`, which is what
+    // switches `view` off `newEntryView` and onto the store's own row — clear
+    // it first and the form would fall back to the seed and blank the title
+    // the save just wrote.
+    clearEdits(next)
     return key
+  }
+
+  /**
+   * Everything the user changed has landed, so the set starts empty and the
+   * view speaks for every field again.
+   *
+   * The refs go first and synchronously, re-read from the store rather than
+   * left at this render's values: a commit can be followed by another within
+   * the same tick (a dialog confirm right after an autosave flush), long
+   * before React re-renders — and for a brand-new entry the commit is also
+   * what gives it a store row to derive from at all.
+   */
+  const clearEdits = (saved: EntryState) => {
+    const item = initialOcc ?? createdItemRef.current
+    const fresh = item ? storeView(item, saved.editScope, getItems()) : formViewRef.current
+    editsRef.current = {}
+    viewRef.current = fresh
+    formViewRef.current = { ...fresh, body: saved.body }
+    entryRef.current = formViewRef.current
+    setBodyBase(saved.body)
+    setEdits({})
   }
 
   const { scheduleAutoSave, flushAutoSave, cancelAutoSave, bodyRef } = useAutoSave(commitEntry, entryRef, entry.body)
   useEffect(() => { flushEditsRef.current = flushAutoSave })
-
-  // Something else writing to this entry while it is open — a second tab, the
-  // installed PWA, a sync from another device — moves the store under the
-  // fields on screen. Take the ones the user has not touched, and advance the
-  // base with them so the next save doesn't write them straight back out.
-  // Adopting is deliberately all this does; the overlaps are `saveNode`'s to
-  // report. See useLiveReload.
-  useLiveReload(entry.item?.entryKey ?? createdKey, entryRef, createdItemRef, baseRef, bodyRef, fields => {
-    setEntry(prev => ({ ...prev, ...fields }))
-    baseRef.current = { ...baseRef.current, ...fields }
-  })
 
   const saveMeta = (next: EntryState) => {
     if (next.editScope === 'add') return
@@ -279,7 +406,9 @@ export function useEntryEditor(
     // still deliberately null, so saving must target the adopted item rather than ask
     // for another new entry. draftIdRef covers the window before that adoption lands.
     const item = entry.item ?? createdItemRef.current
-    const key = saveNode(item, entry.editScope, { ...entry, body }, { draftId, targetVaultId, base: baseRef.current })
+    const pending = foldEdits(editsRef.current, entryRef.current, { ...entry, body }, formViewRef.current)
+    reportContested(contestedFields(pending, viewRef.current))
+    const key = saveNode(item, entry.editScope, { ...entry, body }, { draftId, targetVaultId, edits: editedFields(pending) })
     if (key !== null) { setTitleMissing(false); goBack(); return }
     setTitleMissing(true)
     setFocusTitleTick(t => t + 1)
@@ -317,56 +446,32 @@ export function useEntryEditor(
 
   /**
    * Picking a scope says which occurrences the *next* edit covers. It is not
-   * itself an edit, so it only moves the form — `setEntry`, never `updateEntry`.
+   * itself an edit, so it moves nothing but the scope: `view` re-derives
+   * `scheduled`, `repeat` and `done` from the store for the newly chosen
+   * scope, and whatever the user has actually typed rides along in `edits`
+   * untouched.
    *
-   * Committing here wrote the entry at the newly chosen scope with every field
-   * still unchanged, which for 'future' means `applyFuture` splitting the series
-   * on the spot: choosing "edit this and all following occurrences" silently cut
-   * the series in two, capping the original and starting a new one that carried
-   * the *old* repeat rule. The rule the user then picked committed a second
-   * time, and because `entry.item` still points at the original series, that
-   * second save split it again — leaving two series anchored on the same day
-   * (two occurrences that day) beside a daily one that never ended (an
-   * occurrence on every later day). Both are the reported bug.
+   * This used to be three coupled assignments and was wrong twice. Committing
+   * here wrote the entry at the new scope with every field unchanged, which
+   * for 'future' meant `applyFuture` splitting the series on the spot. Moving
+   * the form without moving `baseRef` made the next save read the scope switch
+   * as a second writer, so every repeat change warned "the repeat also changed
+   * somewhere else" on a vault nobody else was writing to. And blanking `done`
+   * for 'add' left the form with no way back to the real value, so a
+   * there-and-back through "Add new occurrence" un-ticked a completed task on
+   * the next ordinary save.
    *
-   * Scope 'add' has always been exempt from the meta save for the same reason
-   * (`saveMeta`), just expressed one layer down: choosing "add new occurrence"
-   * must not add one. The rule is the same for every scope.
-   *
-   * The base moves with the form, because `applyScope` reads those two fields
-   * out of the store: at the new scope they are what the store holds, which is
-   * exactly what `baseRef` means. Left behind, it went on describing the old
-   * scope — and since 'single' drops the repeat, opening a recurring entry
-   * (the default scope) and switching to "Edit repeat pattern" left a base
-   * saying `repeat: null`. The next save then read its own scope switch as a
-   * third writer: base null, editor's new rule, store's old one, all
-   * different, which is `overlappingFields`' definition of a conflict. Every
-   * repeat change made that way warned "the repeat also changed somewhere
-   * else" with nobody else on the vault. Not a `done` switch too: that one is
-   * a form-only nicety for 'add' (a scope that never merges against the base
-   * at all — see `touchedFieldsOnly`), and adopting it would let a scope
-   * switch swallow a real edit.
+   * All three were the same thing: state that had to be kept in step by hand.
+   * A derived view has nothing to keep in step — 'add' shows `done: false`
+   * because `entryFromOccurrence` says so at that scope, and the moment the
+   * scope changes back it says something else.
    */
   const handleScopeChange = (scope: EditScope) => {
     if (!entry.item) return
-    const { scheduled, repeat } = applyScope(entry.item, scope)
-    // 'add' creates a brand-new occurrence rather than editing entry.item, so it
-    // must not inherit that occurrence's done state — carrying it over is what
-    // made a freshly added occurrence show up checked when the one it was
-    // switched from happened to be done.
-    //
-    // Leaving 'add' puts it back, from the base rather than from the form: that
-    // `false` was a property of the view, not an edit (no save happens at 'add'
-    // scope — see `saveMeta`), so `entry.done` no longer knows what the store
-    // holds and `baseRef` still does. Reading it off the form instead let a
-    // there-and-back through "Add new occurrence" carry the view's `false` into
-    // the next ordinary save, silently un-ticking a completed task.
-    const done =
-      scope === 'add'            ? false
-      : entry.editScope === 'add' ? baseRef.current.done
-      : entry.done
-    setEntry({ ...entry, editScope: scope, scheduled, repeat, done })
-    baseRef.current = { ...baseRef.current, editScope: scope, scheduled, repeat }
+    setEditScope(scope)
+    const kept = dropScopedEdits(editsRef.current)
+    editsRef.current = kept
+    setEdits(kept)
   }
 
   const handleTypeChange = (t: ItemType) => {

@@ -9,9 +9,15 @@
  * store, which is what these drive directly. A sync pulling another device's
  * change arrives identically, so these cover that too.
  *
- * The policy, in one line: adopt what only the other side moved, keep (and
+ * The policy, in one line: show what only the other side moved, keep (and
  * report) what both sides moved, and never re-read the description under the
  * cursor.
+ *
+ * None of this is adoption any more — the form derives every field the user
+ * has not touched straight from the store (`storeView`), so "the other side's
+ * change appears" is the absence of a mechanism rather than one. These tests
+ * outlived `useLiveReload`, which is the point of keeping them: they were
+ * always about what the editor *does*, never about how.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
@@ -100,10 +106,10 @@ describe('useEntryEditor — a change arriving from another view', () => {
     expect(result.current.entry.title).toBe('Standup (renamed elsewhere)')
   })
 
-  it('does not write an adopted field back out on the next save', () => {
-    // The adoption advances the editor's base too. Without that, the adopted
-    // value reads as something the user touched, and the save pushes it
-    // straight back — a write nobody asked for, and a conflict on the next one.
+  it('does not write a field it merely displayed back out on the next save', () => {
+    // A field the user has not touched is not in the edit set, so the save
+    // never names it and `widenEdits` leaves it at whatever the store holds.
+    // Showing it and writing it are unrelated.
     seedEntry()
     const { result } = renderHook(() => useEntryEditor(expanded()))
 
@@ -138,8 +144,9 @@ describe('useEntryEditor — a change arriving from another view', () => {
 
   it('never re-reads the description under the cursor', () => {
     // A CodeMirror document with a cursor, a selection and an undo history in
-    // it — see useLiveReload. The save is still correct without adopting it:
-    // an untouched description is not written, so the other view's survives.
+    // it — see `mountBody` in useEntryEditor. The save is still correct
+    // without re-reading it: an untouched description is never written, so the
+    // other view's survives.
     seedEntry()
     const { result } = renderHook(() => useEntryEditor(expanded()))
 
