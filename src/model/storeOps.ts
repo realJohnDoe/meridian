@@ -441,6 +441,82 @@ function editedEntry(
   }
 }
 
+/**
+ * Whether this save is asking for the repeat to be *deleted*, as opposed to
+ * simply not carrying one.
+ *
+ * `applyScope` hands every 'single'- and 'add'-scope save a null `repeat`,
+ * because at those scopes the field names this occurrence rather than the
+ * series and the editor has no rule to offer. Reading that null as a deletion
+ * would wipe a series whenever someone edited one of its occurrences, which is
+ * why the fields alone cannot answer and everything below used to fall back to
+ * `repeat ?? existing` — and why removing a repeat silently did nothing.
+ *
+ * `touched` is the difference: the save says which fields it is actually
+ * writing (see `TouchedKeys`), so a null that *is* in the set means the user
+ * cleared the rule. An absent set means "unknown, treat every field as
+ * changed", which is the debug view and the rebuild paths — none of them are a
+ * user clearing a repeat, and destroying a series on a maybe is not a trade
+ * worth making, so those keep the old fallback.
+ */
+function repeatRemoved(fields: EditFields, touched?: TouchedKeys): boolean {
+  return fields.repeat === null && touched?.has('repeat') === true
+}
+
+/**
+ * The standalone occurrence a series becomes when its repeat is removed.
+ *
+ * Keeps the series' own id, mirroring `applySingle`'s standalone→series
+ * conversion in the other direction: the node stays the same node, it just
+ * stops having a rule. `occMeta` rather than `seriesMeta` because it is an
+ * occurrence now — `seriesMeta` forces `done` to the default a child would
+ * inherit, which is exactly wrong for something with no children left.
+ */
+function seriesToOccurrence(
+  series:  RepeatPattern<OccurrenceMetadata>,
+  fields:  EditFields,
+  touched?: TouchedKeys,
+): OccurrenceEntry<OccurrenceMetadata> {
+  const { scheduled } = fields
+  return {
+    date:     scheduled?.date ?? '',
+    time:     scheduled?.date ? scheduled.time || null : null,
+    source:   'explicit',
+    entryKey: series.entryKey,
+    id:       series.id,
+    metadata: occMeta(series.metadata, fields, touched),
+  }
+}
+
+/** A non-series child of `seriesId` — an override, or an exclusion stub. */
+function isChildOf(item: StoreItem, seriesId: string): boolean {
+  return !isSeries(item) && item.ownerId === seriesId
+}
+
+/**
+ * The overrides removing a repeat would delete — the occurrences the user has
+ * customised, which cannot outlive the series they hang off.
+ *
+ * Exclusion stubs are not counted: a stub records "don't generate this slot",
+ * which is meaningless once nothing is generated, so dropping it loses the
+ * user nothing they could point at. What the editor does with the count is
+ * ask first — see `handleRepeatRemove`.
+ */
+export function overridesLostToRepeatRemoval(
+  items: StoreItem[],
+  occ:   Occurrence,
+  scope: EditScope,
+): OccurrenceEntry<OccurrenceMetadata>[] {
+  const series = findSeries(items, occ)
+  if (!series) return []
+  return items.filter((i): i is OccurrenceEntry<OccurrenceMetadata> =>
+    !isSeries(i)
+    && i.ownerId === series.id
+    && !i.excluded
+    && (scope !== 'future' || i.date >= occ.date),
+  )
+}
+
 /** Apply editor fields onto an existing series or standalone item's structural + metadata fields. */
 function applyFieldsToItem(item: StoreItem, fields: EditFields, touched?: TouchedKeys): StoreItem {
   const { scheduled, repeat } = fields
@@ -657,10 +733,38 @@ function freshItem(entryKey: EntryKey, fields: EditFields, id: string): StoreIte
   return occ
 }
 
-/** Update the series (or standalone) metadata across all occurrences. */
+/**
+ * Update the series (or standalone) metadata across all occurrences.
+ *
+ * Removing the repeat here is the one case that changes the file's shape
+ * rather than its fields: the series becomes a standalone occurrence on the
+ * date the form is showing (its anchor, which is what `applyScope` puts there
+ * at this scope), and every override hanging off it goes with the rule they
+ * were overriding. Nothing else in the file is touched — a second series
+ * alongside this one, and its own children, are somebody else's occurrences.
+ * The user is asked first where that loses anything; see
+ * `overridesLostToRepeatRemoval` and the editor's `handleRepeatRemove`.
+ */
 function applyAll(data: StoreData, occ: Occurrence, fields: EditFields, touched?: TouchedKeys): StoreData {
   const entry = data.entries.get(occ.entryKey)
   if (!entry) return data
+  const series = occ.ownerId
+    ? (entry.items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined)
+    : undefined
+  if (series && repeatRemoved(fields, touched)) {
+    const converted = seriesToOccurrence(series, fields, touched)
+    const mapped = entry.items.flatMap(i =>
+      i.id === series.id        ? [converted]
+      : isChildOf(i, series.id) ? []
+      : [i],
+    )
+    // The series is always in `entry.items` and always yields `converted`, so
+    // the default never fires — it is how the non-empty guarantee is kept
+    // without an assertion, same idiom as `applyFuture` below.
+    const [head = converted, ...tail] = mapped
+    const items: Entry['items'] = [head, ...tail]
+    return { ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items, touched)) }
+  }
   const matchItem = occ.ownerId
     ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
     : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
@@ -771,16 +875,26 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
   const newSeriesId = crypto.randomUUID()
   const newRepeat = repeat ?? series.repeat
   const newMeta = seriesMeta(series.metadata, fields, touched)
+  const removing = repeatRemoved(fields, touched)
 
-  const [head, ...tail] = entry.items
-  const expand = (i: StoreItem): StoreItem[] => {
-    if (i.id === series.id) {
-      const capped: RepeatPattern<OccurrenceMetadata> = {
-        ...(i as RepeatPattern<OccurrenceMetadata>),
-        repeat: { ...(i as RepeatPattern<OccurrenceMetadata>).repeat,
-          end: { type: 'until' as const, date: dayBefore(occDate) } },
+  const capped: RepeatPattern<OccurrenceMetadata> = {
+    ...series,
+    repeat: { ...series.repeat, end: { type: 'until' as const, date: dayBefore(occDate) } },
+  }
+  // Removing the repeat from here on leaves a single occurrence where the new
+  // series would have started — the same conversion `applyAll` does, bounded
+  // to the half of the file this scope covers. The earlier occurrences keep
+  // their rule; only the tail stops recurring.
+  const newLeg: StoreItem = removing
+    ? {
+        date:     scheduled?.date ?? occDate,
+        time:     scheduled?.time || null,
+        source:   'explicit',
+        entryKey: series.entryKey,
+        id:       newSeriesId,
+        metadata: occMeta(series.metadata, fields, touched),
       }
-      const newSeries: RepeatPattern<OccurrenceMetadata> = {
+    : {
         date:     scheduled?.date ?? occDate,
         time:     scheduled?.time || null,
         repeat:   newRepeat,
@@ -788,24 +902,31 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
         id:       newSeriesId,
         metadata: newMeta,
       }
-      return [capped, newSeries]
-    }
+
+  const expand = (i: StoreItem): StoreItem[] => {
+    if (i.id === series.id) return [capped, newLeg]
     // Re-point overrides at/after occDate to the new series, applying the same
     // metadata the new series root got. Without this they keep the value they
     // inherited from the OLD series and collapse re-emits it as a divergence —
     // the same defect `applyFieldsToChildren` fixes for scope 'all', and the
     // same reasoning: "this and following" covers the overridden occurrences in
     // that range too. `done`/`excluded`/date/time stay the child's own.
+    //
+    // Unless the rule is going: there is no new series for them to hang off,
+    // so they go with it — which is what the editor asks about before letting
+    // this run.
     if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
-      return [{ ...i, ownerId: newSeriesId, metadata: { ...occMeta(i.metadata, fields, touched), done: i.metadata.done } }]
+      return removing
+        ? []
+        : [{ ...i, ownerId: newSeriesId, metadata: { ...occMeta(i.metadata, fields, touched), done: i.metadata.done } }]
     }
     return [i]
   }
-  // `expand` maps each item to at least one item — the series' own leg returns
-  // the capped series plus its new sibling — so expanding the head keeps the
-  // result non-empty without a cast.
-  const [first = head, ...restOfHead] = expand(head)
-  const items: Entry['items'] = [first, ...restOfHead, ...tail.flatMap(expand)]
+  // The series is always in `entry.items` and always yields `capped`, so the
+  // default never fires — it is how the non-empty guarantee is kept without an
+  // assertion, now that `expand` can also map an item to nothing.
+  const [head = capped, ...tail] = entry.items.flatMap(expand)
+  const items: Entry['items'] = [head, ...tail]
   return { ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items, touched)) }
 }
 

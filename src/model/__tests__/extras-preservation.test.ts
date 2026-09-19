@@ -144,6 +144,7 @@ const EXEMPT: Record<string, string> = {
   draftEntryKey: 'pure lookup — returns an existing entry\'s key, never touches metadata',
   freeEntryKey: 'pure key allocation — returns a string, never touches metadata',
   moveLinkBreakage: 'read-only count of what a move would break — returns keys and refs',
+  overridesLostToRepeatRemoval: 'read-only filter over items — returns existing objects untouched',
   groupIntoEntries: 'pure regrouping — carries the same root and item objects into one map, by reference',
 }
 

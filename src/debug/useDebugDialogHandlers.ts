@@ -15,6 +15,9 @@ export function useDebugDialogHandlers(
   const handlers: DialogHandlers = {
     activeDialog,
     pendingDelete:    null,
+    // The debug view edits one node directly, with no series behind it to lose
+    // overrides from, so removing a repeat here never has anything to confirm.
+    pendingRepeatRemove: null,
     seriesSheetConfig: null,
     onClose:       () => setActiveDialog(null),
     onDateConfirm: date => { setEntry(e => e ? { ...e, scheduled: { date, time: e.scheduled?.time || '' } } : e); setActiveDialog(null) },
@@ -26,6 +29,7 @@ export function useDebugDialogHandlers(
     onDurRemove:   ()   => { setEntry(e => e ? { ...e, duration: '' } : e) },
     onRepeatConfirm: r  => { setEntry(e => e ? { ...e, repeat: r } : e); setActiveDialog(null) },
     onRepeatRemove: ()  => { setEntry(e => e ? { ...e, repeat: null } : e); setActiveDialog(null) },
+    onRepeatRemoveClose: () => {},
     onSeriesClose: () => {},
     onDeleteClose: () => {},
   }

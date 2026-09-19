@@ -21,6 +21,7 @@ export default function DialogStack({ entry, handlers }: Props) {
     onClose, onDateConfirm, onDateRemove, onPriority,
     onTimeConfirm, onTimeRemove, onDurConfirm, onDurRemove,
     onRepeatConfirm, onRepeatRemove, onSeriesClose, onDeleteClose,
+    pendingRepeatRemove, onRepeatRemoveClose,
   } = handlers
   const today = useToday()
   return (
@@ -80,6 +81,23 @@ export default function DialogStack({ entry, handlers }: Props) {
         onConfirm={() => pendingDelete?.onConfirm()}
         onArchive={() => pendingDelete?.onArchive()}
         onClose={onDeleteClose}
+      />
+      <DeleteDialog
+        open={!!pendingRepeatRemove}
+        title={pendingRepeatRemove?.title ?? ''}
+        heading="Remove repeat"
+        description={
+          <>
+            Stop &ldquo;{pendingRepeatRemove?.title}&rdquo; repeating?{' '}
+            {pendingRepeatRemove?.lost === 1
+              ? 'Its 1 changed occurrence will be deleted.'
+              : `Its ${pendingRepeatRemove?.lost ?? 0} changed occurrences will be deleted.`}{' '}
+            This cannot be undone.
+          </>
+        }
+        confirmLabel="Remove repeat"
+        onConfirm={() => pendingRepeatRemove?.onConfirm()}
+        onClose={onRepeatRemoveClose}
       />
     </>
   )
