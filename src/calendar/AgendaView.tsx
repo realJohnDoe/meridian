@@ -13,6 +13,7 @@ import AgendaRow from './AgendaRow'
 import AgendaOverdueGroupRow from './AgendaOverdueGroupRow'
 import AgendaLoadEarlierRow from './AgendaLoadEarlierRow'
 import { computeAgendaScrollRestore, useSaveAgendaScroll, useAnchoredAgendaScroll } from './computeAgendaScrollRestore'
+import { occRowKeyFor } from './agendaSections'
 import { useAgendaSections, estimateRow, type ExtraMetaProbe } from './useAgendaSections'
 import { useVirtualFlip, FLIP_KEY_ATTR } from './useVirtualFlip'
 import { useScrollabilityWarning } from './agendaScrollability'
@@ -84,7 +85,7 @@ export default function AgendaView({ onOpen }: Props) {
   // (Before row virtualization, DaySection's custom comparator ignored them
   // entirely, so instability was silently absorbed instead — the failure mode
   // has inverted, but useCallback is required either way.)
-  const handleToggleDone = useCallback((occ: Occurrence) => toggleOccDone(occ), [])
+  // handleToggleDone is defined further down, once excludeFromAnchor exists.
   const handleSwipeDelete = useCallback((occ: Occurrence) => beginSwipeDelete(occ), [])
 
   // AgendaView owns its scroll container (scRef below), so the virtualizer reads
@@ -133,7 +134,19 @@ export default function AgendaView({ onOpen }: Props) {
   // than a scroll — a vault's background sync landing, a filter toggle. See
   // the hook for why this corrects the offset rather than re-requesting a
   // scroll target.
-  const { captureAnchor, anchorAt } = useAnchoredAgendaScroll(scRef, virtualizer, rows, scrollTarget !== null)
+  const { captureAnchor, anchorAt, excludeFromAnchor } = useAnchoredAgendaScroll(scRef, virtualizer, rows, scrollTarget !== null)
+
+  // Checking a task off moves it from the active to the dimmed sort bucket
+  // within its own day (occSort.ts), so its row lands lower in the same
+  // section. Without excludeFromAnchor, useAnchoredAgendaScroll would find
+  // that same row at its new position and re-pin the viewport there —
+  // chasing the checked task down the screen instead of holding the day
+  // section's top in place. See findAnchorIndex's own comment.
+  const handleToggleDone = useCallback((occ: Occurrence) => {
+    const key = occRowKeyFor(occ)
+    if (key) excludeFromAnchor(key)
+    toggleOccDone(occ)
+  }, [excludeFromAnchor])
 
   const virtualItems = virtualizer.getVirtualItems()
 

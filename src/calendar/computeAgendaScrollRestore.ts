@@ -143,10 +143,21 @@ export interface ScrollAnchor {
  * `-1` means neither matched — the anchor's day fell out of the window
  * entirely, and the caller should leave the scroll position alone rather than
  * guess.
+ *
+ * `excludeKey`, when it equals `anchor.key`, skips the exact-key match and
+ * goes straight to the same-day fallback — see useAnchoredAgendaScroll's
+ * `excludeFromAnchor` for why: the anchor row itself can be the thing whose
+ * own mutation reordered it (a checked-off task sorting to the bottom of its
+ * day), and re-pinning to it there would chase it across the screen instead
+ * of holding the day's top in place. This mirrors the CSS scroll-anchoring
+ * spec's own exclusion rule, which never anchors a viewport to the node a
+ * mutation is directly changing.
  */
-export function findAnchorIndex(rows: AgendaRow[], anchor: ScrollAnchor): number {
-  const exact = rows.findIndex(r => r.key === anchor.key)
-  if (exact >= 0) return exact
+export function findAnchorIndex(rows: AgendaRow[], anchor: ScrollAnchor, excludeKey?: string | null): number {
+  if (anchor.key !== excludeKey) {
+    const exact = rows.findIndex(r => r.key === anchor.key)
+    if (exact >= 0) return exact
+  }
   return rows.findIndex(r => r.dateKey >= anchor.dateKey)
 }
 
@@ -189,16 +200,18 @@ export function findAnchorIndex(rows: AgendaRow[], anchor: ScrollAnchor): number
  * scroll-to-target effect already relies on.
  *
  * Returns `captureAnchor` (for the scroll listener — the authoritative moment,
- * since `virtualizer.scrollOffset` is only current after a real scroll event)
- * and `anchorAt` (for the scroll-to-target effect, which knows exactly where it
- * just landed without having to read it back).
+ * since `virtualizer.scrollOffset` is only current after a real scroll event),
+ * `anchorAt` (for the scroll-to-target effect, which knows exactly where it
+ * just landed without having to read it back), and `excludeFromAnchor` (for a
+ * caller about to mutate the anchor row's own sort position — see its own
+ * comment).
  */
 export function useAnchoredAgendaScroll(
   scrollRef: React.RefObject<HTMLDivElement | null>,
   virtualizer: AgendaVirtualizer,
   rows: AgendaRow[],
   scrollTargetPending: boolean,
-): { captureAnchor: () => void; anchorAt: (index: number, dateKey: string) => void } {
+): { captureAnchor: () => void; anchorAt: (index: number, dateKey: string) => void; excludeFromAnchor: (key: string) => void } {
   const anchorRef = useRef<ScrollAnchor | null>(null)
 
   // Whether a finger is currently down on the list — the one state in which
@@ -253,6 +266,14 @@ export function useAnchoredAgendaScroll(
     anchorRef.current = row ? { key: row.key, dateKey, index } : null
   }, [rows])
 
+  // Set by a caller that is about to mutate the anchor row itself in a way
+  // that reorders it (AgendaView's done-toggle: checking a task moves it from
+  // the active to the dimmed sort bucket within its own day — see
+  // occSort.ts). Consumed once, by the very next reconciliation below, so it
+  // never leaks into an unrelated later rebuild.
+  const excludeAnchorKeyRef = useRef<string | null>(null)
+  const excludeFromAnchor = useCallback((key: string) => { excludeAnchorKeyRef.current = key }, [])
+
   // Seeded with the mount's own rows so the first run is a no-op — there is
   // nothing to correct before anything has changed, and the mount path is
   // already handled by computeAgendaScrollRestore's seeded initialOffset.
@@ -261,6 +282,8 @@ export function useAnchoredAgendaScroll(
   useLayoutEffect(() => {
     const prevRows = prevRowsRef.current
     prevRowsRef.current = rows
+    const excludeKey = excludeAnchorKeyRef.current
+    excludeAnchorKeyRef.current = null
     if (prevRows === rows) return
 
     // An explicit jump (Today, a sidebar jump, a vault change) is already
@@ -275,7 +298,7 @@ export function useAnchoredAgendaScroll(
     // instead of from a position they have already left.
     if (touchingRef.current) { captureAnchor(); return }
 
-    const index = findAnchorIndex(rows, anchor)
+    const index = findAnchorIndex(rows, anchor, excludeKey)
     if (index < 0) return
     // Same index means nothing above the viewport was added or removed, so
     // there is nothing to correct — and re-pinning anyway would snap a mid-row
@@ -286,7 +309,7 @@ export function useAnchoredAgendaScroll(
     anchorRef.current = { ...anchor, index }
   }, [rows, scrollTargetPending, virtualizer, captureAnchor])
 
-  return { captureAnchor, anchorAt }
+  return { captureAnchor, anchorAt, excludeFromAnchor }
 }
 
 /**

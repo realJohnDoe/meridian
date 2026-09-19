@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import ItemsList, { rowSortKey } from './ItemsList'
 import { parseItemEntry } from './items'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeSeries, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
@@ -36,11 +36,12 @@ Element.prototype.animate ??= (() => ({ finished: new Promise(() => {/* never se
 type Row = Parameters<typeof rowSortKey>[0]
 
 function linkRow(idx: number, occ: Occurrence | undefined, ref = 'note.md'): Row {
-  return { entry: { ...parseItemEntry(`[[${ref}]]`), idx }, occ }
+  return { entry: { ...parseItemEntry(`[[${ref}]]`), idx, key: `link:${ref}` }, occ }
 }
 
 function taskRow(idx: number, raw: string): Row {
-  return { entry: { ...parseItemEntry(raw), idx }, occ: undefined }
+  const entry = parseItemEntry(raw)
+  return { entry: { ...entry, idx, key: `task:${idx}` }, occ: undefined }
 }
 
 const FUTURE = new Date('2099-01-01T09:00:00')
@@ -199,6 +200,43 @@ describe('ItemsList exit animation', () => {
     fireEvent.click(screen.getByRole('checkbox'))
 
     expect(collapsingRows()).toHaveLength(0)
+  })
+})
+
+describe('ItemsList row identity', () => {
+  // A row is tracked by its `data-item-key` — React reuses its element by it and
+  // the FlipList glides it from wherever that key last was. So a removal has to
+  // leave every surviving row's key alone. Keyed by position in `items` it did
+  // not: removing one item renumbered every later one, so each survivor
+  // inherited its neighbour's key and got glided from that neighbour's old spot
+  // — a list where nothing but the removed row moved appeared to shuffle.
+  const keyOf = (text: string) =>
+    screen.getByText(text).closest('[data-item-key]')!.getAttribute('data-item-key')
+
+  const removeRow = (text: string) => {
+    const row = screen.getByText(text).closest('[data-item-key]')!
+    fireEvent.click(within(row as HTMLElement).getByLabelText('Remove'))
+  }
+
+  it('keeps every surviving row under the key it already had when an item is removed', () => {
+    // Stored back-to-front of the order they sort in, so an index-derived key
+    // doesn't even line up with the row it would be renumbered onto.
+    render(<Harness initialItems={['[ ] cherry', '[ ] banana', '[ ] apple']} roots={makeRoots('current.md')} />)
+
+    const before = { apple: keyOf('apple'), cherry: keyOf('cherry') }
+
+    removeRow('banana')
+
+    expect(keyOf('apple')).toBe(before.apple)
+    expect(keyOf('cherry')).toBe(before.cherry)
+  })
+
+  it('collapses the removed row out rather than snapping it away', () => {
+    render(<Harness initialItems={['[ ] Buy milk']} roots={makeRoots('current.md')} />)
+
+    removeRow('Buy milk')
+
+    expect(collapsingRows()).toHaveLength(1)
   })
 })
 

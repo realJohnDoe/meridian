@@ -500,6 +500,38 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     expect(scrollContainer().scrollTop).toBeLessThan(offsetBefore)
   })
 
+  // The bug this regresses: checking off today's topmost task sorts it from
+  // the active to the dimmed bucket (occSort.ts), which moves its own row
+  // down within today's section. Before excludeFromAnchor, the anchored-row
+  // reconciliation found that same row at its new, lower index and re-pinned
+  // the viewport there — chasing the just-checked task down the screen
+  // instead of leaving today's section resting at the top.
+  it('keeps the day pinned to the top when its own topmost task is checked off', async () => {
+    const topTask = makeOcc({
+      id: 'top-task', date: fmtISO(today), time: '08:00', entryKey: testKey('note.md'),
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Top task', done: false },
+    })
+    const secondTask = makeOcc({
+      id: 'second-task', date: fmtISO(today), time: '09:00', entryKey: testKey('note.md'),
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Second task', done: false },
+    })
+    seedStore([topTask, secondTask, ...upcoming()], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await settle()
+
+    expect(calendarView.getState().agendaTopDate).toBe(fmtISO(today))
+    const offsetBefore = scrollContainer().scrollTop
+
+    // Checking `topTask` (earlier time, so it sorts first while both are
+    // open) moves it behind `secondTask` within today's section.
+    const checkbox = within(scrollContainer()).getAllByRole('checkbox')[0]!
+    await act(async () => { fireEvent.click(checkbox); await Promise.resolve() })
+    await settle()
+
+    expect(scrollContainer().scrollTop).toBe(offsetBefore)
+    expect(calendarView.getState().agendaTopDate).toBe(fmtISO(today))
+  })
+
   // The guard the isScrolling flag was standing in for, now stated directly:
   // while a finger is actually down, re-pinning would drag content out from
   // under the gesture. Programmatic settling (the startup case above) is no
