@@ -112,14 +112,16 @@ states a vault is in (`fs-permission`, `reauth`, `access`, `config`) plus a
 message, so the UI can render more than one row shape instead of a flag.
 → `store.ts` · `VaultAttention`, `AttentionKind`
 
-### subscribe vs import
-Two ways an `.ics` calendar reaches Meridian, and only one of them moves in.
-A **subscription** is an iCal vault: its entries are re-synthesized from the
+### subscribe vs import vs move in
+Three ways an `.ics` calendar reaches Meridian; two of them keep it. A
+**subscription** is an iCal vault: its entries are re-synthesized from the
 feed on every refresh, are `readOnly`, and vanish with the vault. An
 **import** runs the same converter once into a *writable* vault, where the
 results are ordinary editable files matched on the source event's `uid` if
-imported again.
-→ `storage/ical/icsImport.ts` · `planIcsImport`
+imported again. **Moving in** is that same import sourced from a mounted
+subscription rather than a file, so the events become the user's copy and the
+subscription can be dropped.
+→ `storage/ical/icsImport.ts` · `planEntryImport`, `planIcsImport`, `vaultImportCandidates`
 
 ### view-only vs sandbox
 UI access modes, deliberately not called "read-only" so they can never be

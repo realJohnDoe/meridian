@@ -11,10 +11,10 @@
 import { describe, it, expect } from 'vitest'
 import { setupStore, TEST_VAULT } from '@/test-utils'
 import { useStore } from '@/store'
-import { entryKey, keySlug, titleToSlug } from '@/fileIO'
+import { entryKey, keySlug, titleToSlug, pathToKey } from '@/fileIO'
 import { parseToStoreItems, roundTripLoss } from '@/model'
 import { icsToEntries } from './icsToEntries'
-import { planIcsImport } from './icsImport'
+import { planIcsImport, planEntryImport, vaultImportCandidates } from './icsImport'
 
 setupStore()
 
@@ -109,5 +109,71 @@ describe('planIcsImport — round trip', () => {
       const path = `${titleToSlug(entry.title)}.md`
       expect(roundTripLoss(path, entry.content, parseToStoreItems(path, entry.content, TEST_VAULT))).toEqual([])
     }
+  })
+})
+
+// ── Moving a subscription in ────────────────────────────────────────────────
+//
+// The other front door onto the same planner: the events are already in the
+// store as an iCal vault's layer, so a conversion re-reads them from there
+// rather than re-fetching the feed. What these pin is that arriving that way
+// reaches the same place as arriving from a file — same filenames, same UID
+// dedupe — because that convergence is the reason the planner takes candidates
+// rather than a document.
+
+const FEED = 'feed-vault'
+
+/** Mount a vault's worth of synthesized entries the way `parseFiles` does. */
+function seedFeed(ics: string): void {
+  const synthesis = icsToEntries(ics)!
+  const layer = new Map(synthesis.entries.map(e => {
+    const path = `${e.fileSlug}.md`
+    return [pathToKey(FEED, path), parseToStoreItems(path, e.content, FEED)] as const
+  }))
+  useStore.getState().setVaultLayer(FEED, layer)
+}
+
+describe('vaultImportCandidates', () => {
+  it('offers every event the subscription is showing, by title and uid', () => {
+    seedFeed(calendar(LUNCH, STANDUP))
+
+    expect(vaultImportCandidates(FEED).map(c => ({ title: c.title, uid: c.uid }))).toEqual([
+      { title: 'Lunch with Sam', uid: 'lunch@example' },
+      { title: 'Team Standup', uid: 'standup@example' },
+    ])
+  })
+
+  it('skips an entry with no uid — there is no identity to dedupe a second run on', () => {
+    useStore.getState().setVaultLayer(FEED, new Map([
+      [pathToKey(FEED, 'hand-written.md'), parseToStoreItems('hand-written.md', '---\ntitle: Hand written\ndate: 2026-08-17\n---\n', FEED)],
+    ]))
+
+    expect(vaultImportCandidates(FEED)).toEqual([])
+  })
+
+  it('lands on the same filenames a file import would, and only once', () => {
+    seedFeed(calendar(LUNCH, STANDUP))
+
+    const plan = planEntryImport(TEST_VAULT, vaultImportCandidates(FEED))
+    expect(plan.keys.map(keySlug)).toEqual(['lunch-with-sam', 'team-standup'])
+    expect(plan.added).toBe(2)
+
+    // The feed's own `ical-<hash>` files are untouched: a conversion copies out
+    // of the subscription, it does not move the subscription's own entries.
+    useStore.getState().setData(plan.next.entries)
+    expect(useStore.getState().entries.get(entryKey(TEST_VAULT, 'lunch-with-sam'))).toBeDefined()
+    expect(vaultImportCandidates(FEED)).toHaveLength(2)
+  })
+
+  it('updates in place when the same calendar was already imported from a file', () => {
+    importInto(calendar(LUNCH, STANDUP))
+    seedFeed(calendar(LUNCH, STANDUP))
+
+    const plan = planEntryImport(TEST_VAULT, vaultImportCandidates(FEED))
+
+    // Same events, same UIDs — so moving the subscription in converges on the
+    // entries the file import already made rather than doubling them.
+    expect(plan).toMatchObject({ added: 0, updated: 2 })
+    expect(plan.keys.map(keySlug)).toEqual(['lunch-with-sam', 'team-standup'])
   })
 })
