@@ -672,6 +672,76 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     expect(calendarView.getState().agendaScrollTarget).toBeNull()
     expect(calendarView.getState().agendaTopDate).toBe(target)
   })
+
+  // ── Row glides (useVirtualFlip) ──────────────────────────────────────────
+  //
+  // jsdom never dispatches `scrollend`, and virtual-core skips its debounce
+  // fallback whenever scrollend is supported — so `virtualizer.isScrolling`
+  // latches true after the mount's own scroll-to-today and never clears.
+  // Every glide would then be skipped for harness reasons alone, and an
+  // assertion that a row moved continuously would pass while testing nothing.
+  // Fire it by hand.
+  const settleScroll = async () => {
+    await settle()
+    scrollContainer().dispatchEvent(new Event('scrollend'))
+    await settle()
+  }
+
+  /**
+   * The flip key of every row `Element.animate` is called on from here on, in
+   * call order. The file-wide `afterEach` restores the stub this replaces.
+   */
+  const recordGlides = (): string[] => {
+    const keys: string[] = []
+    Object.defineProperty(Element.prototype, 'animate', {
+      configurable: true, writable: true,
+      value(this: HTMLElement) {
+        keys.push(this.getAttribute('data-flip-key') ?? '(unkeyed)')
+        return { cancel: () => {} }
+      },
+    })
+    return keys
+  }
+
+  // A task with a priority sits at the top of its day's active bucket, so
+  // checking it off sends it past every open item below it into the dimmed
+  // bucket at the end of the day (occSort.ts). On a busy day that journey is
+  // longer than the viewport — which useVirtualFlip used to read as "this can
+  // only be a scroll-compensated shift" and refuse to animate. The one row the
+  // user had just touched was then the only one that jumped, while every row
+  // it displaced glided smoothly around it.
+  it('glides a checked-off task across a day taller than the viewport', async () => {
+    const prioritised = makeOcc({
+      id: 'prioritised', date: fmtISO(today), time: '08:00', entryKey: testKey('note.md'),
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Prioritised task', done: false, priority: 'high' },
+    })
+    // Enough open items below it that it has more than one 600px screen to
+    // cross once it drops to the bottom of the day.
+    const rest = Array.from({ length: 14 }, (_, i) => makeOcc({
+      id: `rest-${i}`, date: fmtISO(today), time: `09:${String(i * 4).padStart(2, '0')}`,
+      entryKey: testKey('note.md'),
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: `Task ${i}`, done: false },
+    }))
+    seedStore([prioritised, ...rest, ...upcoming()], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await settleScroll()
+
+    // Read the row's flip key off the DOM rather than rebuilding it here: the
+    // instant in it is derived during expansion, not carried on the fixture.
+    const rowKey = screen.getByLabelText('Prioritised task')
+      .closest('[data-flip-key]')!.getAttribute('data-flip-key')
+
+    const glided = recordGlides()
+    const checkbox = within(scrollContainer()).getAllByRole('checkbox')[0]!
+    await act(async () => { fireEvent.click(checkbox); await Promise.resolve() })
+
+    expect(glided).toContain(rowKey)
+    // Not a lone glide that happens to include it: the rows it displaced move
+    // too, and the point is that it travels *with* them rather than teleporting
+    // past them.
+    expect(glided.length).toBeGreaterThan(1)
+  })
+
 })
 
 /**

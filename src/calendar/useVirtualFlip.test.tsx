@@ -53,6 +53,31 @@ function setup(items: VirtualItem[], rowsKey: unknown, isScrolling = false) {
   }
 }
 
+/**
+ * jsdom reports `scrollTop` as 0 for every element, so the hook's scroll term
+ * needs stubbing to model a commit that also corrected the scroll offset.
+ */
+function withScrollTop(value: number, run: () => void): void {
+  withStubbed('scrollTop', value, run)
+}
+
+/**
+ * jsdom lays nothing out, so the container reports a zero-height viewport.
+ * Give it a real one, or a test about a row travelling further than a screen
+ * is measuring against a screen of no height at all.
+ */
+function withViewportHeight(value: number, run: () => void): void {
+  withStubbed('clientHeight', value, run)
+}
+
+function withStubbed(prop: 'scrollTop' | 'clientHeight', value: number, run: () => void): void {
+  // Both are real accessors on Element.prototype in jsdom, so there is always
+  // a descriptor to put back — unlike `animate`, which jsdom omits entirely.
+  const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, prop)!
+  Object.defineProperty(Element.prototype, prop, { configurable: true, get: () => value })
+  try { run() } finally { Object.defineProperty(Element.prototype, prop, descriptor) }
+}
+
 /** The `from` offset of each glide the hook started, in call order. */
 const glideOffsets = () =>
   animate.mock.calls.map(([keyframes]) => keyframes[0]!.transform)
@@ -123,19 +148,34 @@ describe('useVirtualFlip', () => {
     expect(glideOffsets()).toEqual(['translateY(50px)'])
   })
 
-  it('skips a glide longer than the viewport', () => {
+  it('does not glide rows the scroll offset was corrected to hold in place', () => {
     // A filter change dropping thousands of rows above moves the survivors
-    // enormously; the virtualizer compensates the scroll offset so they stay
-    // put on screen, and animating that delta would fling them across it.
-    const clientHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
-    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 600 })
-    try {
-      const { update } = setup([item('a', 300_000)], ['a'])
-      update([item('a', 200)], ['b'])
-      expect(animate).not.toHaveBeenCalled()
-    } finally {
-      if (clientHeightDescriptor) Object.defineProperty(HTMLElement.prototype, 'clientHeight', clientHeightDescriptor)
-    }
+    // enormously; the agenda compensates the scroll offset by the same amount
+    // so they stay put on screen, and animating that delta would fling them
+    // across it. What the row visibly did is nothing, so nothing animates.
+    withViewportHeight(600, () => {
+      withScrollTop(300_000, () => {
+        const { update } = setup([item('a', 300_000)], ['a'])
+        withScrollTop(200, () => { update([item('a', 200)], ['b']) })
+      })
+    })
+
+    expect(animate).not.toHaveBeenCalled()
+  })
+
+  it('glides a row that moved further than the viewport without a scroll correction', () => {
+    // Checking off a prioritised task sends it from the top of a day's active
+    // bucket past every open item below it (occSort.ts). On a busy day that is
+    // further than a screen, but the scroll offset did not move — so this is a
+    // real, visible journey and the row has to make it continuously. A
+    // one-viewport cap here used to drop exactly this row, leaving the one the
+    // user just touched as the only one that jumped.
+    withViewportHeight(600, () => {
+      const { update } = setup([item('a', 200)], ['a'])
+      update([item('a', 1_400)], ['b'])
+    })
+
+    expect(glideOffsets()).toEqual(['translateY(-1200px)'])
   })
 
   it('skips silently where the Web Animations API is absent', () => {
