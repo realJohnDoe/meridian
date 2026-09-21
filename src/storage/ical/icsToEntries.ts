@@ -24,6 +24,16 @@ import { rruleToRepeat } from './rruleToRepeat'
 export interface SynthesizedEntry {
   fileSlug: string
   content:  string
+  /** `SUMMARY`, already defaulted — what an *import* re-slugs by (`icsImport.ts`). */
+  title:    string
+  /**
+   * The event's own `UID`, exactly as `extras.uid` records it in `content`.
+   *
+   * Carried out here as well so a re-import can match this event against the
+   * entry a previous import made without re-parsing the markdown it just
+   * emitted. A subscription ignores it — `fileSlug` already hashes it.
+   */
+  uid:      string
 }
 
 export interface IcalSynthesis {
@@ -333,7 +343,7 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null 
     extras: readExtras(master, group.uid, timing.tzid),
   })
 
-  return { fileSlug: slugForUid(group.uid), content: renderEntry(frontmatter, body) }
+  return { fileSlug: slugForUid(group.uid), content: renderEntry(frontmatter, body), title, uid: group.uid }
 }
 
 /**

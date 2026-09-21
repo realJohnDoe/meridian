@@ -7,7 +7,8 @@ export type { VaultRef } from '@/storage'
 export { syncToBackend, cacheDirtyCount } from '@/storage'
 
 import type { VaultRef } from '@/storage'
-import { entriesToIcs } from '@/storage'
+import { entriesToIcs, planIcsImport } from '@/storage'
+import { commitNext } from '@/storeCommit'
 import { useStore, vaultLayer } from '@/store'
 
 /**
@@ -28,6 +29,40 @@ export function sortVaults(vaults: VaultRef[]): VaultRef[] {
 export function exportVaultIcs(vaultId: string): string {
   const { entries } = useStore.getState()
   return entriesToIcs([...vaultLayer(entries, vaultId).values()])
+}
+
+/** What importing a `.ics` file into a vault would do — see `previewVaultIcsImport`. */
+export interface IcsImportSummary {
+  added:   number
+  updated: number
+}
+
+/**
+ * What `importVaultIcs` would do to `vaultId`, without doing any of it. `null`
+ * when the text isn't a calendar.
+ *
+ * The counts are the whole point: an `.ics` file says nothing about its size or
+ * its contents from the outside, and `updated` is an overwrite of entries the
+ * user may since have edited. Both are things to agree to before the write, not
+ * to discover after it.
+ */
+export function previewVaultIcsImport(vaultId: string, text: string): IcsImportSummary | null {
+  const plan = planIcsImport(vaultId, text)
+  return plan && { added: plan.added, updated: plan.updated }
+}
+
+/**
+ * Import a `.ics` file's events into `vaultId` as ordinary, editable entries.
+ * `null` when the text isn't a calendar.
+ *
+ * Re-plans rather than taking a plan from `previewVaultIcsImport`, so the
+ * commit is built against the store as it is now — see `planIcsImport`.
+ */
+export function importVaultIcs(vaultId: string, text: string): IcsImportSummary | null {
+  const plan = planIcsImport(vaultId, text)
+  if (!plan) return null
+  commitNext(plan.next, plan.keys)
+  return { added: plan.added, updated: plan.updated }
 }
 
 export {

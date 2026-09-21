@@ -16,6 +16,7 @@ export {
 
 export { previewIcalFeed } from './icalBackend'
 export { entriesToIcs } from './ical/entriesToIcs'
+export { planIcsImport } from './ical/icsImport'
 
 export { isFolderPickerSupported } from './fs'
 
