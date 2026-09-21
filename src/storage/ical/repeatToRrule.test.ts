@@ -110,6 +110,20 @@ function weeklyAnchor(days: string[]): Date {
   return addDays(BASE, Math.min(...offsets))
 }
 
+/**
+ * The anchor that makes a weekly BYDAY rule's two window origins *disagree*:
+ * its LAST named weekday counting from Monday, so every other named day falls
+ * before it inside the RFC week.
+ *
+ * The mirror of `weeklyAnchor` above, and deliberately so. That one picks the
+ * case where the anchor's week and the RFC's happen to coincide; this one picks
+ * the case where they cannot, which is the only case `wkst` exists for.
+ */
+function lastWeeklyAnchor(days: string[]): Date {
+  const offsets = days.map(d => (JS_DAY[d]! - BASE.getDay() + 7) % 7)
+  return addDays(BASE, Math.max(...offsets))
+}
+
 /** The first day-of-month in `days` landing on or after BASE. */
 function monthDayAnchor(days: number[]): Date {
   for (let m = 0; m < 24; m++) {
@@ -176,8 +190,13 @@ function ruleBodies(): Case[] {
   for (const interval of [1, 2, 3]) {
     const iv = interval > 1 ? `;INTERVAL=${interval}` : ''
 
-    // DAILY takes no BY* part the engine can read — that is the whole shape.
+    // DAILY: bare, then the BY* parts RFC 5545 §3.3.10 makes *limits* on a
+    // single-day period — which is how both engines read them.
     push(`FREQ=DAILY${iv}`, BASE)
+    for (const days of [['MO', 'WE', 'FR'], ['SA', 'SU'], ['MO', 'TU', 'WE', 'TH', 'FR']]) {
+      push(`FREQ=DAILY${iv};BYDAY=${days.join(',')}`, weeklyAnchor(days))
+    }
+    push(`FREQ=DAILY${iv};BYMONTHDAY=1,15`, monthDayAnchor([1, 15]))
 
     // WEEKLY: bare (the anchor's own weekday), then BYDAY sets of one, two and
     // three days, including one spanning the RFC week's Sunday end.
@@ -185,11 +204,28 @@ function ruleBodies(): Case[] {
     for (const days of [['TU'], ['MO', 'WE', 'FR'], ['WE', 'SA'], ['TH', 'SU'], ['MO', 'TU', 'WE', 'TH', 'FR']]) {
       push(`FREQ=WEEKLY${iv};BYDAY=${days.join(',')}`, weeklyAnchor(days))
     }
+    // The same sets anchored on their LAST named weekday instead of their
+    // first, so every named day earlier in the RFC week falls before the
+    // anchor's and the two window origins disagree. At INTERVAL >= 2 that is
+    // the case the importer carries by emitting `wkst`; these are the corpus
+    // entries that hold that claim to the same standard as the rest.
+    for (const days of [['MO', 'WE', 'FR'], ['SU', 'MO'], ['TH', 'SU'], ['MO', 'TU', 'WE', 'TH', 'FR']]) {
+      push(`FREQ=WEEKLY${iv};BYDAY=${days.join(',')};WKST=MO`, lastWeeklyAnchor(days))
+    }
 
     // MONTHLY: bare (the anchor's day-of-month), by day-of-month including a
     // 31st that several months cannot hold, and by weekday-position in both
     // spellings the RFC allows.
     push(`FREQ=MONTHLY${iv}`, new Date(2025, 7, 10))
+    // A weekday with no position — "every Friday of the month". Only the
+    // INTERVAL=1 spelling is claimed (as the weekly rule it is identical to);
+    // the interval ones sit in STILL_DECLINED below.
+    if (interval === 1) {
+      for (const days of [['FR'], ['MO', 'TH']]) {
+        push(`FREQ=MONTHLY;BYDAY=${days.join(',')}`, weeklyAnchor(days))
+      }
+      push('FREQ=MONTHLY;BYDAY=WE;BYMONTH=3,6,9,12', new Date(2026, 2, 4), YEARLY_WINDOW)
+    }
     for (const days of [[15], [1, 15], [31], [10, 20, 30], [-1], [1, -1], [-3]]) {
       push(`FREQ=MONTHLY${iv};BYMONTHDAY=${days.join(',')}`, monthDayAnchor(days))
     }
@@ -258,9 +294,13 @@ const CLAIMED = CORPUS.filter(c => rruleToRepeat(c.rrule, c.anchor, NOW).kind ==
  * quietly never having covered it.
  */
 const STILL_DECLINED: Array<{ rrule: string; anchor: Date; why: string }> = [
-  { rrule: 'FREQ=DAILY;BYDAY=MO,WE,FR', anchor: BASE, why: 'daily takes no BY* part but BYMONTH' },
-  { rrule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=SU,MO', anchor: new Date(2025, 7, 10), why: 'the two weeks disagree' },
   { rrule: 'FREQ=HOURLY;INTERVAL=6', anchor: BASE, why: 'sub-daily has no occurrence model' },
+  // A daily period holds one day, so there is nothing for a position to pick
+  // from — and the engine's daily arm ignores the field rather than erroring.
+  { rrule: 'FREQ=DAILY;BYDAY=MO,WE,FR;BYSETPOS=1', anchor: BASE, why: 'BYSETPOS has no meaning over a one-day period' },
+  // "Every Friday of every other month" is not "every other Friday", so the
+  // weekly reading that rescues the INTERVAL=1 case does not reach this one.
+  { rrule: 'FREQ=MONTHLY;INTERVAL=2;BYDAY=FR', anchor: new Date(2025, 7, 8), why: 'a weekday with no position, at an interval the weekly reading cannot carry' },
   // One ordinal spread over several weekdays is two dates a month; one
   // `bysetpos` over their union is one. Both spellings otherwise agree.
   { rrule: 'FREQ=MONTHLY;BYDAY=1MO,1FR', anchor: new Date(2026, 0, 2), why: 'an ordinal per weekday, not one position over their union' },
@@ -316,6 +356,24 @@ describe('the round-trip corpus', () => {
     for (const { rrule, anchor, why } of STILL_DECLINED) {
       expect(rruleToRepeat(rrule, anchor, NOW).kind, `${rrule} — ${why}`).toBe('dates')
     }
+  })
+
+  it('exercises the shapes the importer only recently began to carry', () => {
+    // Each of these agrees with the RFC walk by a different mechanism, and each
+    // would keep agreeing — vacuously — if the corpus stopped containing it.
+    //
+    // `wkst` is the sharpest of the three: a rule that agrees *because the
+    // anchor happens to line up* proves nothing about the field. Requiring
+    // cases that actually carry one is what keeps this honest if the importer
+    // ever quietly goes back to declining them.
+    const carrying = CLAIMED.map(c => repeatFor(c)).filter(r => r.type === 'schedule')
+    expect(carrying.filter(r => r.wkst !== undefined).length).toBeGreaterThan(10)
+    expect(carrying.filter(r => r.freq === 'daily' && (r.byweekday ?? r.bymonthday)).length).toBeGreaterThan(10)
+    // "Every Friday of the month", carried as the weekly rule it equals — so
+    // the corpus holds MONTHLY bodies whose mapping comes back weekly.
+    expect(CLAIMED.filter(c => c.rrule.startsWith('FREQ=MONTHLY')
+      && repeatFor(c).type === 'schedule'
+      && (repeatFor(c) as Extract<Repeat, { type: 'schedule' }>).freq === 'weekly').length).toBeGreaterThan(3)
   })
 
   it('exercises every frequency the engine has', () => {

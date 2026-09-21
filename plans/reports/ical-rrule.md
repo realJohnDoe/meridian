@@ -5,8 +5,11 @@ standard — where are the gaps?" (2026-08-16).
 
 **Status:** all of Group 1 (the silent-wrongness bugs) and the engine/importer
 half of Group 2's yearly gap have shipped, along with ICS export. #1010 (`WKST`)
-has also shipped now, on the engine side: `model/expansion.ts` takes an
-optional `wkst` on a weekly schedule repeat. The one gap still open is an issue,
+has now shipped end to end: `model/expansion.ts` takes an optional `wkst` on a
+weekly schedule repeat, the importer emits it where the two week definitions
+disagree, and the exporter honours it. The same pass claimed two more shapes
+the engine could already carry but the importer was still declining — see
+gap G and the note under the headline. The one gap still open is an issue,
 not a section here — #1009 (a yearly month/weekday-pattern picker in the
 authoring UI). What remains below is the survey itself: the inventory, the
 verdicts, and what Meridian already covers. Every claim marked _observed_ was
@@ -30,12 +33,20 @@ narrow and specific:
   but `RepeatDialog`/`RepeatForm` can only create "the anchor's month and day,
   annually." Reaching one of these rules today means hand-editing YAML or
   importing a feed that has one.
-- **`WKST`** (gap G) is implemented in the engine (#1010) but reachable only by
-  hand-editing YAML — see its entry. The ICS importer still routes the one
-  case it needs for (`INTERVAL >= 2` with a `BYDAY` earlier than the anchor's
-  weekday) to bounded-expansion fallback rather than emitting it; wiring the
-  importer to use it natively is unclaimed follow-up work, not tracked as its
-  own issue.
+- **`WKST`** (gap G) is now wired end to end — engine, importer and exporter.
+  It is still not reachable from the authoring UI, which is the same shape of
+  gap as A/B above and equally narrow: nothing in `RepeatForm` sets it.
+
+A note on how this class of gap arises, since two more of them turned up while
+closing G. The engine, the importer and the exporter are three independent
+readings of the same rule, and they drift: `matchesInPeriod` gained BYDAY and
+BYMONTHDAY as §3.3.10 *limits* at `FREQ=DAILY`, and `expansion.ts` gained
+`wkst`, but `tryRepresent` kept declining both — its comments still described
+the engine as it had been. A decline is invisible (the rule still imports, as
+dates) which is why these sat unnoticed. The cross-engine corpus in
+`repeatToRrule.test.ts` is the standing guard, and it now carries an explicit
+"shapes the importer only recently began to carry" assertion so a silent
+reversion fails rather than passing vacuously.
 
 Everything else is either already representable, correctly declined and routed
 to the ICS importer's bounded-expansion fallback, or genuinely not worth
@@ -80,7 +91,7 @@ _Read._ Format, engine and importer all handle `bymonth`, `bymonthday` and
 without hand-editing YAML. Estimated 1–2 days, pure UI/form work. The evidence
 and the shape of the fix are in the issue.
 
-**G. No `WKST`.** → **#1010, implemented (engine side).**
+**G. No `WKST`.** → **#1010, shipped end to end.**
 _Read._ Meridian still pins each weekly window to the anchor's weekday by
 default — a deliberate choice out of the data-integrity survey, provably
 equivalent for `INTERVAL: 1`. A schedule repeat can now carry an explicit
@@ -88,12 +99,20 @@ equivalent for `INTERVAL: 1`. A schedule repeat can now carry an explicit
 `matchesInPeriod`'s weekly branch (`expansion.ts`) reads the window's own
 opening weekday back off the period cursor rather than off the anchor, so one
 formula covers both the default (anchor-pinned) and explicit (`WKST`-pinned)
-readings, and an existing file with no `wkst` is byte-for-byte unaffected. The
-ICS importer's `weeklyWindowsAgree` (`rruleToRepeat.ts:305-315`) still routes
-`INTERVAL >= 2` rules whose `BYDAY` names an earlier weekday to
-bounded-expansion fallback rather than emitting the new field — that wiring,
-and a `repeatToRrule.ts` export path for an explicit `wkst`, is unclaimed
-follow-up, since the field is reachable only by hand-editing YAML today.
+readings, and an existing file with no `wkst` is byte-for-byte unaffected.
+
+Both halves of the follow-up this entry used to name are done. The importer's
+`weeklyWindowsAgree` no longer decides whether to *decline* an `INTERVAL >= 2`
+rule whose `BYDAY` names an earlier weekday — only whether the field is
+*needed*, so an agreeing rule keeps the plainer spelling and a disagreeing one
+is carried with `wkst`. `repeatToRrule` reads the field rather than always
+emitting the anchor's weekday, which it had to: a rule imported with a `wkst`
+would otherwise have exported as the anchor's weekday and moved a fortnight's
+worth of dates on the way out. Two neighbouring declines went with it:
+`FREQ=DAILY` with `BYDAY`/`BYMONTHDAY` (the engine has applied those as limits
+for some time), and `FREQ=MONTHLY;BYDAY=<no position>` at `INTERVAL=1`, which
+is the weekly rule over identical dates. Still reachable only by hand-editing
+YAML or importing a feed — the authoring UI sets no `wkst`.
 
 ### Recommend leaving to the fallback
 

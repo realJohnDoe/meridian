@@ -74,6 +74,16 @@ function byDayList(parts: RRuleParts): Array<{ ordinal?: number; day: string }> 
   return out
 }
 
+/** The BYDAY tokens as Meridian weekdays, dropping any the map has no name for. */
+function weekdays(byDay: Array<{ day: string }>): Weekday[] {
+  return byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d)
+}
+
+/** The rule's own `WKST` as a Meridian weekday — Monday when it names none (RFC 5545 §3.3.10). */
+function rfcWeekStart(parts: RRuleParts): Weekday {
+  return WEEKDAY_BY_ICS[(parts['WKST'] ?? 'MO').toUpperCase()] ?? 'mo'
+}
+
 function intList(raw: string | undefined): number[] | null {
   if (!raw) return []
   const out: number[] = []
@@ -169,23 +179,44 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
   const base = { type: 'schedule' as const, freq, ...(interval > 1 ? { interval } : {}), ...(end ? { end } : {}) }
 
   if (freq === 'daily') {
-    // Meridian's daily branch emits exactly one date per period; a BYDAY or
-    // BYMONTHDAY filter on top of it has no representation. BYMONTH is the
-    // exception: it limits a daily rule to the months it names in both
-    // engines alike (RFC 5545 §3.3.10), which is what `bymonth` does at every
-    // frequency below yearly.
-    if (byDay.length > 0 || byMonthDay.length > 0 || bySetPos.length > 0) return null
-    return { ...base, ...monthPart }
+    // BYDAY, BYMONTHDAY and BYMONTH are all *limits* at DAILY, not expansions
+    // (RFC 5545 §3.3.10): a daily period is a single day, so naming days
+    // inside it can only narrow it. The engine's daily arm reads them exactly
+    // that way — see `matchesInPeriod`'s `passesWeekday && passesMonthday` in
+    // model/expansion.ts — so all three carry across.
+    //
+    // BYSETPOS does not: it picks from a period's candidate list, a daily
+    // period holds one day, and the engine's daily arm ignores the field
+    // outright. A rule carrying one still goes to expansion.
+    if (bySetPos.length > 0) return null
+    // An ordinal is only meaningful at MONTHLY/YEARLY, and the daily limit
+    // reads the bare weekday; claiming `2FR` here would drop the `2`.
+    if (byDay.some(d => d.ordinal !== undefined)) return null
+    if (byMonthDay.some(d => d === 0 || d < -31 || d > 31)) return null
+    return {
+      ...base, ...monthPart,
+      ...(byDay.length > 0 ? { byweekday: weekdays(byDay) } : {}),
+      ...(byMonthDay.length > 0 ? { bymonthday: byMonthDay } : {}),
+    }
   }
 
   if (freq === 'weekly') {
     if (byMonthDay.length > 0 || bySetPos.length > 0) return null
     if (byDay.length === 0) return { ...base, ...monthPart }
     if (byDay.some(d => d.ordinal !== undefined)) return null // `2FR` is meaningless weekly
-    if (!weeklyWindowsAgree(byDay, parts, anchor, interval)) return null
+    // Where the windows disagree, state which week the rule means instead of
+    // giving up on it: `wkst` (#1010) opens the engine's windows on the RFC's
+    // own week start rather than the anchor's weekday, and that boundary *is*
+    // the whole of the disagreement — see `weekOrigin` in model/expansion.ts.
+    //
+    // Omitted where they already agree, which includes every `interval: 1`
+    // rule: `wkst` cannot change a date there, and a field that means nothing
+    // is not worth writing into someone's file.
+    //
     // BYMONTH limits which of the selected days survive; it cannot move the
-    // 7-day windows themselves, so `weeklyWindowsAgree` above still decides.
-    return { ...base, ...monthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d) }
+    // 7-day windows themselves, so it has no bearing on either branch.
+    const week = weeklyWindowsAgree(byDay, parts, anchor, interval) ? {} : { wkst: rfcWeekStart(parts) }
+    return { ...base, ...monthPart, ...week, byweekday: weekdays(byDay) }
   }
 
   if (freq === 'monthly') {
@@ -216,12 +247,25 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
       // whereas one `bysetpos` over the pair's combined candidate list picks
       // whichever of them falls earlier, and only that one.
       if (byDay.length > 1) return null
-      return { ...base, ...monthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
+      return { ...base, ...monthPart, byweekday: weekdays(byDay), bysetpos: pos }
     }
-    if (bySetPos.length === 0) return null
+    if (bySetPos.length === 0) {
+      // "Every Friday of the month". The engine's monthly arm needs a position
+      // to read a weekday at all (`monthCandidates` requires `bysetpos`), so
+      // it cannot say this as a monthly rule — but at INTERVAL=1 it does not
+      // have to: every Friday of every month is every Friday, which is the
+      // weekly rule, over exactly the same dates. COUNT and UNTIL bound the
+      // same occurrences either way, and BYMONTH is the same limit in both
+      // readings.
+      //
+      // Only at INTERVAL=1. "Every Friday of every other month" is not "every
+      // other Friday", so those still expand.
+      if (interval > 1) return null
+      return { ...base, freq: 'weekly', ...monthPart, byweekday: weekdays(byDay) }
+    }
     if (bySetPos.some(p => p === 0)) return null
     const positions = bySetPos.length === 1 ? bySetPos[0]! : bySetPos
-    return { ...base, ...monthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: positions }
+    return { ...base, ...monthPart, byweekday: weekdays(byDay), bysetpos: positions }
   }
 
   // Yearly. The engine expands over the months `bymonth` names and fills each
@@ -271,7 +315,7 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
     // As monthly: one ordinal distributes over each named weekday separately,
     // one `bysetpos` picks from their combined list. Equal for one weekday.
     if (byDay.length > 1) return null
-    return { ...base, ...yearMonthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: pos }
+    return { ...base, ...yearMonthPart, byweekday: weekdays(byDay), bysetpos: pos }
   }
 
   // A plain BYDAY with no position is every matching weekday of the month to
@@ -285,7 +329,7 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
   // March alone to the RFC, and of both months to the engine.
   if (yearMonths.length !== 1) return null
   const yearPositions = bySetPos.length === 1 ? bySetPos[0]! : bySetPos
-  return { ...base, ...yearMonthPart, byweekday: byDay.map(d => WEEKDAY_BY_ICS[d.day]).filter((d): d is Weekday => !!d), bysetpos: yearPositions }
+  return { ...base, ...yearMonthPart, byweekday: weekdays(byDay), bysetpos: yearPositions }
 }
 
 /**
@@ -300,7 +344,11 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
  * named weekday that falls *before* the anchor's weekday inside the RFC week:
  * the RFC skips it in the first period and picks it up in the next, while
  * Meridian counts it forward into the current one — landing a week apart from
- * then on. Those go to bounded expansion instead.
+ * then on.
+ *
+ * Disagreement is no longer a refusal — the caller emits `wkst` and the engine
+ * reproduces the RFC exactly. This decides only whether the field is *needed*,
+ * so that an agreeing rule stays the plainer of the two spellings.
  */
 function weeklyWindowsAgree(
   byDay: Array<{ day: string }>, parts: RRuleParts, anchor: Date, interval: number,

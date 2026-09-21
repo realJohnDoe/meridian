@@ -143,36 +143,47 @@ describe('rruleToRepeat — representable rules', () => {
 
   it('maps biweekly BYDAY when the RFC and Meridian windows agree', () => {
     // Anchor Monday, WKST Monday, BYDAY=MO,WE — both listed days fall on or
-    // after the anchor's weekday inside the RFC week, so the two agree.
+    // after the anchor's weekday inside the RFC week, so the two agree. No
+    // `wkst` is written: it could not change a date, and the plainer spelling
+    // is the better thing to put in someone's file.
     expect(repeatOf('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;WKST=MO', monday))
       .toEqual({ type: 'schedule', freq: 'weekly', interval: 2, byweekday: ['mo', 'we'] })
+  })
+
+  it('states wkst when the windows disagree, rather than giving up on the rule', () => {
+    // Anchor Wednesday but BYDAY names Monday too: the RFC picks up that Monday
+    // in the *next* fortnight, and anchor-opened windows would count it forward
+    // into this one. `wkst` moves the engine's window origin onto the RFC's, so
+    // the rule can be carried instead of expanded. `repeatToRrule.test.ts`
+    // holds the resulting dates against the RFC walk's, case for case.
+    expect(repeatOf('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;WKST=MO', new Date(2026, 7, 12)))
+      .toEqual({ type: 'schedule', freq: 'weekly', interval: 2, wkst: 'mo', byweekday: ['mo', 'we'] })
+  })
+
+  it('maps DAILY restricted to weekdays — BYDAY is a limit there, and the engine applies it', () => {
+    expect(repeatOf('FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR', monday))
+      .toEqual({ type: 'schedule', freq: 'daily', byweekday: ['mo', 'tu', 'we', 'th', 'fr'] })
+    expect(repeatOf('FREQ=DAILY;BYMONTHDAY=1,15', monday))
+      .toEqual({ type: 'schedule', freq: 'daily', bymonthday: [1, 15] })
+  })
+
+  it('maps "every Friday of the month" to the weekly rule it is identical to', () => {
+    // The engine's monthly arm cannot read a weekday without a position, but at
+    // INTERVAL=1 it does not need to: every Friday of every month is every
+    // Friday. BYMONTH rides along as the same limit in both readings.
+    expect(repeatOf('FREQ=MONTHLY;BYDAY=FR', new Date(2026, 7, 7)))
+      .toEqual({ type: 'schedule', freq: 'weekly', byweekday: ['fr'] })
+    expect(repeatOf('FREQ=MONTHLY;BYDAY=WE;BYMONTH=3,6', new Date(2026, 2, 4)))
+      .toEqual({ type: 'schedule', freq: 'weekly', bymonth: [3, 6], byweekday: ['we'] })
   })
 })
 
 describe('rruleToRepeat — bounded expansion fallback', () => {
   const wednesday = new Date(2026, 7, 12) // 2026-08-12
 
-  it('expands biweekly BYDAY when the windows disagree', () => {
-    // Anchor Wednesday but BYDAY names Monday too: the RFC picks up the Monday
-    // of the *next* fortnight, Meridian would count it forward into this one.
-    const dates = datesOf('FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;WKST=MO', wednesday)
-    expect(dates.slice(0, 4)).toEqual(['2026-08-12', '2026-08-24', '2026-08-26', '2026-09-07'])
-  })
-
-  it('expands DAILY restricted to weekdays', () => {
-    const dates = datesOf('FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR', wednesday)
-    expect(dates.slice(0, 5)).toEqual(['2026-08-12', '2026-08-13', '2026-08-14', '2026-08-17', '2026-08-18'])
-    expect(dates).not.toContain('2026-08-15') // a Saturday
-  })
-
   it('expands "first and third Friday" (mixed ordinals)', () => {
     const dates = datesOf('FREQ=MONTHLY;BYDAY=1FR,3FR', new Date(2026, 7, 7))
     expect(dates.slice(0, 4)).toEqual(['2026-08-07', '2026-08-21', '2026-09-04', '2026-09-18'])
-  })
-
-  it('expands "every Friday of the month" (BYDAY with no position)', () => {
-    const dates = datesOf('FREQ=MONTHLY;BYDAY=FR', new Date(2026, 7, 7))
-    expect(dates.slice(0, 4)).toEqual(['2026-08-07', '2026-08-14', '2026-08-21', '2026-08-28'])
   })
 
   it('expands a yearly rule whose BYSETPOS spans the whole year', () => {
@@ -190,25 +201,32 @@ describe('rruleToRepeat — bounded expansion fallback', () => {
     expect(dates.slice(0, 4)).toEqual(['2026-01-02', '2026-01-05', '2026-02-02', '2026-02-06'])
   })
 
+  // The window/COUNT/UNTIL mechanics below are about `expandRRule` itself, so
+  // they need a rule that still reaches it. `BYSETPOS` on a DAILY rule is that
+  // vehicle: it is declined because a one-day period gives a position nothing
+  // to pick from, while the walk ignores it and expands the plain weekday set —
+  // so these read exactly as they did when the weekday rule itself fell back.
+  const dailyWeekdays = 'FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=1'
+
   it('stops at UNTIL', () => {
-    const dates = datesOf('FREQ=MONTHLY;BYDAY=FR;UNTIL=20260930', new Date(2026, 7, 7))
-    expect(dates.at(-1)).toBe('2026-09-25')
+    const dates = datesOf('FREQ=MONTHLY;BYDAY=1FR,3FR;UNTIL=20260930', new Date(2026, 7, 7))
+    expect(dates.at(-1)).toBe('2026-09-18')
   })
 
   it('counts COUNT from the anchor, not from the window', () => {
     // Ten weekdays from the anchor — all inside the window, so all ten appear.
-    const dates = datesOf('FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR;COUNT=10', wednesday)
+    const dates = datesOf(`${dailyWeekdays};COUNT=10`, wednesday)
     expect(dates).toHaveLength(10)
     expect(dates.at(-1)).toBe('2026-08-25')
   })
 
   it('returns nothing for a series that ran out before the window', () => {
     // COUNT=5 starting a decade ago: every occurrence predates the window.
-    expect(datesOf('FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR;COUNT=5', new Date(2010, 0, 4))).toEqual([])
+    expect(datesOf(`${dailyWeekdays};COUNT=5`, new Date(2010, 0, 4))).toEqual([])
   })
 
   it('reaches the window for an old open-ended series', () => {
-    const dates = datesOf('FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR', new Date(2010, 0, 4))
+    const dates = datesOf(dailyWeekdays, new Date(2010, 0, 4))
     expect(dates.length).toBeGreaterThan(500)
     expect(dates[0]?.startsWith('2025-08')).toBe(true)
   })
