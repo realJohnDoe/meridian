@@ -43,7 +43,7 @@ Everything else:
 - **Agenda, day, and month views** — tasks and events together, in whatever layout suits the moment.
 - **Wikilinks** — connect entries with `[[Note Title]]` links that render as inline chips with a preview popover.
 - **Participants** — tag people on entries and filter the whole calendar to show only their items.
-- **Calendar subscriptions** — subscribe to an iCal feed (Google, Outlook, Apple, or anywhere else) and see its events alongside your own, read-only; export a vault back out as a single `.ics` file to plug into another calendar.
+- **Calendar subscriptions, import and export** — subscribe to an iCal feed (Google, Outlook, Apple, or anywhere else) and see its events alongside your own, read-only; or *import* an `.ics` export into a vault, which turns each event into an ordinary Markdown entry you own and can edit, so moving in doesn't mean retyping your calendar. A vault exports back out as a single `.ics` file to plug into another calendar.
 - **Offline-first, and held to it** — the app works without a network connection and syncs when you're back online. Table stakes for anything multi-device, so it's treated that way: [six written invariants](plans/reports/sync-invariants.md) and a generated two-device suite that re-checks them after every operation.
 - Plus what you'd expect of any of these apps: **search** across every entry's title and content, and **priority and duration** as first-class fields on any task or event.
 
