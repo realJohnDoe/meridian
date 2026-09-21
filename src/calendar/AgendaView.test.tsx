@@ -13,6 +13,27 @@ import type { Occurrence } from '@/types'
 setupStore()
 
 /**
+ * Pin the clock (see FIXED_NOW below for what depended on it).
+ *
+ * **Registered here, first, on purpose.** Vitest runs `beforeEach` hooks in
+ * registration order, and the DOM-measurement shims further down assume they
+ * are installing over a component that will render against the pinned date —
+ * moving this hook below them puts five tests back in the red. `today` is a
+ * module constant rather than a live read for the same reason: it is evaluated
+ * at import, long before any hook runs, so pinning only the fake clock would
+ * leave the fixtures and the agenda disagreeing about what day it is.
+ *
+ * `shouldAdvanceTime` keeps the timer behaviour the tests below rely on; the
+ * incremental-loading block advances timers itself and re-calls these
+ * harmlessly for its own sake.
+ */
+beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  vi.setSystemTime(FIXED_NOW)
+})
+afterEach(() => { vi.useRealTimers() })
+
+/**
  * The overdue section ships expanded (viewState.ts), so its occurrence rows
  * render by default. Only the test about collapsing needs this.
  */
@@ -221,7 +242,27 @@ afterEach(() => {
   restoreScrollShim()
 })
 
-const today = new Date()
+/**
+ * A Wednesday, pinned — the date every fixture here is built around, and the
+ * one the hook at the top of the file makes the component see too.
+ *
+ * Two things in this file used to depend on what day it really was, and both
+ * turned CI red on 2026-09-21 for every branch at once:
+ *
+ * - Several assertions match a **count** by its bare digits, which collides
+ *   with a rendered day-of-month badge whenever the two coincide — 20 overdue
+ *   tasks against yesterday's "20", on the 21st. One test already works around
+ *   this by scoping the query to the Overdue header, with a comment saying it
+ *   "reproduced against" the 2nd of a month; its siblings did not.
+ * - The agenda's chunking is anchored on today's weekday, so a `today` landing
+ *   on the first day of the week changes the initial run's row count, and with
+ *   it two scroll-offset and chunk-growth assertions.
+ *
+ * Scoping each query would only fix the first kind. Pinning the clock fixes
+ * both, and stops the file's verdict being a function of the calendar.
+ */
+const FIXED_NOW = new Date(2026, 8, 16, 12)
+const today = FIXED_NOW
 
 /**
  * An undone task N days in the past. It contributes two kinds of row now: one
