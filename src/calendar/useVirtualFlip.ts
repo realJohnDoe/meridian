@@ -42,7 +42,10 @@ export const FLIP_KEY_ATTR = 'data-flip-key'
  *     completed, deleted, or re-sorted.
  *
  * `isScrolling` is a second, weaker guard for the case where the data does
- * change mid-scroll — the glide would fight the scroll, so skip it.
+ * change mid-scroll — the glide would fight the scroll, so skip it. It also
+ * keeps the scroll term below honest: the virtualizer re-renders when
+ * `isScrolling` flips, so the offset recorded on the last non-scrolling commit
+ * is the one the user is actually looking at.
  */
 export function useVirtualFlip(
   containerRef: React.RefObject<HTMLElement | null>,
@@ -51,6 +54,7 @@ export function useVirtualFlip(
   isScrolling: boolean,
 ): void {
   const prevStartsRef = useRef<Map<string, number>>(new Map())
+  const prevScrollTopRef = useRef(0)
   const prevRowsKeyRef = useRef<unknown>(undefined)
   const animsRef = useRef<Animation[]>([])
 
@@ -61,7 +65,14 @@ export function useVirtualFlip(
     const starts = new Map<string, number>()
     for (const vi of virtualItems) starts.set(String(vi.key), vi.start)
 
+    // Read before anything else in this effect: by now the commit's own scroll
+    // correction has already landed, because the effect that applies it
+    // (useAnchoredAgendaScroll) is declared ahead of this hook and so runs
+    // first in the same layout phase.
+    const scrollTop = container.scrollTop
+
     const prev = prevStartsRef.current
+    const prevScrollTop = prevScrollTopRef.current
     const firstRun = prevRowsKeyRef.current === undefined
     const rowsChanged = !firstRun && prevRowsKeyRef.current !== rowsKey
 
@@ -69,6 +80,7 @@ export function useVirtualFlip(
     // next data change has to glide from where the rows actually are now, which
     // includes any pure-measurement shifts that happened in between.
     prevStartsRef.current = starts
+    prevScrollTopRef.current = scrollTop
     prevRowsKeyRef.current = rowsKey
 
     // A glide is pure polish, and this runs inside a layout effect where an
@@ -76,12 +88,23 @@ export function useVirtualFlip(
     // where the Web Animations API isn't there (jsdom, notably).
     if (!rowsChanged || isScrolling || typeof Element.prototype.animate !== 'function') return
 
-    // A row can move further than the viewport when a lot of content above it
-    // appears or disappears at once (a filter change dropping thousands of
-    // overdue rows, say). The virtualizer compensates the scroll offset so the
-    // row stays put on screen; animating that delta would send it flying across
-    // the viewport instead. Cap the glide at one screen.
-    const maxGlide = container.clientHeight || Infinity
+    // What a row visibly did, not what its layout coordinate did — the two
+    // come apart whenever the commit also moved the scroll offset.
+    //
+    // A lot of content appearing or disappearing above the viewport (a filter
+    // change dropping thousands of overdue rows, a chunk prepended by "Load
+    // earlier") shifts every surviving row's `start` enormously, and the
+    // agenda compensates the scroll offset by the same amount so they stay put
+    // on screen. Subtracting that compensation leaves ~0, so those rows
+    // correctly don't animate.
+    //
+    // This used to be capped at one viewport instead, on the theory that a row
+    // moving further than a screen could only be that compensated case. It
+    // isn't: checking off a task with a priority sends it from the top of a
+    // day's active bucket past every open item below it (occSort.ts), which on
+    // a busy day is further than a screen — so the one row the user just
+    // touched was the one row that jumped, while its neighbours glided.
+    const scrolled = scrollTop - prevScrollTop
 
     const moved: { key: string; delta: number }[] = []
     for (const [key, start] of starts) {
@@ -90,8 +113,8 @@ export function useVirtualFlip(
       // the window — there's nowhere to glide from. Matches FlipList, which
       // also leaves newcomers alone.
       if (before === undefined) continue
-      const delta = before - start
-      if (Math.abs(delta) <= 1 || Math.abs(delta) > maxGlide) continue
+      const delta = (before - start) + scrolled
+      if (Math.abs(delta) <= 1) continue
       moved.push({ key, delta })
     }
     if (!moved.length) return
