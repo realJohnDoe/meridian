@@ -96,7 +96,7 @@ export function repeatToRrule(repeat: Repeat, anchor: Date): string | null {
   // would drift the moment the user is a day late.
   if (repeat.type !== 'schedule') return null
 
-  const { freq, byweekday, bymonthday, bymonth, bysetpos, interval = 1, end } = repeat
+  const { freq, byweekday, bymonthday, bymonth, bysetpos, interval = 1, wkst, end } = repeat
   if (!['daily', 'weekly', 'monthly', 'yearly'].includes(freq)) return null
   // `interval` reaches here from YAML through an unchecked cast, so it can be
   // anything. The engine's cursor never advances on a non-positive interval —
@@ -132,14 +132,23 @@ export function repeatToRrule(repeat: Repeat, anchor: Date): string | null {
     // The weekly arm reads `byweekday` and nothing else.
     if (days.length > 0) {
       parts.push(`BYDAY=${days.join(',')}`)
-      // Meridian's 7-day windows start on the ANCHOR's weekday; the RFC's start
-      // on `WKST`, which defaults to Monday. With `interval: 1` every window
-      // holds each weekday exactly once however the boundary is drawn, so the
-      // two tile identically and `WKST` cannot change a date. From `interval: 2`
-      // up the windows no longer tile and the boundary decides which fortnight
-      // a weekday lands in, so the anchor's weekday has to be stated —
-      // `expansion.ts` records this as the exact `WKST` that reproduces it.
-      if (interval > 1) parts.push(`WKST=${ICS_BY_WEEKDAY[WEEKDAY_BY_JS_DAY[anchor.getDay()]!]}`)
+      // Meridian's 7-day windows start on the ANCHOR's weekday *unless the
+      // series names a `wkst`*, in which case they start there (#1010); the
+      // RFC's start on `WKST`, defaulting to Monday. With `interval: 1` every
+      // window holds each weekday exactly once however the boundary is drawn,
+      // so the two tile identically and `WKST` cannot change a date. From
+      // `interval: 2` up the windows no longer tile and the boundary decides
+      // which fortnight a weekday lands in, so whichever weekday the engine
+      // will actually open on has to be stated.
+      //
+      // Reading `wkst` here is what keeps this the inverse of the importer: a
+      // rule that came in carrying one (`rruleToRepeat`, where the RFC week
+      // and the anchor's disagreed) would otherwise export as the anchor's
+      // weekday and move a fortnight's worth of dates on the way out.
+      if (interval > 1) {
+        const opensOn = wkst && ICS_BY_WEEKDAY[wkst.toLowerCase() as Weekday]
+        parts.push(`WKST=${opensOn || ICS_BY_WEEKDAY[WEEKDAY_BY_JS_DAY[anchor.getDay()]!]}`)
+      }
     }
   } else if (freq === 'monthly') {
     if (bymonthday?.length) {
