@@ -324,3 +324,83 @@ describe('VaultSettings — archived', () => {
     expect(screen.getByRole('button', { name: 'Hide archived entries' })).toBeInTheDocument()
   })
 })
+
+// #1097 — bringing an existing calendar in as editable entries. The dialog is
+// not a nag: an `.ics` says nothing about its size from the outside, and a
+// re-import overwrites entries an earlier one made.
+describe('VaultSettings — import', () => {
+  const persistence = installFakePersistence()
+
+  const LOCAL_VAULT: VaultRef = { id: TEST_VAULT, name: 'Notes', kind: 'local' }
+
+  const ICS = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0',
+    'BEGIN:VEVENT', 'UID:lunch@example', 'DTSTART:20260817T090000', 'SUMMARY:Lunch with Sam', 'END:VEVENT',
+    'BEGIN:VEVENT', 'UID:standup@example', 'DTSTART:20260818T090000', 'SUMMARY:Team Standup', 'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n')
+
+  /** Pick a file in the hidden input the Import button clicks. */
+  async function pick(container: HTMLElement, text: string) {
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!
+    await act(async () => {
+      fireEvent.change(input, { target: { files: [new File([text], 'calendar.ics', { type: 'text/calendar' })] } })
+      // `File.text()` is a promise, so the handler's state updates land a
+      // microtask later — inside this act(), not after it.
+      await Promise.resolve()
+    })
+  }
+
+  it('is offered on a writable vault and withheld from a subscription', () => {
+    const { rerender } = render(<VaultSettings vault={LOCAL_VAULT} />)
+    expect(screen.getByRole('button', { name: /Import \.ics/ })).toBeInTheDocument()
+
+    rerender(<VaultSettings vault={{ id: 'feed', name: 'Holidays', kind: 'ical', ical: { url: 'https://x/y.ics' } }} />)
+    expect(screen.queryByRole('button', { name: /Import \.ics/ })).not.toBeInTheDocument()
+  })
+
+  it('counts the events before writing anything, and writes them on confirm', async () => {
+    const { container } = render(<VaultSettings vault={LOCAL_VAULT} />)
+
+    await pick(container, ICS)
+
+    expect(screen.getByText('Import 2 events into “Notes”?')).toBeInTheDocument()
+    // Nothing is durable until the user agrees — the dialog is a decision point,
+    // not a receipt.
+    expect(persistence.writes).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }))
+
+    expect(persistence.writes).toEqual([testKey('lunch-with-sam'), testKey('team-standup')])
+    expect(persistence.contentByKey.get(testKey('lunch-with-sam'))).toContain('title: Lunch with Sam')
+  })
+
+  it('leaves the vault alone on cancel', async () => {
+    const { container } = render(<VaultSettings vault={LOCAL_VAULT} />)
+
+    await pick(container, ICS)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(persistence.writes).toEqual([])
+    expect(useStore.getState().entries.size).toBe(0)
+  })
+
+  it('says a re-import replaces what the first one created, rather than silently doing it', async () => {
+    const { container } = render(<VaultSettings vault={LOCAL_VAULT} />)
+    await pick(container, ICS)
+    fireEvent.click(screen.getByRole('button', { name: 'Import' }))
+
+    await pick(container, ICS)
+
+    expect(screen.getByText(/2 entries imported from this calendar before will be replaced/)).toBeInTheDocument()
+  })
+
+  it('explains a file that is not a calendar, and offers no way to import it', async () => {
+    const { container } = render(<VaultSettings vault={LOCAL_VAULT} />)
+
+    await pick(container, '<html>Please sign in</html>')
+
+    expect(screen.getByText('Not a calendar')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument()
+  })
+})
