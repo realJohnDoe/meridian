@@ -7,7 +7,7 @@ export type { VaultRef } from '@/storage'
 export { syncToBackend, cacheDirtyCount } from '@/storage'
 
 import type { VaultRef } from '@/storage'
-import { entriesToIcs, planIcsImport } from '@/storage'
+import { entriesToIcs, planIcsImport, planEntryImport, vaultImportCandidates } from '@/storage'
 import { commitNext } from '@/storeCommit'
 import { useStore, vaultLayer } from '@/store'
 
@@ -61,6 +61,37 @@ export function previewVaultIcsImport(vaultId: string, text: string): IcsImportS
 export function importVaultIcs(vaultId: string, text: string): IcsImportSummary | null {
   const plan = planIcsImport(vaultId, text)
   if (!plan) return null
+  commitNext(plan.next, plan.keys)
+  return { added: plan.added, updated: plan.updated }
+}
+
+/**
+ * What moving `fromVaultId`'s events into `toVaultId` would do, without doing
+ * any of it — the subscription half of the same import.
+ *
+ * Separate from `previewVaultIcsImport` only in where the events come from: a
+ * mounted subscription rather than a file the user picked. Both end at
+ * `planEntryImport`.
+ */
+export function previewVaultCopy(fromVaultId: string, toVaultId: string): IcsImportSummary {
+  const { added, updated } = planEntryImport(toVaultId, vaultImportCandidates(fromVaultId))
+  return { added, updated }
+}
+
+/**
+ * Move a subscription's events into a writable vault, where they become
+ * ordinary editable entries.
+ *
+ * Re-reads and re-plans rather than taking a plan from `previewVaultCopy`, for
+ * the same reason `importVaultIcs` does: the commit is built against the store
+ * as it is now. That matters more here than for a file — a subscription
+ * refreshes on a timer, so its layer really can change while the dialog is up.
+ *
+ * Removing the subscription afterwards is the caller's call, not this one's: it
+ * is a separate durable act, and `removeVault` already owns what it means.
+ */
+export function copyVaultInto(fromVaultId: string, toVaultId: string): IcsImportSummary {
+  const plan = planEntryImport(toVaultId, vaultImportCandidates(fromVaultId))
   commitNext(plan.next, plan.keys)
   return { added: plan.added, updated: plan.updated }
 }

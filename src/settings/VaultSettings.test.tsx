@@ -7,7 +7,7 @@ import { setupStore, installFakePersistence, seedStore, makeOcc, makeRoots, test
 import { entryKey } from '@/fileIO'
 import type { Roots } from '@/types'
 import type { VaultRef } from '@/vaultRef'
-import { setVaultColor, setVaultRetentionDays } from '@/vaultActions'
+import { setVaultColor, setVaultRetentionDays, removeVault } from '@/vaultActions'
 import type * as VaultActions from '@/vaultActions'
 import { VaultSettings } from './VaultSettings'
 
@@ -19,6 +19,9 @@ vi.mock('@/vaultActions', async (importOriginal) => ({
   ...(await importOriginal<typeof VaultActions>()),
   setVaultColor: vi.fn(),
   setVaultRetentionDays: vi.fn(),
+  // Faked for the move-in tests below, which assert the subscription is
+  // removed — the real one reaches Dexie and the vault registry.
+  removeVault: vi.fn(),
 }))
 
 // The archived list's rows are real `Link`s (see keyRoute), which need a
@@ -402,5 +405,85 @@ describe('VaultSettings — import', () => {
 
     expect(screen.getByText('Not a calendar')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Import' })).not.toBeInTheDocument()
+  })
+})
+
+// The conversion half of #1097: a subscription is a view, and this is how it
+// stops being one. The events are already in the store as the feed vault's
+// layer, so this exercises the same planner the file import uses.
+describe('VaultSettings — moving a subscription in', () => {
+  const persistence = installFakePersistence()
+
+  const FEED: VaultRef = { id: 'feed', name: 'Holidays', kind: 'ical', ical: { url: 'https://x/y.ics' } }
+  const TARGET: VaultRef = { id: TEST_VAULT, name: 'Notes', kind: 'local' }
+
+  /** Register both vaults and give the feed one event, as a mounted feed has. */
+  function seedFeed() {
+    useStore.setState({ vaults: [FEED, TARGET] })
+    const occ = makeOcc({
+      id: 'feed-1', entryKey: entryKey('feed', 'ical-abc'), date: '2026-08-17',
+      metadata: { vaultId: 'feed', fileSlug: 'ical-abc', title: 'Boxing Day', extra: { uid: 'xmas@example' } },
+    })
+    const roots: Roots = new Map([[entryKey('feed', 'ical-abc'), {
+      title: 'Boxing Day', tags: [], items: [], vaultId: 'feed', fileSlug: 'ical-abc',
+      extra: { uid: 'xmas@example' },
+    }]])
+    useStore.getState().setVaultLayer('feed', new Map([[entryKey('feed', 'ical-abc'), {
+      key: entryKey('feed', 'ical-abc'), root: roots.get(entryKey('feed', 'ical-abc'))!, items: [occ] as [typeof occ],
+    }]]))
+  }
+
+  it('is offered on a subscription and withheld from a writable vault', () => {
+    seedFeed()
+    const { rerender } = render(<VaultSettings vault={FEED} />)
+    expect(screen.getByRole('button', { name: /Move in/ })).toBeInTheDocument()
+
+    rerender(<VaultSettings vault={TARGET} />)
+    expect(screen.queryByRole('button', { name: /Move in/ })).not.toBeInTheDocument()
+  })
+
+  it('names the count and the target, and writes into the target vault on confirm', () => {
+    seedFeed()
+    render(<VaultSettings vault={FEED} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Move in/ }))
+    expect(screen.getByText(/^1 event becomes an ordinary entry you can edit/)).toBeInTheDocument()
+    expect(persistence.writes).toEqual([])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Move in' }))
+
+    // Written into the *target*, under a readable name — not left on the
+    // feed's own `ical-<hash>` slug.
+    expect(persistence.writes).toEqual([testKey('boxing-day')])
+    expect(persistence.contentByKey.get(testKey('boxing-day'))).toContain('uid: xmas@example')
+  })
+
+  it('removes the subscription by default, and leaves it when unticked', () => {
+    // The remove-vault tests earlier in this file call the same mock.
+    vi.mocked(removeVault).mockClear()
+    seedFeed()
+    const { unmount } = render(<VaultSettings vault={FEED} />)
+    fireEvent.click(screen.getByRole('button', { name: /Move in/ }))
+    fireEvent.click(screen.getByRole('checkbox'))
+    fireEvent.click(screen.getByRole('button', { name: 'Move in' }))
+
+    expect(vi.mocked(removeVault)).not.toHaveBeenCalled()
+    unmount()
+
+    seedFeed()
+    render(<VaultSettings vault={FEED} />)
+    fireEvent.click(screen.getByRole('button', { name: /Move in/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Move in' }))
+
+    // Default on: leaving both would show every event twice in the agenda.
+    expect(vi.mocked(removeVault)).toHaveBeenCalledWith('feed')
+  })
+
+  it('explains itself and offers no target when nothing can be written to', () => {
+    useStore.setState({ vaults: [FEED] })
+    render(<VaultSettings vault={FEED} />)
+
+    expect(screen.getByRole('button', { name: /Move in/ })).toBeDisabled()
+    expect(screen.getByText(/You need a vault Meridian can write to first/)).toBeInTheDocument()
   })
 })
