@@ -40,11 +40,16 @@ export default function WikilinkPopup({ popup, roots, vaultId, view, onClose }: 
 
   useResetOnChange([matches], () => setFocusIdx(0))
 
-  function insertWikilink(title: string) {
+  // Writes the bare fileSlug, never the title — a wikilink's stored ref must
+  // survive the target being renamed later (see fileOccurrence.ts's
+  // FilePickerEntry doc comment). The chip still displays the live title
+  // (wikilinkDecorations.ts resolves it from roots on every render), so
+  // nothing is lost by not storing it here.
+  function insertWikilink(fileSlug: string) {
     const to = view.state.selection.main.head
     view.dispatch({
-      changes: { from: popup.from, to, insert: `[[${title}]]` },
-      selection: { anchor: popup.from + title.length + 4 },
+      changes: { from: popup.from, to, insert: `[[${fileSlug}]]` },
+      selection: { anchor: popup.from + fileSlug.length + 4 },
     })
     view.focus()
     onClose()
@@ -70,7 +75,7 @@ export default function WikilinkPopup({ popup, roots, vaultId, view, onClose }: 
         setFocusIdx(i => Math.max(i - 1, 0))
       } else if (e.key === 'Enter') {
         const m = matches[focusIdx]
-        if (m) { e.preventDefault(); e.stopPropagation(); actionsRef.current.insertWikilink(m.title) }
+        if (m) { e.preventDefault(); e.stopPropagation(); actionsRef.current.insertWikilink(m.fileSlug) }
       } else if (e.key === 'Escape') {
         e.preventDefault(); e.stopPropagation(); actionsRef.current.onClose()
       }
@@ -143,7 +148,7 @@ export default function WikilinkPopup({ popup, roots, vaultId, view, onClose }: 
               leadingIcon="kind"
               showTime="none"
               showTagsParticipants={false}
-              onOpen={() => insertWikilink(e.title)}
+              onOpen={() => insertWikilink(e.fileSlug)}
               onToggleDone={() => {}}
               animate={false}
             />
@@ -156,7 +161,7 @@ export default function WikilinkPopup({ popup, roots, vaultId, view, onClose }: 
             aria-selected={isFocused}
             tabIndex={-1}
             className={cn('w-full text-left px-3.5 py-2 text-sm text-secondary-foreground cursor-pointer rounded-md hover:bg-accent', isFocused && 'bg-accent')}
-            onMouseDown={() => insertWikilink(e.title)}
+            onMouseDown={() => insertWikilink(e.fileSlug)}
             onMouseEnter={() => setFocusIdx(i)}
           >
             {e.title}
