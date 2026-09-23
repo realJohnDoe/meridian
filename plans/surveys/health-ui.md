@@ -172,7 +172,7 @@ Examples (not exhaustive):
 
 ### 3. UX States & Accessibility
 
-**Scope:** whether the UI communicates state and is usable by everyone — including on mobile. This app is a mobile-focused PWA, so responsive behavior, touch ergonomics, and safe-area handling are primary hunting grounds here, not edge cases.
+**Scope:** whether the UI communicates state and is usable by everyone — including on mobile. This app is a mobile-focused PWA, so responsive behavior, touch ergonomics, and safe-area handling are primary hunting grounds here, not edge cases. Judgements made by *using* the app rather than reading its code — task flow, mental model, undo and confirmation, whether one operation behaves the same everywhere — belong to [usability.md](usability.md).
 
 Examples (not exhaustive):
 
@@ -180,9 +180,7 @@ Examples (not exhaustive):
 - Non-accessible interactive elements — clickable `div`s, missing keyboard handling, focus not managed in dialogs/menus, missing labels/ARIA on icon-only buttons
 - **Custom components that render a bare element** — an `onClick` on `<Badge>`, `<Card>`, or any wrapper that returns a plain `span`/`div`. Grepping for `<div onClick>` misses these entirely and so does `jsx-a11y`, which cannot see through the component indirection unless told to via `settings['jsx-a11y'].components`. Resolve each shared wrapper to the element it actually returns, then re-check every `onClick` on it — a codebase with zero raw clickable `div`s can still route all of its interactions through one
 - Mobile/responsive gaps — layouts that break at phone widths, touch targets below ~44px, hover-only affordances with no touch equivalent, safe-area (notch) regressions, a desktop dialog where the drawer pattern (`vaul`) is used elsewhere for the same kind of interaction
-- Destructive actions without confirmation or undo
 - Focus/scroll position lost across navigation or list updates
-- Inconsistent interaction patterns for the same operation in different screens
 
 ### 4. Security (UI-facing)
 

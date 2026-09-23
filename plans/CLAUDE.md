@@ -42,7 +42,7 @@ labelled with:
   defines them (`dry`, `srp`, `testing`, `security`, …);
 - a **survey-type label** matching the parent issue — `health`, `ui`
   (`health-ui.md`), `performance`, `product` (`product-niche.md`),
-  `data-integrity`;
+  `data-integrity`, `usability`;
 - a **model-tier label** — exactly one of `haiku`, `sonnet`, `opus`,
   `opus-plan` — matching the Recommended model field;
 - `decision-required` when the finding hinges on a product decision only the
