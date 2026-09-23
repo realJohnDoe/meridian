@@ -257,7 +257,7 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 Don't proactively start the dev server and drive it with `preview_*` tools to verify a change. Only do this when the user explicitly asks for it — they generally test UI changes themselves.
 
 **This does not apply to survey runs.** `plans/surveys/performance.md`,
-`product-niche.md` and `health-ui.md` each specify a measurement or screenshot
+`product-niche.md`, `health-ui.md` and `usability.md` each specify a measurement or screenshot
 pass as a required phase — dev server, browser, real numbers — and those
 surveys are the explicit ask. Skipping that phase because of the paragraph
 above is a silent failure: it lands as "partially assessed", which the survey

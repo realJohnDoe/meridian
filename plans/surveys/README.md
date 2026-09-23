@@ -2,7 +2,7 @@
 
 Shared process, scoring, and reporting rules used by every survey in this
 directory (`health.md`, `performance.md`, `health-ui.md`,
-`data-integrity.md`, `product-niche.md`). Each survey states only what's
+`data-integrity.md`, `product-niche.md`, `usability.md`). Each survey states only what's
 specific to it — its categories, its findings cap, its target
 invariants/flows/niches — and points back here for the rest.
 Finished reports live in `plans/reports/` beside this directory rather than in
@@ -256,7 +256,7 @@ files"); this section states only what a survey run does.
 - **One parent issue per run**, titled with the survey and its scope
   (`Codebase health survey — test code — 2026-09-12` is the worked example,
   #1065), labelled with the survey-type label (`health`, `ui`, `performance`,
-  `product`, `data-integrity`). Its body carries the coverage statement, the
+  `product`, `data-integrity`, `ux`). Its body carries the coverage statement, the
   category verdicts and the summary table — with the table's rows linking to
   each finding's sub-issue rather than restating it. This **replaces** the
   report file the old convention wrote to `plans/reports/`: there is no
