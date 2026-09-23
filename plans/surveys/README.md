@@ -256,7 +256,7 @@ files"); this section states only what a survey run does.
 - **One parent issue per run**, titled with the survey and its scope
   (`Codebase health survey — test code — 2026-09-12` is the worked example,
   #1065), labelled with the survey-type label (`health`, `ui`, `performance`,
-  `product`, `data-integrity`, `usability`). Its body carries the coverage statement, the
+  `product`, `data-integrity`, `ux`). Its body carries the coverage statement, the
   category verdicts and the summary table — with the table's rows linking to
   each finding's sub-issue rather than restating it. This **replaces** the
   report file the old convention wrote to `plans/reports/`: there is no

@@ -11,7 +11,7 @@ plans/CLAUDE.md and plans/surveys/README.md) — do not label it `survey:<name>`
 that label is retired. Label it instead with:
   - the survey's own Category tag(s) (`dry`, `srp`, `testing`, `security`, …)
   - the survey-type label matching the parent issue (`health`, `ui`,
-    `performance`, `product`, `data-integrity`, `usability`)
+    `performance`, `product`, `data-integrity`, `ux`)
   - a model-tier label: exactly one of `haiku`, `sonnet`, `opus`, `opus-plan`
   - `decision-required`, if the finding hinges on a product decision only the
     maintainer can make

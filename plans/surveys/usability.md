@@ -95,8 +95,8 @@ sweep once per distinct screen.
 ## Output structure
 
 **Reporting:** per the [shared reporting conventions](./README.md#reporting),
-with survey-type label `usability`, including suggested improvements to this
-survey file itself.
+with survey-type label `ux`, including suggested improvements to this survey
+file itself.
 
 ### 1. Usability verdict (~5 sentences)
 
