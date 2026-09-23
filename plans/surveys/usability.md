@@ -39,7 +39,9 @@ A defect two surveys both find is one issue: search open issues first, per
   heuristic sweep are done. Knowing what the code intends makes an evaluator
   forgive what a user cannot see — that forgiveness is the failure this survey
   exists to avoid. The only sources are the running app and what it shows,
-  including the Tutorial vault's content as rendered.
+  including the Tutorial vault's content as rendered. The root `CLAUDE.md` is
+  loaded into every session regardless and names routes, slugs and features;
+  say so in the coverage statement and don't use it to find a control.
 - **Then locate, don't re-judge.** Once findings are written, you may grep for
   a finding's on-screen string or component to fill its Task context block, so
   the fixer gets a location. Do not revise a finding's verdict from what the
@@ -49,14 +51,20 @@ A defect two surveys both find is one issue: search open issues first, per
   missed, feeding the survey-file diff.
 - **Drive a real browser.** `pnpm exec vite --port <unique> --strictPort`, then
   a scratch script importing `chromium` from `@playwright/test` (`e2e/` is the
-  worked example). Mobile is primary: 390×844 with `hasTouch` and `isMobile`
-  set; desktop at 1440×900. Use the default theme plus one dark theme — contrast
+  worked example; pass `executablePath`, per `playwright.config.ts`'s
+  `CHROMIUM_PATH` note). Mobile is primary: 390×844 with `hasTouch` and `isMobile`
+  set; desktop at 1440×900. Within a task, move by tapping, never `page.goto`:
+  a reload resets the Tutorial vault and every edit the task made. On every
+  list card, try swipe in both directions and long-press — the 2026-09-23 run
+  missed swipe-to-delete, the only delete with Undo, until the PR history
+  named it. Use the default theme plus one dark theme — contrast
   across all themes is `health-ui.md`'s. Screenshot every step into the
   scratchpad; findings cite steps, not screenshots, since those cannot be
   attached to an issue. Environment limits are in [what this environment can and
   cannot do](./README.md#what-this-environment-can-and-cannot-do): only the
   Tutorial vault is reachable, so the add-vault flow is walked up to the
-  browser-permission or OAuth hand-off and no further. Load the large vault
+  browser-permission or OAuth hand-off, or the calendar's `Check calendar`
+  (its server-side fetch fails here), and no further. Load the large vault
   (`meridian_bigvault`) once, to judge scanning and navigation at scale.
 - **Walk each task, then sweep each screen.** For every task below, state the
   user's goal and what "done" looks like, then walk it cold as a first-time
