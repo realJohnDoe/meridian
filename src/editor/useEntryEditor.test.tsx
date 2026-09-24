@@ -676,6 +676,25 @@ describe('useEntryEditor', () => {
     expect(result.current.titleMissing).toBe(false)
     expect(backMock.mock.calls.length + navigateMock.mock.calls.length).toBeGreaterThan(0)
   })
+
+  // #1120: with only a read-only vault registered, defaultVaultId is null, so a
+  // brand-new entry has no vault to land in. Before the fix, both the mount-time
+  // commit (a title seeded from search's "Create …") and handleSave (Back) took
+  // saveNode's null the same way as an empty title, flagging titleMissing on a
+  // title that was very much present.
+  it('a brand-new entry with a title but no writable vault does not flag titleMissing, on mount or on handleSave', () => {
+    useStore.setState({ defaultVaultId: null })
+
+    const { result } = renderHook(() => useEntryEditor(null, 'all', 'Call the plumber'))
+    expect(persistence.writes).toEqual([])
+    expect(result.current.titleMissing).toBe(false)
+
+    act(() => { result.current.handleSave('body') })
+
+    expect(persistence.writes).toEqual([])
+    expect(result.current.titleMissing).toBe(false)
+    expect(backMock.mock.calls.length + navigateMock.mock.calls.length).toBeGreaterThan(0)
+  })
 })
 
 describe('useEntryEditor — moving between vaults', () => {

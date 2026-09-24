@@ -272,6 +272,11 @@ export function useEntryEditor(
       return key
     }
     if (!next.title) return null
+    // No writable vault to create the file in (e.g. only the read-only Tutorial
+    // vault is registered) — EntryEditor's "no vault to save to" banner already
+    // explains this, so falling through to the titleMissing branch below would
+    // tell the user their (present) title is the problem.
+    if (!vaultId) return null
     const key = saveNode(null, next.editScope, next, { draftId, targetVaultId })
     if (key === null) { setTitleMissing(true); return null }
     setTitleMissing(false)
@@ -406,6 +411,10 @@ export function useEntryEditor(
     // still deliberately null, so saving must target the adopted item rather than ask
     // for another new entry. draftIdRef covers the window before that adoption lands.
     const item = entry.item ?? createdItemRef.current
+    // No vault to save a brand-new entry to — same case commitEntry guards
+    // above. There's nothing this save could do, and the (present) title isn't
+    // the problem, so just leave rather than flagging titleMissing.
+    if (!item && !vaultId) { goBack(); return }
     const pending = foldEdits(editsRef.current, entryRef.current, { ...entry, body }, formViewRef.current)
     reportContested(contestedFields(pending, viewRef.current))
     const key = saveNode(item, entry.editScope, { ...entry, body }, { draftId, targetVaultId, edits: editedFields(pending) })
