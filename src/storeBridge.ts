@@ -17,6 +17,17 @@ export const getSnapshot      = (): { entries: Entries } => ({ entries: getEntri
 export const getVaults        = (): VaultRef[]     => useStore.getState().vaults
 /** Where a brand-new entry goes unless the editor overrides it per entry. */
 export const getDefaultVaultId = (): string | null => useStore.getState().defaultVaultId
+/**
+ * Where a brand-new entry falls back to when there is no writable vault at
+ * all (`getDefaultVaultId` is then null by construction — see
+ * `reconcileDefaultVault`) — the Tutorial's own vault, so creating one goes
+ * through the exact same store-only path as editing one of its existing
+ * entries: shown in the agenda and search for the session, never persisted.
+ * See `hooks/useEntryAccess.ts`'s `sandbox` mode, which this now covers for
+ * new entries too, not only existing ones.
+ */
+export const getSandboxVaultId = (): string | null =>
+  useStore.getState().vaults.find(v => v.kind === 'example')?.id ?? null
 export const getUnreadableFiles = (): Map<EntryKey, { path: string; message: string }> => useStore.getState().unreadableFiles
 export const setUnreadableFiles = (files: Map<EntryKey, { path: string; message: string }>) => useStore.getState().setUnreadableFiles(files)
 
