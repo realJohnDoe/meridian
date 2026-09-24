@@ -76,6 +76,21 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  it('all-scope edit converts a standalone occurrence into a series when a repeat is added', () => {
+    // "Edit repeat pattern" (scope 'all') is exactly where a not-yet-recurring
+    // occurrence gains its first repeat — applySingle already promoted a
+    // standalone to a series for scope 'single'; applyFieldsToItem (the
+    // scope-'all' equivalent) used to silently ignore `repeat` instead.
+    const data = fixtureData('standalone-task')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-09')
+    const next = applyEdit(data, occ, 'all', editFields(occ, {
+      repeat: { type: 'schedule', freq: 'weekly' },
+    }), NEW_TARGET)
+    const item = itemsOf(next).find(i => i.entryKey === occ.entryKey)!
+    expect(isSeries(item)).toBe(true)
+    expect(isSeries(item) && item.repeat).toEqual({ type: 'schedule', freq: 'weekly' })
+  })
+
   // ── finding #2a: clearing an inherited field must survive a reload ─────────
   //
   // The store distinguishes "cleared" from "not set" for both fields below
@@ -487,6 +502,33 @@ repeat:
     expect(itemsOf(afterSecond)).toHaveLength(1)
     expect(itemsOf(afterSecond)[0]!.metadata.duration).toBe('1 hour')
     expect([...rootsIn(afterSecond).keys()]).toEqual([keyOf('board-game-night')])
+  })
+
+  it('adding a repeat on a draft\'s second commit converts it into a series', () => {
+    // A new entry defaults to scope 'all' (_entry.entry.new.tsx), and its first
+    // save (e.g. typing a title) creates it as a standalone item before a repeat
+    // is ever set. Setting the repeat is then a second commit against the same
+    // draft, which used to go through applyFieldsToItem's standalone branch —
+    // the one that dropped `repeat` entirely instead of promoting to a series.
+    const emptyData: StoreData = dataOf([])
+    const fields: EditFields = {
+      title: 'Take vitamins',
+      tags: [], items: [], participants: [],
+      body: '', tracked: true, done: false, priority: null,
+      scheduled: { date: '2026-06-05', time: '' },
+      duration: '', repeat: null,
+    }
+    const draftId = 'draft-1'
+    const afterFirst = applyEdit(emptyData, null, 'all', fields, { vaultId: TEST_VAULT, draftId })
+    expect(itemsOf(afterFirst).some(isSeries)).toBe(false)
+
+    const afterRepeat = applyEdit(afterFirst, null, 'all', {
+      ...fields, repeat: { type: 'schedule', freq: 'daily' },
+    }, { vaultId: TEST_VAULT, draftId })
+    expect(itemsOf(afterRepeat)).toHaveLength(1)
+    const item = itemsOf(afterRepeat)[0]!
+    expect(isSeries(item)).toBe(true)
+    expect(isSeries(item) && item.repeat).toEqual({ type: 'schedule', freq: 'daily' })
   })
 
   it('a draft that has already created its file keeps it when the title is retyped', () => {

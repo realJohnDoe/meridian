@@ -524,6 +524,21 @@ function applyFieldsToItem(item: StoreItem, fields: EditFields, touched?: Touche
     return { ...item, metadata: seriesMeta(item.metadata, fields, touched), repeat: repeat ?? item.repeat,
       date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
   }
+  // A standalone gaining a repeat becomes a series in place — same conversion
+  // `applySingle` does for scope 'single'. Without this, a repeat added at
+  // scope 'all' (a brand-new entry's default scope, and "edit repeat pattern"
+  // on an entry that isn't recurring yet) was silently dropped.
+  if (repeat && !item.ownerId) {
+    const series: RepeatPattern<OccurrenceMetadata> = {
+      date:     scheduled?.date ?? '',
+      time:     scheduled?.date ? scheduled.time || null : null,
+      repeat,
+      entryKey: item.entryKey,
+      id:       item.id,
+      metadata: seriesMeta(item.metadata, fields, touched),
+    }
+    return series
+  }
   return { ...item, metadata: occMeta(item.metadata, fields, touched),
     date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
 }
