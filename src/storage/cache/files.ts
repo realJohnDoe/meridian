@@ -68,12 +68,14 @@ function toCacheRecord(r: DexieFileRow): CacheRecord {
 //
 // Every one of them that changes a row's `content` also calls
 // publishCacheChange, so the other views of this vault hear about it — see
-// broadcast.ts. Two deliberate exceptions: markPushed, because neither of its
-// branches changes content (it writes back either exactly what was pushed —
-// already announced when recordLocalEdit staged it — or the row it found,
-// untouched), and cacheDeleteAll, whose caller is removing the vault from this
-// device entirely and whose cross-view story is the vault registry's, not a
-// file's. `version` is not store state, so nobody listens for it either way.
+// broadcast.ts. Three deliberate exceptions: markPushed, because neither of
+// its branches changes content (it writes back either exactly what was
+// pushed — already announced when recordLocalEdit staged it — or the row it
+// found, untouched); cacheDeleteAll, whose caller is removing the vault from
+// this device entirely and whose cross-view story is the vault registry's,
+// not a file's; and backfillLastModified, which patches only an age signal no
+// view renders. `version` is not store state, so nobody listens for it
+// either way.
 //
 // The call always follows the transaction rather than sitting inside it: a
 // listener re-reads the row the instant it hears, and there is no second
@@ -310,6 +312,28 @@ export async function cacheDirtyCount(vaultId: string): Promise<number> {
       .filter(r => r.dirty === DIRTY_BY_STATUS.dirty || r.dirty === DIRTY_BY_STATUS.deleted).count()
   }
   catch { return 0 }
+}
+
+/**
+ * Patch `lastModified` onto already-clean rows that reconcile found missing
+ * one but unchanged — see `StorageBackend.readDates` and its call site in
+ * `reconcileWithBackend`. Content, version and status are untouched, so this
+ * skips a row that went dirty since the caller's snapshot: an edit in flight
+ * owns that row's fate now, not a date lookup that raced it.
+ */
+export async function backfillLastModified(vaultId: string, dates: Map<string, number>): Promise<void> {
+  if (dates.size === 0) return
+  const d = await cacheInit()
+  await d.transaction('rw', d.files, async () => {
+    const paths = Array.from(dates.keys())
+    const existingRows = await d.files.bulkGet(paths.map(p => vp(vaultId, p)))
+    const toPut: DexieFileRow[] = []
+    for (const existing of existingRows) {
+      if (!existing || existing.dirty !== DIRTY_BY_STATUS.clean) continue
+      toPut.push({ ...existing, lastModified: dates.get(existing.path) })
+    }
+    if (toPut.length > 0) await d.files.bulkPut(toPut)
+  })
 }
 
 export async function cacheDeleteAll(vaultId: string): Promise<void> {
