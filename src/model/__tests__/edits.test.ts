@@ -313,6 +313,38 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(back)).toMatchSnapshot()
   })
 
+  it('single-scope same-day time move excludes the original slot and re-adds at the new time', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
+    const next = applyEdit(data, occ, 'single', editFields(occ, {
+      scheduled: { date: '2026-04-20', time: '10:00' },
+    }), NEW_TARGET)
+    const onDay = expandRange(itemsOf(next), rootsIn(next), new Date('2026-04-19'), new Date('2026-04-23'))
+      .filter(o => o.date === '2026-04-20')
+    expect(onDay).toHaveLength(1)
+    expect(onDay[0]!.time).toBe('10:00')
+    expect(serializeData(next)).toMatchSnapshot()
+  })
+
+  it('moving an occurrence back to its original time un-hides it', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
+    const moved = applyEdit(data, occ, 'single', editFields(occ, {
+      scheduled: { date: '2026-04-20', time: '10:00' },
+    }), NEW_TARGET)
+    const movedOcc = occOn(itemsOf(moved), rootsIn(moved), '2026-04-20')
+    const back = applyEdit(moved, movedOcc, 'single', editFields(movedOcc, {
+      scheduled: { date: '2026-04-20', time: '09:00' },
+    }), NEW_TARGET)
+    const onDay = expandRange(itemsOf(back), rootsIn(back), new Date('2026-04-19'), new Date('2026-04-23'))
+      .filter(o => o.date === '2026-04-20')
+    expect(onDay).toHaveLength(1)
+    expect(onDay[0]!.time).toBe('09:00')
+    // No stray excluded stub left behind.
+    expect(itemsOf(back).filter(i => !isSeries(i) && (i as { excluded?: boolean }).excluded)).toHaveLength(0)
+    expect(serializeData(back)).toMatchSnapshot()
+  })
+
   it('moving an occurrence onto a date excluded for an unrelated reason un-hides that date', () => {
     const data = fixtureData('weekly-series')
     const excludedOcc = occOn(itemsOf(data), rootsIn(data), '2026-04-27')

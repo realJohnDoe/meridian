@@ -197,23 +197,28 @@ export function upsertOverride(
 }
 
 /**
- * Drop any exclusion-only stub already sitting at `date` for `ownerId`.
+ * Drop any exclusion-only stub already sitting at `date`+`time` for `ownerId`.
  *
- * An occurrence about to occupy that date supersedes an earlier "hide this
- * slot" marker. Without this, moving an occurrence onto a date that already
+ * An occurrence about to occupy that slot supersedes an earlier "hide this
+ * slot" marker. Without this, moving an occurrence onto a slot that already
  * carries an excluded stub (e.g. moving it back to where it started, or onto
- * a date excluded for an unrelated reason) leaves two children on the same
- * date; `expandNode`'s override lookup returns the first array match, which
+ * a slot excluded for an unrelated reason) leaves two children on the same
+ * slot; `expandNode`'s override lookup returns the first array match, which
  * can be the stale excluded stub, silently hiding the real occurrence.
+ *
+ * Matched on time as well as date — not date alone — so this can't remove a
+ * stub sitting at a *different* time on the same date, which is exactly what
+ * `applySingle`'s exclude-and-detach branch writes just before calling this
+ * for a same-day time move.
  */
-function dropExclusionStub(items: Entry['items'], ownerId: string, date: string): Entry['items'] {
+function dropExclusionStub(items: Entry['items'], ownerId: string, date: string, time: string | null): Entry['items'] {
   // Only ever called on an entry that has `ownerId`'s series, and a series is
   // never a stub — so something always survives, and the `?? items` is
   // unreachable rather than a fallback with behaviour of its own.
   return filterItems(items, i => {
     if (isSeries(i)) return true
     const io = i
-    return !(io.ownerId === ownerId && io.date === date && io.excluded)
+    return !(io.ownerId === ownerId && io.date === date && io.time === time && io.excluded)
   }) ?? items
 }
 
@@ -779,12 +784,14 @@ function applyAll(data: StoreData, occ: Occurrence, fields: EditFields, touched?
  * Upsert an explicit override for a single occurrence's date.
  *
  * A standalone gaining a repeat is converted to a series in place.
- * A generated occurrence moved to a different date gets excluded and a detached
- * explicit child is appended (the override key doubles as recurrence-id, so an
- * in-place date change would leave the original generated slot un-suppressed).
- * Either way, landing on a date that already carries an exclusion stub (e.g.
- * moving the occurrence back to where it started) clears that stub first —
- * see `dropExclusionStub`.
+ * A generated occurrence moved to a different date **or time** gets excluded
+ * and a detached explicit child is appended (the override key doubles as
+ * recurrence-id, so an in-place date/time change would leave the original
+ * generated slot un-suppressed — a same-day time move is exactly as much a
+ * slot change as a date move, and needs the same treatment). Either way,
+ * landing on a slot that already carries an exclusion stub (e.g. moving the
+ * occurrence back to where it started) clears that stub first — see
+ * `dropExclusionStub`.
  */
 function applySingle(data: StoreData, occ: Occurrence, fields: EditFields, touched?: TouchedKeys): StoreData {
   const { scheduled, repeat } = fields
@@ -810,9 +817,9 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields, touch
     return commit(mapItems(items, i => i.id === occ.id ? newSeries : i))
   }
 
-  if (occ.ownerId && occ.source === 'generated' && newDate && newDate !== occ.date) {
+  if (occ.ownerId && occ.source === 'generated' && newDate && (newDate !== occ.date || newTime !== occ.time)) {
     items = upsertOverride(items, occ, { excluded: true })
-    items = dropExclusionStub(items, occ.ownerId, newDate)
+    items = dropExclusionStub(items, occ.ownerId, newDate, newTime)
     // Keyed by target slot rather than a fresh UUID so re-running the same move is
     // idempotent. The editor pins `entry.item` to the pre-move occurrence for the
     // whole session (useEntryEditor's useState initialiser), so every later save —
@@ -833,8 +840,8 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields, touch
     return commit(already ? mapItems(items, i => i.id === movedId ? moved : i) : addItem(items, moved))
   }
 
-  if (occ.ownerId && newDate && newDate !== occ.date) {
-    items = dropExclusionStub(items, occ.ownerId, newDate)
+  if (occ.ownerId && newDate && (newDate !== occ.date || newTime !== occ.time)) {
+    items = dropExclusionStub(items, occ.ownerId, newDate, newTime)
   }
 
   return commit(upsertOverride(items, occ, { date: newDate, time: newTime, metadata: occMeta(base, fields, touched) }))
