@@ -27,7 +27,9 @@ export interface RawFile {
    * drifted from the cache's), so `reconcileWithBackend` stamps the current
    * time instead of asking the backend for one. `undefined` when the backend
    * doesn't know (or wasn't asked) — the sweep treats that as "never archive"
-   * rather than guessing.
+   * rather than guessing. A row that's still `undefined` after that and never
+   * changes again would stay that way forever; `StorageBackend.readDates`
+   * below is `reconcileWithBackend`'s way of asking after the fact.
    */
   lastModified?: number
 }
@@ -109,4 +111,16 @@ export interface StorageBackend {
    * the recovery attempt is never mistaken for a dead credential.
    */
   refreshAuth?(): Promise<boolean>
+  /**
+   * Look up `lastModified` for paths whose content reconcile already knows
+   * hasn't changed, without re-reading it — closes the gap `readFiles()`
+   * leaves open per `RawFile.lastModified` above for a row that was never
+   * backfilled and never changes again (see `reconcileWithBackend`'s use of
+   * this). Optional: a backend whose `readFiles()`/`readAll()` already
+   * return a real date on every call (local FS's `File.lastModified`) has no
+   * such gap to close. A path this can't resolve a date for is left out of
+   * the result rather than guessing — same fail-safe contract as
+   * `RawFile.lastModified`.
+   */
+  readDates?(paths: string[]): Promise<Map<string, number>>
 }
