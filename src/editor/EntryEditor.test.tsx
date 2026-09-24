@@ -139,10 +139,10 @@ describe('EntryEditor — archived banner', () => {
   })
 })
 
-// #1120: with only a read-only vault registered, defaultVaultId is null, so a
-// brand-new entry has nowhere to save to. saveNode already refuses that
-// silently (see save.ts) — the fix is showing it rather than losing the entry
-// with no trace, and not misreporting it as a missing title.
+// #1120: with genuinely no vault registered (the Tutorial removed, nothing added
+// in its place), a brand-new entry has nowhere to save to. saveNode already
+// refuses that silently (see save.ts) — the fix is showing it rather than
+// losing the entry with no trace, and not misreporting it as a missing title.
 describe('EntryEditor — no vault to save to', () => {
   function NewEntryHarness({ title }: { title: string }) {
     const hooks = useEntryEditor(null, 'all', title)
@@ -164,6 +164,29 @@ describe('EntryEditor — no vault to save to', () => {
     // taken the titleMissing branch, which would paint the (present) title's
     // placeholder as an error.
     expect(persistence.writes).toEqual([])
+    expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive/)
+  })
+})
+
+// #1120's product question: with only the read-only Tutorial vault registered,
+// a brand-new entry now falls back to the Tutorial's own sandbox vault (see
+// useVaultTarget.ts's initialTargetVault) instead of the "no vault" case above
+// — so it shows the same "read-only — changes aren't saved" banner an existing
+// Tutorial entry already gets, not the "add a vault" one.
+describe('EntryEditor — new entry in the Tutorial sandbox', () => {
+  function NewEntryHarness({ title }: { title: string }) {
+    const hooks = useEntryEditor(null, 'all', title)
+    return <EntryEditor hooks={hooks} items={[]} roots={useStore.getState().roots} />
+  }
+
+  it('shows the read-only banner, not the no-vault one', () => {
+    useStore.setState({ defaultVaultId: null, vaults: [{ id: 'example', name: 'Tutorial', kind: 'example' }] })
+    useStore.getState().setVaultSync('example', { readOnly: true })
+
+    render(<NewEntryHarness title="Call the plumber" />)
+
+    expect(screen.getByText(/tutorial is read-only/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no vault to save to yet/i)).not.toBeInTheDocument()
     expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive/)
   })
 })

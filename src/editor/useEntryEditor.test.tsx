@@ -677,13 +677,14 @@ describe('useEntryEditor', () => {
     expect(backMock.mock.calls.length + navigateMock.mock.calls.length).toBeGreaterThan(0)
   })
 
-  // #1120: with only a read-only vault registered, defaultVaultId is null, so a
-  // brand-new entry has no vault to land in. Before the fix, both the mount-time
-  // commit (a title seeded from search's "Create …") and handleSave (Back) took
-  // saveNode's null the same way as an empty title, flagging titleMissing on a
-  // title that was very much present.
-  it('a brand-new entry with a title but no writable vault does not flag titleMissing, on mount or on handleSave', () => {
-    useStore.setState({ defaultVaultId: null })
+  // #1120: with no vault registered at all (the Tutorial removed, nothing added
+  // in its place — see EntryEditor.test.tsx's "no vault to save to" suite for the
+  // banner this leans on), a brand-new entry has nowhere to land. Before the fix,
+  // both the mount-time commit (a title seeded from search's "Create …") and
+  // handleSave (Back) took saveNode's null the same way as an empty title,
+  // flagging titleMissing on a title that was very much present.
+  it('a brand-new entry with a title but no vault at all does not flag titleMissing, on mount or on handleSave', () => {
+    useStore.setState({ defaultVaultId: null, vaults: [] })
 
     const { result } = renderHook(() => useEntryEditor(null, 'all', 'Call the plumber'))
     expect(persistence.writes).toEqual([])
@@ -694,6 +695,28 @@ describe('useEntryEditor', () => {
     expect(persistence.writes).toEqual([])
     expect(result.current.titleMissing).toBe(false)
     expect(backMock.mock.calls.length + navigateMock.mock.calls.length).toBeGreaterThan(0)
+  })
+
+  // #1120's product question: with only the read-only Tutorial vault registered
+  // (defaultVaultId null, same setup as above but the Tutorial present), a
+  // brand-new entry now falls back to the Tutorial's own sandbox vault instead of
+  // having nowhere to go. `installFakePersistence` swaps out the whole
+  // persistence port, so it can't see entityWrites.ts's own readOnly skip
+  // (that's what actually keeps this from ever reaching Dexie or a push — see
+  // ExampleBackend.write) — what this test can and does confirm is the part that
+  // used to be broken: the save is no longer silently refused before it even
+  // gets there, and the entry becomes visible in the store for the session.
+  it('a brand-new entry falls back to the Tutorial sandbox vault when no writable vault is registered', () => {
+    useStore.setState({ defaultVaultId: null, vaults: [{ id: 'example', name: 'Tutorial', kind: 'example' }] })
+
+    const { result } = renderHook(() => useEntryEditor(null, 'all', 'Call the plumber'))
+
+    const key = makeEntryKey('example', titleToSlug('Call the plumber'))
+    expect(result.current.vaultId).toBe('example')
+    expect(result.current.titleMissing).toBe(false)
+    expect(persistence.writes).toEqual([key])
+    // Visible in the store for the session, the way agenda/search read it.
+    expect(useStore.getState().roots.get(key)?.title).toBe('Call the plumber')
   })
 })
 

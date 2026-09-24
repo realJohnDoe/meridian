@@ -4,7 +4,7 @@ import { fmtISO, applyEdit, joinFileMeta, newEntryKey, excludeOccurrence, setArc
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
-import { getSnapshot, getSlugSnapshot, getEntries, getItems, getDefaultVaultId } from '@/storeBridge'
+import { getSnapshot, getSlugSnapshot, getEntries, getItems, getDefaultVaultId, getSandboxVaultId } from '@/storeBridge'
 import { keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { commitNext, commitDelete } from '@/storeCommit'
@@ -321,7 +321,10 @@ export interface SaveOpts {
  *
  * An existing item keeps its own vault (it rides inside its key); a new one goes
  * to `opts.targetVaultId` if the editor's vault chip picked one, else to the
- * default vault. Returns the key actually written
+ * default vault, else — when there is no writable vault registered at all —
+ * the Tutorial's own sandbox vault, so it lands exactly where editing one of
+ * the Tutorial's existing entries already does (see `getSandboxVaultId`).
+ * Returns the key actually written
  * rather than letting callers recompute `titleToSlug(title)`: a new entry whose
  * title slugifies onto a slug some other file in that vault already owns — or
  * one that belongs to a file that failed to parse and so has no root of its
@@ -332,7 +335,7 @@ export function saveNode(item: Occurrence | null, editScope: EditScope, fields: 
   if (!title) return null
   const { draftId, targetVaultId } = opts
 
-  const vaultId = item ? keyVaultId(item.entryKey) : (targetVaultId ?? getDefaultVaultId())
+  const vaultId = item ? keyVaultId(item.entryKey) : (targetVaultId ?? getDefaultVaultId() ?? getSandboxVaultId())
   // No vault loaded at all — there is nowhere to put a new entry, and inventing
   // a target would create an unreachable root under a vault id nothing owns.
   if (!vaultId) return null

@@ -7,7 +7,7 @@ import { isWritableVault } from '@/vaultRef'
 import { keyVaultId, keySlug } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { moveEntryToVault } from '@/occurrenceActions'
-import { getSlugSnapshot } from '@/storeBridge'
+import { getSlugSnapshot, getSandboxVaultId } from '@/storeBridge'
 import type { PendingMove } from './dialogs/MoveVaultDialog'
 import type { EntryState } from './state'
 
@@ -43,8 +43,10 @@ export interface VaultTarget {
 
 /**
  * Which vault a brand-new entry starts out targeting: the one the route named
- * (the new-entry vault chip), else the default. Null for an existing entry —
- * its vault is fixed, and rides inside its own key.
+ * (the new-entry vault chip), else the default, else — when there is no
+ * writable vault registered at all — the Tutorial's own sandbox vault (see
+ * `getSandboxVaultId`). Null for an existing entry — its vault is fixed, and
+ * rides inside its own key.
  *
  * Exported because `useEntryEditor` needs the same answer one hook call
  * earlier, to seed a new entry's participants from the vault it will actually
@@ -52,7 +54,7 @@ export interface VaultTarget {
  * store snapshot, so they cannot disagree.
  */
 export function initialTargetVault(isNewEntry: boolean, seedVault?: string): string | null {
-  return isNewEntry ? (seedVault ?? useStore.getState().defaultVaultId) : null
+  return isNewEntry ? (seedVault ?? useStore.getState().defaultVaultId ?? getSandboxVaultId()) : null
 }
 
 /**
