@@ -4,6 +4,7 @@ import { renderHook, act, fireEvent } from '@testing-library/react'
 import { useEntryDialogs } from './useEntryDialogs'
 import { ENTRY_DEFAULT } from './state'
 import type { EntryState } from './state'
+import { makeOcc } from '@/test-utils'
 
 function setup(entry: EntryState = ENTRY_DEFAULT) {
   const updateEntry = vi.fn()
@@ -61,6 +62,23 @@ describe('useEntryDialogs', () => {
     const { result, updateEntry } = setup(entry)
     act(() => result.current.dialogHandlers.onTimeConfirm('10:30'))
     expect(updateEntry).toHaveBeenCalledWith(expect.objectContaining({ scheduled: { date: '2026-06-15', time: '10:30' } }))
+  })
+
+  it('onRepeatConfirm switches scope to "all" when converting a single occurrence into a series', () => {
+    const entry: EntryState = { ...ENTRY_DEFAULT, editScope: 'single', item: makeOcc() }
+    const { result, updateEntry } = setup(entry)
+    act(() => result.current.dialogHandlers.onRepeatConfirm({ type: 'schedule', freq: 'weekly' }))
+    expect(updateEntry).toHaveBeenCalledWith(expect.objectContaining({
+      repeat: { type: 'schedule', freq: 'weekly' },
+      editScope: 'all',
+    }))
+  })
+
+  it('onRepeatConfirm leaves the scope alone for an occurrence already in a series', () => {
+    const entry: EntryState = { ...ENTRY_DEFAULT, editScope: 'single', item: makeOcc({ ownerId: 'series-1' }) }
+    const { result, updateEntry } = setup(entry)
+    act(() => result.current.dialogHandlers.onRepeatConfirm({ type: 'schedule', freq: 'weekly' }))
+    expect(updateEntry).toHaveBeenCalledWith(expect.objectContaining({ editScope: 'single' }))
   })
 
   it('handlePriority sets the priority and closes the dialog', () => {

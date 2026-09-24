@@ -72,8 +72,16 @@ export function useEntryDialogs(entry: EntryState, updateEntry: (next: EntryStat
     updateEntry({ ...entry, duration: '' })
   }
 
+  /**
+   * Adding a repeat to a single, non-recurring occurrence converts it into a
+   * series (see `applySingle`/`applyFieldsToItem` in model/storeOps.ts) — so
+   * "this occurrence" is no longer what the form is showing. Switch to 'all'
+   * ("Edit repeat pattern") along with the save, rather than leaving the
+   * scope selector pointed at a question the save just answered differently.
+   */
   const handleRepeatConfirm = (repeat: EntryState['repeat']) => {
-    updateEntry({ ...entry, repeat })
+    const becomingSeries = entry.editScope === 'single' && !entry.item?.ownerId
+    updateEntry({ ...entry, repeat, editScope: becomingSeries ? 'all' : entry.editScope })
     setActiveDialog(null)
   }
 
