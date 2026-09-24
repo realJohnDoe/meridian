@@ -80,21 +80,25 @@ interface CalendarViewState {
   agendaLoadedChunks: { first: number; last: number } | null
   /**
    * Whether the agenda's overdue section is collapsed to just its header row.
+   * `null` means "no explicit choice yet" — see `useOverdueCollapsed` below
+   * for how that resolves to a default.
    *
-   * **Starts expanded.** Scroll-to-today already targets the overdue section
-   * when there is one (see agendaSections.ts's `preferOverdue`), so "scroll to
-   * today" means "scroll to overdue, with Today directly below it" — and
-   * showing that work is the point of opening the app. This previously started
-   * collapsed to keep the landing spot from being an unbounded wall of
-   * unfinished tasks; row-level virtualization makes that cheap now (AgendaView
-   * counts rows, not sections, so an oversized overdue section never mounts
-   * more than the viewport), and the header still carries a count and a toggle
-   * for anyone who wants it out of the way.
+   * Scroll-to-today already targets the overdue section when there is one
+   * (see agendaSections.ts's `preferOverdue`), so "scroll to today" means
+   * "scroll to overdue, with Today directly below it" — and with a small
+   * backlog, showing that work is the point of opening the app. Past
+   * `OVERDUE_AUTO_COLLAPSE_THRESHOLD` groups, though, that same default would
+   * bury Today under a wall of unfinished tasks (row-level virtualization
+   * keeps that cheap to *render*, but not to *scroll past*), so the default
+   * flips to collapsed instead — the header still carries a count and a
+   * toggle for anyone who wants the detail back.
    *
-   * Collapsing is a per-session act — this is view-ephemeral like the rest of
-   * this store, so a reload starts expanded again.
+   * An explicit tap of that toggle (`toggleOverdueCollapsed`) always wins over
+   * the count-based default, for the rest of the session, whichever way it
+   * goes — this is view-ephemeral like the rest of this store, so a reload
+   * starts back at `null`.
    */
-  overdueCollapsed: boolean
+  overdueCollapsed: boolean | null
   /**
    * ISO date (`YYYY-MM-DD`) of the day last focused across the calendar
    * views — kept in sync with agenda's scroll position, the day carousel's
@@ -151,7 +155,7 @@ export const calendarView = createStore<CalendarViewState>(() => ({
   agendaScrollTarget: fmtISO(startOfToday()),
   agendaTopDate: null,
   agendaLoadedChunks: null,
-  overdueCollapsed: false,
+  overdueCollapsed: null,
   currentDate: fmtISO(startOfToday()),
   quickNavOpen: false,
   quickNavBrowsePreview: null,
@@ -308,12 +312,31 @@ export function useCurrentDate(): string {
   return useZustandStore(calendarView, s => s.currentDate)
 }
 
-export function useOverdueCollapsed(): boolean {
-  return useZustandStore(calendarView, s => s.overdueCollapsed)
+/**
+ * Small backlogs are worth seeing on open; past this many overdue groups the
+ * unstated default flips to collapsed instead — see `overdueCollapsed`'s own
+ * doc comment above. Not exported: nothing outside `useOverdueCollapsed`
+ * needs the number itself, just the behavior it produces.
+ */
+const OVERDUE_AUTO_COLLAPSE_THRESHOLD = 3
+
+/**
+ * The overdue section's effective collapsed state: the user's own toggle if
+ * they've made one this session, else the count-based default. `groupCount`
+ * is `pool.groups.length` — the number of overdue *series*, matching what the
+ * header's own count badge shows (see useAgendaSections.ts).
+ */
+export function useOverdueCollapsed(groupCount: number): boolean {
+  const override = useZustandStore(calendarView, s => s.overdueCollapsed)
+  return override ?? groupCount > OVERDUE_AUTO_COLLAPSE_THRESHOLD
 }
 
-export function toggleOverdueCollapsed(): void {
-  calendarView.setState(s => ({ overdueCollapsed: !s.overdueCollapsed }))
+/** `collapsed` is the section's current *effective* state (AgendaRow's own
+ * `collapsed`, as rendered) — this records the flip as an explicit override,
+ * regardless of whether that state came from the user or the count-based
+ * default. */
+export function toggleOverdueCollapsed(collapsed: boolean): void {
+  calendarView.setState({ overdueCollapsed: !collapsed })
 }
 
 export function useQuickNavOpen(): boolean {
