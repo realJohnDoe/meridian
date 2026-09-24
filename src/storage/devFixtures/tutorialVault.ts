@@ -86,7 +86,7 @@ Welcome! Meridian keeps your tasks, events, and notes as plain Markdown files in
 folder you own — no database, no lock-in.
 
 The one idea behind all of it: **everything is a list with items.** This very note is a
-list — its **items** (shown under the title) link to everything below. Start here:
+list — its items, listed under **Items** at the bottom, link to everything below. Start here:
 
 - [[everything-is-a-list]] — the core idea
 - [[tasks-and-events]] — how tasks, events, and notes differ
@@ -165,7 +165,7 @@ items:
   - "[x] Bananas"
 ---
 
-A plain **task** — it has a \`done\` field, so it shows a checkbox in the Agenda.
+A plain **task** — it has a checkbox, so it shows one in the Agenda too.
 
 Because a task is a list, its subtasks live in the **Items** section below — tick them
 off as you shop.
@@ -199,7 +199,7 @@ duration: 30m
 participants: [You]
 ---
 
-An **event** — it has a \`date\`, \`time\`, and \`duration\`, so it lands on the Day-view
+An **event** — it has a date, a time and a length, so it lands on the Day-view
 timeline and in the Month grid.
 
 Block 30 minutes to set up the week ahead. Related: [[morning-run]], [[team-standup]].`,
@@ -232,15 +232,16 @@ items:
 
 Real schedules are messy, so Meridian's recurrence goes well past "repeats weekly."
 
-A \`repeat\` block defines the schedule; \`instances\` override individual occurrences.
-See [[team-standup]] — a Mon/Wed/Fri event where the past occurrences are ticked done
-while future ones stay open. Tasks repeat the same way: [[morning-run]].
+It repeats on a schedule you set, and any single occurrence can be changed without
+touching the rest. See [[team-standup]] — a Mon/Wed/Fri event where the past occurrences
+are ticked done while future ones stay open. Tasks repeat the same way: [[morning-run]].
 
 **Editing one occurrence.** Recurring items support the same per-occurrence edit scopes
-as any calendar app — when you change one, Meridian asks how far the change should reach:
-- **This event** — only this one occurrence
-- **This and future** — split the series from here onward
-- **All events** — the whole series
+as any calendar app — pick how far the change reaches from the dropdown above the fields,
+*before* you edit:
+- **Edit this occurrence** — only this one occurrence
+- **Edit this and all following occurrences** — split the series from here onward
+- **Edit repeat pattern** — the whole series
 
 That part is standard. What isn't: you can mix multiple patterns in one item, like
 *first and second Friday* of the month, instead of being locked to a single rule.`,
@@ -265,10 +266,11 @@ ${recDone}---
 
 A **recurring event** that repeats Mon/Wed/Fri.
 
-The \`repeat\` block defines the schedule. Each \`instances\` entry overrides one
-occurrence — here the past ones are marked done while future ones stay open.
+It repeats on a schedule, and any single occurrence can be overridden — here the
+past ones are marked done while future ones stay open.
 
-See [[recurring-events]] for the *This / This and future / All* edit choices.`,
+See [[recurring-events]] for the *Edit this occurrence / this and all following /
+repeat pattern* edit choices.`,
     },
 
     // ── morning-run: recurring task ──
@@ -301,11 +303,11 @@ items:
 
 Connect entries two ways:
 
-- **Items** — wikilinks listed under an entry's title. They're the entry's list members (see [[everything-is-a-list]]).
+- **Items** — wikilinks listed under **Items**, at the bottom. They're the entry's list members (see [[everything-is-a-list]]).
 - **Body wikilinks** — type \`[[\` anywhere in the body for autocomplete. Link by slug or title.
 
-Either way the link is two-directional: open [[dev-notes]] and you'll find this note in
-its **Backlinks** panel at the bottom of the editor.
+Only **Items** links show up as a reverse link: open [[dev-notes]] and you'll find this
+note under **Listed on**, at the top of the entry. Body wikilinks don't appear there.
 
 > Tip: typing \`[[\` in the body opens link suggestions as you go.`,
     },
@@ -327,7 +329,7 @@ Key endpoints:
 - \`GET  /api/items\` — list with filters
 - \`PUT  /api/items/:id\` — update
 
-Open the **Backlinks** panel (bottom of the editor) to see [[links-and-backlinks]] pointing here.`,
+Find [[links-and-backlinks]] pointing here under **Listed on**, at the top of this entry.`,
     },
 
     // ── favorites ──
