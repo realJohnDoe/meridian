@@ -6,6 +6,9 @@ import { setupStore, makeOcc, TEST_VAULT } from '@/test-utils'
 import { useStore } from '@/store'
 import type { VaultRef } from '@/vaultRef'
 
+const { toastMock } = vi.hoisted(() => ({ toastMock: vi.fn() }))
+vi.mock('sonner', () => ({ toast: toastMock }))
+
 setupStore()
 
 function baseProps() {
@@ -48,5 +51,20 @@ describe('AgendaOverdueGroupRow', () => {
     swipeLeft('Pay the invoice')
 
     expect(props.onSwipeDelete).not.toHaveBeenCalled()
+  })
+
+  // #1129: a hover-only title tooltip never surfaces on a touchscreen, which
+  // is exactly where this chip showed up unexplained. Tapping it must work
+  // without opening the card underneath (onOpen).
+  it('explains the ×N chip on tap instead of only on hover', () => {
+    const oldest = new Date(2026, 0, 3)
+    const props = { ...baseProps(), count: 3, oldest }
+    render(<AgendaOverdueGroupRow {...props} />)
+
+    fireEvent.click(screen.getByText('×3'))
+
+    expect(toastMock).toHaveBeenCalledTimes(1)
+    expect(toastMock.mock.calls[0]![0]).toContain('3')
+    expect(props.onOpen).not.toHaveBeenCalled()
   })
 })

@@ -91,13 +91,16 @@ export function useAgendaSections(
   const loadedRun = useAgendaLoadedRun(anchor, ws)
   const chunkOccs = useAgendaChunks(items, roots, agendaChunkRun(loadedRun), ws)
   const { filterOccs, filterKey } = useCalendarFilter()
-  const overdueCollapsed = useOverdueCollapsed()
 
   const cachedPool = overduePoolSlot.get(SECTIONS_CACHE_KEY) ?? null
   const pool = computeOverduePool(cachedPool, items, roots, today, filterOccs)
   if (pool !== cachedPool) {
     overduePoolSlot.set(SECTIONS_CACHE_KEY, pool)
   }
+
+  // Needs pool.groups.length for its count-based default, so this reads after
+  // the pool above rather than alongside filterOccs/filterKey.
+  const overdueCollapsed = useOverdueCollapsed(pool.groups.length)
 
   // now ticks once a minute (see useNow), but a remounted AgendaView
   // allocates a fresh Date even within the same tick — bucket to that same

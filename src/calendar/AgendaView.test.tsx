@@ -34,10 +34,13 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers() })
 
 /**
- * The overdue section ships expanded (viewState.ts), so its occurrence rows
- * render by default. Only the test about collapsing needs this.
+ * The overdue section only ships expanded by default below
+ * viewState.ts's OVERDUE_AUTO_COLLAPSE_THRESHOLD — most fixtures in this file
+ * use far more than that to exercise scroll/virtualization behavior, so they
+ * force it open explicitly rather than relying on the count-based default.
  */
 const collapseOverdue = () => { calendarView.setState({ overdueCollapsed: true }) }
+const expandOverdue = () => { calendarView.setState({ overdueCollapsed: false }) }
 
 /**
  * A loaded-run seed wide enough to cover every fixture in this file (the
@@ -292,6 +295,7 @@ describe('AgendaView', () => {
   it('mounts only a viewport-sized window of rows, not the whole overdue section', () => {
     const occs = Array.from({ length: 500 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
+    expandOverdue()
 
     render(<AgendaView onOpen={vi.fn()} />)
 
@@ -353,8 +357,10 @@ describe('AgendaView', () => {
     expect(within(overdueHeader).getByText('2')).toBeInTheDocument()
   })
 
-  it('expands the overdue section by default, mounting its rows', () => {
-    const occs = Array.from({ length: 20 }, (_, i) => overdueTask(i))
+  it('expands a small overdue backlog by default, mounting its rows', () => {
+    // Below OVERDUE_AUTO_COLLAPSE_THRESHOLD (viewState.ts) — the count-based
+    // default should leave this expanded with no override needed.
+    const occs = Array.from({ length: 2 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
 
     render(<AgendaView onOpen={vi.fn()} />)
@@ -362,7 +368,7 @@ describe('AgendaView', () => {
     // The count rides beside the label rather than inside it, so the divider
     // still reads exactly "Overdue".
     expect(screen.getByText('Overdue')).toBeInTheDocument()
-    expect(screen.getByText('20')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
     expect(renderedCards().length).toBeGreaterThan(0)
 
     // …and one tap folds it away to just the bar. The tasks' own past-day rows
@@ -372,15 +378,40 @@ describe('AgendaView', () => {
     expect(overdueGroupRows()).toHaveLength(0)
   })
 
-  it('renders only the header once the user collapses the overdue section', () => {
+  // #1129: with a large backlog, scroll-to-today lands on the Overdue header
+  // (preferOverdue in agendaSections.ts) — leaving it expanded by default
+  // buried Today under the whole wall of unfinished work. Collapsing it by
+  // default once it passes the threshold is what keeps the button's landing
+  // spot small, without hiding the work: the header still carries the count
+  // and a toggle.
+  it('collapses a large overdue backlog by default, leaving only the header', () => {
     const occs = Array.from({ length: 20 }, (_, i) => overdueTask(i))
+    seedStore(occs, makeRoots('note.md'))
+
+    render(<AgendaView onOpen={vi.fn()} />)
+
+    expect(screen.getByText('Overdue')).toBeInTheDocument()
+    expect(screen.getByText('20')).toBeInTheDocument()
+    expect(overdueGroupRows()).toHaveLength(0)
+
+    // Still reachable — the toggle overrides the default for the rest of the
+    // session.
+    fireEvent.click(screen.getByRole('button', { expanded: false }))
+
+    expect(overdueGroupRows().length).toBeGreaterThan(0)
+  })
+
+  it('renders only the header once the user collapses the overdue section', () => {
+    // Below the auto-collapse threshold, so this is exercising the explicit
+    // override winning over the count-based default, not the default itself.
+    const occs = Array.from({ length: 2 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
     collapseOverdue()
 
     render(<AgendaView onOpen={vi.fn()} />)
 
     expect(screen.getByText('Overdue')).toBeInTheDocument()
-    expect(screen.getByText('20')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
     expect(overdueGroupRows()).toHaveLength(0)
   })
 
@@ -440,7 +471,14 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
   // (isScrollingResetDelay, 150ms). Left ticking on real timers it never fires
   // inside a test, so the anchoring's "don't fight an in-flight gesture" guard
   // would swallow every correction and these tests would pass vacuously.
-  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) })
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    // These tests are about scroll/row-list mechanics, not the overdue
+    // collapse default — several seed overdue(20)/overdue(60), well past
+    // OVERDUE_AUTO_COLLAPSE_THRESHOLD, and need those rows mounted for their
+    // scroll-offset math. A no-op for the tests here that don't use overdue().
+    expandOverdue()
+  })
   afterEach(() => { vi.useRealTimers() })
 
   /** Flush the shim's microtask scroll dispatch and let the scroll settle. */
