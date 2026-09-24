@@ -315,9 +315,10 @@ export function useCurrentDate(): string {
 /**
  * Small backlogs are worth seeing on open; past this many overdue groups the
  * unstated default flips to collapsed instead — see `overdueCollapsed`'s own
- * doc comment above.
+ * doc comment above. Not exported: nothing outside `useOverdueCollapsed`
+ * needs the number itself, just the behavior it produces.
  */
-export const OVERDUE_AUTO_COLLAPSE_THRESHOLD = 3
+const OVERDUE_AUTO_COLLAPSE_THRESHOLD = 3
 
 /**
  * The overdue section's effective collapsed state: the user's own toggle if
