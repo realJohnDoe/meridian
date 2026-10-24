@@ -1,6 +1,6 @@
 import { startOfToday } from 'date-fns'
 import { toast } from 'sonner'
-import { fmtISO, applyEdit, joinFileMeta, newEntryKey, excludeOccurrence, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, entryKeyItems, findSeries } from '@/model'
+import { fmtISO, applyEdit, joinFileMeta, newEntryKey, excludeOccurrence, hasSiblingOccurrences, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
@@ -383,9 +383,7 @@ export function deleteNode(
   if (!item) return
   const items     = getItems()
   const series    = findSeries(items, item)
-  const slugItems = entryKeyItems(items, item.entryKey)
-  const isSelf      = (i: StoreItem) => i.id === item.id
-  const hasSiblings = slugItems.some(i => !isSeries(i) && !isSelf(i) && !i.excluded)
+  const hasSiblings = hasSiblingOccurrences(items, item)
   const isRecurring = !!item.ownerId
   const isScheduled = series?.repeat.type === 'schedule'
   const title       = item.metadata.title

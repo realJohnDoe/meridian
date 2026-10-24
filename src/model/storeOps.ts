@@ -1135,6 +1135,11 @@ export function deletionEndsAfterCompletionSeries(items: StoreItem[], occ: Occur
   return !hasOpenAfterCompletionOccurrence(items, series.id, occ.id)
 }
 
+/** True when `occ`'s entry has another live standalone occurrence besides it. */
+export function hasSiblingOccurrences(items: StoreItem[], occ: Occurrence): boolean {
+  return entryKeyItems(items, occ.entryKey).some(i => !isSeries(i) && i.id !== occ.id && !i.excluded)
+}
+
 /**
  * Mark a recurring occurrence as excluded; remove a standalone by id.
  *
