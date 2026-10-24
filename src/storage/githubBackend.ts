@@ -378,27 +378,24 @@ export class GitHubBackend implements StorageBackend {
   }
 
   /**
-   * Attach each file's most recent commit date as `lastModified` — the
-   * retention sweep's age signal (plans/archived-entries.md 4b). Blobs carry
-   * no dates of their own, so this is a second pass of batched, aliased
-   * GraphQL queries (see `buildHistoryQuery`) after the content is already in
-   * hand — done here, once, on `readAll()` only: an incremental pull
-   * (`readFiles()`) has no call to this at all, and stamps the current time
-   * instead (see `reconcileWithBackend`) rather than paying for a
-   * history lookup on every ordinary sync.
+   * Batched, aliased GraphQL lookup of each path's most recent commit date —
+   * the retention sweep's age signal (plans/archived-entries.md 4b). Blobs
+   * carry no dates of their own, so this is its own pass over `buildHistoryQuery`,
+   * shared by `backfillLastModified` (after `readAll()` already has the
+   * content in hand) and `readDates` (reconcile asking for a date alone, on
+   * paths whose content it already knows hasn't changed).
    *
    * Soft-fails: a lookup that errors (or a path with no history — shouldn't
-   * happen, but `nodes` can come back empty) leaves that file's
-   * `lastModified` unset rather than failing the whole read. The content is
-   * what matters; the age signal degrades to "unknown", which the sweep
-   * already treats as "never archive" — fails safe, same as everywhere else
-   * in 4b.
+   * happen, but `nodes` can come back empty) simply leaves that path out of
+   * the result rather than failing the whole call. The age signal degrades to
+   * "unknown", which callers already treat as "never archive" — fails safe,
+   * same as everywhere else in 4b.
    */
-  private async backfillLastModified(files: RawFile[]): Promise<RawFile[]> {
-    if (files.length === 0) return files
+  private async fetchCommitDates(paths: string[]): Promise<Map<string, number>> {
     const dates = new Map<string, number>()
+    if (paths.length === 0) return dates
     try {
-      await mapWithConcurrency(chunk(files.map(f => f.path), HISTORY_BATCH_SIZE), GRAPHQL_CONCURRENCY, async batch => {
+      await mapWithConcurrency(chunk(paths, HISTORY_BATCH_SIZE), GRAPHQL_CONCURRENCY, async batch => {
         const data = await this._octokit.graphql<HistoryQueryResult>(
           buildHistoryQuery(this._cfg.branch, batch),
           { owner: this._cfg.owner, name: this._cfg.repo },
@@ -410,10 +407,33 @@ export class GitHubBackend implements StorageBackend {
         })
       })
     } catch (e) {
-      console.warn('[github] could not backfill lastModified:', e)
-      return files
+      console.warn('[github] could not look up commit dates:', e)
     }
+    return dates
+  }
+
+  /**
+   * Attach each file's most recent commit date as `lastModified` — done here,
+   * once, on `readAll()` only: an incremental pull (`readFiles()`) has no
+   * call to this at all, and stamps the current time instead (see
+   * `reconcileWithBackend`) rather than paying for a history lookup on every
+   * ordinary sync.
+   */
+  private async backfillLastModified(files: RawFile[]): Promise<RawFile[]> {
+    if (files.length === 0) return files
+    const dates = await this.fetchCommitDates(files.map(f => f.path))
     return files.map(f => ({ ...f, lastModified: dates.get(f.path) }))
+  }
+
+  /**
+   * `StorageBackend.readDates` — see its doc comment. The same history-only
+   * lookup `backfillLastModified` uses, without content: `reconcileWithBackend`
+   * calls this for cache rows that are missing `lastModified` and unchanged
+   * since (so never otherwise re-fetched), where a date alone is worth
+   * paying for but the content is not.
+   */
+  async readDates(paths: string[]): Promise<Map<string, number>> {
+    return this.fetchCommitDates(paths)
   }
 
   async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {

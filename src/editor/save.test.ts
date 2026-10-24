@@ -17,7 +17,7 @@ import { makeOcc, makeSeries, setupStore, installFakePersistence, seedStore, mak
 import { useStore } from '@/store'
 import { entryKey } from '@/fileIO'
 import { setUnreadableFiles, setVaultListedKeys } from '@/storeBridge'
-import { ENTRY_DEFAULT } from './state'
+import { ENTRY_DEFAULT, itemTypeOf } from './state'
 import type { StoreItem } from '@/types'
 import { parseToStoreItems, expandRange } from '@/model'
 
@@ -25,7 +25,7 @@ describe('entryFromOccurrence', () => {
   it('derives a note when the item is untracked and unscheduled', () => {
     const occ = makeOcc({ time: null, date: '' })
     const entry = entryFromOccurrence(occ, 'single')
-    expect(entry.itemType).toBe('note')
+    expect(itemTypeOf(entry)).toBe('note')
     expect(entry.tracked).toBe(false)
     expect(entry.scheduled).toBeNull()
   })
@@ -33,7 +33,7 @@ describe('entryFromOccurrence', () => {
   it('derives an event when the item is scheduled but not tracked', () => {
     const occ = makeOcc()
     const entry = entryFromOccurrence(occ, 'single')
-    expect(entry.itemType).toBe('event')
+    expect(itemTypeOf(entry)).toBe('event')
     expect(entry.tracked).toBe(false)
     expect(entry.scheduled).toEqual({ date: '2026-06-15', time: '09:00' })
   })
@@ -41,7 +41,7 @@ describe('entryFromOccurrence', () => {
   it('derives a task when `done` is defined, regardless of scheduling', () => {
     const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false } })
     const entry = entryFromOccurrence(occ, 'single')
-    expect(entry.itemType).toBe('task')
+    expect(itemTypeOf(entry)).toBe('task')
     expect(entry.tracked).toBe(true)
     expect(entry.done).toBe(false)
   })

@@ -407,6 +407,55 @@ describe('cache/files — applyRemoteBatch', () => {
   })
 })
 
+// ── files.ts: backfillLastModified ─────────────────────────────
+
+describe('cache/files — backfillLastModified', () => {
+  it('patches lastModified onto a clean row, leaving content/version/status untouched', async () => {
+    await m.files.setResolvedClean(V, 'old.md', 'body', 'sha1')
+
+    await m.files.backfillLastModified(V, new Map([['old.md', 123]]))
+
+    expect(await rawRow(V, 'old.md')).toMatchObject({ content: 'body', dirty: 0, version: 'sha1', lastModified: 123 })
+  })
+
+  it('skips a row that went dirty since the caller snapshotted it, and a path with no cache row at all', async () => {
+    await m.files.setResolvedClean(V, 'clean.md', 'body', 'sha1')
+    await m.files.recordLocalEdit(V, 'dirty.md', 'local edit')
+
+    await m.files.backfillLastModified(V, new Map([
+      ['clean.md', 111],
+      ['dirty.md', 222],
+      ['missing.md', 333],
+    ]))
+
+    expect(await rawRow(V, 'clean.md')).toMatchObject({ lastModified: 111 })
+    // An edit in flight owns this row's fate now, not a date lookup that raced it.
+    const dirtyRow = await rawRow(V, 'dirty.md')
+    expect(dirtyRow).toMatchObject({ content: 'local edit', dirty: 1 })
+    expect(dirtyRow?.lastModified).toBeUndefined()
+    expect(await rawRow(V, 'missing.md')).toBeUndefined()
+  })
+
+  it('does nothing when every path is skipped (dirty or never cached)', async () => {
+    await m.files.recordLocalEdit(V, 'dirty.md', 'local edit')
+
+    await m.files.backfillLastModified(V, new Map([['dirty.md', 111], ['missing.md', 222]]))
+
+    const dirtyRow = await rawRow(V, 'dirty.md')
+    expect(dirtyRow).toMatchObject({ content: 'local edit', dirty: 1 })
+    expect(dirtyRow?.lastModified).toBeUndefined()
+    expect(await rawRow(V, 'missing.md')).toBeUndefined()
+  })
+
+  it('handles an empty dates map without opening a write', async () => {
+    await m.files.setResolvedClean(V, 'untouched.md', 'body', 'sha1')
+
+    await m.files.backfillLastModified(V, new Map())
+
+    expect((await rawRow(V, 'untouched.md'))?.lastModified).toBeUndefined()
+  })
+})
+
 // ── files.ts: queries, counts and deletion ─────────────────────
 
 describe('cache/files — queries', () => {

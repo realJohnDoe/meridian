@@ -9,7 +9,7 @@ import { keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { commitNext } from '@/storeCommit'
 import { deleteOccurrenceWithUndo, deleteFutureWithUndo, deleteSeriesWithUndo, deleteWholeFileWithUndo } from '@/occurrenceActions'
-import type { EntryState, ItemType } from './state'
+import type { EntryState } from './state'
 import { editFieldsOf } from './edits'
 
 // ── BACKLINK HELPERS ──────────────────────────────────────────
@@ -106,7 +106,6 @@ export function entryFromOccurrence(
   const m = item.metadata
   const { scheduled, repeat } = applyScope(item, editScope, items)
   const tracked  = isTracked(item)
-  const itemType: ItemType = tracked ? 'task' : scheduled ? 'event' : 'note'
   return {
     item,
     title:        m.title    || '',
@@ -115,7 +114,6 @@ export function entryFromOccurrence(
     repeat,
     duration:     m.duration || '',
     tracked,
-    itemType,
     // 'add' starts a brand-new occurrence off `item`'s other fields (title,
     // tags, ...) — but not its done state, which belongs to that occurrence,
     // not the one being created.
@@ -285,15 +283,11 @@ export function reportContested(contested: Array<keyof EditFields>): void {
  * derivation a save already used to decide what *not* to overwrite — sharing
  * it is the point, since a form and a save that disagreed about what the store
  * holds is exactly the class of bug this replaced.
- *
- * `itemType` is re-derived rather than carried over, because `tracked` and
- * `scheduled` may have come back different from the pinned occurrence's.
  */
 export function storeView(item: Occurrence, editScope: EditScope, items: StoreItem[]): EntryState {
   const pinned = entryFromOccurrence(item, editScope, items)
   const fields = currentFields(item, editScope, editFieldsOf(pinned))
-  const itemType: ItemType = fields.tracked ? 'task' : fields.scheduled ? 'event' : 'note'
-  return { ...pinned, ...fields, itemType }
+  return { ...pinned, ...fields }
 }
 
 /** Everything `saveNode` needs beyond the item and its fields. */
