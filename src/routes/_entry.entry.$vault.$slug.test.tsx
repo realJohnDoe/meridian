@@ -1,18 +1,26 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
+import { addDays, startOfToday } from 'date-fns'
 import type * as ReactRouter from '@tanstack/react-router'
 import { useStore } from '@/store'
-import { setupStore, seedStore, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
+import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
+import { applyEdit, expandRange, fmtISO, parseToStoreItems } from '@/model'
+import { commitNext } from '@/storeCommit'
+import { getSnapshot } from '@/storeBridge'
+import { toggleOccDone } from '@/occurrenceActions'
+import type { Occurrence } from '@/types'
+import type { EditFields } from '@/model'
 import type { VaultRef } from '@/vaultRef'
 
-const { navigateMock, backMock, paramsMock, searchMock, handleDelete, handleClose } = vi.hoisted(() => ({
+const { navigateMock, backMock, paramsMock, searchMock, handleDelete, handleClose, editorGot } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   backMock:     vi.fn(),
   paramsMock:   vi.fn<() => { vault: string; slug: string }>(),
   searchMock:   vi.fn<() => { date?: string; scope?: string; id?: string }>(),
   handleDelete: vi.fn(),
   handleClose:  vi.fn(),
+  editorGot:    { occ: null as Occurrence | null },
 }))
 
 // createFileRoute is mocked so the page component is reachable without a real
@@ -40,8 +48,8 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 // via `hooks`, threaded through from `useEntryEditor(occ, scope)`'s first
 // argument, so the stub has to read it from there rather than from `items[0]`.
 vi.mock('@/editor', () => ({
-  useEntryEditor: (occ: { metadata: { title: string } }) => ({ handleDelete, handleClose, occ }),
-  EntryEditor:   ({ hooks }: { hooks: { occ: { metadata: { title: string } } } }) => <div data-testid="editor">{hooks.occ.metadata.title}</div>,
+  useEntryEditor: (occ: Occurrence) => { editorGot.occ = occ; return { handleDelete, handleClose, occ } },
+  EntryEditor:   ({ hooks }: { hooks: { occ: { date: string; metadata: { title: string } } } }) => <div data-testid="editor" data-date={hooks.occ.date}>{hooks.occ.metadata.title}</div>,
   EntryViewOnly: ({ occ }: { occ: { metadata: { title: string } } }) => <div data-testid="view-only">{occ.metadata.title}</div>,
 }))
 
@@ -49,6 +57,7 @@ vi.mock('@/editor', () => ({
 vi.mock('@/components', () => ({ SyncButton: () => <div data-testid="sync-button" /> }))
 
 setupStore()
+installFakePersistence()
 
 const { Route } = await import('./_entry.entry.$vault.$slug')
 const EntrySlugPage = (Route as unknown as { component: () => React.ReactElement }).component
@@ -217,5 +226,75 @@ describe('_entry/entry/$vault/$slug — view-only back navigation', () => {
 
     expect(navigateMock).toHaveBeenCalledWith({ to: '/' })
     expect(backMock).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('_entry/entry/$vault/$slug — the open occurrence stays the one that was opened', () => {
+  // A weekly task a few days out, so the file's representative occurrence —
+  // what a date-less URL resolves to — is its first one.
+  const first = addDays(startOfToday(), 3)
+  const week = (n: number) => fmtISO(addDays(first, 7 * n))
+
+  function seedWeekly() {
+    const parsed = parseToStoreItems('note.md.md', `---\ntitle: Weekly\ndone: false\ndate: ${week(0)}\nrepeat:\n  type: schedule\n  freq: weekly\n---\n`, TEST_VAULT)
+    seedStore(parsed.items, new Map([[parsed.key, parsed.root]]))
+  }
+  const editorOcc = () => editorGot.occ!
+  const occOn = (date: string) => expandRange(useStore.getState().items, useStore.getState().roots, new Date(date + 'T00:00:00'), new Date(date + 'T23:59:59'))[0]!
+
+  /** The editor's date picker, at 'single' scope. */
+  function moveTo(occ: Occurrence, date: string) {
+    const m = occ.metadata
+    const fields: EditFields = {
+      title: m.title, body: m.body ?? '', tags: m.tags, items: m.items, participants: m.participants,
+      tracked: true, done: m.done ?? false, priority: null, duration: '', repeat: null,
+      scheduled: { date, time: '' },
+    }
+    commitNext(applyEdit(getSnapshot(), occ, 'single', fields, { vaultId: TEST_VAULT }), [occ.entryKey])
+  }
+
+  // Opened from a favorite or a wikilink, the URL names no date and resolves
+  // to the earliest open occurrence — which ticking it done just changed.
+  it('ticking done on a date-less open keeps the editor on that occurrence', async () => {
+    seedWeekly()
+    render(<EntrySlugPage />)
+    await screen.findByTestId('editor')
+    expect(editorOcc().date).toBe(week(0))
+
+    act(() => { toggleOccDone(editorOcc()) })
+
+    expect(editorOcc().date).toBe(week(0))
+    expect(editorOcc().metadata.done).toBe(true)
+  })
+
+  it('follows an occurrence the editor moves, rather than staying on the emptied date', async () => {
+    seedWeekly()
+    const opened = occOn(week(1))
+    searchMock.mockReturnValue({ date: opened.date, id: opened.id })
+    render(<EntrySlugPage />)
+    await screen.findByTestId('editor')
+
+    const moved = fmtISO(addDays(first, 9))
+    act(() => { moveTo(editorOcc(), moved) })
+    expect(editorOcc().date).toBe(moved)
+
+    act(() => { toggleOccDone(editorOcc()) })
+    expect(occOn(moved).metadata.done).toBe(true)
+    expect(occOn(week(0)).metadata.done).toBe(false)
+  })
+
+  // Back from a wikilink lands on the URL the occurrence was opened under,
+  // whose date it has since left.
+  it('resolves a URL by id when the occurrence has moved off the URL\'s date', async () => {
+    seedWeekly()
+    const opened = occOn(week(1))
+    const moved = fmtISO(addDays(first, 9))
+    moveTo(opened, moved)
+    searchMock.mockReturnValue({ date: opened.date, id: opened.id })
+
+    render(<EntrySlugPage />)
+    await screen.findByTestId('editor')
+    expect(editorOcc().date).toBe(moved)
   })
 })
