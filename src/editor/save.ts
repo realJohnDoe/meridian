@@ -1,13 +1,14 @@
 import { startOfToday } from 'date-fns'
 import { toast } from 'sonner'
-import { fmtISO, applyEdit, joinFileMeta, newEntryKey, excludeOccurrence, hasSiblingOccurrences, setArchived, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, findSeries } from '@/model'
+import { fmtISO, applyEdit, joinFileMeta, newEntryKey, setArchived, deletionEndsAfterCompletionSeries, entryKeyItems, findSeries } from '@/model'
 import { isSeries, isTracked } from '@/types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Repeat, Scheduled, StoreItem, EditScope } from '@/types'
 import type { EditFields } from '@/model'
 import { getSnapshot, getSlugSnapshot, getEntries, getItems, getDefaultVaultId, getSandboxVaultId } from '@/storeBridge'
 import { keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
-import { commitNext, commitDelete } from '@/storeCommit'
+import { commitNext } from '@/storeCommit'
+import { deleteOccurrenceWithUndo, deleteFutureWithUndo, deleteSeriesWithUndo, deleteWholeFileWithUndo } from '@/occurrenceActions'
 import type { EntryState } from './state'
 import { editFieldsOf } from './edits'
 
@@ -377,7 +378,19 @@ export function deleteNode(
   if (!item) return
   const items     = getItems()
   const series    = findSeries(items, item)
-  const hasSiblings = hasSiblingOccurrences(items, item)
+  const slugItems = entryKeyItems(items, item.entryKey)
+  const isSelf    = (i: StoreItem) => i.id === item.id
+  // Whether the file holds anything beyond this occurrence's own group (its
+  // series and that series' overrides, or just itself for a standalone) —
+  // counting series markers themselves, unlike a plain sibling-occurrence
+  // check (hasSiblingOccurrences, used by beginSwipeDelete for the simpler
+  // standalone-vs-standalone case), so a second repeat pattern with no
+  // overrides yet still counts. This decides both whether the lone-standalone
+  // shortcut below applies and whether "all occurrences" needs a separate,
+  // wider "delete whole file" option next to it.
+  const isOwnGroup = (i: StoreItem) => isSelf(i) || (!!item.ownerId && (isSeries(i) ? i.id === item.ownerId : i.ownerId === item.ownerId))
+  const isExcluded = (i: StoreItem) => !isSeries(i) && i.excluded
+  const hasOtherContent = slugItems.some(i => !isOwnGroup(i) && !isExcluded(i))
   const isRecurring = !!item.ownerId
   const isScheduled = series?.repeat.type === 'schedule'
   const title       = item.metadata.title
@@ -386,20 +399,25 @@ export function deleteNode(
 
   function excludeThis() {
     if (!item) return
-    const next = excludeOccurrence(getSnapshot(), item)
-    commitNext(next, [item.entryKey])
+    deleteOccurrenceWithUndo(item)
     hideSheet(); navigateBack()
   }
-  function deleteAll() {
+  // Only reachable when isRecurring (see the `options` construction below),
+  // so `series` is never undefined here.
+  function deleteAllOfSeries() {
     if (!item) return
-    const { data: next, affectedKeys } = deleteByEntryKey(getSnapshot(), item.entryKey)
-    commitDelete(next, item.entryKey, affectedKeys)
+    if (hasOtherContent) deleteSeriesWithUndo(item)
+    else deleteWholeFileWithUndo(item.entryKey, title)
     hideSheet(); navigateBack()
   }
   function deleteFuture() {
     if (!item) return
-    const next = deleteFollowing(getSnapshot(), item)
-    commitNext(next, [item.entryKey])
+    deleteFutureWithUndo(item)
+    hideSheet(); navigateBack()
+  }
+  function deleteWholeFile() {
+    if (!item) return
+    deleteWholeFileWithUndo(item.entryKey, title)
     hideSheet(); navigateBack()
   }
   // No hideSheet()/navigateBack(): archiving neither removes the entry nor
@@ -412,12 +430,13 @@ export function deleteNode(
     archiveEntry(item.entryKey, true)
   }
 
-  if (!isRecurring && !hasSiblings) {
-    const doDelete = () => {
-      const { data: next, affectedKeys } = deleteByEntryKey(getSnapshot(), item.entryKey)
-      commitDelete(next, item.entryKey, affectedKeys)
-      navigateBack()
-    }
+  if (!isRecurring && !hasOtherContent) {
+    // Nothing to disambiguate — a lone standalone occupies the whole file, so
+    // deleting it is deleting the file. Archive is still a real alternative
+    // (not a safety confirmation), so it keeps a lightweight dialog; deleting
+    // now goes straight through the same undo toast as every other path
+    // below, rather than committing immediately behind a "cannot be undone".
+    const doDelete = () => { deleteWholeFileWithUndo(item.entryKey, title); navigateBack() }
     if (onConfirmSingle) { onConfirmSingle(title, doDelete, archiveThis); return }
     doDelete()
     return
@@ -431,11 +450,22 @@ export function deleteNode(
       ...(endsSeries ? { warning: 'This series only creates its next occurrence when you complete the current one. Deleting this occurrence leaves nothing to complete, so the series ends here.' } : {}),
     },
   ]
-  if (isScheduled) {
-    options.push({ icon: 'calendar-range', label: 'This and all following', sublabel: 'Remove this and all future occurrences', onClick: deleteFuture })
-    options.push({ icon: 'calendar-range', label: 'All occurrences',        sublabel: 'Remove all occurrences',                  onClick: deleteAll   })
-  } else {
-    options.push({ icon: 'calendar-range', label: 'All occurrences',        sublabel: 'Remove all occurrences',                  onClick: deleteAll   })
+  if (isRecurring) {
+    if (isScheduled) {
+      options.push({ icon: 'calendar-range', label: 'This and all following', sublabel: 'Remove this and all future occurrences', onClick: deleteFuture })
+    }
+    options.push({ icon: 'calendar-range', label: 'All occurrences', sublabel: 'Remove all occurrences of this series', onClick: deleteAllOfSeries })
+  }
+  // A wider, categorically different action from the ones above — it reaches
+  // past this occurrence's own series into every other series/occurrence the
+  // file holds — so it only appears when there is something else to lose,
+  // and carries its own warning rather than reading as one more peer scope.
+  if (hasOtherContent) {
+    options.push({
+      icon: 'calendar-range', label: 'Delete whole file', sublabel: 'Remove everything in this file, not just this series',
+      warning: 'This deletes the whole file, including its other events and series — not just this one.',
+      onClick: deleteWholeFile,
+    })
   }
 
   onShowSeries?.({ title: `Delete "${title}"`, options, onArchive: archiveThis })

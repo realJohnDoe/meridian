@@ -1,5 +1,17 @@
 import { describe, it, expect, vi } from 'vitest'
 import { applyScope, entryFromOccurrence, saveNode, deleteNode, archiveEntry } from './save'
+
+// This file runs in a plain node environment (no DOM), but deleteNode's
+// delete paths now arm an undo toast (occurrenceActions.ts's showDeleteToast)
+// on every commit. Sonner itself needs browser APIs (requestAnimationFrame)
+// that don't exist here — the toast UI/timer mechanics are already covered in
+// occurrenceActions.test.tsx (which does render <Toaster/> in jsdom); this
+// file only cares that deleteNode wires the right scope to the right
+// underlying action, so the toast call itself is a no-op stub.
+vi.mock('sonner', () => {
+  const toastFn = vi.fn(() => 'toast-id')
+  return { toast: Object.assign(toastFn, { dismiss: vi.fn(), warning: vi.fn(() => 'toast-id') }) }
+})
 import type { SeriesSheetConfig } from './save'
 import { makeOcc, makeSeries, setupStore, installFakePersistence, seedStore, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { useStore } from '@/store'
@@ -432,5 +444,123 @@ describe('deleteNode — archiving instead of deleting', () => {
     expect(useStore.getState().roots.get(testKey('multi'))?.archived).toBe(true)
     // Both occurrences are still there — archiving is not a delete of any kind.
     expect(useStore.getState().items.map(i => i.id).sort()).toEqual(['multi-a', 'multi-b'])
+  })
+})
+
+// ── deleteNode's scope options (issue #1128) ────────────────────────────────
+//
+// The toast/undo mechanics these options defer to (deleteOccurrenceWithUndo,
+// deleteFutureWithUndo, deleteSeriesWithUndo, deleteWholeFileWithUndo) are
+// covered in occurrenceActions.test.tsx; these tests are about deleteNode's
+// own job — which option calls which of those, scoped to which content.
+
+describe('deleteNode — scope options for multi-occurrence files', () => {
+  setupStore()
+  const persistence = installFakePersistence()
+
+  it('a standalone sharing its file with another standalone offers "This occurrence" and "Delete whole file", not "All occurrences"', () => {
+    const occA = makeOcc({ entryKey: testKey('multi'), id: 'multi-a', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
+    const occB = makeOcc({ entryKey: testKey('multi'), id: 'multi-b', date: '2026-06-16', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
+    seedStore([occA, occB], makeRoots('multi', { title: 'Task A' }))
+
+    let config: SeriesSheetConfig | undefined
+    deleteNode(occA, vi.fn(), c => { config = c }, vi.fn())
+
+    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'Delete whole file'])
+  })
+
+  it('"This occurrence" removes just the selected occurrence, leaving its sibling', () => {
+    const occA = makeOcc({ entryKey: testKey('multi'), id: 'multi-a', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
+    const occB = makeOcc({ entryKey: testKey('multi'), id: 'multi-b', date: '2026-06-16', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
+    seedStore([occA, occB], makeRoots('multi', { title: 'Task A' }))
+
+    let config: SeriesSheetConfig | undefined
+    deleteNode(occA, vi.fn(), c => { config = c }, vi.fn())
+    config!.options.find(o => o.label === 'This occurrence')!.onClick()
+
+    expect(useStore.getState().items.map(i => i.id)).toEqual(['multi-b'])
+  })
+
+  it('"Delete whole file" removes everything, including the sibling occurrence', () => {
+    const occA = makeOcc({ entryKey: testKey('multi'), id: 'multi-a', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
+    const occB = makeOcc({ entryKey: testKey('multi'), id: 'multi-b', date: '2026-06-16', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
+    seedStore([occA, occB], makeRoots('multi', { title: 'Task A' }))
+
+    let config: SeriesSheetConfig | undefined
+    deleteNode(occA, vi.fn(), c => { config = c }, vi.fn())
+    config!.options.find(o => o.label === 'Delete whole file')!.onClick()
+
+    expect(useStore.getState().items).toEqual([])
+    expect(useStore.getState().roots.has(testKey('multi'))).toBe(false)
+  })
+
+  it('a recurring occurrence sharing its file with another series offers a scoped "All occurrences" AND a separate "Delete whole file"', () => {
+    const series1 = makeSeries({ id: 'series-1', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'daily' } })
+    const series2 = makeSeries({ id: 'series-2', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'weekly' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('multi'), ownerId: 'series-1' })
+    seedStore([series1, series2], makeRoots('multi'))
+
+    let config: SeriesSheetConfig | undefined
+    deleteNode(occ, vi.fn(), c => { config = c }, vi.fn())
+
+    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'This and all following', 'All occurrences', 'Delete whole file'])
+  })
+
+  it('"All occurrences" on that file only removes the targeted series, leaving its sibling series', () => {
+    const series1 = makeSeries({ id: 'series-1', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'daily' } })
+    const series2 = makeSeries({ id: 'series-2', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'weekly' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('multi'), ownerId: 'series-1' })
+    seedStore([series1, series2], makeRoots('multi'))
+
+    let config: SeriesSheetConfig | undefined
+    deleteNode(occ, vi.fn(), c => { config = c }, vi.fn())
+    config!.options.find(o => o.label === 'All occurrences')!.onClick()
+
+    expect(useStore.getState().items.map(i => i.id)).toEqual(['series-2'])
+  })
+
+  it('"Delete whole file" on that same file removes everything, including the sibling series', () => {
+    const series1 = makeSeries({ id: 'series-1', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'daily' } })
+    const series2 = makeSeries({ id: 'series-2', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'weekly' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('multi'), ownerId: 'series-1' })
+    seedStore([series1, series2], makeRoots('multi'))
+
+    let config: SeriesSheetConfig | undefined
+    deleteNode(occ, vi.fn(), c => { config = c }, vi.fn())
+    config!.options.find(o => o.label === 'Delete whole file')!.onClick()
+
+    expect(useStore.getState().items).toEqual([])
+  })
+
+  it('a lone recurring series (nothing else in the file) only offers "All occurrences", which deletes the whole file', () => {
+    const series = makeSeries({ id: 'series-1', entryKey: testKey('solo'), repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('solo'), ownerId: 'series-1' })
+    seedStore([series], makeRoots('solo'))
+
+    let config: SeriesSheetConfig | undefined
+    deleteNode(occ, vi.fn(), c => { config = c }, vi.fn())
+    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'This and all following', 'All occurrences'])
+
+    config!.options.find(o => o.label === 'All occurrences')!.onClick()
+
+    expect(useStore.getState().roots.has(testKey('solo'))).toBe(false)
+  })
+
+  it('the lone-standalone path defers persistence through the undo toast instead of committing immediately', () => {
+    const occ = makeOcc({ entryKey: testKey('solo2'), id: 'solo2-1', metadata: { vaultId: TEST_VAULT, fileSlug: 'solo2', title: 'Solo note 2' } })
+    seedStore([occ], makeRoots('solo2', { title: 'Solo note 2' }))
+
+    let captured: { onConfirm: () => void } | undefined
+    deleteNode(occ, vi.fn(), undefined, undefined, (_title, onConfirm) => { captured = { onConfirm } })
+    captured!.onConfirm()
+
+    // Optimistic: gone from the store immediately...
+    expect(useStore.getState().items.some(i => i.id === 'solo2-1')).toBe(false)
+    // ...but the backend delete waits on the toast, not committed inline.
+    // (not asserting persistence.deletes is empty: an earlier test in this
+    // file may still have its own toast's commit pending, and arming a new
+    // one here force-settles it — see showDeleteToast — which is real,
+    // already-tested behaviour, not a leak this test should fail on)
+    expect(persistence.deletes).not.toContain(testKey('solo2'))
   })
 })

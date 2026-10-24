@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseFixture, serialize, rootMeta, collectUndated, TEST_VAULT, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn, serializeKey, serializeOnly } from './helpers'
-import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing, deletionEndsAfterCompletionSeries } from '@/model/storeOps'
+import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing, deleteSeries, deletionEndsAfterCompletionSeries } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { parseToStoreItems } from '@/model/storeItems'
 import { expandRange } from '@/model/expansion'
@@ -293,6 +293,40 @@ describe('edit operations → serialized YAML', () => {
     const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
     const next = deleteFollowing(data, occ)
     expect(serializeData(next)).toMatchSnapshot()
+  })
+
+  it('deleteSeries removes the targeted series and its own overrides, leaving an unrelated series and the file untouched', () => {
+    const series1: StoreItem = {
+      date: '2026-06-01', time: '09:00', entryKey: keyOf('multi'), id: 'series-1',
+      repeat: { type: 'schedule', freq: 'daily' }, metadata: { participants: [] },
+    }
+    const series2: StoreItem = {
+      date: '2026-07-01', time: '09:00', entryKey: keyOf('multi'), id: 'series-2',
+      repeat: { type: 'schedule', freq: 'weekly' }, metadata: { participants: [] },
+    }
+    const roots = rootsOf({ title: 'Multi', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'multi' })
+    const data = dataOf([series1, series2], roots)
+
+    // Give series-1 an override, to confirm deleteSeries takes that with it.
+    const dailyOcc = occOn(itemsOf(data), rootsIn(data), '2026-06-02')
+    const withOverride = excludeOccurrence(data, dailyOcc)
+    const target = occOn(itemsOf(withOverride), rootsIn(withOverride), '2026-06-01')
+
+    const next = deleteSeries(withOverride, target)
+    expect(itemsOf(next).map(i => i.id)).toEqual(['series-2'])
+    expect(rootsIn(next).get(keyOf('multi'))?.title).toBe('Multi')
+  })
+
+  it('deleteSeries deletes the whole entry when the series is the file\'s only content', () => {
+    const series: StoreItem = {
+      date: '2026-06-01', time: '09:00', entryKey: keyOf('solo'), id: 'series-1',
+      repeat: { type: 'schedule', freq: 'daily' }, metadata: { participants: [] },
+    }
+    const data = dataOf([series], rootsOf({ title: 'Solo', tags: [], items: [], vaultId: TEST_VAULT, fileSlug: 'solo' }))
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-06-01')
+
+    const next = deleteSeries(data, occ)
+    expect(next.entries.has(keyOf('solo'))).toBe(false)
   })
 
   it('single-scope move excludes the original slot and re-adds at the new date', () => {

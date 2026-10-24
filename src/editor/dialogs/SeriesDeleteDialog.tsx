@@ -43,7 +43,7 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
         <AlertDialogHeader>
           <AlertDialogTitle>{config?.title ?? 'Delete recurring event'}</AlertDialogTitle>
           <AlertDialogDescription>
-            Choose which occurrences to remove.
+            Choose what to delete.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
