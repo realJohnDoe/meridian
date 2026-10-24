@@ -217,7 +217,8 @@ export default defineConfig({
         // the one thing standing between a mis-built `next` and writing an
         // empty file over the target before tombstoning the source.
         'src/storeCommit.ts': { statements: 95, branches: 95, functions: 95, lines: 95 },
-        'src/storage/sync.ts': { statements: 88, branches: 82, functions: 90, lines: 90 },
+        // Branches re-measured 2026-10-24 (#1144): 92.02.
+        'src/storage/sync.ts': { statements: 88, branches: 89, functions: 90, lines: 90 },
         // The three clusters split out of sync.ts (health survey finding #10):
         // the parse/round-trip reporting (part A), and the per-vault sync
         // state, the scheduler and the persistence-port write side (part B).
