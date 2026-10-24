@@ -292,6 +292,13 @@ describe('VaultSettings — archived', () => {
     expect(useStore.getState().roots.get(testKey('old-task'))?.archived).toBeUndefined()
   })
 
+  it('deletes an archived entry from its row', () => {
+    seedArchived('old-task', 'Old Task')
+    render(<VaultSettings vault={LOCAL_VAULT} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Old Task' }))
+    expect(useStore.getState().roots.has(testKey('old-task'))).toBe(false)
+  })
+
   // A vault only ever sees its own archived entries — plans/archived-entries.md
   // PR 3 is explicit that the list is per vault, not global.
   it('never lists another vault\'s archived entry', () => {
