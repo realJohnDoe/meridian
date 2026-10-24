@@ -21,7 +21,7 @@ import ItemsList from './ItemsList'
 import ParticipantsRow from './ParticipantsRow'
 import EntryBody from './EntryBody'
 import { cn } from '@/lib/cn'
-import type { EntryState, ItemType } from './state'
+import { itemTypeOf, type EntryState, type ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
 import { formatDurationChip, fmtDuration, fmtShort } from '@/format'
 import { fmtT, parseDateString, formatRepeatChip } from '@/model'
@@ -163,7 +163,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
 
   const allParticipants = useAllParticipants(items, vaultId)
 
-  const { item, title, body, scheduled, duration, tracked, itemType, repeat, done, items: listItems, participants, priority, editScope } = entry
+  const { item, title, body, scheduled, duration, tracked, repeat, done, items: listItems, participants, priority, editScope } = entry
 
   const { effectiveKey, pendingKeys, handleAdd, handleRemove } = pendingLinks
 
@@ -179,6 +179,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
   const hasDate = !!scheduled
   const hasTime = !!(scheduled?.time)
   const isSingleScope = editScope === 'single'
+  const itemType = itemTypeOf(entry)
   const isNote = itemType === 'note'
 
   const showDateChip = !isNote

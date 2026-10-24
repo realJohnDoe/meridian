@@ -3,6 +3,10 @@ import type { EditorFields } from '@/model'
 
 export type ItemType = 'task' | 'event' | 'note'
 
+/** The toggle's position. Derived, never stored: a second copy could disagree. */
+export const itemTypeOf = (e: Pick<EntryState, 'tracked' | 'scheduled'>): ItemType =>
+  e.tracked ? 'task' : e.scheduled ? 'event' : 'note'
+
 /**
  * Everything the entry form shows, in one shape.
  *
@@ -16,7 +20,6 @@ export type ItemType = 'task' | 'event' | 'note'
 export interface EntryState extends EditorFields {
   item:      Occurrence | null
   body:      string
-  itemType:  ItemType
   editScope: EditScope
 }
 
@@ -27,7 +30,6 @@ export const ENTRY_DEFAULT: EntryState = {
   scheduled: null,
   duration: '',
   tracked: true,
-  itemType: 'task',
   repeat: null,
   done: false,
   tags: [],
