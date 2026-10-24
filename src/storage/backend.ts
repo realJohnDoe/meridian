@@ -123,4 +123,12 @@ export interface StorageBackend {
    * `RawFile.lastModified`.
    */
   readDates?(paths: string[]): Promise<Map<string, number>>
+  /**
+   * Whether `content` is one of the last few committed versions of `path` —
+   * how a refused push finds out that an earlier push of the same content
+   * landed even though its response never arrived (`resolveCollision`).
+   * Optional: only a backend with history can answer. Never throws: a lookup
+   * that fails answers `false`, which leaves the collision handled as before.
+   */
+  wasCommitted?(path: string, content: string): Promise<boolean>
 }

@@ -271,6 +271,26 @@ describe('GitHubBackend', () => {
     expect(init.cache).toBe('no-store')
   })
 
+  describe('wasCommitted', () => {
+    const history = (...oids: Array<string | null>) => ({
+      data: { repository: { ref: { target: { history: { nodes: oids.map(oid => ({ file: oid && { oid } })) } } } } },
+    })
+
+    it('finds content among the recent versions by its blob SHA', async () => {
+      mockFetch(history('other', await blobSha('hello\n'), null))
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      expect(await backend.wasCommitted('note.md', 'hello\n')).toBe(true)
+      expect(await backend.wasCommitted('note.md', 'bye\n')).toBe(false)
+    })
+
+    it('answers false rather than throwing when the lookup fails', async () => {
+      mockFetch({ message: 'Server Error' }, 502)
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      expect(await backend.wasCommitted('note.md', 'hello\n')).toBe(false)
+    })
+  })
+
   // Finding #1: an unchanged tree must go out as a conditional request and be
   // read as "nothing moved" rather than a real refusal — GitHub does not
   // count a 304 against the rate limit, which is what makes it safe to poll

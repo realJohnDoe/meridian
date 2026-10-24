@@ -143,6 +143,10 @@ async function writeConflictCopy(
  *    spurious refusal, caught one step earlier — the CAS precondition we sent
  *    is *still* what the backend holds, so no second writer can exist. Retry
  *    the write once rather than treating our own edit as a conflict.
+ *  - **Our content landed earlier; the remote has moved on from it.** A push
+ *    whose response was lost left the record based on the version before it.
+ *    Where the backend keeps history (`wasCommitted`), finding our content in
+ *    it means the remote already contains our edit: adopt the remote.
  *  - **The remote diverged, on fields we did not touch.** Someone else's content
  *    sits at `path`, but the two edits are disjoint — the classic case being one
  *    person rescheduling a task while another writes its description. A
@@ -276,6 +280,20 @@ async function resolveCollision(
         return { kind: 'settled' }
       }
     }
+  }
+
+  // ── Spurious #3: our content landed, and the remote has moved on from it ───
+  // A push whose response never arrived (the app suspended mid-request) left
+  // this record dirty against the version *before* it, though the backend
+  // committed it. Somebody then wrote on top. Merging against the stale base
+  // sees both sides changing the same fields and copies out; against the true
+  // one — our own content — only the remote moved, so the remote is the
+  // answer, and it is already on the backend. markMerged, because the remote
+  // content replaces ours here and a further local edit must stay dirty.
+  if (remote && await backend.wasCommitted?.(path, localContent)) {
+    await markMerged(vaultId, path, localContent, remote.content, remote.version)
+    journal('collision-superseded', vaultId, path, facts(), backend.kind)
+    return { kind: 'merged', merges: [{ path, content: remote.content }] }
   }
 
   // ── Diverged on disjoint fields: merge, and nobody needs to hear about it ──
