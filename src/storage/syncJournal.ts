@@ -63,6 +63,7 @@ export type SyncEventKind =
   | 'collision-already-landed'  // the backend already holds exactly our content
   | 'collision-retried'         // nothing had diverged — the CAS was retried and took
   | 'collision-recreated'       // the file was gone remotely; our content was restored
+  | 'collision-superseded'      // our content had landed (its response was lost) and the remote moved on from it
   | 'collision-merged'          // divergence on disjoint fields; both changes combined
   | 'collision-copied'          // divergence over the same ground; both sides kept
   // ── pull ──────────────────────────────────────────────────────

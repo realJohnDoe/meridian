@@ -121,6 +121,27 @@ function buildBlobQuery(branch: string, paths: string[]): string {
   }`
 }
 
+/** How far back `wasCommitted` looks — a lost push is minutes old, not dozens of commits. */
+const RECENT_VERSIONS = 10
+
+const RECENT_VERSIONS_QUERY = `query($owner: String!, $name: String!, $ref: String!, $path: String!) {
+  repository(owner: $owner, name: $name) {
+    ref(qualifiedName: $ref) {
+      target {
+        ... on Commit {
+          history(first: ${RECENT_VERSIONS}, path: $path) { nodes { file(path: $path) { oid } } }
+        }
+      }
+    }
+  }
+}`
+
+type RecentVersionsResult = {
+  repository: {
+    ref: { target: { history?: { nodes: { file: { oid: string } | null }[] } } | null } | null
+  }
+}
+
 type HistoryQueryResult = {
   repository: {
     ref: { target: Record<string, { nodes: { committedDate: string }[] } | null> | null } | null
@@ -434,6 +455,23 @@ export class GitHubBackend implements StorageBackend {
    */
   async readDates(paths: string[]): Promise<Map<string, number>> {
     return this.fetchCommitDates(paths)
+  }
+
+  /** A blob SHA is a pure function of the bytes, so no old content has to be fetched to compare. */
+  async wasCommitted(path: string, content: string): Promise<boolean> {
+    try {
+      const oid = await blobSha(content)
+      const data = await this._octokit.graphql<RecentVersionsResult>(RECENT_VERSIONS_QUERY, {
+        owner: this._cfg.owner,
+        name:  this._cfg.repo,
+        ref:   `refs/heads/${this._cfg.branch}`,
+        path,
+      })
+      return data.repository.ref?.target?.history?.nodes.some(n => n.file?.oid === oid) ?? false
+    } catch (e) {
+      console.warn('[github] could not look up recent versions:', e)
+      return false
+    }
   }
 
   async write(path: string, content: string, expectedVersion?: string): Promise<string | undefined> {

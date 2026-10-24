@@ -266,6 +266,7 @@ class FakeBackend implements StorageBackend {
   readonly hasRemote = true
   refreshAuth?: () => Promise<boolean>
   readDates?:   (paths: string[]) => Promise<Map<string, number>>
+  wasCommitted?: (path: string, content: string) => Promise<boolean>
 
   writeCallCount     = 0
   deleteCallCount    = 0
@@ -605,6 +606,50 @@ describe('pushDirty — a divergence on disjoint fields is merged, not copied', 
 
     const copyPath = backend.listPaths().find(p => p !== 'essensplan.md')
     expect(copyPath).toBeDefined()
+    expect(backend.get(copyPath!)?.content).toBe(LOCAL)
+  })
+})
+
+describe('pushDirty — our push landed but its response was lost, and the remote moved on', () => {
+  // The dm.md incident: a push committed while the app was suspended, so the
+  // record stayed dirty against the version before it; another device then
+  // edited the same field on top. Against that stale base both sides changed
+  // `items` — a conflict copy of content the remote already contains.
+  const BASE   = '---\ntitle: Einkauf\nitems:\n  - "[ ] Milch"\n---\n'
+  const LOCAL  = '---\ntitle: Einkauf\nitems:\n  - "[ ] Milch"\n  - "[ ] Brot"\n---\n'
+  const REMOTE = '---\ntitle: Einkauf\nitems:\n  - "[x] Milch"\n  - "[x] Brot"\n---\n'
+
+  function setup(landed: boolean) {
+    const backend = new FakeBackend()
+    backend.seed('einkauf.md', BASE, 'sha1')
+    mountBackend(backend)
+    backend.seed('einkauf.md', REMOTE, 'sha3')
+    backend.wasCommitted = (_path, content) => Promise.resolve(landed && content === LOCAL)
+    seedDirtyWithBase('fake-vault', 'einkauf.md', LOCAL, 'sha1', BASE)
+    return backend
+  }
+
+  it('adopts the remote, with no conflict copy and no toast', async () => {
+    const backend = setup(true)
+
+    await syncToBackend()
+
+    expect(backend.listPaths()).toEqual(['einkauf.md'])
+    expect(backend.get('einkauf.md')?.content).toBe(REMOTE)
+    expect(notifyFns.warnWithDetails).not.toHaveBeenCalled()
+    const cached = cacheStore.get(vp('fake-vault', 'einkauf.md'))
+    expect(cached?.status).toBe('clean')
+    expect(cached?.content).toBe(REMOTE)
+    expect(cached?.version).toBe('sha3')
+    expect(syncJournalDump({ path: 'einkauf.md' })).toContain('collision-superseded')
+  })
+
+  it('still copies out when our content never landed', async () => {
+    const backend = setup(false)
+
+    await syncToBackend()
+
+    const copyPath = backend.listPaths().find(p => p !== 'einkauf.md')
     expect(backend.get(copyPath!)?.content).toBe(LOCAL)
   })
 })
