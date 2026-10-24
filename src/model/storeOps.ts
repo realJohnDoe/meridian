@@ -833,26 +833,27 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields, touch
   }
 
   if (occ.ownerId && occ.source === 'generated' && newDate && (newDate !== occ.date || newTime !== occ.time)) {
-    items = upsertOverride(items, occ, { excluded: true })
+    // The occurrence keeps its id and moves; the slot it leaves gets an
+    // exclusion stub under an id derived from that slot. Keeping the id is what
+    // lets an editor holding this occurrence follow it to the new date — the
+    // stub used to take the id instead, so the editor's next save landed on the
+    // hidden stub. Both halves are idempotent: the editor can replay this save
+    // with the pre-move occurrence (a debounced autosave queued before the
+    // move re-rendered), which patches the same row and finds the stub present.
     items = dropExclusionStub(items, occ.ownerId, newDate, newTime)
-    // Keyed by target slot rather than a fresh UUID so re-running the same move is
-    // idempotent. The editor pins `entry.item` to the pre-move occurrence for the
-    // whole session (useEntryEditor's useState initialiser), so every later save —
-    // a debounced body autosave, the flush on close — replays this branch with the
-    // same `occ`; a random id would append a second occurrence on the target date
-    // each time.
-    const movedId = stableOccId(`${occ.ownerId}|${newDate}|${newTime ?? ''}`)
-    const moved: OccurrenceEntry<OccurrenceMetadata> = {
-      date:     newDate,
-      time:     newTime,
+    items = upsertOverride(items, occ, { date: newDate, time: newTime, metadata: occMeta(base, fields, touched) })
+    const stubId = stableOccId(`${occ.ownerId}|excluded|${occ.date}|${occ.time ?? ''}`)
+    if (items.some(i => i.id === stubId)) return commit(items)
+    return commit(addItem(items, {
+      date:     occ.date,
+      time:     occ.time,
       source:   'explicit',
+      excluded: true,
       entryKey: occ.entryKey,
-      id:       movedId,
+      id:       stubId,
       ownerId:  occ.ownerId,
-      metadata: occMeta(base, fields, touched),
-    }
-    const already = items.some(i => i.id === movedId)
-    return commit(already ? mapItems(items, i => i.id === movedId ? moved : i) : addItem(items, moved))
+      metadata: base,
+    }))
   }
 
   if (occ.ownerId && newDate && (newDate !== occ.date || newTime !== occ.time)) {
@@ -1059,8 +1060,8 @@ export function applyEdit(
  * `occ` with its `ownerId` re-read from the store.
  *
  * An editor pins the occurrence it opened for the whole session (see
- * `useEntryEditor`'s `useState` initialiser, and `applySingle`'s pre-move id
- * reuse for the date-shaped half of the same staleness). Ownership is not
+ * `EntryReady` in `routes/_entry.entry.$vault.$slug.tsx`, and `applySingle`'s
+ * id-keeping move for the date-shaped half of the same staleness). Ownership is not
  * stable across that session: a 'future' save re-homes every override from
  * occDate onward onto the series it splits off, so the *next* save arrives
  * naming a series this occurrence has left.

@@ -362,6 +362,22 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(back)).toMatchSnapshot()
   })
 
+  // The id is how an open editor finds its occurrence again. If the stub took
+  // the id instead, the editor followed the hidden stub: the form showed the
+  // old date and the next save (ticking done) landed on the stub.
+  it('a moved generated occurrence keeps its id, and a later toggle reaches it', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
+    const moved = applyEdit(data, occ, 'single', editFields(occ, {
+      scheduled: { date: '2026-04-22', time: '09:00' },
+    }), NEW_TARGET)
+    expect(occOn(itemsOf(moved), rootsIn(moved), '2026-04-22').id).toBe(occ.id)
+
+    // Toggling done with the pre-move occurrence — what an editor still holds.
+    const done = toggleDone(moved, occ)
+    expect(occOn(itemsOf(done), rootsIn(done), '2026-04-22').metadata.done).toBe(true)
+  })
+
   it('single-scope same-day time move excludes the original slot and re-adds at the new time', () => {
     const data = fixtureData('weekly-series')
     const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')

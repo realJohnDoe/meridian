@@ -339,11 +339,11 @@ instances:
     done: true
   - date: 2026-04-14
     done: true
+  - date: 2026-04-27
+    time: 09:00
   - date: 2026-04-20
     time: 09:00
     excluded: true
-  - date: 2026-04-27
-    time: 09:00
 ---
 
 Quick sync. Agenda:
@@ -405,11 +405,11 @@ instances:
     done: true
   - date: 2026-04-14
     done: true
+  - date: 2026-04-22
+    time: 09:00
   - date: 2026-04-20
     time: 09:00
     excluded: true
-  - date: 2026-04-22
-    time: 09:00
 ---
 
 Quick sync. Agenda:
@@ -440,10 +440,10 @@ instances:
   - date: 2026-04-14
     done: true
   - date: 2026-04-20
+    time: 10:00
+  - date: 2026-04-20
     time: 09:00
     excluded: true
-  - date: 2026-04-20
-    time: 10:00
 ---
 
 Quick sync. Agenda:
