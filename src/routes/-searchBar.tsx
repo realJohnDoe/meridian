@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { newEntryRoute } from '@/entryRoute'
 import { useOpenEntry } from '@/hooks'
 import { useCurrentDate } from '@/calendar'
+import { fmtISO } from '@/model'
 import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import type { SearchRow } from '@/search'
@@ -26,6 +27,13 @@ import type { SearchRow } from '@/search'
 // shouldn't sit on the agenda's cold-start critical path — deferred until
 // search is actually opened.
 const SearchOverlay = lazy(() => import('@/search').then(m => ({ default: m.SearchOverlay })))
+
+// A new entry defaults to today rather than a past date the view happens to
+// be scrolled to; a future date is kept, since browsing ahead is deliberate.
+function newEntryDate(currentDate: string) {
+  const today = fmtISO(new Date())
+  return currentDate < today ? today : currentDate
+}
 
 export default function SearchBar() {
   // sq present (even as '') = search overlay open; sq value = current query.
@@ -107,7 +115,7 @@ export default function SearchBar() {
   }, [openEntry])
 
   const handleCreate = useCallback((title: string) => {
-    void navigate({ ...newEntryRoute(title, { date: currentDate }), replace: true })
+    void navigate({ ...newEntryRoute(title, { date: newEntryDate(currentDate) }), replace: true })
   }, [navigate, currentDate])
 
   // Keyboard row nav: ArrowUp/Down move a highlighted row, Enter acts on it.
@@ -221,7 +229,7 @@ export default function SearchBar() {
             size="icon"
             className="w-9 h-9 rounded-full shrink-0 hover:scale-[1.08] active:scale-[.93] [&_svg]:size-4"
             aria-label="New entry"
-            onClick={() => navigate({ ...newEntryRoute(filterQuery || undefined, { date: currentDate }), replace: searchOpen })}
+            onClick={() => navigate({ ...newEntryRoute(filterQuery || undefined, { date: newEntryDate(currentDate) }), replace: searchOpen })}
           ><Plus size={16} /></Button>
         </div>
       </div>

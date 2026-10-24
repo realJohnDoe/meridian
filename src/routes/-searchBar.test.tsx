@@ -5,6 +5,7 @@ import type * as ReactRouter from '@tanstack/react-router'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { setMediaQuery, setupStore, makeOcc } from '@/test-utils'
 import { setCurrentDate } from '@/calendar'
+import { fmtISO } from '@/model'
 import { entryRoute, newEntryRoute } from '@/entryRoute'
 import SearchBar from './-searchBar'
 
@@ -54,6 +55,9 @@ vi.mock('@/search', () => ({
   ),
 }))
 
+// Future so it survives the "never default to a past date" clamp unchanged.
+const FUTURE = '2999-06-15'
+
 setupStore()
 const setMobile = setMediaQuery(false)
 
@@ -74,7 +78,7 @@ function searchResultOf(call: unknown, prev: Record<string, unknown> = {}) {
 beforeEach(() => {
   navigateMock.mockClear()
   searchMock.mockReturnValue({})
-  setCurrentDate('2026-06-15')
+  setCurrentDate(FUTURE)
 })
 
 describe('SearchBar — closed state', () => {
@@ -100,7 +104,16 @@ describe('SearchBar — closed state', () => {
     renderSearchBar()
     fireEvent.click(screen.getByRole('button', { name: 'New entry' }))
 
-    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute(undefined, { date: '2026-06-15' }), replace: false })
+    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute(undefined, { date: FUTURE }), replace: false })
+  })
+
+  it('defaults a new entry to today, not a past date the view is scrolled to', () => {
+    setCurrentDate('2020-01-01')
+    renderSearchBar()
+    fireEvent.click(screen.getByRole('button', { name: 'New entry' }))
+
+    const { date } = (navigateMock.mock.calls[0]![0] as { search: { date: string } }).search
+    expect(date).toBe(fmtISO(new Date()))
   })
 })
 
@@ -158,7 +171,7 @@ describe('SearchBar — open state', () => {
     renderSearchBar()
 
     fireEvent.keyDown(screen.getByPlaceholderText('Search or create…'), { key: 'Enter' })
-    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('groceries', { date: '2026-06-15' }), replace: true })
+    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('groceries', { date: FUTURE }), replace: true })
   })
 
   it('does not create an entry from Enter when the query is empty', () => {
@@ -174,7 +187,7 @@ describe('SearchBar — open state', () => {
     renderSearchBar()
     fireEvent.click(screen.getByRole('button', { name: 'New entry' }))
 
-    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('groceries', { date: '2026-06-15' }), replace: true })
+    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('groceries', { date: FUTURE }), replace: true })
   })
 
   it('forwards the overlay\'s create and close callbacks', async () => {
@@ -183,7 +196,7 @@ describe('SearchBar — open state', () => {
     await screen.findByTestId('search-overlay')
 
     fireEvent.click(screen.getByRole('button', { name: 'overlay-create' }))
-    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('typed title', { date: '2026-06-15' }), replace: true })
+    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('typed title', { date: FUTURE }), replace: true })
 
     fireEvent.click(screen.getByRole('button', { name: 'overlay-close' }))
     const call = navigateMock.mock.calls.at(-1)![0] as { to: string; replace: boolean }
@@ -237,7 +250,7 @@ describe('SearchBar — open state', () => {
     fireEvent.click(screen.getByRole('button', { name: 'overlay-report-rows' }))
     fireEvent.keyDown(screen.getByPlaceholderText('Search or create…'), { key: 'Enter' })
 
-    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('groceries', { date: '2026-06-15' }), replace: true })
+    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('groceries', { date: FUTURE }), replace: true })
   })
 
   it('docks to the top edge only on desktop with a non-empty query', () => {
