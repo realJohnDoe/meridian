@@ -11,8 +11,8 @@ import EntryEditor from './EntryEditor'
 const { navigateMock, backMock } = vi.hoisted(() => ({ navigateMock: vi.fn(), backMock: vi.fn() }))
 
 vi.mock('@tanstack/react-router', async (importOriginal) => {
-  const [actual, { navigateStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
-  return { ...actual, ...navigateStub({ navigate: navigateMock, back: backMock }) }
+  const [actual, { navigateStub, linkStub }] = await Promise.all([importOriginal<typeof ReactRouter>(), import('@/test-utils/router')])
+  return { ...actual, ...navigateStub({ navigate: navigateMock, back: backMock }), Link: linkStub }
 })
 
 // CodeMirror can't mount in jsdom — stand in a plain textarea wired to the same
@@ -136,5 +136,57 @@ describe('EntryEditor — archived banner', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Unarchive' }))
 
     expect(useStore.getState().roots.get(testKey('unarchive-me.md'))?.archived).toBeUndefined()
+  })
+})
+
+// #1120: with genuinely no vault registered (the Tutorial removed, nothing added
+// in its place), a brand-new entry has nowhere to save to. saveNode already
+// refuses that silently (see save.ts) — the fix is showing it rather than
+// losing the entry with no trace, and not misreporting it as a missing title.
+describe('EntryEditor — no vault to save to', () => {
+  function NewEntryHarness({ title }: { title: string }) {
+    const hooks = useEntryEditor(null, 'all', title)
+    return <EntryEditor hooks={hooks} items={[]} roots={useStore.getState().roots} />
+  }
+
+  it('shows a banner linking to add-vault, and never flags the present title as missing', () => {
+    useStore.setState({ defaultVaultId: null, vaults: [] })
+    render(<NewEntryHarness title="Call the plumber" />)
+
+    expect(screen.getByText(/no vault to save to yet/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /add a vault/i })).toHaveAttribute('href', '/settings/vault/new')
+    expect(persistence.writes).toEqual([])
+
+    fireEvent.change(screen.getByPlaceholderText('Title'), { target: { value: 'Call the plumber tomorrow' } })
+    act(() => { vi.advanceTimersByTime(1500) })
+
+    // Autosave found nowhere to write and gave up quietly — it must not have
+    // taken the titleMissing branch, which would paint the (present) title's
+    // placeholder as an error.
+    expect(persistence.writes).toEqual([])
+    expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive/)
+  })
+})
+
+// #1120's product question: with only the read-only Tutorial vault registered,
+// a brand-new entry now falls back to the Tutorial's own sandbox vault (see
+// useVaultTarget.ts's initialTargetVault) instead of the "no vault" case above
+// — so it shows the same "read-only — changes aren't saved" banner an existing
+// Tutorial entry already gets, not the "add a vault" one.
+describe('EntryEditor — new entry in the Tutorial sandbox', () => {
+  function NewEntryHarness({ title }: { title: string }) {
+    const hooks = useEntryEditor(null, 'all', title)
+    return <EntryEditor hooks={hooks} items={[]} roots={useStore.getState().roots} />
+  }
+
+  it('shows the read-only banner, not the no-vault one', () => {
+    useStore.setState({ defaultVaultId: null, vaults: [{ id: 'example', name: 'Tutorial', kind: 'example' }] })
+    useStore.getState().setVaultSync('example', { readOnly: true })
+
+    render(<NewEntryHarness title="Call the plumber" />)
+
+    expect(screen.getByText(/tutorial is read-only/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no vault to save to yet/i)).not.toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive/)
   })
 })

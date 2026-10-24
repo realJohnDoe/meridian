@@ -33,9 +33,12 @@ const chipCls = 'bg-warning/30 text-chip-tint-foreground'
  * overdue pools many different days into one bucket that has no single day
  * badge to show.
  *
- * It starts **expanded** (calendar/viewState.ts, whose own comment explains
- * why), and `count` is the number of overdue *groups* — one per unfinished
- * series — not the number of occurrences behind them. See overduePool.ts.
+ * Starts expanded for a small backlog and collapsed for a large one — see
+ * calendar/viewState.ts's `useOverdueCollapsed`/`OVERDUE_AUTO_COLLAPSE_THRESHOLD`
+ * for the default, and `overdueCollapsed`'s own comment for why an explicit
+ * tap here overrides it. `count` is the number of overdue *groups* — one per
+ * unfinished series — not the number of occurrences behind them. See
+ * overduePool.ts.
  */
 function AgendaHeaderRow({ label, collapsed, count, onToggle }: Props) {
   return (

@@ -327,7 +327,7 @@ export default function AgendaView({ onOpen }: Props) {
                   label={row.label}
                   collapsed={row.collapsed}
                   count={row.count}
-                  onToggle={toggleOverdueCollapsed}
+                  onToggle={() => toggleOverdueCollapsed(row.collapsed)}
                 />
               ) : row.kind === 'month' || row.kind === 'week' ? (
                 <AgendaDividerRow variant={row.kind} label={row.label} />

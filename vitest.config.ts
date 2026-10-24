@@ -194,7 +194,9 @@ export default defineConfig({
         'src/storage/icalBackend.ts':        { statements: 93, branches: 85, functions: 95, lines: 95 },
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 82, branches: 78, functions: 78, lines: 85 },
         'src/occurrenceActions.ts': { statements: 90, branches: 77, functions: 95, lines: 94 },
-        'src/editor/useEntryEditor.ts': { statements: 77, branches: 55, functions: 73, lines: 82 },
+        // Re-measured 2026-09-24 (#1120): measured 85.07/65.13/82.5/89.37 — the
+        // no-writable-vault fallback path added new branch coverage here.
+        'src/editor/useEntryEditor.ts': { statements: 80, branches: 60, functions: 77, lines: 84 },
         // Re-measured 2026-09-12 (#1039): measured 90.9/75/90/95.65.
         'src/editor/useAutoSave.ts': { statements: 86, branches: 70, functions: 85, lines: 91 },
         // Re-measured 2026-09-12 (#1039): measured 93.75/80/100/100.

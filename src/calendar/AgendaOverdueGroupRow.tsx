@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import { toast } from 'sonner'
 import type { Occurrence } from '@/types'
 import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
@@ -64,14 +65,28 @@ function AgendaOverdueGroupRow({ occ, count, oldest, onOpen, onToggleDone, onSwi
                 bg-warning aliases bg-priority-3 in every theme, so this reads
                 with the same verified contrast rather than the plain
                 bg-warning/15 tint this replaced, which was barely visible on
-                light themes. */}
-            <Badge
-              variant="tag"
-              className="bg-warning/30 text-chip-tint-foreground font-bold tabular-nums"
+                light themes.
+
+                Wrapped in a button rather than relying on the Badge's own
+                `title`: a hover tooltip never surfaces on a touchscreen, which
+                is exactly where this chip is otherwise unexplained (#1129) —
+                a tap shows the same explanation as a toast instead. `title`
+                stays too, for a mouse user who hovers without clicking.
+                `className="contents"` keeps the button out of this box's own
+                layout, so wrapping it doesn't shift the centered Badge. */}
+            <button
+              type="button"
+              className="contents"
               title={`${count} overdue, oldest ${fmtShort(oldest)}`}
+              onClick={() => toast(`Missed ${count} times — oldest ${fmtShort(oldest)}`)}
             >
-              ×{count}
-            </Badge>
+              <Badge
+                variant="tag"
+                className="bg-warning/30 text-chip-tint-foreground font-bold tabular-nums"
+              >
+                ×{count}
+              </Badge>
+            </button>
           </div>
         )}
       </div>
