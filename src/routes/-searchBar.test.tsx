@@ -23,17 +23,33 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 // wiring props through to the (lazily-loaded) overlay, so the overlay is
 // stood in for a marker exposing its props via test-only controls.
 vi.mock('@/search', () => ({
-  SearchOverlay: ({ query, onClose, onCreate, onOpen }: {
+  SearchOverlay: ({ query, onClose, onCreate, onOpen, highlightedIndex, onRowsChange, activeDescendantId }: {
     query: string
     onClose: () => void
     onCreate: (title: string) => void
     onOpen: (occ: ReturnType<typeof makeOcc>) => void
+    highlightedIndex: number
+    onRowsChange: (rows: { id: string; entryKey: string | null; activate: () => void }[], defaultIndex: number) => void
+    activeDescendantId?: string
   }) => (
     <div data-testid="search-overlay">
       <span data-testid="overlay-query">{query}</span>
+      <span data-testid="overlay-highlighted-index">{highlightedIndex}</span>
+      <span data-testid="overlay-active-id">{activeDescendantId}</span>
       <button type="button" onClick={onClose}>overlay-close</button>
       <button type="button" onClick={() => onCreate('typed title')}>overlay-create</button>
       <button type="button" onClick={() => onOpen(makeOcc())}>overlay-open</button>
+      {/* Stands in for SearchResults reporting a Create row plus one matching result — enough for the keyboard-nav tests to drive ArrowDown/ArrowUp/Enter against real rows instead of the empty-rows fallback. */}
+      <button
+        type="button"
+        onClick={() => onRowsChange(
+          [
+            { id: 'search-option-create', entryKey: null, activate: () => onCreate(query) },
+            { id: 'search-option-note', entryKey: 'note', activate: () => onOpen(makeOcc()) },
+          ],
+          0,
+        )}
+      >overlay-report-rows</button>
     </div>
   ),
 }))
@@ -181,6 +197,47 @@ describe('SearchBar — open state', () => {
     fireEvent.click(screen.getByRole('button', { name: 'overlay-open' }))
 
     expect(navigateMock).toHaveBeenCalledWith({ ...entryRoute(makeOcc()), replace: true })
+  })
+
+  it('activates the highlighted row on Enter instead of always creating (issue #1124)', async () => {
+    searchMock.mockReturnValue({ sq: 'groceries' })
+    renderSearchBar()
+    await screen.findByTestId('search-overlay')
+
+    fireEvent.click(screen.getByRole('button', { name: 'overlay-report-rows' }))
+    expect(screen.getByTestId('overlay-highlighted-index')).toHaveTextContent('0')
+
+    // Default highlight is the Create row (index 0); ArrowDown moves to the
+    // one reported result (index 1) without touching the input's own value.
+    fireEvent.keyDown(screen.getByPlaceholderText('Search or create…'), { key: 'ArrowDown' })
+    expect(screen.getByTestId('overlay-highlighted-index')).toHaveTextContent('1')
+    expect(screen.getByTestId('overlay-active-id')).toHaveTextContent('search-option-note')
+
+    navigateMock.mockClear()
+    fireEvent.keyDown(screen.getByPlaceholderText('Search or create…'), { key: 'Enter' })
+    expect(navigateMock).toHaveBeenCalledWith({ ...entryRoute(makeOcc()), replace: true })
+  })
+
+  it('ArrowUp does not move past the first row', async () => {
+    searchMock.mockReturnValue({ sq: 'groceries' })
+    renderSearchBar()
+    await screen.findByTestId('search-overlay')
+
+    fireEvent.click(screen.getByRole('button', { name: 'overlay-report-rows' }))
+    fireEvent.keyDown(screen.getByPlaceholderText('Search or create…'), { key: 'ArrowUp' })
+
+    expect(screen.getByTestId('overlay-highlighted-index')).toHaveTextContent('0')
+  })
+
+  it('still creates on Enter when the highlighted row is the Create row', async () => {
+    searchMock.mockReturnValue({ sq: 'groceries' })
+    renderSearchBar()
+    await screen.findByTestId('search-overlay')
+
+    fireEvent.click(screen.getByRole('button', { name: 'overlay-report-rows' }))
+    fireEvent.keyDown(screen.getByPlaceholderText('Search or create…'), { key: 'Enter' })
+
+    expect(navigateMock).toHaveBeenCalledWith({ ...newEntryRoute('groceries', { date: '2026-06-15' }), replace: true })
   })
 
   it('docks to the top edge only on desktop with a non-empty query', () => {

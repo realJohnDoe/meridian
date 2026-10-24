@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { ArrowLeft, Search, X } from 'lucide-react'
 import type { Occurrence } from '@/types'
-import SearchResults from './SearchResults'
+import SearchResults, { type SearchRow } from './SearchResults'
 import { IconButton } from '@/components/primitives/icon-button'
 import { Input } from '@/components/ui/input'
 import { useSidebar } from '@/components/ui/sidebar'
@@ -15,6 +15,11 @@ interface Props {
   onClose: () => void
   onOpen: (occ: Occurrence) => void
   onCreate: (title: string) => void
+  /** Keyboard row nav, owned by -searchBar.tsx so both this overlay's mobile input and its own desktop input can drive the same highlighted row. */
+  highlightedIndex: number
+  onRowsChange: (rows: SearchRow[], defaultIndex: number) => void
+  activeDescendantId?: string
+  onInputKeyDown: (e: ReactKeyboardEvent<HTMLInputElement>) => void
 }
 
 /**
@@ -34,7 +39,7 @@ interface Props {
  *   right of the sidebar (offset by --sidebar-width when expanded) rather
  *   than the sidebar itself.
  */
-export default function SearchOverlay({ open, query, onQueryChange, onClose, onOpen, onCreate }: Props) {
+export default function SearchOverlay({ open, query, onQueryChange, onClose, onOpen, onCreate, highlightedIndex, onRowsChange, activeDescendantId, onInputKeyDown }: Props) {
   const { isMobile, open: sidebarOpen } = useSidebar()
   const inputRef = useRef<HTMLInputElement>(null)
   const mobileLayerRef = useRef<HTMLDivElement>(null)
@@ -102,11 +107,11 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
               variant="ghost"
               className="flex-1 min-w-0"
               placeholder="Search or create…"
+              role="combobox"
+              aria-activedescendant={activeDescendantId}
               value={query}
               onChange={e => onQueryChange(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && query) onCreate(query)
-              }}
+              onKeyDown={onInputKeyDown}
             />
             {query && (
               <IconButton variant="ghost" hit="pad" className="w-7 h-7 text-muted-foreground" label="Clear search" onClick={() => onQueryChange('')}>
@@ -118,7 +123,14 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
 
         {/* Results — scroll region; keyboard sits below this */}
         <div ref={mobileScrollRef} className="flex-1 min-h-0 overflow-y-auto [-webkit-overflow-scrolling:touch]">
-          <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={mobileScrollRef} />
+          <SearchResults
+            query={query}
+            onOpen={onOpen}
+            onCreate={onCreate}
+            scrollRef={mobileScrollRef}
+            highlightedIndex={highlightedIndex}
+            onRowsChange={onRowsChange}
+          />
         </div>
       </div>
     )
@@ -149,7 +161,14 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         )}
       >
         <div ref={desktopScrollRef} className="overflow-y-auto [-webkit-overflow-scrolling:touch] bg-background flex-1 min-h-0">
-          <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={desktopScrollRef} />
+          <SearchResults
+            query={query}
+            onOpen={onOpen}
+            onCreate={onCreate}
+            scrollRef={desktopScrollRef}
+            highlightedIndex={highlightedIndex}
+            onRowsChange={onRowsChange}
+          />
         </div>
       </div>
     </>

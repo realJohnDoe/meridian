@@ -9,7 +9,7 @@
  * `components → calendar → components`): a leaf-UI directory that features
  * import, importing those features back.
  */
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
@@ -20,6 +20,7 @@ import { useOpenEntry } from '@/hooks'
 import { useCurrentDate } from '@/calendar'
 import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
+import type { SearchRow } from '@/search'
 
 // Lazy: SearchResults/FileResultsList pull in enough weight that they
 // shouldn't sit on the agenda's cold-start critical path — deferred until
@@ -92,16 +93,60 @@ export default function SearchBar() {
     void navigate({ to: '.' as const, search: (prev: Record<string, unknown>) => ({ ...prev, sq: undefined }), replace: true })
   }
 
-  function handleOpen(occ: Parameters<typeof openEntry>[0]) {
+  // useCallback: these two are both relied on as *stable* identities by the
+  // row-reporting effect in SearchResults (its `rows` memo closes over them),
+  // so a fresh function reference here on every render would make `rows`
+  // "change" every render too, which would re-trigger handleRowsChange below
+  // forever — not a visible bug, but a permanent render loop between this
+  // component and the lazy-loaded overlay.
+  const handleOpen = useCallback((occ: Parameters<typeof openEntry>[0]) => {
     // replace: true so the transient "search open" entry is overwritten
     // rather than left behind — back from the entry goes straight to the
     // pre-search page instead of reopening the overlay.
     void openEntry(occ, undefined, { replace: true })
+  }, [openEntry])
+
+  const handleCreate = useCallback((title: string) => {
+    void navigate({ ...newEntryRoute(title, { date: currentDate }), replace: true })
+  }, [navigate, currentDate])
+
+  // Keyboard row nav: ArrowUp/Down move a highlighted row, Enter acts on it.
+  // Lives here (view-local, not store.ts — invariant 5) because it's the one
+  // state both this component's own input and SearchOverlay's mobile input
+  // need, as well as SearchResults for rendering the highlight — see
+  // SearchResults.tsx's SearchRow and the GitHub issue this closes.
+  const [rows, setRows] = useState<SearchRow[]>([])
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
+  // Identifies the row *set* (not the array reference, which is rebuilt on
+  // every keystroke) so a result list that hasn't actually changed doesn't
+  // clobber an in-progress ArrowUp/ArrowDown selection.
+  const rowSetRef = useRef<string | null>(null)
+
+  const handleRowsChange = useCallback((newRows: SearchRow[], defaultIndex: number) => {
+    setRows(newRows)
+    const signature = newRows.map(r => r.id).join('|')
+    if (signature !== rowSetRef.current) {
+      rowSetRef.current = signature
+      setHighlightedIndex(defaultIndex)
+    }
+  }, [])
+
+  function handleInputKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown' && rows.length) {
+      e.preventDefault()
+      setHighlightedIndex(i => Math.min(i + 1, rows.length - 1))
+    } else if (e.key === 'ArrowUp' && rows.length) {
+      e.preventDefault()
+      setHighlightedIndex(i => Math.max(i - 1, 0))
+    } else if (e.key === 'Enter' && filterQuery) {
+      e.preventDefault()
+      const row = rows[highlightedIndex]
+      if (row) row.activate()
+      else handleCreate(filterQuery)
+    }
   }
 
-  function handleCreate(title: string) {
-    void navigate({ ...newEntryRoute(title, { date: currentDate }), replace: true })
-  }
+  const activeDescendantId = rows[highlightedIndex]?.id
 
   return (
     <div
@@ -122,6 +167,10 @@ export default function SearchBar() {
             onClose={closeSearch}
             onOpen={handleOpen}
             onCreate={handleCreate}
+            highlightedIndex={highlightedIndex}
+            onRowsChange={handleRowsChange}
+            activeDescendantId={activeDescendantId}
+            onInputKeyDown={handleInputKeyDown}
           />
         </Suspense>
       )}
@@ -155,12 +204,12 @@ export default function SearchBar() {
             variant="ghost"
             className="flex-1 min-w-0 placeholder:text-card-foreground"
             placeholder="Search or create…"
+            role="combobox"
+            aria-activedescendant={activeDescendantId}
             value={filterQuery}
             onClick={openSearch}
             onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && filterQuery) handleCreate(filterQuery)
-            }}
+            onKeyDown={handleInputKeyDown}
           />
           {filterQuery && (
             <IconButton variant="ghost" hit="pad" className="w-7 h-7 text-muted-foreground" label="Clear search" onClick={closeSearch}>

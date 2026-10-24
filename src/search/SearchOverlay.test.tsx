@@ -28,6 +28,9 @@ function renderOverlay({ mobile, query = 'foo' }: { mobile: boolean; query?: str
         onClose={onClose}
         onOpen={vi.fn()}
         onCreate={vi.fn()}
+        highlightedIndex={-1}
+        onRowsChange={vi.fn()}
+        onInputKeyDown={vi.fn()}
       />
     </SidebarProvider>,
   )
