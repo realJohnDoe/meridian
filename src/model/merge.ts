@@ -23,7 +23,10 @@
  * for it is worse than handing both versions back. Frontmatter is merged
  * key-by-key because its keys *are* independent fields — which is the case
  * this module exists for (one person reschedules a task while another writes
- * its description).
+ * its description). The `items` checklist goes one level further and merges
+ * line by line (`mergeItems`): it is the field two people share a shopping
+ * list through, and one adding a line while the other ticks another is not an
+ * overlap.
  */
 
 import { loadFile } from '@/fileIO'
@@ -83,10 +86,66 @@ function mergeRawNodes(
   const out: Record<string, unknown> = {}
   for (const key of new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)])) {
     const picked = pickValue(base[key], local[key], remote[key])
+      ?? (key === 'items' ? mergeItems(base[key], local[key], remote[key]) : null)
     if (!picked) return null
     if (picked.value !== undefined) out[key] = picked.value
   }
   return out
+}
+
+/**
+ * A checklist line's identity across versions: its text without the checkbox,
+ * so ticking a box is an edit to that line rather than a new one.
+ */
+const lineId = (line: string) => line.trim().replace(/^\[[ xX]\]\s+/, '')
+
+const isLines = (v: unknown): v is string[] => Array.isArray(v) && v.every(x => typeof x === 'string')
+
+/**
+ * Merge an `items` checklist line by line, with `pickValue`'s rule applied to
+ * each line: lines added, removed or ticked on either side all survive.
+ *
+ * Null — the conflict copy — when both sides changed the same line to
+ * different things (one ticked it, the other renamed it), when both reordered
+ * the list, or when a side holds the same line twice, so there is no identity
+ * to match on. Order follows the side that reordered, else the remote's; a
+ * line the other side added goes in after the line it followed there.
+ */
+function mergeItems(base: unknown, local: unknown, remote: unknown): { value: string[] } | null {
+  if (!isLines(base) || !isLines(local) || !isLines(remote)) return null
+  const index = (lines: string[]) => {
+    const byId = new Map(lines.map(l => [lineId(l), l]))
+    return byId.size === lines.length ? byId : null
+  }
+  const b = index(base), l = index(local), r = index(remote)
+  if (!b || !l || !r) return null
+
+  const reordered = (side: Map<string, string>) => {
+    const kept = [...side.keys()].filter(id => b.has(id))
+    const was  = [...b.keys()].filter(id => side.has(id))
+    return kept.some((id, i) => id !== was[i])
+  }
+  const localReordered = reordered(l)
+  if (localReordered && reordered(r)) return null
+  const [frame, other] = localReordered ? [l, r] : [r, l]
+
+  // Every line the other side holds gets a slot, not only its additions: one
+  // the frame deleted still has to reach `pickValue`, which drops it if the
+  // other side left it alone and refuses if it ticked it.
+  const order = [...frame.keys()]
+  let at = -1
+  for (const id of other.keys()) {
+    if (frame.has(id)) at = order.indexOf(id)
+    else order.splice(++at, 0, id)
+  }
+
+  const out: string[] = []
+  for (const id of order) {
+    const picked = pickValue(b.get(id), l.get(id), r.get(id))
+    if (!picked) return null
+    if (picked.value !== undefined) out.push(picked.value as string)
+  }
+  return { value: out }
 }
 
 /** Merge two bodies whole — see the no-diff3 note at the top of this file. */
@@ -102,7 +161,8 @@ function mergeBody(base: string, local: string, remote: string): string | null {
  * the local edit was made from.
  *
  * Returns the merged file, or null when the two sides genuinely overlap (the
- * same frontmatter key set to two different values, or both bodies edited).
+ * same frontmatter key or `items` line set to two different values, or both
+ * bodies edited).
  * Null is not a failure: it is the signal that a conflict copy is the honest
  * outcome, and it is what the caller falls back to.
  *
