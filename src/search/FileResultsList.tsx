@@ -7,12 +7,23 @@ import { VirtualRows } from '@/components/primitives/virtual-rows'
 import { useStore } from '@/store'
 import { useFileOccurrenceMap } from '@/hooks'
 import { rankByQuery } from '@/lib/matching'
+import { cn } from '@/lib/cn'
+
+export interface FileSearchResult {
+  entry:    { entryKey: string; title: string }
+  occ:      Occurrence
+  listedOn: string[]
+}
 
 interface Props {
   query: string
   onOpen: (occ: Occurrence) => void
   /** Scroll container the virtualizer measures against — owned by the caller (SearchOverlay). */
   scrollRef: RefObject<HTMLDivElement | null>
+  /** entryKey of the row the keyboard currently has highlighted, or null when none of these results is (e.g. the Create row is highlighted instead). */
+  highlightedEntryKey?: string | null
+  /** Reports the current ranked results up to SearchResults whenever they change, so it can build the combined Create+results row list for keyboard nav. */
+  onResultsChange?: (results: FileSearchResult[]) => void
 }
 
 // OccurrenceCard min-h-11 + py-2 padding + gap-1.5 (6) between rows ≈ 68px.
@@ -38,13 +49,15 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
  * has multiple occurrences in the range.
  * Tags and topics are matched the same way — no divergence between fields.
  */
-export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
+export default function FileResultsList(props: Props) {
   'use no memo' // TanStack Virtual's useVirtualizer() returns imperative
   // methods over mutable internal state, which the compiler can't safely
   // memoize around — react-hooks/incompatible-library. The compiler already
   // auto-skips memoizing this function for the same reason, so this directive
   // is explicit documentation rather than a functional change; the eslint
   // warning here is expected and permanent, see eslint.config.js.
+  const { query, onOpen, scrollRef, onResultsChange } = props
+  const highlightedEntryKey = props.highlightedEntryKey ?? null
   const roots     = useStore(s => s.roots)
   const occBySlug = useFileOccurrenceMap()
   const backlinks = useStore(s => s.backlinks)
@@ -77,6 +90,8 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
     })
   }, [roots, backlinks, occBySlug, debouncedQuery])
 
+  useEffect(() => { onResultsChange?.(results) }, [results, onResultsChange])
+
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
     count: results.length,
@@ -100,17 +115,29 @@ export default function FileResultsList({ query, onOpen, scrollRef }: Props) {
       virtualizer={virtualizer}
       rows={results}
       rowStyle={(_, vi) => ({ '--stagger': `${vi.index * 0.025}s`, paddingBottom: 6 }) as React.CSSProperties}
-      renderRow={({ occ, listedOn }) => (
-        <OccurrenceCard
-          occ={occ}
-          leadingIcon="kind"
-          showTime="badge"
-          showDate
-          listedOn={listedOn}
-          onOpen={() => onOpen(occ)}
-          onToggleDone={() => {}}
-        />
-      )}
+      renderRow={({ entry, occ, listedOn }) => {
+        const highlighted = highlightedEntryKey === entry.entryKey
+        return (
+          // Not role="option" itself — OccurrenceCard's own SurfaceButton
+          // already carries the meaningful accessible name and click target;
+          // this id is purely an aria-activedescendant anchor, same split
+          // WikilinkPopup uses for its OccurrenceCard-wrapped matches.
+          <div
+            id={`search-option-${entry.entryKey}`}
+            className={cn('rounded-lg', highlighted && 'ring-2 ring-ring')}
+          >
+            <OccurrenceCard
+              occ={occ}
+              leadingIcon="kind"
+              showTime="badge"
+              showDate
+              listedOn={listedOn}
+              onOpen={() => onOpen(occ)}
+              onToggleDone={() => {}}
+            />
+          </div>
+        )
+      }}
     />
   )
 }

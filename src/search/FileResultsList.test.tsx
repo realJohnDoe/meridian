@@ -2,7 +2,7 @@
 import { createRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import FileResultsList from './FileResultsList'
+import FileResultsList, { type FileSearchResult } from './FileResultsList'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
 import type { Roots } from '@/types'
 
@@ -43,22 +43,23 @@ afterEach(() => {
  * type" naturally provides (and mirrors how the search box is actually used —
  * nobody opens it pre-filled).
  */
-function renderList() {
+function renderList(highlightedEntryKey: string | null = null) {
   const scrollRef = createRef<HTMLDivElement>()
   const onOpen = vi.fn()
+  const onResultsChange = vi.fn<(results: FileSearchResult[]) => void>()
   const { container, rerender } = render(
     <div ref={scrollRef}>
-      <FileResultsList query="" onOpen={onOpen} scrollRef={scrollRef} />
+      <FileResultsList query="" onOpen={onOpen} scrollRef={scrollRef} highlightedEntryKey={highlightedEntryKey} onResultsChange={onResultsChange} />
     </div>,
   )
   function type(query: string) {
     rerender(
       <div ref={scrollRef}>
-        <FileResultsList query={query} onOpen={onOpen} scrollRef={scrollRef} />
+        <FileResultsList query={query} onOpen={onOpen} scrollRef={scrollRef} highlightedEntryKey={highlightedEntryKey} onResultsChange={onResultsChange} />
       </div>,
     )
   }
-  return { onOpen, container, type }
+  return { onOpen, onResultsChange, container, type }
 }
 
 function flushDebounce() {
@@ -194,5 +195,29 @@ describe('FileResultsList', () => {
     flushDebounce()
 
     expect(screen.getByText('Linked From')).toBeInTheDocument()
+  })
+
+  it('reports ranked results up via onResultsChange', () => {
+    const occ = makeOcc({ entryKey: testKey('note.md') })
+    seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
+    const { type, onResultsChange } = renderList()
+
+    type('stand')
+    flushDebounce()
+
+    const [results] = onResultsChange.mock.calls.at(-1)!
+    expect(results).toHaveLength(1)
+    expect(results[0]!.entry.entryKey).toBe(testKey('note.md'))
+  })
+
+  it('rings the row matching highlightedEntryKey', () => {
+    const occ = makeOcc({ entryKey: testKey('note.md') })
+    seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
+    const { type } = renderList(testKey('note.md'))
+
+    type('stand')
+    flushDebounce()
+
+    expect(document.getElementById(`search-option-${testKey('note.md')}`)?.className).toMatch(/ring-2/)
   })
 })

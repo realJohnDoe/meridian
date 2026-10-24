@@ -2,7 +2,7 @@
 import { createRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import SearchResults from './SearchResults'
+import SearchResults, { type SearchRow } from './SearchResults'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey } from '@/test-utils'
 
 setupStore()
@@ -28,23 +28,24 @@ afterEach(() => {
   if (offsetWidthDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor)
 })
 
-function renderResults() {
+function renderResults(highlightedIndex = -1) {
   const scrollRef = createRef<HTMLDivElement>()
   const onOpen = vi.fn()
   const onCreate = vi.fn()
+  const onRowsChange = vi.fn<(rows: SearchRow[], defaultIndex: number) => void>()
   const { rerender } = render(
     <div ref={scrollRef}>
-      <SearchResults query="" onOpen={onOpen} onCreate={onCreate} scrollRef={scrollRef} />
+      <SearchResults query="" onOpen={onOpen} onCreate={onCreate} scrollRef={scrollRef} highlightedIndex={highlightedIndex} onRowsChange={onRowsChange} />
     </div>,
   )
   function type(query: string) {
     rerender(
       <div ref={scrollRef}>
-        <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={scrollRef} />
+        <SearchResults query={query} onOpen={onOpen} onCreate={onCreate} scrollRef={scrollRef} highlightedIndex={highlightedIndex} onRowsChange={onRowsChange} />
       </div>,
     )
   }
-  return { onOpen, onCreate, type }
+  return { onOpen, onCreate, onRowsChange, type }
 }
 
 function flushDebounce() {
@@ -54,14 +55,14 @@ function flushDebounce() {
 describe('SearchResults', () => {
   it('hides the Create row when the query is empty', () => {
     renderResults()
-    expect(screen.queryByRole('button', { name: /Create/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /Create/ })).not.toBeInTheDocument()
   })
 
   it('shows a Create row for the current query and calls onCreate when clicked', () => {
     const { type, onCreate } = renderResults()
     type('New idea')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create "New idea"' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Create "New idea"' }))
 
     expect(onCreate).toHaveBeenCalledWith('New idea')
   })
@@ -87,5 +88,59 @@ describe('SearchResults', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Standup' }))
 
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('note.md') }))
+  })
+
+  // See issue #1124: Enter must land on an exact title match rather than
+  // always creating a duplicate — this is the row-reporting half of that fix.
+  // The combined row list is [Create, ...results], so an exact match at
+  // results[0] defaults to combined index 1.
+  it('reports the exact title match as the default highlighted row', () => {
+    const occ = makeOcc({ entryKey: testKey('note.md') })
+    seedStore([occ], makeRoots('note.md', { title: 'Morning Run' }))
+    const { type, onRowsChange } = renderResults()
+
+    type('Morning Run')
+    flushDebounce()
+
+    const [rows, defaultIndex] = onRowsChange.mock.calls.at(-1)!
+    expect(defaultIndex).toBe(1)
+    expect(rows[1]!.entryKey).toBe(testKey('note.md'))
+  })
+
+  // Mobile hazard from the issue: with no exact match, Enter on a phone
+  // keyboard must still create rather than landing on some fuzzy result.
+  it('defaults to the Create row when there is no exact title match', () => {
+    const occ = makeOcc({ entryKey: testKey('note.md') })
+    seedStore([occ], makeRoots('note.md', { title: 'Morning Run' }))
+    const { type, onRowsChange } = renderResults()
+
+    type('Morning') // matches "Morning Run" but isn't exactly it
+    flushDebounce()
+
+    const [, defaultIndex] = onRowsChange.mock.calls.at(-1)!
+    expect(defaultIndex).toBe(0)
+  })
+
+  it("activating a reported result row opens its occurrence, and the Create row's creates", () => {
+    const occ = makeOcc({ entryKey: testKey('note.md') })
+    seedStore([occ], makeRoots('note.md', { title: 'Morning Run' }))
+    const { type, onOpen, onCreate, onRowsChange } = renderResults()
+
+    type('Morning Run')
+    flushDebounce()
+
+    const [rows] = onRowsChange.mock.calls.at(-1)!
+    rows[1]!.activate()
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('note.md') }))
+
+    rows[0]!.activate()
+    expect(onCreate).toHaveBeenCalledWith('Morning Run')
+  })
+
+  it('rings the Create row when it is the highlighted index', () => {
+    const { type } = renderResults(0)
+    type('New idea')
+
+    expect(screen.getByRole('option', { name: 'Create "New idea"' }).className).toMatch(/ring-2/)
   })
 })
