@@ -155,6 +155,11 @@ export function applyEdits(view: EntryState, edits: Edits): EntryState {
     // `mergeEditFields`.
     if (edit) (out as Record<string, unknown>)[key] = edit.value
   }
+  // `itemType` isn't an edit field — it's derived from `tracked`/`scheduled`,
+  // so it has to be re-derived over the edited values or the toggle keeps
+  // showing the store's type until the store catches up (or forever, when the
+  // occurrence has no stored row of its own to catch up from).
+  out.itemType = out.tracked ? 'task' : out.scheduled ? 'event' : 'note'
   return out
 }
 
