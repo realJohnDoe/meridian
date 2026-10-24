@@ -757,7 +757,10 @@ function expandNode<M>(
     // schedule branch reports an override that lands on a generated date. That
     // source is what tells applySingle to suppress the slot when the occurrence is
     // moved off it; calling such an instance 'explicit' leaves the slot free and it
-    // re-appears alongside the moved occurrence on the next expansion.
+    // re-appears alongside the moved occurrence on the next expansion. The
+    // anchor is a projected slot for the same reason: the series root emits it
+    // whether or not anything is stored there, so moving the first occurrence of
+    // a fresh series has to suppress it too.
     const lastDone = [...allTimes].reverse().find(e => e.done === true)
     const nextJsTime = lastDone
       ? addInterval(lastDone.jsTime, repeat.interval || '1 day')
@@ -780,7 +783,7 @@ function expandNode<M>(
           date:       spec.date ?? '',
           time:       entry.time ?? spec.time,
           jsTime:     entry.jsTime,
-          source:     onNextSlot(entry.jsTime, entry.timed) ? 'generated' : 'explicit',
+          source:     entry.jsTime === anchor || onNextSlot(entry.jsTime, entry.timed) ? 'generated' : 'explicit',
           done:       entry.done,
           overrideId: entry.overrideId,
           metadata:   entry.metadata,
