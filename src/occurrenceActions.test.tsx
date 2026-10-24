@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { beginSwipeDelete, toggleOccDone, reopenOcc, moveEntryToVault } from './occurrenceActions'
+import {
+  beginSwipeDelete, toggleOccDone, reopenOcc, moveEntryToVault,
+  deleteOccurrenceWithUndo, deleteFutureWithUndo, deleteSeriesWithUndo, deleteWholeFileWithUndo,
+} from './occurrenceActions'
 import { entryKey as makeEntryKey } from '@/fileIO'
 import { Toaster } from '@/components/ui/sonner'
 import { useStore } from '@/store'
@@ -221,6 +224,158 @@ describe('beginSwipeDelete', () => {
     flushToastMount()
 
     expect(screen.getByText(/this series only repeats after completion/)).toBeInTheDocument()
+  })
+})
+
+// ── Editor delete paths (issue #1128) ───────────────────────────────────────
+//
+// Same deferred-commit/undo contract as beginSwipeDelete, minus the swipe
+// animation: the store update lands immediately (no `apply()` step), and
+// only the persist/backend write (and Undo) waits on the toast.
+
+describe('deleteOccurrenceWithUndo', () => {
+  it('excludes a recurring occurrence immediately and defers persistence to auto-close', () => {
+    const series = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1' })
+    seedStore([series], makeRoots('note.md'))
+    render(<Toaster />)
+
+    deleteOccurrenceWithUndo(occ)
+    flushToastMount()
+
+    expect(findOverrideFor('series-1')?.excluded).toBe(true)
+    expect(persistence.writes).toEqual([])
+    expect(screen.getByText('Deleted: Standup')).toBeInTheDocument()
+
+    act(() => { vi.advanceTimersByTime(4100) })
+
+    expect(persistence.writes).toEqual([testKey('note.md')])
+  })
+
+  it('Undo restores the un-excluded snapshot', () => {
+    const series = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1' })
+    seedStore([series], makeRoots('note.md'))
+    render(<Toaster />)
+
+    deleteOccurrenceWithUndo(occ)
+    flushToastMount()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(items()).toEqual([series])
+
+    act(() => { vi.advanceTimersByTime(5000) })
+
+    expect(persistence.writes).toEqual([testKey('note.md')])
+    expect(persistence.deletes).toEqual([])
+  })
+})
+
+describe('deleteFutureWithUndo', () => {
+  it('caps the series end immediately and defers persistence to auto-close', () => {
+    const series = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-06-20' })
+    seedStore([series], makeRoots('note.md'))
+    render(<Toaster />)
+
+    deleteFutureWithUndo(occ)
+    flushToastMount()
+
+    const stored = items().find(i => i.id === 'series-1') as { repeat: { end?: { type: string; date: string } } }
+    expect(stored.repeat.end).toEqual({ type: 'until', date: '2026-06-19' })
+    expect(persistence.writes).toEqual([])
+
+    act(() => { vi.advanceTimersByTime(4100) })
+
+    expect(persistence.writes).toEqual([testKey('note.md')])
+  })
+
+  it('Undo restores the uncapped series', () => {
+    const series = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-06-20' })
+    seedStore([series], makeRoots('note.md'))
+    render(<Toaster />)
+
+    deleteFutureWithUndo(occ)
+    flushToastMount()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(items()).toEqual([series])
+  })
+})
+
+describe('deleteSeriesWithUndo', () => {
+  it('removes the series and its overrides, leaving a sibling series, and defers persistence to auto-close', () => {
+    const series1 = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
+    const series2 = makeSeries({ id: 'series-2', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'weekly' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1' })
+    seedStore([series1, series2], makeRoots('note.md'))
+    render(<Toaster />)
+
+    deleteSeriesWithUndo(occ)
+    flushToastMount()
+
+    expect(items().map(i => i.id)).toEqual(['series-2'])
+    expect(persistence.writes).toEqual([])
+
+    act(() => { vi.advanceTimersByTime(4100) })
+
+    expect(persistence.writes).toEqual([testKey('note.md')])
+    expect(persistence.deletes).toEqual([])
+  })
+
+  it('Undo restores the deleted series alongside its untouched sibling', () => {
+    const series1 = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
+    const series2 = makeSeries({ id: 'series-2', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'weekly' } })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1' })
+    seedStore([series1, series2], makeRoots('note.md'))
+    render(<Toaster />)
+
+    deleteSeriesWithUndo(occ)
+    flushToastMount()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(items().map(i => i.id).sort()).toEqual(['series-1', 'series-2'])
+  })
+})
+
+describe('deleteWholeFileWithUndo', () => {
+  it('deletes the entry and cleans up backlinks immediately, deferring the write', () => {
+    const a = makeOcc({ id: 'occ-a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', title: 'A' } })
+    const b = makeOcc({ id: 'occ-b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', title: 'B' } })
+    const roots: Roots = makeRoots('a.md', { title: 'A' })
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] }))
+    seedStore([a, b], roots)
+    render(<Toaster />)
+
+    deleteWholeFileWithUndo(testKey('a.md'), 'A')
+    flushToastMount()
+
+    expect(items().find(i => i.id === 'occ-a')).toBeUndefined()
+    expect(useStore.getState().roots.get(testKey('b.md'))?.items).toEqual([])
+    expect(persistence.deletes).toEqual([])
+    expect(screen.getByText('Deleted: A')).toBeInTheDocument()
+
+    act(() => { vi.advanceTimersByTime(4100) })
+
+    expect(persistence.deletes).toEqual([testKey('a.md')])
+    expect(persistence.writes).toEqual([testKey('b.md')])
+  })
+
+  it('Undo restores both the deleted entry and the wikilink other files carried to it', () => {
+    const a = makeOcc({ id: 'occ-a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', title: 'A' } })
+    const b = makeOcc({ id: 'occ-b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', title: 'B' } })
+    const roots: Roots = makeRoots('a.md', { title: 'A' })
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'B', tags: [], items: ['[[a.md]]'] }))
+    seedStore([a, b], roots)
+    render(<Toaster />)
+
+    deleteWholeFileWithUndo(testKey('a.md'), 'A')
+    flushToastMount()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(items().find(i => i.id === 'occ-a')).toBeDefined()
+    expect(useStore.getState().roots.get(testKey('b.md'))?.items).toEqual(['[[a.md]]'])
   })
 })
 

@@ -115,6 +115,11 @@ const OPERATIONS: Record<string, (data: StoreData) => StoreData> = {
   'toggleDone/generated': d => storeOps.toggleDone(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
   excludeOccurrence: d => storeOps.excludeOccurrence(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
   deleteFollowing: d => storeOps.deleteFollowing(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
+  // Removes the whole series — root included, since it's the fixture's only
+  // content — the same reason deleteByEntryKey below is vacuous here; this
+  // exists for the coverage guard, with the real scoped-removal behaviour
+  // (leaving a sibling series/root untouched) asserted in edits.test.ts.
+  deleteSeries: d => storeOps.deleteSeries(d, occOn(itemsOf(d), rootsIn(d), GENERATED)),
   // Removes its target file by design; the property still holds for every file
   // it does not touch, which is what this case pins down.
   deleteByEntryKey: d => storeOps.deleteByEntryKey(d, keyOf('some-other-file')).data,

@@ -15,12 +15,13 @@ interface Props {
   onConfirm: () => void
   onClose: () => void
   /**
-   * Overrides the heading and body for a destructive action that is not a
-   * plain delete — removing a repeat, which deletes the series' changed
-   * occurrences along with the rule. Same dialog on purpose: it is the same
-   * promise to the user (this is irreversible, here is what goes, cancel is
-   * the safe answer), and giving that promise a second look would be how the
-   * two drift apart.
+   * Overrides the heading and body for a destructive action that has no undo
+   * path of its own — removing a repeat, which deletes the series' changed
+   * occurrences along with the rule and is asked about plainly ("cannot be
+   * undone") because nothing here reverts it. The default body below makes no
+   * such promise: `onConfirm` for a plain delete goes through an undo toast
+   * (see `deleteNode`/`occurrenceActions.ts`), so there is nothing to warn
+   * away from — Archive is offered as a real alternative, not a safety net.
    */
   heading?: string
   description?: ReactNode
@@ -44,7 +45,7 @@ export default function DeleteDialog({ open, title, onConfirm, onClose, onArchiv
         <AlertDialogHeader>
           <AlertDialogTitle>{heading ?? 'Delete'}</AlertDialogTitle>
           <AlertDialogDescription>
-            {description ?? <>Delete &ldquo;{title}&rdquo;? This cannot be undone.</>}
+            {description ?? <>Delete &ldquo;{title}&rdquo;, or archive it instead?</>}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <DeleteDialogFooter

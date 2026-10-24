@@ -1348,3 +1348,28 @@ export function deleteFollowing(data: StoreData, occ: Occurrence): StoreData {
     }) }),
   }
 }
+
+/**
+ * Remove one series — its repeat pattern and every occurrence it owns —
+ * from its file, leaving the rest of the file (other series, standalone
+ * occurrences) untouched. Same scope as `deleteFollowing` (this occurrence's
+ * own series, nothing wider), but removes rather than caps it.
+ *
+ * Callers must only reach this when the series is not the file's only
+ * content — see `deleteNode` (editor/save.ts), which routes to
+ * `deleteByEntryKey` instead whenever it is, the same way `excludeOccurrence`
+ * leaves backlink cleanup to that function rather than duplicating it here.
+ */
+export function deleteSeries(data: StoreData, occ: Occurrence): StoreData {
+  const entry = data.entries.get(occ.entryKey)
+  if (!entry) return data
+  const series = findSeries(entry.items, occ)
+  if (!series) return data
+  const items = filterItems(entry.items, i => i.id !== series.id && !(!isSeries(i) && i.ownerId === series.id))
+  if (!items) {
+    const next = new Map(data.entries)
+    next.delete(occ.entryKey)
+    return { ...data, entries: next }
+  }
+  return { ...data, entries: withEntry(data.entries, { ...entry, items }) }
+}

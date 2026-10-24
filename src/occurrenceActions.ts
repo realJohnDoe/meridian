@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
+import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, deleteSeries, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Entries, Entry, StoreItem } from './types'
@@ -193,5 +193,69 @@ export function beginSwipeDelete(o: Occurrence): () => void {
       setData(data.entries)
     }
   }
+}
+
+// ── Editor delete paths (issue #1128) ───────────────────────────────────────
+//
+// Same deferred-commit/undo shape as `beginSwipeDelete` above, minus the
+// swipe animation: the editor has nothing to time the store update against,
+// so `setData` runs immediately here and only the persist/backend write (and
+// therefore Undo) waits on the toast.
+
+/** "This occurrence" — a series' single instance, or a standalone sharing its file with other content. */
+export function deleteOccurrenceWithUndo(o: Occurrence): void {
+  const snapshot = getSnapshot()
+  const next = excludeOccurrence(snapshot, o)
+  const endsSeries = deletionEndsAfterCompletionSeries(snapshot.entries.get(o.entryKey)?.items ?? [], o)
+  setData(next.entries)
+  showDeleteToast(o.metadata.title,
+    () => { persistEntries(getSnapshot(), [o.entryKey]) },
+    () => { restoreEntries(snapshot, [o.entryKey]) },
+    { endsSeries },
+  )
+}
+
+/** "This and all following" — caps the series' repeat.end. */
+export function deleteFutureWithUndo(o: Occurrence): void {
+  const snapshot = getSnapshot()
+  const next = deleteFollowing(snapshot, o)
+  setData(next.entries)
+  showDeleteToast(o.metadata.title,
+    () => { persistEntries(getSnapshot(), [o.entryKey]) },
+    () => { restoreEntries(snapshot, [o.entryKey]) },
+  )
+}
+
+/**
+ * "All occurrences of this series" — only reachable when the series isn't
+ * the file's only content (see `deleteSeries`'s doc comment in model/); a
+ * lone series goes through `deleteWholeFileWithUndo` instead, for the
+ * backlink cleanup a file that vanishes needs.
+ */
+export function deleteSeriesWithUndo(o: Occurrence): void {
+  const snapshot = getSnapshot()
+  const next = deleteSeries(snapshot, o)
+  setData(next.entries)
+  showDeleteToast(o.metadata.title,
+    () => { persistEntries(getSnapshot(), [o.entryKey]) },
+    () => { restoreEntries(snapshot, [o.entryKey]) },
+  )
+}
+
+/**
+ * Delete an entire file: the lone-standalone case, an explicit "Delete whole
+ * file" choice, or "all occurrences" when a series is all the file holds.
+ * Reuses `deleteByEntryKey`'s backlink cleanup and restores both the primary
+ * entry and every backlink-edited file on Undo — the same restoration
+ * `beginSwipeDelete`'s non-recurring branch already relies on.
+ */
+export function deleteWholeFileWithUndo(entryKey: EntryKey, title: string): void {
+  const snapshot = getSnapshot()
+  const { data: next, affectedKeys } = deleteByEntryKey(snapshot, entryKey)
+  setData(next.entries)
+  showDeleteToast(title,
+    () => { persistEntries(getSnapshot(), affectedKeys); deleteEntity(entryKey) },
+    () => { restoreEntries(snapshot, [entryKey, ...affectedKeys]) },
+  )
 }
 
