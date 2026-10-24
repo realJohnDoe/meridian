@@ -902,7 +902,6 @@ export async function runSync(
       // caught below), so it can't take a successful cycle down with it.
       void sweepRetention(vaultId).catch((e: unknown) => console.error(`[vault] retention sweep failed for ${vaultId}:`, e))
     }
-    updateSyncUI(backend)
   } catch (e) {
     console.error(`[vault] sync failed for ${vaultId}:`, e)
 
@@ -936,6 +935,9 @@ export async function runSync(
   } finally {
     syncState.syncing = false
     setVaultSync(vaultId, { inProgress: false })
+    // Every outcome, not just success: pushDirty cleans rows one by one, so a
+    // cycle that throws partway has still changed the count.
+    updateSyncUI(backend)
   }
   // A push that arrived mid-sync was queued (see attemptPush) rather than
   // dropped; draining it is the scheduler's job, and this is what tells it
