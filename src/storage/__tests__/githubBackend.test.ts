@@ -263,6 +263,14 @@ describe('GitHubBackend', () => {
     await expect(backend.statAll()).rejects.toThrow(/truncated/i)
   })
 
+  it('reads bypass the browser HTTP cache, which would serve a just-pushed file\'s previous content', async () => {
+    mockFetch({ sha: 'sha1', content: btoa('hello') })
+    const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+    await backend.readFiles(['note.md'])
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit]
+    expect(init.cache).toBe('no-store')
+  })
+
   // Finding #1: an unchanged tree must go out as a conditional request and be
   // read as "nothing moved" rather than a real refusal — GitHub does not
   // count a 304 against the rate limit, which is what makes it safe to poll

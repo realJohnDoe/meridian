@@ -8,6 +8,14 @@ const ThrottledOctokit = Octokit.plugin(throttling)
 export function makeOctokit(token: string): InstanceType<typeof ThrottledOctokit> {
   return new ThrottledOctokit({
     auth: token,
+    // GitHub answers reads with `Cache-Control: private, max-age=60`, and
+    // `fetch` honours that by default: a second GET of the same file within a
+    // minute is served from the browser's HTTP cache without reaching GitHub.
+    // Sync treats every read as the remote's current state — a cached one let
+    // reconcile pull a just-pushed file's previous content back over the
+    // edit, and then reported the follow-up push as a conflict. `statAll`'s
+    // own ETag revalidation still works: a conditional request is sent as-is.
+    request: { fetch: (url: string, init: RequestInit) => fetch(url, { ...init, cache: 'no-store' }) },
     throttle: {
       // Bottleneck's write group enforces minTime: 1000ms. Under test the
       // transport is a stubbed fetch, so that is a second of real sleep
