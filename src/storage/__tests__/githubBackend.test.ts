@@ -853,4 +853,38 @@ describe('GitHubBackend', () => {
     expect(progressUpdates.every(p => p.total === 120)).toBe(true)
     expect(progressUpdates[progressUpdates.length - 1]!.loaded).toBe(120)
   }, 10000)
+
+  // ── readDates — StorageBackend.readDates, reconcile's on-demand backfill ──
+
+  describe('readDates', () => {
+    it('resolves a commit date per path via one aliased history batch, without touching content', async () => {
+      fetchSpy.mockResolvedValueOnce(makeHistoryResp(['a.md', 'b.md']))
+
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      const dates   = await backend.readDates(['a.md', 'b.md'])
+
+      expect(dates.get('a.md')).toBe(Date.parse('2026-01-01T00:00:00Z'))
+      expect(dates.get('b.md')).toBe(Date.parse('2026-01-01T00:00:00Z'))
+      expect(fetchSpy).toHaveBeenCalledTimes(1) // no tree listing, no Contents/blob fetch — just the history batch
+    })
+
+    it('returns an empty map for an empty path list without making a request', async () => {
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      const dates   = await backend.readDates([])
+
+      expect(dates.size).toBe(0)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('soft-fails to an empty map when the history lookup itself errors', async () => {
+      fetchSpy.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      const backend = new GitHubBackend('id1', 'alice/notes', BASE_CFG)
+      const dates   = await backend.readDates(['a.md'])
+
+      expect(dates.size).toBe(0)
+      warnSpy.mockRestore()
+    })
+  })
 })

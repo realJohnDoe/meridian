@@ -1,7 +1,7 @@
 import {
   applyRemoteBatch, confirmDeleted, cacheGetDirty,
   setResolvedClean, markPushed, cacheLoadAll,
-  cacheGetTombstones, markMerged,
+  cacheGetTombstones, markMerged, backfillLastModified,
 } from '@/storage/cache/files'
 import type { CacheRecord } from '@/storage/cache/files'
 import { heldDeletePaths } from '@/storage/cache/pendingMoves'
@@ -17,6 +17,7 @@ import {
   getVaultLayer, setVaultLayer,
   setVaultSync, setVaultListedKeys,
   getUnreadableFiles, setUnreadableFiles,
+  getVaults,
 } from '@/storeBridge'
 import type { AttentionKind } from '@/store'
 import { notify, warn, warnWithDetails, notifyError } from './notifications'
@@ -489,6 +490,7 @@ export async function reconcileWithBackend(
     : new Set([...skipPaths, ...inFlight])
 
   const { changed, deleted } = planReconcile(diskTokens, cached, effectiveSkip, Date.now())
+  const changedSet = new Set(changed)
 
   // Paths applyRemoteBatch actually wrote — it skips any path a local edit
   // or delete touched since the cacheLoadAll snapshot above (readFiles/readAll
@@ -501,7 +503,6 @@ export async function reconcileWithBackend(
     if (changed.length > LARGE_RECONCILE_THRESHOLD) {
       // readAll() already backfills `lastModified` per file (FS mtime, or
       // GitHub's batched commit-date lookup) — real values, kept as-is.
-      const changedSet = new Set(changed)
       freshFiles = (await backend.readAll()).filter(f => changedSet.has(f.path))
     } else {
       // readFiles() never sets `lastModified` (see its doc comment on
@@ -522,6 +523,24 @@ export async function reconcileWithBackend(
         actual:   f.version,
         remoteHash: hashContent(f.content),
       }, backend.kind)
+    }
+  }
+
+  // A row this cycle never touches — content unchanged since it was cached,
+  // so it's not in `changed` — keeps whatever `lastModified` it already had,
+  // which for a row cached before the age-backfill existed (or never synced
+  // through a path that sets one) is permanently missing: nothing ever
+  // revisits an unchanging path to learn one otherwise. Only worth asking the
+  // backend for when the retention sweep would use the answer, and only from
+  // a backend with a gap to close (`readDates` — local FS's own reads already
+  // carry a real mtime and never need this).
+  const retentionDays = getVaults().find(v => v.id === vaultId)?.retentionDays
+  if (backend.readDates && retentionDays) {
+    const missingDatePaths = cached
+      .filter(r => r.status === 'clean' && r.lastModified === undefined && !changedSet.has(r.path) && diskTokens.has(r.path))
+      .map(r => r.path)
+    if (missingDatePaths.length > 0) {
+      await backfillLastModified(vaultId, await backend.readDates(missingDatePaths))
     }
   }
 

@@ -28,7 +28,7 @@ const { cacheStore, pendingMoves, storeState, notifyFns, roundTripLossMock } = v
   cacheStore: new Map<string, {
     vaultPath: string; vaultId: string; path: string; content: string
     status: 'clean' | 'dirty' | 'deleted'; updatedAt: number; version?: string
-    baseContent?: string
+    baseContent?: string; lastModified?: number
   }>(),
   storeState: {
     /** Per-vault layers — the shape the real store holds: one `Entries` map per vault. */
@@ -43,7 +43,7 @@ const { cacheStore, pendingMoves, storeState, notifyFns, roundTripLossMock } = v
     listedKeys: new Map<string, ReadonlySet<string>>(),
     /** The registered vault refs — what `getVaults` answers. Registration is
      *  not the same thing as being mounted: `writeTarget` tells them apart. */
-    vaults: [] as Array<{ id: string; name: string; kind: string }>,
+    vaults: [] as Array<{ id: string; name: string; kind: string; retentionDays?: number }>,
     /** vaultId → the fields `setVaultSync` writes. */
     syncByVault: new Map<string, {
       dirtyCount: number; error: string | null; offline: boolean
@@ -142,6 +142,13 @@ vi.mock('@/storage/cache/files', () => {
     }),
     cacheDirtyCount: vi.fn(async (vaultId: string) => {
       return Array.from(cacheStore.values()).filter(r => r.vaultId === vaultId && (r.status === 'dirty' || r.status === 'deleted')).length
+    }),
+    backfillLastModified: vi.fn(async (vaultId: string, dates: Map<string, number>) => {
+      for (const [path, lastModified] of dates) {
+        const key = vp(vaultId, path)
+        const existing = cacheStore.get(key)
+        if (existing && existing.status === 'clean') cacheStore.set(key, { ...existing, lastModified })
+      }
     }),
   }
 })
@@ -258,6 +265,7 @@ class FakeBackend implements StorageBackend {
   readonly readOnly = false
   readonly hasRemote = true
   refreshAuth?: () => Promise<boolean>
+  readDates?:   (paths: string[]) => Promise<Map<string, number>>
 
   writeCallCount     = 0
   deleteCallCount    = 0
@@ -1613,6 +1621,81 @@ describe('reconcileWithBackend — large changed sets route through readAll()', 
     expect(backend.readFilesCallCount).toBe(1)
     expect(backend.readAllCallCount).toBe(0)
     expect(cacheStore.get(vp('fake-vault', 'note.md'))?.content).toBe('content')
+  })
+})
+
+// ── Backfilling lastModified for rows reconcile otherwise never revisits ──
+//
+// A row whose content hasn't changed since it was cached is never in
+// `changed`, so nothing else in reconcile ever looks at it again — a row
+// cached before the age-backfill existed (or one a backend never set a date
+// for) would stay "unknown age" forever otherwise. See backend.ts's
+// `StorageBackend.readDates` and its call site below.
+
+describe('reconcileWithBackend — backfilling lastModified for untouched rows', () => {
+  it('asks the backend for dates on a retention-enabled vault and patches the missing rows', async () => {
+    storeState.vaults = [{ id: 'fake-vault', name: 'Fake', kind: 'local', retentionDays: 30 }]
+    const backend = new FakeBackend()
+    backend.seed('old.md', 'content', 'v1')
+    mountBackend(backend)
+    seedClean('fake-vault', 'old.md', 'content', 'v1', Date.now()) // clean, same version → not "changed"; no lastModified set
+
+    const readDates = vi.fn(async (paths: string[]) => new Map(paths.map(p => [p, 111])))
+    backend.readDates = readDates
+
+    await reconcileWithBackend(backend, 'fake-vault')
+
+    expect(readDates).toHaveBeenCalledWith(['old.md'])
+    expect(cacheStore.get(vp('fake-vault', 'old.md'))?.lastModified).toBe(111)
+  })
+
+  it('does not ask when the vault has no retentionDays set', async () => {
+    storeState.vaults = [{ id: 'fake-vault', name: 'Fake', kind: 'local' }]
+    const backend = new FakeBackend()
+    backend.seed('old.md', 'content', 'v1')
+    mountBackend(backend)
+    seedClean('fake-vault', 'old.md', 'content', 'v1', Date.now())
+
+    const readDates = vi.fn(async () => new Map<string, number>())
+    backend.readDates = readDates
+
+    await reconcileWithBackend(backend, 'fake-vault')
+
+    expect(readDates).not.toHaveBeenCalled()
+  })
+
+  it('does not ask for a row that already has lastModified, or one the backend has no readDates for', async () => {
+    storeState.vaults = [{ id: 'fake-vault', name: 'Fake', kind: 'local', retentionDays: 30 }]
+    const backend = new FakeBackend() // no readDates implemented
+    backend.seed('old.md', 'content', 'v1')
+    backend.seed('known.md', 'content 2', 'v1')
+    mountBackend(backend)
+    seedClean('fake-vault', 'old.md', 'content', 'v1', Date.now())
+    cacheStore.set(vp('fake-vault', 'known.md'), {
+      vaultPath: vp('fake-vault', 'known.md'), vaultId: 'fake-vault', path: 'known.md',
+      content: 'content 2', status: 'clean', updatedAt: Date.now(), version: 'v1', lastModified: 222,
+    })
+
+    await reconcileWithBackend(backend, 'fake-vault') // must not throw despite no readDates
+
+    expect(cacheStore.get(vp('fake-vault', 'old.md'))?.lastModified).toBeUndefined()
+    expect(cacheStore.get(vp('fake-vault', 'known.md'))?.lastModified).toBe(222)
+  })
+
+  it('does not ask for a path that changed this cycle — it gets a fresh stamp on its own', async () => {
+    storeState.vaults = [{ id: 'fake-vault', name: 'Fake', kind: 'local', retentionDays: 30 }]
+    const backend = new FakeBackend()
+    backend.seed('changed.md', 'new content', 'v2')
+    mountBackend(backend)
+    seedClean('fake-vault', 'changed.md', 'old content', 'v1', Date.now()) // version drifted → "changed"
+
+    const readDates = vi.fn(async () => new Map<string, number>())
+    backend.readDates = readDates
+
+    await reconcileWithBackend(backend, 'fake-vault')
+
+    expect(readDates).not.toHaveBeenCalled()
+    expect(cacheStore.get(vp('fake-vault', 'changed.md'))?.content).toBe('new content')
   })
 })
 
