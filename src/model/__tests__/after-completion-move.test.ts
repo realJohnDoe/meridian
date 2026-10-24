@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { parseFixture, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn, serializeOnly } from './helpers'
+import { parseFixture, rootsOf, NEW_TARGET, TEST_VAULT, keyOf, dataOf, itemsOf, rootsIn, serializeOnly } from './helpers'
 import { applyEdit } from '@/model/storeOps'
+import { parseToStoreItems } from '@/model/storeItems'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { expandRange } from '@/model/expansion'
 import type { Occurrence, Roots, StoreItem } from '@/types'
@@ -76,6 +77,20 @@ describe('after_completion: moving the projected occurrence', () => {
     expect(serializeOnly(data)).toContain(
       '  - date: 2026-07-23\n    excluded: true',
     )
+  })
+
+  // Nothing done yet, so the only occurrence is the series' own anchor — which
+  // the root emits whether or not a row backs it, exactly like the projected
+  // slot. Moving it used to leave the anchor standing beside the moved copy.
+  it('suppresses the anchor when the first occurrence of a fresh series is moved', () => {
+    const parsed = parseToStoreItems('fresh.md', '---\ntitle: Fresh\ndone: false\ndate: 2026-07-01\nrepeat:\n  type: after_completion\n  interval: 1 week\n---\n', TEST_VAULT)
+    let data = dataOf(parsed.items, rootsOf(parsed.root))
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-07-01')
+    expect(occ.source).toBe('generated')
+
+    data = applyEdit(data, occ, 'single', editFields(occ, { scheduled: { date: '2026-07-03', time: '' } }), NEW_TARGET)
+
+    expect(datesIn(data, '2026-07')).toEqual(['2026-07-03'])
   })
 
   it('is idempotent when the editor replays the move with its pinned occurrence', () => {
