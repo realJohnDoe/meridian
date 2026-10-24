@@ -122,6 +122,58 @@ describe('mergeFileContent — the overlapping case', () => {
   })
 })
 
+describe('mergeFileContent — items checklists merge line by line', () => {
+  const list = (...lines: string[]) =>
+    `---\ntitle: Einkauf\nitems:\n${lines.map(l => `  - "${l}"`).join('\n')}\n---\n`
+  const items = (content: string | null) => parsed(content!).fm.items
+  const base = list('[ ] Milch', '[ ] Brot', '[ ] Eier')
+
+  it('keeps a line one side added and a box the other side ticked', () => {
+    const local  = list('[ ] Milch', '[ ] Brot', '[ ] Eier', '[ ] Käse')
+    const remote = list('[ ] Milch', '[x] Brot', '[ ] Eier')
+    expect(items(mergeFileContent(PATH, base, local, remote)))
+      .toEqual(['[ ] Milch', '[x] Brot', '[ ] Eier', '[ ] Käse'])
+  })
+
+  it('puts an added line after the line it followed on its own side', () => {
+    const local  = list('[ ] Milch', '[ ] Butter', '[ ] Brot', '[ ] Eier')
+    const remote = list('[ ] Milch', '[ ] Eier')                           // removed Brot
+    expect(items(mergeFileContent(PATH, base, local, remote)))
+      .toEqual(['[ ] Milch', '[ ] Butter', '[ ] Eier'])
+  })
+
+  it('follows the order of the side that reordered', () => {
+    const local  = list('[ ] Eier', '[ ] Milch', '[ ] Brot')
+    const remote = list('[ ] Milch', '[x] Brot', '[ ] Eier')
+    expect(items(mergeFileContent(PATH, base, local, remote)))
+      .toEqual(['[ ] Eier', '[ ] Milch', '[x] Brot'])
+  })
+
+  it('accepts both sides ticking the same box', () => {
+    const ticked = list('[ ] Milch', '[x] Brot', '[ ] Eier')
+    expect(items(mergeFileContent(PATH, base, ticked, list('[x] Milch', '[x] Brot', '[ ] Eier'))))
+      .toEqual(['[x] Milch', '[x] Brot', '[ ] Eier'])
+  })
+
+  it('refuses when both sides changed the same line differently', () => {
+    const local  = list('[ ] Milch', '[x] Brot', '[ ] Eier')
+    const remote = list('[ ] Milch', '[ ] Vollkornbrot', '[ ] Eier')       // renamed = removed Brot
+    expect(mergeFileContent(PATH, base, local, remote)).toBeNull()
+  })
+
+  it('refuses when both sides reordered', () => {
+    const local  = list('[ ] Eier', '[ ] Milch', '[ ] Brot')
+    const remote = list('[ ] Brot', '[ ] Milch', '[ ] Eier')
+    expect(mergeFileContent(PATH, base, local, remote)).toBeNull()
+  })
+
+  it('refuses when a side holds the same line twice — there is nothing to match on', () => {
+    const local  = list('[ ] Milch', '[ ] Brot', '[ ] Eier', '[ ] Milch')
+    const remote = list('[ ] Milch', '[x] Brot', '[ ] Eier')
+    expect(mergeFileContent(PATH, base, local, remote)).toBeNull()
+  })
+})
+
 // ── mergeEditFields ────────────────────────────────────────────
 
 const FIELDS: EditFields = {
