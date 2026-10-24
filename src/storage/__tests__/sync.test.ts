@@ -1502,6 +1502,26 @@ describe('runSync — needsAttention by AuthSyncError kind', () => {
   })
 })
 
+describe('runSync — the dirty count after a cycle that fails partway', () => {
+  it('re-counts what is still dirty, rather than keeping the pre-cycle number', async () => {
+    const backend = new FakeBackend()
+    mountBackend(backend)
+    seedDirty('fake-vault', 'a.md', 'one', undefined)
+    seedDirty('fake-vault', 'b.md', 'two', undefined)
+    const write = backend.write.bind(backend)
+    let calls = 0
+    backend.write = async (...args: Parameters<typeof write>) => {
+      if (++calls === 2) throw new TransientSyncError('offline')
+      return write(...args)
+    }
+
+    await syncToBackend()
+
+    expect(syncOf().offline).toBe(true)
+    await vi.waitFor(() => expect(syncOf().dirtyCount).toBe(1))
+  })
+})
+
 // ── Backoff transitions ───────────────────────────────────────────────────
 
 describe('runSync — exponential backoff on transient failures', () => {
