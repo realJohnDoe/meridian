@@ -7,7 +7,7 @@ import TimePickerDialog from './dialogs/TimePickerDialog'
 import DurationDialog from './dialogs/DurationDialog'
 import { fmtISO } from '@/model'
 import { useToday } from '@/hooks'
-import type { EntryState } from './state'
+import { itemTypeOf, type EntryState } from './state'
 import type { DialogHandlers } from './useEntryEditor'
 
 interface Props {
@@ -53,7 +53,7 @@ export default function DialogStack({ entry, handlers }: Props) {
         open={activeDialog === 'dlgDur'}
         value={entry.duration || ''}
         scheduled={entry.scheduled}
-        itemType={entry.itemType}
+        itemType={itemTypeOf(entry)}
         onConfirm={onDurConfirm}
         onRemove={onDurRemove}
         onClose={onClose}
@@ -63,7 +63,7 @@ export default function DialogStack({ entry, handlers }: Props) {
         open={activeDialog === 'dlgRepeat'}
         scheduled={entry.scheduled}
         tracked={entry.tracked}
-        itemType={entry.itemType}
+        itemType={itemTypeOf(entry)}
         repeat={entry.repeat}
         onConfirm={onRepeatConfirm}
         onRemove={onRepeatRemove}

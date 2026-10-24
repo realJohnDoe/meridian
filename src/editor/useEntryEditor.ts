@@ -33,13 +33,12 @@ export interface NewEntrySeed {
 
 function entryFromItem(item: Occurrence | null, editScope: EditScope, seed?: NewEntrySeed): EntryState {
   if (!item) {
-    const itemType = seed?.itemType ?? ENTRY_DEFAULT.itemType
+    const itemType = seed?.itemType ?? 'task'
     return {
       ...ENTRY_DEFAULT,
       editScope,
-      itemType,
       tracked: itemType === 'task',
-      scheduled: { date: seed?.date ?? fmtISO(startOfToday()), time: seed?.time ?? '' },
+      scheduled: itemType === 'note' ? null : { date: seed?.date ?? fmtISO(startOfToday()), time: seed?.time ?? '' },
       duration: seed?.duration ?? '',
     }
   }
@@ -363,7 +362,7 @@ export function useEntryEditor(
     const listTitle = title.trim()
     if (!listTitle) return
     const target = saveNode(null, 'all', {
-      item: null, title: listTitle, tracked: false, itemType: 'note', done: false,
+      item: null, title: listTitle, tracked: false, done: false,
       body: '', tags: [], items: [],
       participants: vaultId ? readVaultStringArray('meridian_default_participants', vaultId) : [],
       priority: null, scheduled: null, duration: '', repeat: null,
@@ -486,7 +485,6 @@ export function useEntryEditor(
   const handleTypeChange = (t: ItemType) => {
     updateEntry({
       ...entry,
-      itemType: t,
       tracked: t === 'task',
       priority: t !== 'task' ? null : entry.priority,
       scheduled:
@@ -515,7 +513,7 @@ export function useEntryEditor(
   // stale the moment the parent entry lives elsewhere.
   const handlePromoteTask = (title: string, done: boolean): string | null => {
     const key = saveNode(null, 'all', {
-      item: null, title, tracked: true, itemType: 'task', done,
+      item: null, title, tracked: true, done,
       body: '', tags: [], items: [], participants: vaultId ? readVaultStringArray('meridian_default_participants', vaultId) : [],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
