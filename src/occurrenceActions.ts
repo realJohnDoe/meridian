@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { toggleDone, excludeOccurrence, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
+import { toggleDone, excludeOccurrence, hasSiblingOccurrences, deletionEndsAfterCompletionSeries, deleteByEntryKey, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Entries, Entry, StoreItem } from './types'
@@ -155,7 +155,10 @@ export function beginSwipeDelete(o: Occurrence): () => void {
   const title    = o.metadata.title
   let cancelled  = false
 
-  if (occIsRecur(o)) {
+  // A standalone occurrence with live siblings is removed on its own, like a
+  // recurring one; only the entry's last occurrence takes the file with it
+  // (mirrors `deleteNode` in editor/save.ts).
+  if (occIsRecur(o) || hasSiblingOccurrences(getItems(), o)) {
     const next = excludeOccurrence(snapshot, o)
     const endsSeries = deletionEndsAfterCompletionSeries(snapshot.entries.get(o.entryKey)?.items ?? [], o)
     showDeleteToast(title,
