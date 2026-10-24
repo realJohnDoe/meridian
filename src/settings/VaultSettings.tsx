@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Link } from '@tanstack/react-router'
 import { Trash2, TriangleAlert, AlertCircle, Download, Upload, RefreshCw, ArchiveRestore, ChevronRight, Copy, Check, ExternalLink, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
+import { IconButton } from '@/components/primitives/icon-button'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,6 +29,7 @@ import {
 } from '@/vaultActions'
 import { ParticipantsRow, archiveEntry } from '@/editor'
 import { keyRoute } from '@/entryRoute'
+import { deleteWholeFileWithUndo } from '@/occurrenceActions'
 import type { VaultRef, IcsImportSummary } from '@/vaultActions'
 import { VAULT_COLORS, isWritableVault } from '@/vaultRef'
 import { VAULT_COLOR_SWATCH } from '@/components/primitives/occurrence-variants'
@@ -41,7 +43,7 @@ import type { ArchivedEntry } from './archivedEntries'
 /** Above this many archived entries, the list hides behind a disclosure — see `ArchivedRows`. */
 const ARCHIVE_COLLAPSE_THRESHOLD = 5
 
-/** One archived entry's row: a link to it, plus its own Unarchive action. */
+/** One archived entry's row: a link to it, plus its own Unarchive and (undoable) Delete actions. */
 function ArchivedRows({ archived }: { archived: ArchivedEntry[] }) {
   return (
     <ul className="flex flex-col gap-1.5">
@@ -59,6 +61,14 @@ function ArchivedRows({ archived }: { archived: ArchivedEntry[] }) {
             <ArchiveRestore className="size-3.5 stroke-[1.7]" />
             Unarchive
           </Button>
+          <IconButton
+            label={`Delete ${title}`}
+            hit="pad"
+            className="p-1.5 text-muted-foreground hover:text-destructive"
+            onClick={() => deleteWholeFileWithUndo(key, title)}
+          >
+            <Trash2 className="size-3.5 stroke-[1.7]" />
+          </IconButton>
         </li>
       ))}
     </ul>
