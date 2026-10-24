@@ -532,16 +532,16 @@ describe('deleteNode — scope options for multi-occurrence files', () => {
     expect(useStore.getState().items).toEqual([])
   })
 
-  it('a lone recurring series (nothing else in the file) only offers "All occurrences", which deletes the whole file', () => {
+  it('a lone recurring series (nothing else in the file) offers "Delete whole file" instead of a scoped "All occurrences"', () => {
     const series = makeSeries({ id: 'series-1', entryKey: testKey('solo'), repeat: { type: 'schedule', freq: 'daily' } })
     const occ = makeOcc({ id: 'occ-1', entryKey: testKey('solo'), ownerId: 'series-1' })
     seedStore([series], makeRoots('solo'))
 
     let config: SeriesSheetConfig | undefined
     deleteNode(occ, vi.fn(), c => { config = c }, vi.fn())
-    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'This and all following', 'All occurrences'])
+    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'This and all following', 'Delete whole file'])
 
-    config!.options.find(o => o.label === 'All occurrences')!.onClick()
+    config!.options.find(o => o.label === 'Delete whole file')!.onClick()
 
     expect(useStore.getState().roots.has(testKey('solo'))).toBe(false)
   })

@@ -454,7 +454,11 @@ export function deleteNode(
     if (isScheduled) {
       options.push({ icon: 'calendar-range', label: 'This and all following', sublabel: 'Remove this and all future occurrences', onClick: deleteFuture })
     }
-    options.push({ icon: 'calendar-range', label: 'All occurrences', sublabel: 'Remove all occurrences of this series', onClick: deleteAllOfSeries })
+    // A lone series is the whole file, so say so rather than hiding file
+    // deletion behind a label that reads as scoped to occurrences.
+    options.push(hasOtherContent
+      ? { icon: 'calendar-range', label: 'All occurrences', sublabel: 'Remove all occurrences of this series', onClick: deleteAllOfSeries }
+      : { icon: 'calendar-range', label: 'Delete whole file', sublabel: 'Remove all occurrences and the file itself', onClick: deleteAllOfSeries })
   }
   // A wider, categorically different action from the ones above — it reaches
   // past this occurrence's own series into every other series/occurrence the
