@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import { useEffect } from 'react'
 import { addDays, startOfToday } from 'date-fns'
 import type * as ReactRouter from '@tanstack/react-router'
 import { useStore } from '@/store'
@@ -20,7 +21,7 @@ const { navigateMock, backMock, paramsMock, searchMock, handleDelete, handleClos
   searchMock:   vi.fn<() => { date?: string; scope?: string; id?: string }>(),
   handleDelete: vi.fn(),
   handleClose:  vi.fn(),
-  editorGot:    { occ: null as Occurrence | null },
+  editorGot:    { occ: null as Occurrence | null, mounts: 0 },
 }))
 
 // createFileRoute is mocked so the page component is reachable without a real
@@ -48,7 +49,11 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 // via `hooks`, threaded through from `useEntryEditor(occ, scope)`'s first
 // argument, so the stub has to read it from there rather than from `items[0]`.
 vi.mock('@/editor', () => ({
-  useEntryEditor: (occ: Occurrence) => { editorGot.occ = occ; return { handleDelete, handleClose, occ } },
+  useEntryEditor: (occ: Occurrence) => {
+    useEffect(() => { editorGot.mounts++ }, [])
+    editorGot.occ = occ
+    return { handleDelete, handleClose, occ }
+  },
   EntryEditor:   ({ hooks }: { hooks: { occ: { date: string; metadata: { title: string } } } }) => <div data-testid="editor" data-date={hooks.occ.date}>{hooks.occ.metadata.title}</div>,
   EntryViewOnly: ({ occ }: { occ: { metadata: { title: string } } }) => <div data-testid="view-only">{occ.metadata.title}</div>,
 }))
@@ -66,7 +71,7 @@ const LOCAL_VAULT: VaultRef = { id: TEST_VAULT, name: 'Notes', kind: 'local' }
 const ICAL_VAULT: VaultRef = { id: TEST_VAULT, name: 'Family calendar', kind: 'ical', ical: { url: 'https://example.com/cal.ics' } }
 
 beforeEach(() => {
-  navigateMock.mockClear()
+  navigateMock.mockReset()
   backMock.mockClear()
   handleDelete.mockClear()
   handleClose.mockClear()
@@ -214,7 +219,7 @@ describe('_entry/entry/$vault/$slug — view-only back navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Back' }))
 
     expect(backMock).toHaveBeenCalledTimes(1)
-    expect(navigateMock).not.toHaveBeenCalled()
+    expect(navigateMock).not.toHaveBeenCalledWith({ to: '/' })
   })
 
   it('navigates to the agenda when there is no history to go back to', () => {
@@ -258,6 +263,8 @@ describe('_entry/entry/$vault/$slug — the open occurrence stays the one that w
   // to the earliest open occurrence — which ticking it done just changed.
   it('ticking done on a date-less open keeps the editor on that occurrence', async () => {
     seedWeekly()
+    // The router applies the route's own URL rewrite, as TanStack does.
+    navigateMock.mockImplementation(({ search }: { search: ReturnType<typeof searchMock> }) => { searchMock.mockReturnValue(search) })
     render(<EntrySlugPage />)
     await screen.findByTestId('editor')
     expect(editorOcc().date).toBe(week(0))
@@ -296,5 +303,23 @@ describe('_entry/entry/$vault/$slug — the open occurrence stays the one that w
     render(<EntrySlugPage />)
     await screen.findByTestId('editor')
     expect(editorOcc().date).toBe(moved)
+  })
+})
+
+describe('_entry/entry/$vault/$slug — a date-less URL', () => {
+  it('gets the occurrence it resolved to written in, without remounting the editor', async () => {
+    const occ = makeOcc({ id: 'occ-1', date: '2026-06-15', entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Plain note' } })
+    seedStore([occ], makeRoots('note.md'))
+    editorGot.mounts = 0
+    const { rerender } = render(<EntrySlugPage />)
+    await screen.findByTestId('editor')
+
+    expect(navigateMock).toHaveBeenCalledWith(expect.objectContaining({
+      search: { date: '2026-06-15', scope: 'single', id: 'occ-1' }, replace: true,
+    }))
+
+    searchMock.mockReturnValue({ date: '2026-06-15', scope: 'single', id: 'occ-1' })
+    rerender(<EntrySlugPage />)
+    expect(editorGot.mounts).toBe(1)
   })
 })

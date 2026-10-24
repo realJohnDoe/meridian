@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
@@ -7,6 +7,7 @@ import { useEntryEditor } from '@/editor'
 import { expandRange } from '@/model'
 import { isEditScope, isSeries } from '@/types'
 import { entryKey as makeEntryKey } from '@/fileIO'
+import { entryRoute } from '@/entryRoute'
 import { IconButton } from '@/components/primitives/icon-button'
 import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
 import { EntryTopbar } from './-entryTopbar'
@@ -157,6 +158,13 @@ function EntrySlugPage() {
     return byId ?? (date ? occurrencesOn(items, roots, entryKey, date)[0] : undefined) ?? fom.get(entryKey) ?? null
   }, [fom, items, roots, entryKey, date, id])
 
+  // A URL that names no occurrence gets the one it resolved to written in, so
+  // Back and reload return to it rather than to whichever occurrence is the
+  // file's representative by then (ticking this one done changes that).
+  useEffect(() => {
+    if (occ?.date && !date) void navigate({ ...entryRoute(occ, scope), replace: true })
+  }, [occ, date, scope, navigate])
+
   if (vaultLoading && !occ) return <EntrySkeleton />
   if (!occ) return (
     <div className="flex flex-col px-3.5 pt-4 lg:max-w-3xl lg:mx-auto w-full">
@@ -169,5 +177,7 @@ function EntrySlugPage() {
     </div>
   )
 
-  return <EntryReady key={`${entryKey}-${date ?? ''}-${id ?? ''}-${scope ?? ''}`} occ={occ} scope={scope} />
+  // Keyed by what the URL resolved to, not by its raw params, so the rewrite
+  // above — same occurrence, now spelled out — doesn't remount the editor.
+  return <EntryReady key={`${entryKey}-${date ?? occ.date}-${id ?? occ.id}-${scope ?? 'single'}`} occ={occ} scope={scope} />
 }
