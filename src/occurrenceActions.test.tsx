@@ -60,6 +60,22 @@ describe('beginSwipeDelete', () => {
     expect(persistence.deletes).toEqual([testKey('note.md')])
   })
 
+  it('removes only the swiped standalone occurrence when the entry has others, keeping the file', () => {
+    const a = makeOcc({ id: 'occ-a', entryKey: testKey('note.md') })
+    const b = makeOcc({ id: 'occ-b', entryKey: testKey('note.md') })
+    seedStore([a, b], makeRoots('note.md'))
+    render(<Toaster />)
+
+    act(() => beginSwipeDelete(a)())
+    flushToastMount()
+    act(() => { vi.advanceTimersByTime(4100) })
+
+    expect(items().find(i => i.id === 'occ-a')).toBeUndefined()
+    expect(items().find(i => i.id === 'occ-b')).toBeDefined()
+    expect(persistence.deletes).toEqual([])
+    expect(persistence.writes).toEqual([testKey('note.md')])
+  })
+
   it('Undo restores the snapshot, persists the restore, and the deferred commit never persists', () => {
     const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md'))

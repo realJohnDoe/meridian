@@ -383,10 +383,11 @@ export function deleteNode(
   // Whether the file holds anything beyond this occurrence's own group (its
   // series and that series' overrides, or just itself for a standalone) —
   // counting series markers themselves, unlike a plain sibling-occurrence
-  // check, so a second repeat pattern with no overrides yet still counts.
-  // This decides both whether the lone-standalone shortcut below applies and
-  // whether "all occurrences" needs a separate, wider "delete whole file"
-  // option next to it.
+  // check (hasSiblingOccurrences, used by beginSwipeDelete for the simpler
+  // standalone-vs-standalone case), so a second repeat pattern with no
+  // overrides yet still counts. This decides both whether the lone-standalone
+  // shortcut below applies and whether "all occurrences" needs a separate,
+  // wider "delete whole file" option next to it.
   const isOwnGroup = (i: StoreItem) => isSelf(i) || (!!item.ownerId && (isSeries(i) ? i.id === item.ownerId : i.ownerId === item.ownerId))
   const isExcluded = (i: StoreItem) => !isSeries(i) && i.excluded
   const hasOtherContent = slugItems.some(i => !isOwnGroup(i) && !isExcluded(i))
