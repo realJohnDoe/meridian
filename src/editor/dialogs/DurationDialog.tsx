@@ -186,7 +186,10 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                     'cursor-pointer',
                     serialiseInterval(Math.max(1, n), unit) === p.value && 'bg-primary/20 text-primary border-primary',
                   )}
-                  onClick={() => { onConfirm(p.value); onClose() }}
+                  onClick={() => {
+                    const parsed = parseDuration(p.value)
+                    setN(parsed?.n ?? 1); setUnit(parsed?.unit ?? 'minutes')
+                  }}
                 >
                   {p.label}
                 </button>
