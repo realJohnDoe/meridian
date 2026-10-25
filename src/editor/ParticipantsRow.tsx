@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Users, type LucideIcon } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { AddChip, TagChip } from '@/components'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { FloatingComboboxList } from './FloatingComboboxList'
@@ -11,9 +11,6 @@ interface Props {
   participants:     string[]
   onChange:         (next: string[]) => void
   allParticipants?: string[]
-  /** Chip noun and icon — people by default; the settings screen reuses the row for tags. */
-  noun?:            string
-  icon?:            LucideIcon
 }
 
 // `allParticipants` takes its default via `??` in the body rather than as a
@@ -23,8 +20,6 @@ interface Props {
 export default function ParticipantsRow(props: Props) {
   const { participants, onChange } = props
   const allParticipants = props.allParticipants ?? EMPTY_PARTICIPANTS
-  const noun = props.noun ?? 'person'
-  const Icon = props.icon ?? Users
   const [open,  setOpen]  = useState(false)
   const [query, setQuery] = useState('')
   const { anchorRef, listRef, placement } = useFloatingCombobox(open, o => { setOpen(o); if (!o) setQuery('') })
@@ -46,7 +41,7 @@ export default function ParticipantsRow(props: Props) {
 
   return (
     <div className="flex flex-wrap gap-1.5 items-center">
-      <Icon size={13} className="opacity-40 self-center" />
+      <Users size={13} className="opacity-40 self-center" />
       {participants.map((p, i) => (
         <TagChip
           key={p}
@@ -73,7 +68,7 @@ export default function ParticipantsRow(props: Props) {
               />
             </div>
           ) : (
-            <AddChip label={noun} onClick={() => setOpen(true)} />
+            <AddChip label="person" onClick={() => setOpen(true)} />
           )}
           <FloatingComboboxList placement={placement} listRef={listRef} className="w-48">
             <CommandList>

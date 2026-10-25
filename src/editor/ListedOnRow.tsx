@@ -8,6 +8,7 @@ import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandE
 import { FloatingComboboxList } from './FloatingComboboxList'
 import { rankByQuery } from '@/lib/matching'
 import { useFloatingCombobox } from '@/hooks'
+import { cn } from '@/lib/cn'
 
 interface Props {
   /** Entries whose `items:` list already points at this one. */
@@ -26,9 +27,18 @@ interface Props {
    * matched, as it always did.
    */
   onCreate?:       (title: string) => void
+  /** Heading before the chips; `''` for none. Defaults to "Listed on". */
+  label?:          string
+  /**
+   * The row picks lists without describing an entry (the vault's default
+   * lists), so it offers the picker with no `entryKey` to exclude.
+   */
+  standalone?:     boolean
+  className?:      string
 }
 
-export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOpenWikilink, onAdd, onRemove, onCreate }: Props) {
+export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOpenWikilink, onAdd, onRemove, onCreate, label, standalone, className }: Props) {
+  const canPick = !!entryKey || !!standalone
   const [pickerOpen,  setPickerOpen]  = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const { anchorRef, listRef, placement } = useFloatingCombobox(pickerOpen, open => { setPickerOpen(open); if (!open) setPickerQuery('') })
@@ -52,22 +62,24 @@ export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOp
   }
 
   function handleSelect(target: EntryKey) {
-    if (!entryKey) return
+    if (!canPick) return
     onAdd?.(target)
     closePicker()
   }
 
   function handleCreate() {
-    if (!entryKey || !canCreate) return
+    if (!canPick || !canCreate) return
     onCreate(newListTitle)
     closePicker()
   }
 
-  if (!linkedKeys.length && !entryKey) return null
+  if (!linkedKeys.length && !canPick) return null
 
   return (
-    <div className="flex flex-wrap gap-1.5 mb-4 items-center">
-      <span className="text-2xs text-muted-foreground font-medium tracking-[.05em] uppercase shrink-0">Listed on</span>
+    <div className={cn('flex flex-wrap gap-1.5 items-center', className ?? 'mb-4')}>
+      {(label ?? 'Listed on') && (
+        <span className="text-2xs text-muted-foreground font-medium tracking-[.05em] uppercase shrink-0">{label ?? 'Listed on'}</span>
+      )}
       {linkedKeys.map(key => {
         const meta = roots.get(key)
         const label = meta?.title || meta?.fileSlug || key
@@ -84,7 +96,7 @@ export default function ListedOnRow({ linkedKeys, entryKey, vaultId, roots, onOp
           />
         )
       })}
-      {entryKey && (
+      {canPick && (
         <div ref={anchorRef} className="inline-block">
           <Command shouldFilter={false} className="contents">
             {pickerOpen ? (

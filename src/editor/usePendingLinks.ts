@@ -11,14 +11,20 @@ import { addItemLink, removeItemLink } from './save'
  *
  * `vaultId` is the vault the entry lives in (its own, or the target vault for a
  * brand-new one) — it is what turns that estimated slug into a real key.
+ *
+ * `initialKeys` are lists a brand-new entry starts out on (the vault's default
+ * lists), written like any other pending pick on its first save. `resetPending`
+ * swaps them for another vault's when the entry is retargeted: a `[[link]]`
+ * never crosses vaults, so the old vault's picks have nowhere to go.
  */
 export function usePendingLinks(
   item: Occurrence | null,
   title: string,
   vaultId: string | null,
   createdKey?: EntryKey | null,
+  initialKeys: EntryKey[] = [],
 ) {
-  const [pendingKeys, setPendingKeys] = useState<EntryKey[]>([])
+  const [pendingKeys, setPendingKeys] = useState<EntryKey[]>(initialKeys)
 
   const estimated = vaultId && title.trim() ? makeEntryKey(vaultId, titleToSlug(title)) : undefined
   const effectiveKey = item?.entryKey ?? createdKey ?? estimated
@@ -46,7 +52,7 @@ export function usePendingLinks(
     pendingKeys.forEach(target => addItemLink(target, finalSlug))
   }
 
-  return { effectiveKey, sourceSlug, pendingKeys, handleAdd, handleRemove, flushOnSave }
+  return { effectiveKey, sourceSlug, pendingKeys, handleAdd, handleRemove, flushOnSave, resetPending: setPendingKeys }
 }
 
 // The subset consumed by EntryEditor; flushOnSave stays hook-internal (useEntryEditor
