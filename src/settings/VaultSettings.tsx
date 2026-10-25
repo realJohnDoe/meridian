@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import { Link } from '@tanstack/react-router'
-import { Trash2, TriangleAlert, AlertCircle, Download, Upload, RefreshCw, ArchiveRestore, ChevronRight, Copy, Check, ExternalLink, ArrowRightLeft, Tag } from 'lucide-react'
+import { Trash2, TriangleAlert, AlertCircle, Download, Upload, RefreshCw, ArchiveRestore, ChevronRight, Copy, Check, ExternalLink, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
 import { IconButton } from '@/components/primitives/icon-button'
 import {
@@ -27,7 +27,7 @@ import {
   GITHUB_APP_INSTALL_URL, APP_URL, exportVaultIcs, previewVaultIcsImport, importVaultIcs,
   previewVaultCopy, copyVaultInto,
 } from '@/vaultActions'
-import { ParticipantsRow, archiveEntry } from '@/editor'
+import { ParticipantsRow, TagsRow, archiveEntry } from '@/editor'
 import { keyRoute } from '@/entryRoute'
 import { deleteWholeFileWithUndo } from '@/occurrenceActions'
 import type { VaultRef, IcsImportSummary } from '@/vaultActions'
@@ -500,12 +500,7 @@ export function VaultSettings({ vault }: Props) {
             label="Default tags"
             description="Added to new entries in this vault, but not to checklist items you turn into entries. Stored on this device only."
           >
-            <ParticipantsRow
-              participants={defaultTags}
-              onChange={handleDefaultTagsChange}
-              noun="tag"
-              icon={Tag}
-            />
+            <TagsRow tags={defaultTags} onChange={handleDefaultTagsChange} />
           </SettingsRow>
         </SettingsSection>
       )}

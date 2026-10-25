@@ -1,99 +1,12 @@
-import { useState } from 'react'
-import { Users, type LucideIcon } from 'lucide-react'
-import { AddChip, TagChip } from '@/components'
-import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
-import { FloatingComboboxList } from './FloatingComboboxList'
-import { useFloatingCombobox } from '@/hooks'
-
-const EMPTY_PARTICIPANTS: string[] = []
+import { Users } from 'lucide-react'
+import ChipListRow from './ChipListRow'
 
 interface Props {
   participants:     string[]
   onChange:         (next: string[]) => void
   allParticipants?: string[]
-  /** Chip noun and icon — people by default; the settings screen reuses the row for tags. */
-  noun?:            string
-  icon?:            LucideIcon
 }
 
-// `allParticipants` takes its default via `??` in the body rather than as a
-// destructured-parameter default — that shape makes
-// babel-plugin-react-compiler silently skip memoizing this component. See
-// OccurrenceCard.tsx for the full rationale.
-export default function ParticipantsRow(props: Props) {
-  const { participants, onChange } = props
-  const allParticipants = props.allParticipants ?? EMPTY_PARTICIPANTS
-  const noun = props.noun ?? 'person'
-  const Icon = props.icon ?? Users
-  const [open,  setOpen]  = useState(false)
-  const [query, setQuery] = useState('')
-  const { anchorRef, listRef, placement } = useFloatingCombobox(open, o => { setOpen(o); if (!o) setQuery('') })
-
-  const existing = new Set(participants.map(p => p.trim()))
-
-  const q = query.trim().toLowerCase()
-  const filtered = allParticipants.filter(p => !existing.has(p) && (!q || p.toLowerCase().includes(q)))
-
-  const canAddNew = query.trim().length > 0 && !existing.has(query.trim())
-
-  function add(name: string) {
-    const trimmed = name.trim()
-    if (!trimmed || existing.has(trimmed)) return
-    onChange([...participants, trimmed])
-    setQuery('')
-    setOpen(false)
-  }
-
-  return (
-    <div className="flex flex-wrap gap-1.5 items-center">
-      <Icon size={13} className="opacity-40 self-center" />
-      {participants.map((p, i) => (
-        <TagChip
-          key={p}
-          label={p.trim()}
-          interactive
-          onRemove={() => onChange(participants.filter((_, j) => j !== i))}
-        />
-      ))}
-      <div ref={anchorRef} className="inline-block">
-        <Command shouldFilter={false} className="contents">
-          {open ? (
-            <div className="flex items-center rounded-md border border-input bg-background">
-              <CommandInput
-                wrapperClassName="border-b-0"
-                placeholder="Name…"
-                value={query}
-                onValueChange={setQuery}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && canAddNew) {
-                    e.preventDefault()
-                    add(query)
-                  }
-                }}
-              />
-            </div>
-          ) : (
-            <AddChip label={noun} onClick={() => setOpen(true)} />
-          )}
-          <FloatingComboboxList placement={placement} listRef={listRef} className="w-48">
-            <CommandList>
-              <CommandEmpty>No suggestions</CommandEmpty>
-              <CommandGroup>
-                {canAddNew && (
-                  <CommandItem value="__new__" onSelect={() => add(query)}>
-                    Add "{query.trim()}"
-                  </CommandItem>
-                )}
-                {filtered.map(p => (
-                  <CommandItem key={p} value={p} onSelect={() => add(p)}>
-                    {p}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </FloatingComboboxList>
-        </Command>
-      </div>
-    </div>
-  )
+export default function ParticipantsRow({ participants, onChange, allParticipants }: Props) {
+  return <ChipListRow values={participants} onChange={onChange} suggestions={allParticipants} noun="person" icon={Users} />
 }
