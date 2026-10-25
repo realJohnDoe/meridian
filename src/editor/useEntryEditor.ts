@@ -540,10 +540,14 @@ export function useEntryEditor(
     entry, setEntry,
     createdKey,
     vaultId,
-    // Before the first save the chip retargets the new entry, and the lists it
-    // starts on are the new vault's defaults; afterwards it stages a move.
+    // Before the first save the chip retargets the new entry, and the lists and
+    // participants it starts with are the new vault's defaults; afterwards it
+    // stages a move.
     onVaultChange: vaultTarget.onVaultChange && ((toVaultId: string) => {
-      if (!createdKey && !entry.item) resetPending(liveDefaultLists(toVaultId, useStore.getState().roots))
+      if (!createdKey && !entry.item) {
+        resetPending(liveDefaultLists(toVaultId, useStore.getState().roots))
+        setEntry(prev => ({ ...prev, participants: readVaultStringArray('meridian_default_participants', toVaultId) }))
+      }
       vaultTarget.onVaultChange?.(toVaultId)
     }),
     pendingMove:   vaultTarget.pendingMove,
