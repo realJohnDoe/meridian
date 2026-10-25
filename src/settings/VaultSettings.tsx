@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 import { Link } from '@tanstack/react-router'
-import { Trash2, TriangleAlert, AlertCircle, Download, Upload, RefreshCw, ArchiveRestore, ChevronRight, Copy, Check, ExternalLink, ArrowRightLeft } from 'lucide-react'
+import { Trash2, TriangleAlert, AlertCircle, Download, Upload, RefreshCw, ArchiveRestore, ChevronRight, Copy, Check, ExternalLink, ArrowRightLeft, Tag } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
 import { IconButton } from '@/components/primitives/icon-button'
 import {
@@ -19,7 +19,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
-import { readVaultStringArray } from '@/lib/vaultStorage'
+import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
 import {
@@ -129,7 +129,7 @@ function importSummary({ added, updated }: IcsImportSummary): string {
 function moveInSummary({ added, updated }: IcsImportSummary): string {
   const total = added + updated
   if (total === 0) {
-    return 'This subscription isn\u2019t showing any events yet, so there is nothing to move. Try again once it has refreshed.'
+    return 'This subscription isn’t showing any events yet, so there is nothing to move. Try again once it has refreshed.'
   }
   const becomes = total === 1
     ? '1 event becomes an ordinary entry you can edit, link to and delete.'
@@ -174,6 +174,10 @@ export function VaultSettings({ vault }: Props) {
   const importCount = importPlan && importPlan.added + importPlan.updated
   const [participants, setParticipants] = useState<string[]>(
     () => readVaultStringArray('meridian_default_participants', vault.id),
+  )
+
+  const [defaultTags, setDefaultTags] = useState<string[]>(
+    () => readVaultStringArray('meridian_default_tags', vault.id),
   )
 
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
@@ -223,6 +227,11 @@ export function VaultSettings({ vault }: Props) {
     // values are currently loaded?" check, so Settings can edit any vault's
     // defaults without disturbing the one a new entry would target.
     setDefaultParticipants(vault.id, next)
+  }
+
+  function handleDefaultTagsChange(next: string[]) {
+    setDefaultTags(next)
+    writeVaultJSON('meridian_default_tags', vault.id, next)
   }
 
   async function handleSyncNow() {
@@ -485,6 +494,17 @@ export function VaultSettings({ vault }: Props) {
               participants={participants}
               onChange={handleParticipantsChange}
               allParticipants={allParticipants}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Default tags"
+            description="Added to new entries in this vault, but not to checklist items you turn into entries. Stored on this device only."
+          >
+            <ParticipantsRow
+              participants={defaultTags}
+              onChange={handleDefaultTagsChange}
+              noun="tag"
+              icon={Tag}
             />
           </SettingsRow>
         </SettingsSection>

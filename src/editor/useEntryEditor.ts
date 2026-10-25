@@ -64,7 +64,7 @@ export function useEntryEditor(
   // seed has to match where the entry actually lands. `useVaultTarget` below
   // seeds its own state from the same helper, in this same mount render.
   //
-  // ── The form is derived, not stored ──────────────────────────────────────
+  // ── The form is derived, not stored ────────────────────────────────────────
   //
   // `view` is what the store says about this occurrence at this scope, and
   // `edits` is what the user has changed on top of it. The form is the two
@@ -83,12 +83,13 @@ export function useEntryEditor(
    */
   const [newEntryView] = useState<EntryState>(() => {
     const target = initialTargetVault(!initialOcc, seed?.vault)
-    const defaultParticipants = target
-      ? readVaultStringArray('meridian_default_participants', target)
-      : []
     const base = entryFromItem(null, initialScope, seed)
-    const seeded = defaultParticipants.length > 0
-      ? { ...base, participants: [...defaultParticipants] }
+    const seeded = target
+      ? {
+          ...base,
+          participants: readVaultStringArray('meridian_default_participants', target),
+          tags:         readVaultStringArray('meridian_default_tags', target),
+        }
       : base
     return initialTitle ? { ...seeded, title: initialTitle } : seeded
   })
@@ -510,7 +511,9 @@ export function useEntryEditor(
   // link is resolved within that same vault. Participants are read straight
   // from that vault's localStorage rather than the store's `defaultParticipants`,
   // which only caches whichever vault is currently the *default* one and goes
-  // stale the moment the parent entry lives elsewhere.
+  // stale the moment the parent entry lives elsewhere. Default tags are
+  // deliberately not applied: a promoted line is not a fresh entry the user
+  // composed, so it should not pick up the vault's standing labels.
   const handlePromoteTask = (title: string, done: boolean): string | null => {
     const key = saveNode(null, 'all', {
       item: null, title, tracked: true, done,
