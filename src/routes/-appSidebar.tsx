@@ -84,7 +84,7 @@ export default function AppSidebar() {
   // since each of these is already single-kind. Positioned with Favorites,
   // below the calendar card.
   const collectionItems = [
-    { Icon: Inbox,       label: 'Unscheduled Tasks', active: pathname.startsWith('/backlog'), onClick: () => { close(); void navigate({ to: '/backlog' }) } },
+    { Icon: Inbox,       label: 'Unscheduled Tasks', active: pathname.startsWith('/unscheduled'), onClick: () => { close(); void navigate({ to: '/unscheduled' }) } },
     { Icon: NotebookPen, label: 'Notes',   active: pathname.startsWith('/notes'),   onClick: () => { close(); void navigate({ to: '/notes' }) } },
   ]
 
@@ -126,7 +126,7 @@ export default function AppSidebar() {
               {/* Not a filter — a calendar composition option, which is why it
                   stays here while the participant filter lives in the topbar.
                   Label spelled out in full so it needs no group heading and
-                  can't be mistaken for scoping Backlog or Notes. */}
+                  can't be mistaken for scoping Unscheduled Tasks or Notes. */}
               <SidebarSeparator className="mx-3 mt-2" />
               <div className="px-3 py-1">
                 <label className="flex items-center gap-2 cursor-pointer py-2.5">
@@ -204,7 +204,7 @@ export default function AppSidebar() {
 
           {favorites.length > 0 && <SidebarSeparator />}
 
-          {/* Backlog & Notes — content destinations. Full-weight rows; their
+          {/* Unscheduled Tasks & Notes — content destinations. Full-weight rows; their
               position below Favorites is enough to signal lower priority. */}
           <SidebarGroup className="p-0">
             <SidebarMenu>

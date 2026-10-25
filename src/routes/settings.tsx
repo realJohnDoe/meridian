@@ -36,7 +36,7 @@ export const Route = createFileRoute('/settings')({
  * `lg` that leaves list-into-detail through the URL as the only way to move
  * within Settings, exactly as before; the back button (`onBack`) remains the
  * sole way out at every depth on every screen size — the rail lets you jump
- * to Agenda/Month/Week/Day/Backlog/Notes, not back up the Settings hierarchy
+ * to Agenda/Month/Week/Day/Unscheduled Tasks/Notes, not back up the Settings hierarchy
  * itself, so it doesn't replace the header's own back control.
  */
 function SettingsLayout() {

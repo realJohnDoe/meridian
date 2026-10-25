@@ -261,7 +261,7 @@ describe('useViewChrome', () => {
   })
 
   it('gives Unscheduled Tasks and Notes a label and nothing else', () => {
-    matches = { '/_app/backlog': { params: {} } }
+    matches = { '/_app/unscheduled': { params: {} } }
     const { result } = renderHook(() => useViewChrome())
     expect(result.current).toMatchObject({ kind: 'list', label: 'Unscheduled Tasks', paging: null, onToday: null, quickNav: null })
   })

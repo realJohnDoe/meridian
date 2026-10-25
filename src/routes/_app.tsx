@@ -94,7 +94,7 @@ function AppMain() {
   const chrome = useViewChrome()
   // Whether this view has a quick-nav panel at all — the single gate on the
   // swipe gesture, the label's disclosure button, the mobile inline card and
-  // the desktop popover below. Backlog/Notes are the views without one.
+  // the desktop popover below. Unscheduled Tasks/Notes are the views without one.
   const hasQuickNav = chrome.quickNav !== null
 
   const quickNavOpen = useQuickNavOpen()
@@ -107,7 +107,7 @@ function AppMain() {
   const isDesktopQuickNav = useMediaQuery('(min-width: 768px)')
 
   // Vertical swipe on the topbar chrome as an alternate gesture for the quick-nav
-  // panel's own disclosure button — see useQuickNavSwipe. Disabled on Backlog/Notes,
+  // panel's own disclosure button — see useQuickNavSwipe. Disabled on Unscheduled Tasks/Notes,
   // which render no panel to toggle.
   const quickNavSwipeRef = useQuickNavSwipe<HTMLDivElement>(hasQuickNav)
 
@@ -191,7 +191,7 @@ function AppMain() {
                     openSidebar={openSidebar}
                     label={chrome.label}
                     // Undefined rather than omitted for a view without paging
-                    // (agenda, backlog, notes) — PagedTopbar treats the two
+                    // (agenda, unscheduled tasks, notes) — PagedTopbar treats the two
                     // the same and renders no chevrons either way.
                     paging={chrome.paging ? {
                       prevLabel: `Previous ${chrome.paging.unit}`,
@@ -200,7 +200,7 @@ function AppMain() {
                       onNext: chrome.paging.onNext,
                     } : undefined}
                     // The label is a disclosure button only for a view that has
-                    // a panel to disclose; Backlog/Notes get plain static text.
+                    // a panel to disclose; Unscheduled Tasks/Notes get plain static text.
                     expanded={hasQuickNav ? quickNavOpen : undefined}
                     onToggle={hasQuickNav ? toggleQuickNav : undefined}
                     toggleRef={hasQuickNav ? toggleButtonRef : undefined}

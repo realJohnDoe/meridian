@@ -7,7 +7,7 @@ const vaultName = (id: string) => names[id]
 describe('settingsTopbar', () => {
   it('returns null outside settings', () => {
     expect(settingsTopbar('/', vaultName)).toBeNull()
-    expect(settingsTopbar('/backlog', vaultName)).toBeNull()
+    expect(settingsTopbar('/unscheduled', vaultName)).toBeNull()
     expect(settingsTopbar('/day/2026-08-26', vaultName)).toBeNull()
   })
 

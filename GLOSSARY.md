@@ -442,7 +442,7 @@ is already explained in its own header comment (`DayView`'s carousel seam,
 
 ### occurrence renderers
 Three, chosen by context, all rendering the same `Occurrence`.
-`OccurrenceCard` is the **list** renderer (agenda, search, backlog, wikilink
+`OccurrenceCard` is the **list** renderer (agenda, search, unscheduled tasks, wikilink
 popup); `OccurrencePill` is the **compact grid** renderer (month cells, all-day
 strips); `TimedBlock` is the **timeline** renderer, placed by time geometry —
 and it wraps `OccurrenceCard` rather than replacing it. Named for the one

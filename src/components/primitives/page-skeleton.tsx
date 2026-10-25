@@ -1,6 +1,6 @@
 import { Skeleton } from '../ui/skeleton'
 
-/** Generic loading placeholder for lazy-loaded list/calendar routes (day, month, backlog, notes). */
+/** Generic loading placeholder for lazy-loaded list/calendar routes (day, month, unscheduled tasks, notes). */
 export function PageSkeleton() {
   return (
     // px-3.5 matches the screen edge these bars stand in for (AgendaRow's

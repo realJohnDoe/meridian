@@ -84,7 +84,7 @@ function hideArchived(occs: Occurrence[]): Occurrence[] {
  * subsets of this, which is how a leg could land in one and silently miss the
  * other. `showTasks` stays OUT of this: it is calendar-specific, not a
  * blanket "hide everywhere" axis — see `useParticipantFilteredOccs`'s own
- * comment for why Backlog/Notes must not inherit it.
+ * comment for why Unscheduled Tasks/Notes must not inherit it.
  */
 function hideEverywhere(
   occs: Occurrence[], hiddenVaultIds: string[], hiddenParticipants: Record<string, string[]>,
@@ -165,12 +165,12 @@ export function useFilteredOccs(occs: Occurrence[]): Occurrence[] {
 
 /**
  * Vault + participant (+ archived) filtering for the undated list views
- * (Backlog, Notes).
+ * (Unscheduled Tasks, Notes).
  *
  * Deliberately does *not* apply showTasks: that toggle composes the calendar,
  * and these views have already answered the kind question by existing —
- * Backlog is tasks-only, Notes is notes-only. Honouring showTasks here would
- * blank the entire Backlog whenever tasks are hidden on the calendar. The
+ * Unscheduled Tasks is tasks-only, Notes is notes-only. Honouring showTasks here would
+ * blank the entire Unscheduled Tasks whenever tasks are hidden on the calendar. The
  * vault, archived, and people legs do apply: hiding a calendar (or an
  * archived entry) means hiding it everywhere — see `hideEverywhere`, the
  * function this and `filterOccs` both funnel through so that "everywhere"

@@ -39,7 +39,7 @@ interface Props {
    *   - 'spacer': a later row on the same day (or an overdue row) — no
    *               badge, but still reserve the gutter so cards nest under
    *               the badge above instead of sliding left to fill the gap.
-   *   - 'none':   this list has no day badges at all (backlog, notes) — no
+   *   - 'none':   this list has no day badges at all (unscheduled tasks, notes) — no
    *               gutter is reserved, so cards sit flush against the edge.
    */
   badge: { kind: 'day'; date: Date; isToday: boolean } | { kind: 'spacer' } | { kind: 'none' }

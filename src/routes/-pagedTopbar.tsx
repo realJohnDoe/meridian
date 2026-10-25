@@ -3,7 +3,7 @@ import { IconButton } from '@/components/primitives/icon-button'
 import { PopoverAnchor } from '@/components/ui/popover'
 import { cn } from '@/lib/cn'
 
-// Shared by every view's topbar left slot (agenda, backlog/notes, day, week,
+// Shared by every view's topbar left slot (agenda, unscheduled tasks/notes, day, week,
 // month): a mobile menu button, a label, optional prev/next chevrons, and an
 // optional quick-nav disclosure — differing only in which of those a given
 // view wires up. The chevrons are desktop-only real estate: on the same
@@ -25,7 +25,7 @@ export function PagedTopbar({
   label: string
   /** Prev/next chevrons render only when this is given — bundled as one object rather than four
    * separate optional props so a caller can't supply a label without its handler (or vice versa).
-   * Omit for a view with no paging (agenda, backlog, notes). */
+   * Omit for a view with no paging (agenda, unscheduled tasks, notes). */
   paging?: { prevLabel: string; nextLabel: string; onPrev: () => void; onNext: () => void }
   /**
    * When provided together, the label becomes a disclosure button that opens

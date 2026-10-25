@@ -169,7 +169,7 @@ is decided by **what the route contains**, not by whether it feels like a
 
 | Shell | Routes | For |
 |---|---|---|
-| `_app` — one screen tall, clips itself | `_app.*` (agenda, day/week/month, backlog, notes) | Routes with **virtualized lists**. `useVirtualizer` is element-scoped via `getScrollElement`, so the scroller must be an element, not the document. |
+| `_app` — one screen tall, clips itself | `_app.*` (agenda, day/week/month, unscheduled tasks, notes) | Routes with **virtualized lists**. `useVirtualizer` is element-scoped via `getScrollElement`, so the scroller must be an element, not the document. |
 | Document flow | `_entry.*`, `settings.*`, `auth.*` | Routes with **text inputs and no virtualizer**. The document can grow, so the browser lifts a focused input above the on-screen keyboard natively, on every platform. |
 
 Put a route with text inputs under `_app` and it gets neither: `_app` caps its

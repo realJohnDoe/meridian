@@ -117,8 +117,8 @@ describe('_app — per-view topbar label and paging', () => {
     expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$month', params: { month: '2026-09' } })
   })
 
-  it('backlog view: a fixed "Unscheduled Tasks" label, no paging chevrons, and no Today button', () => {
-    matches = { '/_app/backlog': { params: {} } }
+  it('unscheduled tasks view: a fixed "Unscheduled Tasks" label, no paging chevrons, and no Today button', () => {
+    matches = { '/_app/unscheduled': { params: {} } }
     render(<AppLayout />)
 
     expect(screen.getByText('Unscheduled Tasks')).toBeInTheDocument()

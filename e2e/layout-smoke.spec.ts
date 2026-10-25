@@ -53,7 +53,7 @@ const VIEWPORTS = [
  *
  * Each carries the `ready` selector that means "this route has painted".
  * It used to be one hardcoded entry-card wait, which only works for the
- * three list-shaped routes (agenda, backlog, notes); day/week/month render
+ * three list-shaped routes (agenda, unscheduled tasks, notes); day/week/month render
  * an hour-grid or month grid, not entry cards, and an empty day/week/month
  * would leave that wait hanging for 30s and failing for the wrong reason.
  * `[data-topbar]` is the one thing every `_app` view renders regardless of
@@ -62,7 +62,7 @@ const VIEWPORTS = [
  */
 const APP_ROUTES = [
   { path: '/', ready: '[data-testid="entry-card"]' },
-  { path: '/backlog', ready: '[data-testid="entry-card"]' },
+  { path: '/unscheduled', ready: '[data-testid="entry-card"]' },
   { path: '/notes', ready: '[data-testid="entry-card"]' },
   { path: '/day/2026-09-04', ready: '[data-topbar]' },
   { path: '/week/2026-09-04', ready: '[data-topbar]' },
@@ -282,7 +282,7 @@ interface FlowProbe {
  * NOT on document.body. body carries only `min-height` (see index.css); the
  * one-screen cap lives on `_app`'s own wrapper, several levels below it. A
  * probe appended to body is therefore a sibling of that cap and grows the
- * document on *every* route — this check passed on `/backlog` before it was
+ * document on *every* route — this check passed on `/unscheduled` before it was
  * anchored here, which is to say it was asserting nothing at all.
  */
 function probeFlow(): FlowProbe {
