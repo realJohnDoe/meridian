@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Occurrence } from '../types'
-import { titleToSlug, entryKey as makeEntryKey } from '../fileIO'
+import { titleToSlug, entryKey as makeEntryKey, keyVaultId } from '../fileIO'
 import type { EntryKey } from '../fileIO'
 import { addItemLink, removeItemLink } from './save'
 
@@ -11,14 +11,21 @@ import { addItemLink, removeItemLink } from './save'
  *
  * `vaultId` is the vault the entry lives in (its own, or the target vault for a
  * brand-new one) — it is what turns that estimated slug into a real key.
+ *
+ * `initialKeys` are lists a brand-new entry starts out on (the vault's default
+ * lists), written like any other pending pick on its first save. Only those in
+ * `vaultId` count: a `[[link]]` never crosses vaults, so retargeting the entry
+ * parks the others instead of writing them.
  */
 export function usePendingLinks(
   item: Occurrence | null,
   title: string,
   vaultId: string | null,
   createdKey?: EntryKey | null,
+  initialKeys: EntryKey[] = [],
 ) {
-  const [pendingKeys, setPendingKeys] = useState<EntryKey[]>([])
+  const [allPendingKeys, setPendingKeys] = useState<EntryKey[]>(initialKeys)
+  const pendingKeys = allPendingKeys.filter(k => keyVaultId(k) === vaultId)
 
   const estimated = vaultId && title.trim() ? makeEntryKey(vaultId, titleToSlug(title)) : undefined
   const effectiveKey = item?.entryKey ?? createdKey ?? estimated

@@ -13,6 +13,7 @@ import type { EntryKey } from '@/fileIO'
 import { toggleOccDone } from '@/occurrenceActions'
 import { getFom, getItems } from '@/storeBridge'
 import { readVaultStringArray } from '@/lib/vaultStorage'
+import { DEFAULT_LISTS_KEY } from './defaultLists'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 import { usePendingLinks } from './usePendingLinks'
@@ -64,7 +65,7 @@ export function useEntryEditor(
   // seed has to match where the entry actually lands. `useVaultTarget` below
   // seeds its own state from the same helper, in this same mount render.
   //
-  // ── The form is derived, not stored ────────────────────────────────────────
+  // ── The form is derived, not stored ──────────────────────────────────────
   //
   // `view` is what the store says about this occurrence at this scope, and
   // `edits` is what the user has changed on top of it. The form is the two
@@ -83,15 +84,24 @@ export function useEntryEditor(
    */
   const [newEntryView] = useState<EntryState>(() => {
     const target = initialTargetVault(!initialOcc, seed?.vault)
+    const defaultParticipants = target
+      ? readVaultStringArray('meridian_default_participants', target)
+      : []
     const base = entryFromItem(null, initialScope, seed)
-    const seeded = target
-      ? {
-          ...base,
-          participants: readVaultStringArray('meridian_default_participants', target),
-          tags:         readVaultStringArray('meridian_default_tags', target),
-        }
+    const seeded = defaultParticipants.length > 0
+      ? { ...base, participants: [...defaultParticipants] }
       : base
     return initialTitle ? { ...seeded, title: initialTitle } : seeded
+  })
+
+  // The lists a brand-new entry starts out on, from the target vault's default
+  // lists. Keys whose list has since been deleted are dropped here, once, rather
+  // than left to write a link into a file that no longer exists.
+  const [defaultListKeys] = useState<EntryKey[]>(() => {
+    const target = initialTargetVault(!initialOcc, seed?.vault)
+    if (!target) return []
+    const { roots } = useStore.getState()
+    return readVaultStringArray(DEFAULT_LISTS_KEY, target).filter((k): k is EntryKey => roots.has(k as EntryKey))
   })
 
   const [titleMissing, setTitleMissing] = useState(false)
@@ -191,7 +201,7 @@ export function useEntryEditor(
   const { vaultId, targetVaultId } = vaultTarget
 
   const { effectiveKey, pendingKeys, handleAdd, handleRemove, flushOnSave } =
-    usePendingLinks(entry.item, entry.title, vaultId, createdKey)
+    usePendingLinks(entry.item, entry.title, vaultId, createdKey, defaultListKeys)
   // Mirrors the latest flushOnSave (its closure changes every render as pendingSlugs/item
   // change) so timer/dialog-driven commits — which may fire after several re-renders —
   // flush against the current pending links instead of a stale render's closure.
@@ -511,9 +521,7 @@ export function useEntryEditor(
   // link is resolved within that same vault. Participants are read straight
   // from that vault's localStorage rather than the store's `defaultParticipants`,
   // which only caches whichever vault is currently the *default* one and goes
-  // stale the moment the parent entry lives elsewhere. Default tags are
-  // deliberately not applied: a promoted line is not a fresh entry the user
-  // composed, so it should not pick up the vault's standing labels.
+  // stale the moment the parent entry lives elsewhere.
   const handlePromoteTask = (title: string, done: boolean): string | null => {
     const key = saveNode(null, 'all', {
       item: null, title, tracked: true, done,

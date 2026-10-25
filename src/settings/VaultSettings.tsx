@@ -27,10 +27,11 @@ import {
   GITHUB_APP_INSTALL_URL, APP_URL, exportVaultIcs, previewVaultIcsImport, importVaultIcs,
   previewVaultCopy, copyVaultInto,
 } from '@/vaultActions'
-import { ParticipantsRow, TagsRow, archiveEntry } from '@/editor'
+import { ParticipantsRow, ListedOnRow, DEFAULT_LISTS_KEY, archiveEntry } from '@/editor'
 import { keyRoute } from '@/entryRoute'
 import { deleteWholeFileWithUndo } from '@/occurrenceActions'
 import type { VaultRef, IcsImportSummary } from '@/vaultActions'
+import type { EntryKey } from '@/fileIO'
 import { VAULT_COLORS, isWritableVault } from '@/vaultRef'
 import { VAULT_COLOR_SWATCH } from '@/components/primitives/occurrence-variants'
 import { VaultChip } from '@/components'
@@ -176,8 +177,8 @@ export function VaultSettings({ vault }: Props) {
     () => readVaultStringArray('meridian_default_participants', vault.id),
   )
 
-  const [defaultTags, setDefaultTags] = useState<string[]>(
-    () => readVaultStringArray('meridian_default_tags', vault.id),
+  const [defaultLists, setDefaultLists] = useState<EntryKey[]>(
+    () => readVaultStringArray(DEFAULT_LISTS_KEY, vault.id) as EntryKey[],
   )
 
   const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
@@ -229,9 +230,9 @@ export function VaultSettings({ vault }: Props) {
     setDefaultParticipants(vault.id, next)
   }
 
-  function handleDefaultTagsChange(next: string[]) {
-    setDefaultTags(next)
-    writeVaultJSON('meridian_default_tags', vault.id, next)
+  function handleDefaultListsChange(next: EntryKey[]) {
+    setDefaultLists(next)
+    writeVaultJSON(DEFAULT_LISTS_KEY, vault.id, next)
   }
 
   async function handleSyncNow() {
@@ -497,10 +498,20 @@ export function VaultSettings({ vault }: Props) {
             />
           </SettingsRow>
           <SettingsRow
-            label="Default tags"
-            description="Added to new entries in this vault, but not to checklist items you turn into entries. Stored on this device only."
+            label="Default lists"
+            description="New entries in this vault start out listed on these. Not applied when you turn a checklist item into an entry. Stored on this device only."
           >
-            <TagsRow tags={defaultTags} onChange={handleDefaultTagsChange} />
+            <ListedOnRow
+              standalone
+              label=""
+              className=""
+              linkedKeys={defaultLists}
+              entryKey={undefined}
+              vaultId={vault.id}
+              roots={roots}
+              onAdd={key => handleDefaultListsChange([...defaultLists, key])}
+              onRemove={key => handleDefaultListsChange(defaultLists.filter(k => k !== key))}
+            />
           </SettingsRow>
         </SettingsSection>
       )}
