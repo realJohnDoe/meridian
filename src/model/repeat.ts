@@ -83,6 +83,37 @@ export function monthlyWeekdaySpec(jsDate: Date): MonthlyWeekdaySpec {
   }
 }
 
+/**
+ * `repeat` with every part that only restates `from` — its weekday, its day of
+ * the month, its "Nth weekday", its month — restated for `to` instead.
+ *
+ * What a save means by moving a series' start without touching its rule: the
+ * same rule, from the new date. Google Calendar reads it the same way. Without
+ * this the stored rule keeps naming the old day (the repeat picker always
+ * writes the weekday out: `byweekday: [we]`, not just `weekly`), and a weekly
+ * Wednesday series moved to a Friday stays on Wednesdays. A part that names
+ * anything else (Mon/Wed/Fri) was the user's own choice and is left alone.
+ */
+export function followDate(repeat: Repeat, from: string, to: string): Repeat {
+  const a = parseDateString(from)
+  const b = parseDateString(to)
+  if (repeat.type !== 'schedule' || !a || !b || from === to) return repeat
+  const r = { ...repeat }
+  const only = <T,>(xs: T[] | undefined, x: T) => xs?.length === 1 && xs[0] === x
+  if (r.bysetpos === undefined && only(r.byweekday, WDAY_CODE_BY_JS_DAY[a.getDay()])) r.byweekday = [WDAY_CODE_BY_JS_DAY[b.getDay()]!]
+  if (r.bysetpos !== undefined) {
+    const was = monthlyWeekdaySpec(a)
+    if (r.bysetpos === was.bysetpos && only(r.byweekday, was.byweekday[0])) {
+      const now = monthlyWeekdaySpec(b)
+      r.byweekday = now.byweekday
+      r.bysetpos = now.bysetpos
+    }
+  }
+  if (only(r.bymonthday, a.getDate())) r.bymonthday = [b.getDate()]
+  if (only(r.bymonth, a.getMonth() + 1)) r.bymonth = [b.getMonth() + 1]
+  return r
+}
+
 // ── Repeat ⇄ form model ───────────────────────────────────────────────────────
 //
 // `RepeatForm` is the editable shape a repeat picker works in: one frequency

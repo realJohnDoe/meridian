@@ -10,7 +10,7 @@ import { applyEdit, expandRange, fmtISO, parseToStoreItems } from '@/model'
 import { commitNext } from '@/storeCommit'
 import { getSnapshot } from '@/storeBridge'
 import { toggleOccDone } from '@/occurrenceActions'
-import type { Occurrence } from '@/types'
+import type { Occurrence, EditScope } from '@/types'
 import type { EditFields } from '@/model'
 import type { VaultRef } from '@/vaultRef'
 
@@ -249,15 +249,18 @@ describe('_entry/entry/$vault/$slug — the open occurrence stays the one that w
   const occOn = (date: string) => expandRange(useStore.getState().items, useStore.getState().roots, new Date(date + 'T00:00:00'), new Date(date + 'T23:59:59'))[0]!
 
   /** The editor's date picker, at 'single' scope. */
-  function moveTo(occ: Occurrence, date: string) {
+  /** An editor save of `occ` at `scope`, changing what `over` names. */
+  function save(occ: Occurrence, scope: EditScope, over: Partial<EditFields>) {
     const m = occ.metadata
     const fields: EditFields = {
       title: m.title, body: m.body ?? '', tags: m.tags, items: m.items, participants: m.participants,
       tracked: true, done: m.done ?? false, priority: null, duration: '', repeat: null,
-      scheduled: { date, time: '' },
+      scheduled: { date: occ.date, time: '' }, ...over,
     }
-    commitNext(applyEdit(getSnapshot(), occ, 'single', fields, { vaultId: TEST_VAULT }), [occ.entryKey])
+    commitNext(applyEdit(getSnapshot(), occ, scope, fields, { vaultId: TEST_VAULT }, new Set(Object.keys(over) as Array<keyof EditFields>)), [occ.entryKey])
   }
+  /** The editor's date picker, at 'single' scope. */
+  const moveTo = (occ: Occurrence, date: string) => save(occ, 'single', { scheduled: { date, time: '' } })
 
   // Opened from a favorite or a wikilink, the URL names no date and resolves
   // to the earliest open occurrence — which ticking it done just changed.
@@ -289,6 +292,22 @@ describe('_entry/entry/$vault/$slug — the open occurrence stays the one that w
     act(() => { toggleOccDone(editorOcc()) })
     expect(occOn(moved).metadata.done).toBe(true)
     expect(occOn(week(0)).metadata.done).toBe(false)
+  })
+
+  // The occurrence it was opened on no longer exists: the new rule doesn't
+  // produce its date. The new series' first occurrence took its place.
+  it('lands on the new series\' first occurrence after a "this and following" weekday change', async () => {
+    seedWeekly()
+    const opened = occOn(week(1))
+    searchMock.mockReturnValue({ date: opened.date, id: opened.id })
+    render(<EntrySlugPage />)
+    await screen.findByTestId('editor')
+
+    const twoDaysLater = addDays(new Date(opened.date + 'T00:00:00'), 2)
+    const weekday = (['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa'] as const)[twoDaysLater.getDay()]!
+    act(() => { save(editorOcc(), 'future', { scheduled: { date: opened.date, time: '' }, repeat: { type: 'schedule', freq: 'weekly', interval: 1, byweekday: [weekday] } }) })
+
+    expect(editorOcc().date).toBe(fmtISO(twoDaysLater))
   })
 
   // Back from a wikilink lands on the URL the occurrence was opened under,

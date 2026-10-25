@@ -251,6 +251,8 @@ function* iterScheduledDates(
   sched: Extract<Repeat, { type: 'schedule' }>,
   from: Date,
   to: Date,
+  /** Yield the anchor itself when the rule produces it — `ruleStartDate`'s question. */
+  includeAnchor = false,
 ): Generator<Date> {
   const { freq, byweekday, bymonthday, bymonth, bysetpos, interval = 1, wkst, end } = sched
   // `end.time` only ever accompanies `end.date` — it names an instant within
@@ -498,10 +500,10 @@ function* iterScheduledDates(
    * `resolveCountBound` relies on, by making "the first N dates" and "every
    * date up to the Nth" disagree at the boundary.
    */
-  function periodDates(periodStart: Date): Date[] {
+  function periodDates(periodStart: Date, withAnchor = false): Date[] {
     const byInstant = new Map<number, Date>()
     for (const d of matchesInPeriod(periodStart)) {
-      if (d > anchor) byInstant.set(d.getTime(), d)
+      if (d > anchor || (withAnchor && d.getTime() === anchor.getTime())) byInstant.set(d.getTime(), d)
     }
     return [...byInstant.values()].sort((a, b) => a.getTime() - b.getTime())
   }
@@ -575,7 +577,7 @@ function* iterScheduledDates(
   const walkBound = dateBound < to ? dateBound : to
   let iter = 0
   while (cursor <= walkBound && iter++ < PERIOD_WALK_LIMIT) {
-    for (const d of periodDates(cursor)) {
+    for (const d of periodDates(cursor, includeAnchor)) {
       if (d <= dateBound && d >= from && d <= to) yield d
     }
     const next = nextBase(cursor)
@@ -593,6 +595,36 @@ function generateScheduledDates(
   to: Date,
 ): Date[] {
   return [...iterScheduledDates(anchor, anchorTimeStr, sched, from, to)]
+}
+
+/**
+ * The first date on or after `date` that `repeat`'s rule itself produces — where
+ * a series meant to start on `date` has to be anchored.
+ *
+ * The anchor is always an occurrence (RFC 5545 counts DTSTART as the first one
+ * whether or not the rule produces it), so a series saved on a Wednesday with a
+ * Friday rule shows that Wednesday too. The RFC says the two SHOULD agree; this
+ * is how a save makes them. `date` comes back unchanged for `after_completion`,
+ * which has no rule, and for a rule that produces nothing after it.
+ */
+/**
+ * Whether a series anchored at `date`/`time` has an occurrence on `day`: its
+ * anchor, or a date its rule produces. Always true for `after_completion`, whose
+ * stored instances are its completion history rather than changes to a slot.
+ */
+export function seriesHasDay(date: string, time: string | null, repeat: Repeat, day: string): boolean {
+  if (repeat.type !== 'schedule' || day === date) return true
+  const anchor = toDate(date)
+  const d = toDate(day)
+  if (!anchor || !d) return false
+  return !iterScheduledDates(anchor, time, repeat, startOfDay(d), endOfDay(d)).next().done
+}
+
+export function ruleStartDate(date: string, time: string | null, repeat: Repeat): string {
+  const anchor = toDate(date)
+  if (repeat.type !== 'schedule' || !anchor) return date
+  const first = iterScheduledDates(anchor, time, repeat, anchor, addYears(anchor, 10), true).next()
+  return first.done ? date : (jsDateToSpec(first.value).date ?? date)
 }
 
 /** One override child, indexed for `findOverridesAt`'s coincidence test. */

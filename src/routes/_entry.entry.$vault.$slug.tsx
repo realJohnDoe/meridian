@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
 import { useFileOccurrenceMap, useEntryAccess } from '@/hooks'
 import { useEntryEditor } from '@/editor'
-import { expandRange } from '@/model'
+import { expandRange, firstOccurrenceFrom } from '@/model'
 import { isEditScope, isSeries } from '@/types'
 import { entryKey as makeEntryKey } from '@/fileIO'
 import { entryRoute } from '@/entryRoute'
@@ -93,6 +93,13 @@ function occurrencesOn(items: StoreItem[], roots: Roots, entryKey: EntryKey, dat
   return expandRange(items, roots, d, next).filter(o => o.entryKey === entryKey)
 }
 
+/** `entryKey`'s first occurrence on or after `date`, looking up to a year ahead. */
+function firstFrom(items: StoreItem[], roots: Roots, entryKey: EntryKey, date: string): Occurrence | undefined {
+  const from = new Date(date + 'T00:00:00')
+  const horizon = new Date(from); horizon.setFullYear(from.getFullYear() + 1)
+  return firstOccurrenceFrom(items.filter(i => i.entryKey === entryKey), roots, from, horizon, () => true) ?? undefined
+}
+
 /**
  * The occurrence `id` names, wherever it sits now. A move keeps the id but not
  * the date (`applySingle`), so a stored row's own date wins over `date`, which
@@ -124,8 +131,9 @@ function EntryReady({ occ: resolved, scope }: { occ: Occurrence; scope?: EditSco
     () => occurrenceById(items, roots, pinned.entryKey, pinned.id, pinned.date)
       // The id itself can go: re-reading the file (a sync, another tab)
       // derives ids afresh, and a 'future' split re-keys the occurrences it
-      // takes over. The slot it was last seen on still names it.
-      ?? (pinned.date ? occurrencesOn(items, roots, pinned.entryKey, pinned.date)[0] : undefined)
+      // takes over — onto a later date, when the new rule doesn't produce this
+      // one. The next occurrence from where it was last seen is what took its place.
+      ?? (pinned.date ? firstFrom(items, roots, pinned.entryKey, pinned.date) : undefined)
       ?? pinned,
     [items, roots, pinned],
   )

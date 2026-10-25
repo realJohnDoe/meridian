@@ -12,7 +12,9 @@ import { isSeries, isStandaloneOcc } from '@/types'
 import { titleToSlug, entryKey as makeEntryKey, parseEntryKey } from '@/fileIO'
 import type { EntryKey, RawScalar } from '@/fileIO'
 import { dayBefore } from './dateUtils'
-import { stableOccId } from './expansion'
+import { stableOccId, ruleStartDate, seriesHasDay } from './expansion'
+import { followDate } from './repeat'
+import { deepEqual } from './fieldRegistry'
 import { resolveWikilink, parseWikilinks, unwrapRef } from '../wikilinks'
 
 export interface StoreData {
@@ -498,45 +500,72 @@ function isChildOf(item: StoreItem, seriesId: string): boolean {
   return !isSeries(item) && item.ownerId === seriesId
 }
 
+type SeriesShape = Pick<RepeatPattern<OccurrenceMetadata>, 'date' | 'time' | 'repeat'>
+
 /**
- * The overrides removing a repeat would delete — the occurrences the user has
- * customised, which cannot outlive the series they hang off.
+ * Whether going from `before` to `after` takes away `day`: the old series had an
+ * occurrence there and the new one doesn't. A change stored for that day was a
+ * change to an occurrence that no longer exists, so it goes — Outlook drops
+ * every exception on a rule change; this keeps the ones the new rule still has a
+ * day for. A child on a day the old series never produced either (an occurrence
+ * moved there) didn't come from the rule and stays.
+ */
+function dropsDay(before: SeriesShape, after: SeriesShape, day: string): boolean {
+  return seriesHasDay(before.date, before.time, before.repeat, day)
+    && !seriesHasDay(after.date, after.time, after.repeat, day)
+}
+
+/**
+ * The changed occurrences a save would delete — what the editor asks about
+ * before letting it run (see `useEntryDialogs`' `saveAskingFirst`).
+ *
+ * Answered by running the save rather than restating its rules: removing a
+ * repeat takes every override in its scope with it (there is no series left for
+ * them to change an occurrence of), and changing a rule or a start takes the
+ * ones on days the new series no longer has (`dropsDay`).
  *
  * Exclusion stubs are not counted: a stub records "don't generate this slot",
- * which is meaningless once nothing is generated, so dropping it loses the
- * user nothing they could point at. What the editor does with the count is
- * ask first — see `handleRepeatRemove`.
+ * which is meaningless once the slot is gone, so dropping it loses the user
+ * nothing they could point at.
  */
-export function overridesLostToRepeatRemoval(
-  items: StoreItem[],
-  occ:   Occurrence,
-  scope: EditScope,
+export function overridesLostTo(
+  data:   StoreData,
+  occ:    Occurrence,
+  scope:  EditScope,
+  fields: EditFields,
 ): OccurrenceEntry<OccurrenceMetadata>[] {
-  const series = findSeries(items, occ)
+  const entry = data.entries.get(occ.entryKey)
+  const series = entry && findSeries(entry.items, withLiveOwner(entry, occ))
   if (!series) return []
-  return items.filter((i): i is OccurrenceEntry<OccurrenceMetadata> =>
-    !isSeries(i)
-    && i.ownerId === series.id
-    && !i.excluded
-    && (scope !== 'future' || i.date >= occ.date),
-  )
+  const after = applyEdit(data, occ, scope, fields, { vaultId: parseEntryKey(occ.entryKey).vaultId }, new Set(['scheduled', 'repeat']))
+  const kept = new Set(after.entries.get(occ.entryKey)?.items.map(i => i.id))
+  return entry.items.filter((i): i is OccurrenceEntry<OccurrenceMetadata> =>
+    !isSeries(i) && i.ownerId === series.id && !i.excluded && !kept.has(i.id))
 }
 
 /** Apply editor fields onto an existing series or standalone item's structural + metadata fields. */
 function applyFieldsToItem(item: StoreItem, fields: EditFields, touched?: TouchedKeys): StoreItem {
   const { scheduled, repeat } = fields
   if (isSeries(item)) {
-    return { ...item, metadata: seriesMeta(item.metadata, fields, touched), repeat: repeat ?? item.repeat,
-      date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
+    const date = scheduled?.date ?? ''
+    const nextRepeat = !repeat || deepEqual(repeat, item.repeat) ? followDate(item.repeat, item.date, date) : repeat
+    const time = scheduled?.date ? scheduled.time || null : null
+    // Re-anchored onto the rule only when this save moves the date or changes
+    // the rule: an anchor that disagrees with its rule on purpose (hand-written,
+    // or imported) is left alone by an edit that did neither.
+    const reanchor = date !== item.date || !deepEqual(nextRepeat, item.repeat)
+    return { ...item, metadata: seriesMeta(item.metadata, fields, touched), repeat: nextRepeat,
+      date: reanchor ? ruleStartDate(date, time, nextRepeat) : date, time }
   }
   // A standalone gaining a repeat becomes a series in place — same conversion
   // `applySingle` does for scope 'single'. Without this, a repeat added at
   // scope 'all' (a brand-new entry's default scope, and "edit repeat pattern"
   // on an entry that isn't recurring yet) was silently dropped.
   if (repeat && !item.ownerId) {
+    const time = scheduled?.date ? scheduled.time || null : null
     const series: RepeatPattern<OccurrenceMetadata> = {
-      date:     scheduled?.date ?? '',
-      time:     scheduled?.date ? scheduled.time || null : null,
+      date:     ruleStartDate(scheduled?.date ?? '', time, repeat),
+      time,
       repeat,
       entryKey: item.entryKey,
       id:       item.id,
@@ -733,7 +762,7 @@ function freshItem(entryKey: EntryKey, fields: EditFields, id: string): StoreIte
   const { scheduled, repeat } = fields
   if (repeat) {
     const series: RepeatPattern<OccurrenceMetadata> = {
-      date:     scheduled?.date ?? '',
+      date:     ruleStartDate(scheduled?.date ?? '', scheduled?.time || null, repeat),
       time:     scheduled?.time || null,
       repeat,
       entryKey,
@@ -763,7 +792,7 @@ function freshItem(entryKey: EntryKey, fields: EditFields, id: string): StoreIte
  * were overriding. Nothing else in the file is touched — a second series
  * alongside this one, and its own children, are somebody else's occurrences.
  * The user is asked first where that loses anything; see
- * `overridesLostToRepeatRemoval` and the editor's `handleRepeatRemove`.
+ * `overridesLostTo`.
  */
 function applyAll(data: StoreData, occ: Occurrence, fields: EditFields, touched?: TouchedKeys): StoreData {
   const entry = data.entries.get(occ.entryKey)
@@ -789,6 +818,10 @@ function applyAll(data: StoreData, occ: Occurrence, fields: EditFields, touched?
     ? (i: StoreItem) => isSeries(i) && i.id === occ.ownerId
     : (i: StoreItem) => isStandaloneOcc(i) && i.id === occ.id
   let items = mapItems(entry.items, i => matchItem(i) ? applyFieldsToItem(i, fields, touched) : i)
+  const before = entry.items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined
+  const after = items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined
+  // The series always survives the filter, so the fallback never fires.
+  if (before && after) items = filterItems(items, i => !(isChildOf(i, after.id) && dropsDay(before, after, i.date))) ?? items
   // …and onto the series' override children, so "all events" reaches the
   // occurrences the user already overrode — see `applyFieldsToChildren`.
   if (occ.ownerId) items = applyFieldsToChildren(items, occ.ownerId, fields, touched)
@@ -822,7 +855,7 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields, touch
 
   if (repeat && !occ.ownerId) {
     const newSeries: RepeatPattern<OccurrenceMetadata> = {
-      date:     newDate,
+      date:     ruleStartDate(newDate, newTime, repeat),
       time:     newTime,
       repeat,
       entryKey: occ.entryKey,
@@ -896,7 +929,9 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
 
   const occDate = occ.date
   const newSeriesId = crypto.randomUUID()
-  const newRepeat = repeat ?? series.repeat
+  const newDate = scheduled?.date ?? occDate
+  const newRepeat = !repeat || deepEqual(repeat, series.repeat) ? followDate(series.repeat, occDate, newDate) : repeat
+  const leg: SeriesShape = { date: ruleStartDate(newDate, scheduled?.time || null, newRepeat), time: scheduled?.time || null, repeat: newRepeat }
   const newMeta = seriesMeta(series.metadata, fields, touched)
   const removing = repeatRemoved(fields, touched)
 
@@ -918,9 +953,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
         metadata: occMeta(series.metadata, fields, touched),
       }
     : {
-        date:     scheduled?.date ?? occDate,
-        time:     scheduled?.time || null,
-        repeat:   newRepeat,
+        ...leg,
         entryKey: series.entryKey,
         id:       newSeriesId,
         metadata: newMeta,
@@ -939,7 +972,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
     // so they go with it — which is what the editor asks about before letting
     // this run.
     if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
-      return removing
+      return removing || dropsDay(series, leg, i.date)
         ? []
         : [{ ...i, ownerId: newSeriesId, metadata: { ...occMeta(i.metadata, fields, touched), done: i.metadata.done } }]
     }
@@ -974,7 +1007,7 @@ function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields, touched?
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
   if (repeat) {
     const newSeries: RepeatPattern<OccurrenceMetadata> = {
-      date:     newDate,
+      date:     ruleStartDate(newDate, scheduled?.time || null, repeat),
       time:     scheduled?.time || null,
       repeat,
       entryKey: occ.entryKey,
