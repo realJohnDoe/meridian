@@ -92,7 +92,7 @@ core, and say which you added:
 5. Change one occurrence of a recurring event; then change all future ones.
 6. Write a note that links to another entry; follow the backlink.
 7. Find an entry by searching.
-8. Move between agenda, day, week, month, backlog and notes, and back to today.
+8. Move between agenda, day, week, month, unscheduled tasks and notes, and back to today.
 9. Delete an entry, then undo it.
 10. Change the theme and one other preference.
 11. Start adding a vault (up to the environment's limit).

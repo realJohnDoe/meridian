@@ -23,7 +23,7 @@ type ViewKind = 'day' | 'week' | 'month' | 'list' | 'agenda'
  * Note what the three nullable fields buy: they turn "which view is this?"
  * into "what does this view have?", which is the question the shell actually
  * has. `paging: null` is what makes the agenda's topbar unpaged, `quickNav:
- * null` is the whole of what makes Backlog/Notes panel-less (no inline card,
+ * null` is the whole of what makes Unscheduled Tasks/Notes panel-less (no inline card,
  * no PopoverContent, no swipe-to-toggle), and `onToday: null` is what drops
  * their Today button. None of those sites names a view.
  */
@@ -33,7 +33,7 @@ export interface ViewChrome {
   label: string
   /**
    * Prev/next chevron paging, or null for a view that has none (agenda pages
-   * by scrolling; Backlog/Notes don't page at all). `unit` is the noun for
+   * by scrolling; Unscheduled Tasks/Notes don't page at all). `unit` is the noun for
    * the buttons' accessible names ("Previous day", "Next week", …).
    *
    * Every implementation navigates with `replace: true`. Stated once here

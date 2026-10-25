@@ -102,7 +102,7 @@ export default defineConfig({
         // topbar composition, quick-nav orchestration and focus management,
         // not registration (health-ui-results.md finding #6).
         'src/routes/_app.index.tsx',
-        'src/routes/_app.backlog.tsx',
+        'src/routes/_app.unscheduled.tsx',
         'src/routes/_app.notes.tsx',
         'src/routes/_app.day.$date.tsx',
         'src/routes/_app.week.$date.tsx',

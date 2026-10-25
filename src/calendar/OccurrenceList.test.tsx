@@ -52,7 +52,7 @@ function baseProps(occs: Occurrence[]) {
   }
 }
 
-/** An undated task, i.e. the kind BacklogView pools without a bound. */
+/** An undated task, i.e. the kind UnscheduledView pools without a bound. */
 function undatedTask(i: number, done = false): Occurrence {
   return makeOcc({ id: `task-${i}`, time: null, metadata: { fileSlug: 'note', title: `Task ${i}`, done } })
 }
@@ -113,7 +113,7 @@ describe('OccurrenceList', () => {
     const occs = Array.from({ length: 500 }, (_, i) => undatedTask(i))
     render(<OccurrenceList {...baseProps(occs)} />)
 
-    // The backlog holds all 500, but virtualization is row-granular: only the
+    // The unscheduled tasks holds all 500, but virtualization is row-granular: only the
     // 600px viewport plus overscan may mount. Unvirtualized, all 500 mounted
     // in one synchronous commit — each AgendaRow carrying three raw touch
     // listeners, two store subscriptions and a backlink lookup.

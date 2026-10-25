@@ -156,7 +156,7 @@ describe('useFilteredOccs', () => {
 })
 
 describe('useParticipantFilteredOccs', () => {
-  it('ignores showTasks — a hidden-tasks calendar must not blank the backlog', () => {
+  it('ignores showTasks — a hidden-tasks calendar must not blank the unscheduled tasks', () => {
     useStore.setState({ showTasks: false, hiddenParticipants: {} })
     const task = occIn(TEST_VAULT, 't', [], { done: false })
 
@@ -187,7 +187,7 @@ describe('useParticipantFilteredOccs', () => {
   })
 
   // The leg this hook and filterOccs share (hideEverywhere) — pinned here so
-  // adding it to only one of the two silently misses the Backlog/Notes case.
+  // adding it to only one of the two silently misses the Unscheduled Tasks/Notes case.
   it('hides an archived entry, same as the calendar', () => {
     const archived = occIn(TEST_VAULT, 'a', [], { done: false, archived: true })
     const active   = occIn(TEST_VAULT, 'b', [], { done: false })

@@ -48,9 +48,9 @@ interface Props {
 }
 
 /**
- * The undated lists (backlog, notes), virtualized row by row.
+ * The undated lists (unscheduled tasks, notes), virtualized row by row.
  *
- * Backlog is by definition where undated tasks pile up without a bound, so it
+ * Unscheduled Tasks is by definition where undated tasks pile up without a bound, so it
  * gets the same treatment AgendaView's overdue section got: `count` is the
  * flat row list, not a section count, and only the viewport plus overscan is
  * ever mounted. Each AgendaRow attaches three raw touch listeners and two

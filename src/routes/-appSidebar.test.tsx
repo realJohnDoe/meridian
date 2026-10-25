@@ -88,7 +88,7 @@ describe('AppSidebar — calendar nav', () => {
   it('navigates to Unscheduled Tasks and Notes', () => {
     renderSidebar()
     fireEvent.click(screen.getByRole('button', { name: 'Unscheduled Tasks' }))
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/backlog' })
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/unscheduled' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Notes' }))
     expect(navigateMock).toHaveBeenCalledWith({ to: '/notes' })

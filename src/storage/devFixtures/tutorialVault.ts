@@ -173,7 +173,7 @@ off as you shop.
 (Read-only here — ticking won't stick. See [[tasks-and-events]].)`,
     },
 
-    // ── book-dentist: undated backlog task ──
+    // ── book-dentist: undated task ──
     {
       id: 'book-dentist',
       content: `---

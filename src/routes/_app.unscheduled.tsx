@@ -3,17 +3,17 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useOpenEntry } from '@/hooks'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 
-const BacklogView = lazy(() => import('@/calendar').then(m => ({ default: m.BacklogView })))
+const UnscheduledView = lazy(() => import('@/calendar').then(m => ({ default: m.UnscheduledView })))
 
-export const Route = createFileRoute('/_app/backlog')({
-  component: BacklogPage,
+export const Route = createFileRoute('/_app/unscheduled')({
+  component: UnscheduledPage,
 })
 
-function BacklogPage() {
+function UnscheduledPage() {
   const onOpen = useOpenEntry()
   return (
     <Suspense fallback={<PageSkeleton />}>
-      <BacklogView onOpen={onOpen} />
+      <UnscheduledView onOpen={onOpen} />
     </Suspense>
   )
 }

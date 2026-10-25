@@ -77,7 +77,7 @@ export function occSortKey(o: Occurrence, now: Date): SortKey {
 /**
  * `now` is required and must be a value the caller can honestly stand behind
  * (a ticking clock, or a provably clock-independent placeholder — see the
- * call sites in BacklogView/NotesView). It used to default to `new Date()`
+ * call sites in UnscheduledView/NotesView). It used to default to `new Date()`
  * internally via isDimmed→occState, which made this function impure and
  * forced its callers into a phantom memo dependency (see AgendaView's
  * history) just to force a periodic re-sort.

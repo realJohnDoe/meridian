@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
 const SHOW_LONG = '@min-[190px]:block'
 const HIDE_SHORT = '@min-[190px]:hidden'
 
-// Shared by the agenda/backlog/notes label and both PagedTopbar variants (day,
+// Shared by the agenda/unscheduled/notes label and both PagedTopbar variants (day,
 // month): swaps between a full label and an abbreviated one purely by the space
 // actually available, rather than truncating the full one into an ellipsis.
 export function TopbarLabel({ long, short, className }: { long: string; short: string; className?: string }) {

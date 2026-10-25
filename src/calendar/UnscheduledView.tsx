@@ -8,12 +8,12 @@ interface Props {
 
 // Unscheduled tasks — standalone task occurrences with no date. Sorted by
 // priority then title (sortOccs collapses to that order when there is no time).
-export default function BacklogView({ onOpen }: Props) {
+export default function UnscheduledView({ onOpen }: Props) {
   return (
     <UndatedListView
       kind="task"
       Icon={Inbox}
-      emptyTitle="Your backlog is empty"
+      emptyTitle="No unscheduled tasks"
       emptyHint="Tasks without a date show up here."
       onOpen={onOpen}
     />

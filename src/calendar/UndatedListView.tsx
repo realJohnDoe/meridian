@@ -18,7 +18,7 @@ interface Props {
   onOpen: (occ: Occurrence, scope?: EditScope) => void
 }
 
-// Shared list for standalone (undated) tasks and notes — BacklogView and
+// Shared list for standalone (undated) tasks and notes — UnscheduledView and
 // NotesView differ only in which kind they filter to and their empty-state copy.
 export default function UndatedListView({ kind, Icon, emptyTitle, emptyHint, onOpen }: Props) {
   const items = useStore(s => s.items)

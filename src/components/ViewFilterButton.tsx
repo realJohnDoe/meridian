@@ -101,7 +101,7 @@ function PersonRow({
 /**
  * The view filter — a "which calendars, and who in them" filter over content,
  * so it lives in the topbar rather than the sidebar: it applies to every
- * browsing view (agenda, month, week, day, backlog, notes) and needs to stay
+ * browsing view (agenda, month, week, day, unscheduled tasks, notes) and needs to stay
  * visible on the screen it is narrowing. The topbar hides it on entry routes,
  * which is exactly right — the filter stops at the document boundary.
  *
