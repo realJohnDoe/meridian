@@ -145,7 +145,7 @@ Meridian has no "type" field. What an entry *is* comes from which fields it carr
 - **Event** — has a \`date\` (plus optional \`time\`, \`duration\`, \`participants\`). Shows up in the Agenda, Month, Week, and Day views. Example: [[plan-the-week]].
 - **Task** — has a \`done\` checkbox (plus optional \`priority\` and \`date\`). Tick it and Meridian writes \`done: true\` back to the file. Example: [[buy-groceries]].
 
-A task doesn't need a date — leave it off and it waits in your backlog, like
+A task doesn't need a date — leave it off and it waits in Unscheduled Tasks, like
 [[book-dentist]]. Find undated items from the search bar at the bottom.
 
 > This sandbox is read-only, so ticking a checkbox won't stick. [[make-it-yours]] to make it real.`,
@@ -182,7 +182,7 @@ done: false
 priority: low
 ---
 
-An **undated task** — no \`date\`, so it lives in your backlog instead of on a day.
+An **undated task** — no \`date\`, so it lives in Unscheduled Tasks instead of on a day.
 Reach it from the search bar, and give it a date when you're ready to schedule it.
 
 Back to [[tasks-and-events]].`,

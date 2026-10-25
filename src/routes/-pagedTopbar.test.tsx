@@ -72,7 +72,7 @@ describe('PagedTopbar', () => {
   // Agenda/backlog/notes have no paging — omitting `paging` must drop the
   // chevrons entirely rather than rendering them disabled or unnamed.
   it('omits the chevrons entirely when paging is not given', () => {
-    render(<PagedTopbar isMobile={false} openSidebar={vi.fn()} label="Backlog" />)
+    render(<PagedTopbar isMobile={false} openSidebar={vi.fn()} label="Unscheduled Tasks" />)
     expect(screen.queryByRole('button', { name: 'Previous month' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Next month' })).not.toBeInTheDocument()
   })
