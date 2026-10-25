@@ -149,6 +149,22 @@ describe('moveEntryKey', () => {
     )
   })
 
+  it('clears participants rather than carrying them into the target vault', () => {
+    const d = add(EMPTY, WORK, 'standup', `---
+title: Standup
+date: "2026-05-01"
+participants: [Ana, Ben]
+---
+`)
+    const before = itemsOf(d).filter(i => i.entryKey === k(WORK, 'standup'))
+    expect(before.every(i => i.metadata.participants.length === 2)).toBe(true)
+
+    const after = moveEntryKey(d, k(WORK, 'standup'), k(HOME, 'standup'))
+    const moved = itemsOf(after).filter(i => i.entryKey === k(HOME, 'standup'))
+    expect(moved).toHaveLength(before.length)
+    expect(moved.every(i => i.metadata.participants.length === 0)).toBe(true)
+  })
+
   it('moves the root to the new key and re-derives its provenance', () => {
     const after = moveEntryKey(snapshot(), from, to)
     expect(rootsIn(after).has(from)).toBe(false)

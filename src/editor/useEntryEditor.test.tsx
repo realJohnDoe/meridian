@@ -299,6 +299,18 @@ describe('useEntryEditor', () => {
     expect(new Set(persistence.writes).size).toBe(1)
   })
 
+  it('retargeting a brand-new entry swaps its default participants for the new vault\'s', () => {
+    localStorage.setItem(`meridian_default_participants_${TEST_VAULT}`, JSON.stringify(['Ana']))
+    localStorage.setItem('meridian_default_participants_other', JSON.stringify(['Ben']))
+    const { result } = renderHook(() => useEntryEditor(null, 'all'))
+    expect(result.current.entry.participants).toEqual(['Ana'])
+
+    act(() => { result.current.onVaultChange?.('other') })
+
+    expect(result.current.entry.participants).toEqual(['Ben'])
+    localStorage.clear()
+  })
+
   it('a second "future" save edits the series the first one split off', () => {
     // Splitting again off the stale owner capped an already-capped series and
     // stood a second new one beside it, so the split day grew an occurrence

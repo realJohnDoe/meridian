@@ -1291,7 +1291,10 @@ export function setArchived(data: StoreData, entryKey: EntryKey, archived: boole
  * copied from the old root) for the same reason `editedEntry` does it — the
  * root's provenance and the map key must be incapable of disagreeing. Every
  * other field, including `extra` and `fileConvention`, is carried over
- * verbatim: a move is not an edit of the file's contents.
+ * verbatim: a move is not an edit of the file's contents. The one exception is
+ * participants, which are a vault's own address book (its default participants
+ * and the suggestions all come from it) and so are cleared rather than leaked
+ * into the target vault.
  *
  * **No other file is touched, by design.** Wikilinks are per vault and stored
  * bare, so the links pointing at this entry from its old vault — and the links
@@ -1308,7 +1311,7 @@ export function moveEntryKey(data: StoreData, fromKey: EntryKey, toKey: EntryKey
   next.set(toKey, {
     key:   toKey,
     root:  { ...entry.root, ...parseEntryKey(toKey) },
-    items: mapItems(entry.items, i => ({ ...i, entryKey: toKey })),
+    items: mapItems(entry.items, i => ({ ...i, entryKey: toKey, metadata: { ...i.metadata, participants: [] } })),
   })
   return { ...data, entries: next }
 }
