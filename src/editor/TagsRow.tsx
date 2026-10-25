@@ -1,4 +1,3 @@
-import { Tag } from 'lucide-react'
 import ChipListRow from './ChipListRow'
 
 interface Props {
@@ -7,5 +6,5 @@ interface Props {
 }
 
 export default function TagsRow({ tags, onChange }: Props) {
-  return <ChipListRow values={tags} onChange={onChange} noun="tag" icon={Tag} />
+  return <ChipListRow values={tags} onChange={onChange} noun="tag" />
 }

@@ -14,7 +14,8 @@ interface Props {
   suggestions?: string[]
   /** What the add chip says it adds: "person", "tag". */
   noun:         string
-  icon:         LucideIcon
+  /** Leading icon; omitted when the row's label already says what it is. */
+  icon?:        LucideIcon
 }
 
 /**
@@ -50,7 +51,7 @@ export default function ChipListRow(props: Props) {
 
   return (
     <div className="flex flex-wrap gap-1.5 items-center">
-      <Icon size={13} className="opacity-40 self-center" />
+      {Icon && <Icon size={13} className="opacity-40 self-center" />}
       {values.map((p, i) => (
         <TagChip
           key={p}
