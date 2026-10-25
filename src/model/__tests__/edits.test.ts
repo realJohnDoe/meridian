@@ -5,7 +5,7 @@ import type { EditFields, StoreData } from '@/model/storeOps'
 import { parseToStoreItems } from '@/model/storeItems'
 import { expandRange } from '@/model/expansion'
 import { isSeries } from '@/types'
-import type { Occurrence, Roots, StoreItem } from '@/types'
+import type { Occurrence, Repeat, Roots, StoreItem } from '@/types'
 
 /** Build a StoreData from a ParseResult (single-file fixture). */
 function fixtureData(name: string): StoreData {
@@ -920,6 +920,32 @@ instances:
 // PR1 threaded the `extra` bag through parse → collapse; these guard the edit
 // path (storeOps.ts), which rebuilds metadata from scratch at several sites and
 // can silently drop the bag if a spread is missing.
+
+// RFC 5545 counts a series' anchor as an occurrence whether or not its rule
+// produces it, so a save that leaves the anchor off the rule leaves a stray
+// occurrence on it.
+describe('changing a series\' weekday', () => {
+  const WEDNESDAYS = '---\ntitle: Sync\ndate: 2026-10-07\nrepeat:\n  type: schedule\n  freq: weekly\n  byweekday: [we]\n---\n'
+  const FRIDAYS: Repeat = { type: 'schedule', freq: 'weekly', interval: 1, byweekday: ['fr'] }
+
+  function weekdayChange(scope: 'future' | 'all', from: string): string[] {
+    const parsed = parseToStoreItems('sync.md', WEDNESDAYS, TEST_VAULT)
+    const data = dataOf(parsed.items, rootsOf(parsed.root))
+    const occ = occOn(itemsOf(data), rootsIn(data), from)
+    // What the editor sends at each scope: the occurrence's own date for
+    // 'future', the series' start for 'all' — only the rule changed.
+    const next = applyEdit(data, occ, scope, editFields(occ, { scheduled: { date: scope === 'all' ? '2026-10-07' : from, time: '' }, repeat: FRIDAYS }), NEW_TARGET, new Set(['repeat']))
+    return expandRange(itemsOf(next), rootsIn(next), new Date('2026-10-01'), new Date('2026-10-31')).map(o => o.date)
+  }
+
+  it('at "this and following" leaves no occurrence on the Wednesday it was changed from', () => {
+    expect(weekdayChange('future', '2026-10-21')).toEqual(['2026-10-07', '2026-10-14', '2026-10-23', '2026-10-30'])
+  })
+
+  it('at "all" moves the series\' start onto its first Friday', () => {
+    expect(weekdayChange('all', '2026-10-21')).toEqual(['2026-10-09', '2026-10-16', '2026-10-23', '2026-10-30'])
+  })
+})
 
 describe('unknown keys survive every edit scope', () => {
   it.each(['single', 'future', 'all', 'add'] as const)(

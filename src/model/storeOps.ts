@@ -12,7 +12,8 @@ import { isSeries, isStandaloneOcc } from '@/types'
 import { titleToSlug, entryKey as makeEntryKey, parseEntryKey } from '@/fileIO'
 import type { EntryKey, RawScalar } from '@/fileIO'
 import { dayBefore } from './dateUtils'
-import { stableOccId } from './expansion'
+import { stableOccId, ruleStartDate } from './expansion'
+import { deepEqual } from './fieldRegistry'
 import { resolveWikilink, parseWikilinks, unwrapRef } from '../wikilinks'
 
 export interface StoreData {
@@ -526,17 +527,25 @@ export function overridesLostToRepeatRemoval(
 function applyFieldsToItem(item: StoreItem, fields: EditFields, touched?: TouchedKeys): StoreItem {
   const { scheduled, repeat } = fields
   if (isSeries(item)) {
-    return { ...item, metadata: seriesMeta(item.metadata, fields, touched), repeat: repeat ?? item.repeat,
-      date: scheduled?.date ?? '', time: scheduled?.date ? scheduled.time || null : null }
+    const nextRepeat = repeat ?? item.repeat
+    const date = scheduled?.date ?? ''
+    const time = scheduled?.date ? scheduled.time || null : null
+    // Re-anchored onto the rule only when this save moves the date or changes
+    // the rule: an anchor that disagrees with its rule on purpose (hand-written,
+    // or imported) is left alone by an edit that did neither.
+    const reanchor = date !== item.date || !deepEqual(nextRepeat, item.repeat)
+    return { ...item, metadata: seriesMeta(item.metadata, fields, touched), repeat: nextRepeat,
+      date: reanchor ? ruleStartDate(date, time, nextRepeat) : date, time }
   }
   // A standalone gaining a repeat becomes a series in place — same conversion
   // `applySingle` does for scope 'single'. Without this, a repeat added at
   // scope 'all' (a brand-new entry's default scope, and "edit repeat pattern"
   // on an entry that isn't recurring yet) was silently dropped.
   if (repeat && !item.ownerId) {
+    const time = scheduled?.date ? scheduled.time || null : null
     const series: RepeatPattern<OccurrenceMetadata> = {
-      date:     scheduled?.date ?? '',
-      time:     scheduled?.date ? scheduled.time || null : null,
+      date:     ruleStartDate(scheduled?.date ?? '', time, repeat),
+      time,
       repeat,
       entryKey: item.entryKey,
       id:       item.id,
@@ -733,7 +742,7 @@ function freshItem(entryKey: EntryKey, fields: EditFields, id: string): StoreIte
   const { scheduled, repeat } = fields
   if (repeat) {
     const series: RepeatPattern<OccurrenceMetadata> = {
-      date:     scheduled?.date ?? '',
+      date:     ruleStartDate(scheduled?.date ?? '', scheduled?.time || null, repeat),
       time:     scheduled?.time || null,
       repeat,
       entryKey,
@@ -822,7 +831,7 @@ function applySingle(data: StoreData, occ: Occurrence, fields: EditFields, touch
 
   if (repeat && !occ.ownerId) {
     const newSeries: RepeatPattern<OccurrenceMetadata> = {
-      date:     newDate,
+      date:     ruleStartDate(newDate, newTime, repeat),
       time:     newTime,
       repeat,
       entryKey: occ.entryKey,
@@ -918,7 +927,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
         metadata: occMeta(series.metadata, fields, touched),
       }
     : {
-        date:     scheduled?.date ?? occDate,
+        date:     ruleStartDate(scheduled?.date ?? occDate, scheduled?.time || null, newRepeat),
         time:     scheduled?.time || null,
         repeat:   newRepeat,
         entryKey: series.entryKey,
@@ -974,7 +983,7 @@ function applyAdd(data: StoreData, occ: Occurrence, fields: EditFields, touched?
   const base = baseSeries?.metadata ?? occFromAppMeta(occ.metadata)
   if (repeat) {
     const newSeries: RepeatPattern<OccurrenceMetadata> = {
-      date:     newDate,
+      date:     ruleStartDate(newDate, scheduled?.time || null, repeat),
       time:     scheduled?.time || null,
       repeat,
       entryKey: occ.entryKey,
