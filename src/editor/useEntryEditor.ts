@@ -64,7 +64,7 @@ export function useEntryEditor(
   // seed has to match where the entry actually lands. `useVaultTarget` below
   // seeds its own state from the same helper, in this same mount render.
   //
-  // ── The form is derived, not stored ───────────────────────────────────────
+  // ── The form is derived, not stored ────────────────────────────────────────
   //
   // `view` is what the store says about this occurrence at this scope, and
   // `edits` is what the user has changed on top of it. The form is the two
