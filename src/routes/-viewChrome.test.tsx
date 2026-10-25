@@ -260,9 +260,9 @@ describe('useViewChrome', () => {
     expect(result.current.paging).toBeNull()
   })
 
-  it('gives Backlog and Notes a label and nothing else', () => {
+  it('gives Unscheduled Tasks and Notes a label and nothing else', () => {
     matches = { '/_app/backlog': { params: {} } }
     const { result } = renderHook(() => useViewChrome())
-    expect(result.current).toMatchObject({ kind: 'list', label: 'Backlog', paging: null, onToday: null, quickNav: null })
+    expect(result.current).toMatchObject({ kind: 'list', label: 'Unscheduled Tasks', paging: null, onToday: null, quickNav: null })
   })
 })

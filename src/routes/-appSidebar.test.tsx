@@ -48,9 +48,9 @@ beforeEach(() => {
 })
 
 describe('AppSidebar — calendar nav', () => {
-  it('renders the four calendar views plus Backlog, Notes and Settings', () => {
+  it('renders the four calendar views plus Unscheduled Tasks, Notes and Settings', () => {
     renderSidebar()
-    for (const label of ['Agenda', 'Month', 'Week', 'Day', 'Backlog', 'Notes', 'Settings']) {
+    for (const label of ['Agenda', 'Month', 'Week', 'Day', 'Unscheduled Tasks', 'Notes', 'Settings']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
   })
@@ -85,9 +85,9 @@ describe('AppSidebar — calendar nav', () => {
     expect(navigateMock).toHaveBeenCalledWith({ to: '/week/$date', params: { date: '2026-06-15' } })
   })
 
-  it('navigates to Backlog and Notes', () => {
+  it('navigates to Unscheduled Tasks and Notes', () => {
     renderSidebar()
-    fireEvent.click(screen.getByRole('button', { name: 'Backlog' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unscheduled Tasks' }))
     expect(navigateMock).toHaveBeenCalledWith({ to: '/backlog' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Notes' }))

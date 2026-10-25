@@ -12,7 +12,7 @@ export function useListChrome(): ViewChrome | null {
   const backlogMatch = useMatch({ from: '/_app/backlog', shouldThrow: false })
   const notesMatch = useMatch({ from: '/_app/notes', shouldThrow: false })
 
-  const label = backlogMatch ? 'Backlog' : notesMatch ? 'Notes' : null
+  const label = backlogMatch ? 'Unscheduled Tasks' : notesMatch ? 'Notes' : null
   if (label === null) return null
 
   return { kind: 'list', label, paging: null, onToday: null, quickNav: null }

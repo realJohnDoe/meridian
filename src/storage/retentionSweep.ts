@@ -8,7 +8,6 @@
  * consult, since archived-ness is occurrence data, not filter state (see
  * `useCalendarFilter`'s own doc comment on that same point).
  */
-import { toast } from 'sonner'
 import { setArchived, isEntryFinished } from '@/model'
 import { isArchived } from '@/occView'
 import { isWritableVault } from '@/vaultRef'
@@ -51,17 +50,4 @@ export async function sweepRetention(vaultId: string): Promise<void> {
   let next = getSnapshot()
   for (const key of keys) next = setArchived(next, key, true)
   commitNext(next, keys)
-
-  const label = keys.length === 1 ? 'entry' : 'entries'
-  toast(`Archived ${keys.length} ${label} in "${ref.name}"`, {
-    duration: 8000,
-    action: {
-      label: 'Undo',
-      onClick: () => {
-        let reverted = getSnapshot()
-        for (const key of keys) reverted = setArchived(reverted, key, false)
-        commitNext(reverted, keys)
-      },
-    },
-  })
 }

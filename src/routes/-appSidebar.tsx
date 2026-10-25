@@ -84,7 +84,7 @@ export default function AppSidebar() {
   // since each of these is already single-kind. Positioned with Favorites,
   // below the calendar card.
   const collectionItems = [
-    { Icon: Inbox,       label: 'Backlog', active: pathname.startsWith('/backlog'), onClick: () => { close(); void navigate({ to: '/backlog' }) } },
+    { Icon: Inbox,       label: 'Unscheduled Tasks', active: pathname.startsWith('/backlog'), onClick: () => { close(); void navigate({ to: '/backlog' }) } },
     { Icon: NotebookPen, label: 'Notes',   active: pathname.startsWith('/notes'),   onClick: () => { close(); void navigate({ to: '/notes' }) } },
   ]
 
