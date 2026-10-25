@@ -610,7 +610,7 @@ export function VaultSettings({ vault }: Props) {
                     {archivedOpen ? 'Hide archived entries' : `Show ${archived.length} archived entries`}
                   </button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pt-1.5">
+                <CollapsibleContent className="overflow-hidden pt-1.5 data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up motion-reduce:animate-none">
                   <ArchivedRows archived={archived} />
                 </CollapsibleContent>
               </Collapsible>
