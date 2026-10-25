@@ -177,7 +177,7 @@ export function VaultSettings({ vault }: Props) {
     () => readVaultStringArray('meridian_default_participants', vault.id),
   )
 
-  const [defaultLists, setDefaultLists] = useState<EntryKey[]>(
+  const [storedLists, setStoredLists] = useState<EntryKey[]>(
     () => readVaultStringArray(DEFAULT_LISTS_KEY, vault.id) as EntryKey[],
   )
 
@@ -185,6 +185,9 @@ export function VaultSettings({ vault }: Props) {
   const vaults                 = useStore(s => s.vaults)
   const items                  = useStore(s => s.items)
   const roots                  = useStore(s => s.roots)
+  // A list deleted since it was picked drops off the row; the stale key leaves
+  // storage with the next edit (see `liveDefaultLists`).
+  const defaultLists = storedLists.filter(k => roots.has(k))
   const lastRefreshed          = useStore(s => s.syncByVault.get(vault.id)?.lastSyncedAt ?? null)
   const needsAttention         = useStore(s => s.syncByVault.get(vault.id)?.needsAttention ?? null)
 
@@ -231,7 +234,7 @@ export function VaultSettings({ vault }: Props) {
   }
 
   function handleDefaultListsChange(next: EntryKey[]) {
-    setDefaultLists(next)
+    setStoredLists(next)
     writeVaultJSON(DEFAULT_LISTS_KEY, vault.id, next)
   }
 

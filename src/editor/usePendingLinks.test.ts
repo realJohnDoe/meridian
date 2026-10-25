@@ -19,8 +19,9 @@ describe('usePendingLinks initialKeys', () => {
     expect(result.current.pendingKeys).toEqual([])
   })
 
-  it('ignores lists from a vault the entry is not targeting', () => {
-    const { result } = renderHook(() => usePendingLinks(null, 'Draft', 'v1', null, [elsewhere]))
-    expect(result.current.pendingKeys).toEqual([])
+  it('swaps them for another vault\'s when the entry is retargeted', () => {
+    const { result } = renderHook(() => usePendingLinks(null, 'Draft', 'v1', null, [inbox]))
+    act(() => { result.current.resetPending([elsewhere]) })
+    expect(result.current.pendingKeys).toEqual([elsewhere])
   })
 })

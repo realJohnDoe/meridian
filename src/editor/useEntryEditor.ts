@@ -13,7 +13,7 @@ import type { EntryKey } from '@/fileIO'
 import { toggleOccDone } from '@/occurrenceActions'
 import { getFom, getItems } from '@/storeBridge'
 import { readVaultStringArray } from '@/lib/vaultStorage'
-import { DEFAULT_LISTS_KEY } from './defaultLists'
+import { liveDefaultLists } from './defaultLists'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 import { usePendingLinks } from './usePendingLinks'
@@ -95,13 +95,11 @@ export function useEntryEditor(
   })
 
   // The lists a brand-new entry starts out on, from the target vault's default
-  // lists. Keys whose list has since been deleted are dropped here, once, rather
-  // than left to write a link into a file that no longer exists.
+  // lists (see `liveDefaultLists` for why a deleted one is not among them).
   const [defaultListKeys] = useState<EntryKey[]>(() => {
     const target = initialTargetVault(!initialOcc, seed?.vault)
     if (!target) return []
-    const { roots } = useStore.getState()
-    return readVaultStringArray(DEFAULT_LISTS_KEY, target).filter((k): k is EntryKey => roots.has(k as EntryKey))
+    return liveDefaultLists(target, useStore.getState().roots)
   })
 
   const [titleMissing, setTitleMissing] = useState(false)
@@ -200,7 +198,7 @@ export function useEntryEditor(
   const vaultTarget = useVaultTarget(entry, createdKey, seed?.vault, flushEditsRef)
   const { vaultId, targetVaultId } = vaultTarget
 
-  const { effectiveKey, pendingKeys, handleAdd, handleRemove, flushOnSave } =
+  const { effectiveKey, pendingKeys, handleAdd, handleRemove, flushOnSave, resetPending } =
     usePendingLinks(entry.item, entry.title, vaultId, createdKey, defaultListKeys)
   // Mirrors the latest flushOnSave (its closure changes every render as pendingSlugs/item
   // change) so timer/dialog-driven commits — which may fire after several re-renders —
@@ -542,7 +540,12 @@ export function useEntryEditor(
     entry, setEntry,
     createdKey,
     vaultId,
-    onVaultChange: vaultTarget.onVaultChange,
+    // Before the first save the chip retargets the new entry, and the lists it
+    // starts on are the new vault's defaults; afterwards it stages a move.
+    onVaultChange: vaultTarget.onVaultChange && ((toVaultId: string) => {
+      if (!createdKey && !entry.item) resetPending(liveDefaultLists(toVaultId, useStore.getState().roots))
+      vaultTarget.onVaultChange?.(toVaultId)
+    }),
     pendingMove:   vaultTarget.pendingMove,
     onMoveConfirm: vaultTarget.onMoveConfirm,
     onMoveCancel:  vaultTarget.onMoveCancel,
