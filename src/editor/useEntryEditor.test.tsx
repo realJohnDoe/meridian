@@ -163,7 +163,7 @@ describe('useEntryEditor', () => {
       act(() => { result.current.handleScopeChange('all') })
       act(() => { result.current.dialogHandlers.onRepeatRemove() })
 
-      expect(result.current.dialogHandlers.pendingRepeatRemove).toBeNull()
+      expect(result.current.dialogHandlers.pendingLoss).toBeNull()
       const items = useStore.getState().items
       expect(items).toHaveLength(1)
       expect(isSeries(items[0]!)).toBe(false)
@@ -182,11 +182,11 @@ describe('useEntryEditor', () => {
       act(() => { result.current.dialogHandlers.onRepeatRemove() })
 
       // Nothing written until the question is answered.
-      expect(result.current.dialogHandlers.pendingRepeatRemove?.lost).toBe(2)
+      expect(result.current.dialogHandlers.pendingLoss?.lost).toBe(2)
       expect(persistence.writes).toEqual([])
       expect(useStore.getState().items).toHaveLength(3)
 
-      act(() => { result.current.dialogHandlers.pendingRepeatRemove?.onConfirm() })
+      act(() => { result.current.dialogHandlers.pendingLoss?.onConfirm() })
 
       const items = useStore.getState().items
       expect(items).toHaveLength(1)
@@ -199,7 +199,7 @@ describe('useEntryEditor', () => {
 
       act(() => { result.current.handleScopeChange('all') })
       act(() => { result.current.dialogHandlers.onRepeatRemove() })
-      act(() => { result.current.dialogHandlers.onRepeatRemoveClose() })
+      act(() => { result.current.dialogHandlers.onLossClose() })
 
       expect(persistence.writes).toEqual([])
       expect(useStore.getState().items).toHaveLength(2)
@@ -217,7 +217,7 @@ describe('useEntryEditor', () => {
       act(() => { result.current.handleScopeChange('all') })
       act(() => { result.current.dialogHandlers.onRepeatRemove() })
 
-      expect(result.current.dialogHandlers.pendingRepeatRemove).toBeNull()
+      expect(result.current.dialogHandlers.pendingLoss).toBeNull()
       expect(useStore.getState().items).toHaveLength(1)
     })
 
@@ -234,8 +234,8 @@ describe('useEntryEditor', () => {
       act(() => { result.current.dialogHandlers.onRepeatRemove() })
 
       // Only the override at/after the cut is at stake; the earlier one is not.
-      expect(result.current.dialogHandlers.pendingRepeatRemove?.lost).toBe(1)
-      act(() => { result.current.dialogHandlers.pendingRepeatRemove?.onConfirm() })
+      expect(result.current.dialogHandlers.pendingLoss?.lost).toBe(1)
+      act(() => { result.current.dialogHandlers.pendingLoss?.onConfirm() })
 
       const items = useStore.getState().items
       const stillSeries = items.filter(isSeries)
@@ -247,6 +247,33 @@ describe('useEntryEditor', () => {
       expect(items.some(i => i.date === '2026-06-17')).toBe(false)
       // …and the one before the cut is untouched.
       expect(items.some(i => i.date === '2026-06-02')).toBe(true)
+    })
+
+    // Same question, asked by a rule change: only the changes on days the new
+    // rule drops are at stake (2026-06-02 is a Tuesday, 06-03 a Wednesday).
+    it('changing the rule asks only about the changes on days it drops', () => {
+      const occ = seriesWith([override('o-1', '2026-06-02'), override('o-2', '2026-06-03')])
+      const { result } = renderHook(() => useEntryEditor(occ))
+
+      act(() => { result.current.handleScopeChange('all') })
+      act(() => { result.current.dialogHandlers.onRepeatConfirm({ type: 'schedule', freq: 'weekly', byweekday: ['tu'] }) })
+
+      expect(result.current.dialogHandlers.pendingLoss).toMatchObject({ kind: 'change', lost: 1 })
+      expect(persistence.writes).toEqual([])
+
+      act(() => { result.current.dialogHandlers.pendingLoss?.onConfirm() })
+      expect(useStore.getState().items.filter(i => !isSeries(i)).map(i => i.date)).toEqual(['2026-06-02'])
+    })
+
+    it('a rule change that keeps every changed day just saves', () => {
+      const occ = seriesWith([override('o-1', '2026-06-02')])
+      const { result } = renderHook(() => useEntryEditor(occ))
+
+      act(() => { result.current.handleScopeChange('all') })
+      act(() => { result.current.dialogHandlers.onRepeatConfirm({ type: 'schedule', freq: 'weekly', byweekday: ['tu'] }) })
+
+      expect(result.current.dialogHandlers.pendingLoss).toBeNull()
+      expect(persistence.writes).toEqual([testKey('note.md')])
     })
   })
 

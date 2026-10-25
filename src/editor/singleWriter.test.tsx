@@ -171,8 +171,8 @@ describe('single-writer editor invariants', () => {
             // generated sequence always says yes, so the op is the removal it
             // claims to be rather than a dialog that quietly cancels itself —
             // an op that no-ops would make every invariant vacuous for it.
-            const pending = result.current.dialogHandlers.pendingRepeatRemove
-            if (pending) act(() => { pending.onConfirm(); result.current.dialogHandlers.onRepeatRemoveClose() })
+            const pending = result.current.dialogHandlers.pendingLoss
+            if (pending) act(() => { pending.onConfirm(); result.current.dialogHandlers.onLossClose() })
           }
           unmount()
 

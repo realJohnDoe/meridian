@@ -607,6 +607,19 @@ function generateScheduledDates(
  * is how a save makes them. `date` comes back unchanged for `after_completion`,
  * which has no rule, and for a rule that produces nothing after it.
  */
+/**
+ * Whether a series anchored at `date`/`time` has an occurrence on `day`: its
+ * anchor, or a date its rule produces. Always true for `after_completion`, whose
+ * stored instances are its completion history rather than changes to a slot.
+ */
+export function seriesHasDay(date: string, time: string | null, repeat: Repeat, day: string): boolean {
+  if (repeat.type !== 'schedule' || day === date) return true
+  const anchor = toDate(date)
+  const d = toDate(day)
+  if (!anchor || !d) return false
+  return !iterScheduledDates(anchor, time, repeat, startOfDay(d), endOfDay(d)).next().done
+}
+
 export function ruleStartDate(date: string, time: string | null, repeat: Repeat): string {
   const anchor = toDate(date)
   if (repeat.type !== 'schedule' || !anchor) return date

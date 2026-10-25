@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseFixture, serialize, rootMeta, collectUndated, TEST_VAULT, rootsOf, NEW_TARGET, keyOf, dataOf, itemsOf, rootsIn, serializeKey, serializeOnly } from './helpers'
-import { applyEdit, toggleDone, excludeOccurrence, deleteFollowing, deleteSeries, deletionEndsAfterCompletionSeries } from '@/model/storeOps'
+import { applyEdit, overridesLostTo, toggleDone, excludeOccurrence, deleteFollowing, deleteSeries, deletionEndsAfterCompletionSeries } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { parseToStoreItems } from '@/model/storeItems'
 import { expandRange } from '@/model/expansion'
@@ -944,6 +944,68 @@ describe('changing a series\' weekday', () => {
 
   it('at "all" moves the series\' start onto its first Friday', () => {
     expect(weekdayChange('all', '2026-10-21')).toEqual(['2026-10-09', '2026-10-16', '2026-10-23', '2026-10-30'])
+  })
+
+  // The picker writes the weekday out, so moving the start alone used to leave
+  // the rule on Wednesdays. Moving the start means the same rule from there.
+  it('moving only the start at "all" takes a rule that just named its weekday along', () => {
+    const parsed = parseToStoreItems('sync.md', WEDNESDAYS, TEST_VAULT)
+    const data = dataOf(parsed.items, rootsOf(parsed.root))
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-10-14')
+    const next = applyEdit(data, occ, 'all', editFields(occ, { scheduled: { date: '2026-10-09', time: '' }, repeat: { type: 'schedule', freq: 'weekly', byweekday: ['we'] } }), NEW_TARGET, new Set(['scheduled']))
+    expect(expandRange(itemsOf(next), rootsIn(next), new Date('2026-10-01'), new Date('2026-10-31')).map(o => o.date))
+      .toEqual(['2026-10-09', '2026-10-16', '2026-10-23', '2026-10-30'])
+  })
+})
+
+// A change belongs to a day of its series. When the rule stops producing that
+// day the change has nothing left to change — Outlook drops every exception on
+// a rule change; this keeps the ones whose day survives.
+describe('changing a rule drops the changes on days it no longer has', () => {
+  const MON_WED = `---
+title: Gym
+date: 2026-10-05
+repeat:
+  type: schedule
+  freq: weekly
+  byweekday: [mo, we]
+instances:
+  - date: 2026-10-12
+    location: Pool
+  - date: 2026-10-14
+    location: Track
+  - date: 2026-10-21
+    excluded: true
+  - date: 2026-10-29
+    location: Moved to Thursday
+---
+`
+  const MON_FRI: Repeat = { type: 'schedule', freq: 'weekly', byweekday: ['mo', 'fr'] }
+
+  function change(scope: 'future' | 'all') {
+    const parsed = parseToStoreItems('gym.md', MON_WED, TEST_VAULT)
+    const data = dataOf(parsed.items, rootsOf(parsed.root))
+    const occ = occOn(itemsOf(data), rootsIn(data), scope === 'all' ? '2026-10-05' : '2026-10-12')
+    const fields = editFields(occ, { scheduled: { date: occ.date, time: '' }, repeat: MON_FRI })
+    const next = applyEdit(data, occ, scope, fields, NEW_TARGET, new Set(['repeat']))
+    const children = itemsOf(next).filter(i => !isSeries(i)).map(i => i.date)
+    return { lost: overridesLostTo(data, occ, scope, fields).map(i => i.date), children }
+  }
+
+  it.each(['future', 'all'] as const)('at "%s": a Monday and a moved occurrence stay, a Wednesday goes', (scope) => {
+    const { lost, children } = change(scope)
+    expect(lost).toEqual(['2026-10-14'])
+    // The stub on a Wednesday goes too, silently: nothing is generated there now.
+    expect(children).toEqual(['2026-10-12', '2026-10-29'])
+  })
+
+  it('an edit that changes neither the rule nor the start drops nothing', () => {
+    const parsed = parseToStoreItems('gym.md', MON_WED, TEST_VAULT)
+    const data = dataOf(parsed.items, rootsOf(parsed.root))
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-10-05')
+    const fields = editFields(occ, { title: 'Gym (renamed)', repeat: { type: 'schedule', freq: 'weekly', byweekday: ['mo', 'we'] } })
+    expect(overridesLostTo(data, occ, 'all', fields)).toEqual([])
+    expect(itemsOf(applyEdit(data, occ, 'all', fields, NEW_TARGET, new Set(['title']))).filter(i => !isSeries(i))).toHaveLength(4)
   })
 })
 
