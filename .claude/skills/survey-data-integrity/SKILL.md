@@ -1,10 +1,17 @@
+---
+name: survey-data-integrity
+description: Run the data integrity survey: ways the app can lose, corrupt or silently mangle the user's Markdown content. Use when asked to run or edit the data-integrity survey.
+---
+
+Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
+
 # Data Integrity & Durability Survey
 
 Survey this codebase for ways it can **lose, corrupt, or silently mangle the user's content**. Meridian owns a directory of plain Markdown files that the user may also edit by hand, on more than one device, through three different backends. The goal: find the **top 8 integrity risks**, each with a **reproduction** so the fix can be verified by re-running it.
 
 Shared process, scoring, and reporting rules — model-tier ratings, the
 ranking formula, category-verdict conventions, and how to report results —
-live in [the shared survey conventions](./README.md). Read that first; this
+live in [the shared survey conventions](../_survey/conventions.md). Read that first; this
 file states only what's specific to this survey.
 
 This survey is about correctness under adversity, not about code aesthetics. A finding that makes the code nicer but cannot lose a byte belongs in the general health survey, not here.
@@ -49,7 +56,7 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 - **Weight silence over noise.** A malformed file that throws a visible parse error is a far better outcome than one that quietly drops a frontmatter key. When scoring impact, a failure the user can see and recover from is worth several points less than one that corrupts on save and is only discovered weeks later in a git diff. Say explicitly, for each finding, whether it fails loudly or silently.
 - **Separate normalization from corruption, and say which the project intends.** Reformatting (key reordering, quote style, indentation) is not automatically a bug — but this project's README promises hand-created files are picked up, so files the user wrote by hand are in scope for fidelity, not just files Meridian generated. Where you find lossy normalization, state whether it is a deliberate product choice or an accident, and put the question to the user rather than assuming.
 - **Existing tests are the raw material, not the verdict.** `src/model/` and `src/storage/` both sit near a 1:1 test-to-source line ratio, so "there are tests" is not an answer. The question is what the tests *don't* assert: which inputs never appear in the fixtures, which interleavings are never exercised, which assertions are loose enough to pass over a real defect. Read `src/model/__tests__/` (including `yaml-roundtrip.test.ts`) and `src/storage/__tests__/` (including `sync-collision.test.ts` and `reconcile.test.ts`) and report the **gap**, not the count. Pay particular attention to `src/model/__tests__/__snapshots__/`: a snapshot asserts only that output hasn't *changed*, not that it is *correct*, so a snapshot accepted with `-u` can bake corruption into the baseline and defend it forever. Check whether the round-trip fixtures assert real equivalence or just stability.
-- Evaluate the code on its merits, per [Running a survey](./README.md#running-a-survey) — here `src/model/AGENTS.md` is the doc that matters most, and "round-trips back to the same store state" and "this is atomic" are the claims to break.
+- Evaluate the code on its merits, per [Running a survey](../_survey/conventions.md#running-a-survey) — here `src/model/AGENTS.md` is the doc that matters most, and "round-trips back to the same store state" and "this is atomic" are the claims to break.
 
 ## Known suspects
 
@@ -116,8 +123,8 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
   skipped wall-clock hour is `00:00`, not `02:00`). Sweep every half-hour of the
   day rather than a handful of times: the 2026-09-05 temporal finding fires only
   for anchors inside the skipped hour, which is 2 of 48 times in most zones.
-- **Compare the three backends against the same contract.** `localBackend.ts`, `githubBackend.ts` (+ `githubApi.ts`), and `exampleBackend.ts` each implement `StorageBackend`. Differences in version-token semantics, CAS enforcement, and delete behaviour are prime lost-update territory. Only the example backend is exercisable here, so record the other two as probed statically or through their unit tests — see [what this environment can and cannot do](./README.md#what-this-environment-can-and-cannot-do).
-- **Exercise realistic scale where it matters** ([generator recipe](./README.md#what-this-environment-can-and-cannot-do)) — for anything where volume changes behaviour: batch writes, partial failure, reconcile over many files.
+- **Compare the three backends against the same contract.** `localBackend.ts`, `githubBackend.ts` (+ `githubApi.ts`), and `exampleBackend.ts` each implement `StorageBackend`. Differences in version-token semantics, CAS enforcement, and delete behaviour are prime lost-update territory. Only the example backend is exercisable here, so record the other two as probed statically or through their unit tests — see [what this environment can and cannot do](../_survey/conventions.md#what-this-environment-can-and-cannot-do).
+- **Exercise realistic scale where it matters** ([generator recipe](../_survey/conventions.md#what-this-environment-can-and-cannot-do)) — for anything where volume changes behaviour: batch writes, partial failure, reconcile over many files.
 - **Run the quality gates once** — `pnpm run build`, `pnpm run lint`, `pnpm test` — and report each gate's status in the coverage statement. Generate the gitignored types first, per the same section.
 - **Check coverage where it is cheap:** `pnpm run test:coverage` is already configured. Use it to find integrity-critical branches with no coverage at all — but treat the number as a pointer to look, never as a finding by itself.
 - Skim the rest of the tree so nothing is invisible. UI presentation, styling, and render performance are **out of scope** — they have their own surveys ([health-ui.md](health-ui.md), [performance.md](performance.md)) — except where a UI affordance causes an integrity failure (e.g. a save path that reports success before the write is durable, or a destructive gesture with no undo).
@@ -126,7 +133,7 @@ Findings must be anchored to one or more of these. An issue that cannot violate 
 
 **Reporting:** this survey's results live in-place in the "Known suspects"
 section above (verdicts appended per suspect), plus the full report per the
-[shared reporting conventions](./README.md#reporting) — see that section for
+[shared reporting conventions](../_survey/conventions.md#reporting) — see that section for
 the existing pattern. Also append suggested improvements to this survey file
 itself, per the same conventions.
 
@@ -153,14 +160,14 @@ Plain-language summary: can this app lose the user's writing, and if so, how? Na
 ### 3. Category verdicts
 
 One line per category (1–7). Verdicts follow the
-[shared convention](./README.md#category-verdicts): **clean** /
+[shared convention](../_survey/conventions.md#category-verdicts): **clean** /
 **findings: #N, #M** / **partially assessed** (here, "the plan" means the
 threat plan, and "scanning" means probing).
 
 ### 4. Findings — top 8
 
 `Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
-the [shared finding fields](./README.md#finding-fields) — note that `Breadth`
+the [shared finding fields](../_survey/conventions.md#finding-fields) — note that `Breadth`
 here is very often a *condition* rather than a file set ("every entry, whenever
 two tabs are open"; "every series whose time falls in the DST gap"), which the
 shared rule allows, and `Fix` must say **how the repro should behave
@@ -181,10 +188,10 @@ product decision (e.g. "preserve comments" vs "declare the file format
 normalized on save"). Example hazard note: "Sonnet 5 if the CAS precondition to
 preserve is spelled out in the task; else Opus 5."
 
-Rank and report findings per the [shared convention](./README.md#ranking-findings) — here the summary table adds `invariant` and `failure mode` columns (finding → invariant → failure mode → recommended model). "Confirming" a fix means re-running a repro or the test suite.
+Rank and report findings per the [shared convention](../_survey/conventions.md#ranking-findings) — here the summary table adds `invariant` and `failure mode` columns (finding → invariant → failure mode → recommended model). "Confirming" a fix means re-running a repro or the test suite.
 
-Per [Don't pad the findings list](./README.md#dont-pad-the-findings-list) and
-[prefer systemic findings](./README.md#finding-fields): "every save path drops
+Per [Don't pad the findings list](../_survey/conventions.md#dont-pad-the-findings-list) and
+[prefer systemic findings](../_survey/conventions.md#finding-fields): "every save path drops
 unknown frontmatter keys" beats "this one date helper is off by one", and a
 short report backed by real reproductions beats a long one built on suspicion.
 
@@ -192,7 +199,7 @@ short report backed by real reproductions beats a long one built on suspicion.
 
 ## Categories to probe — ranked by priority
 
-Ranking and bullets: see [Running a survey](./README.md#running-a-survey).
+Ranking and bullets: see [Running a survey](../_survey/conventions.md#running-a-survey).
 
 ### 1. Round-trip fidelity & edit locality _(highest weight)_
 

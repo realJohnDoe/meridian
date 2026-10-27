@@ -132,7 +132,7 @@ export default defineConfig({
       // storeCommit.ts sat at 30/95/45/35 against a measured 100/100/100/100
       // until 2026-09-06 for exactly that reason. Re-measure the floors
       // (`pnpm run test:coverage`) when running the health survey, per
-      // plans/surveys/health.md's Budget — and src/coverageConfig.test.ts's
+      // the survey-health skill's Budget — and src/coverageConfig.test.ts's
       // third guard now fails CI on its own once any floor drifts more than
       // ~10 points below measured, so a missed re-measure doesn't go
       // unnoticed until the next survey (#1039).

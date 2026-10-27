@@ -7,7 +7,7 @@ labels: ''
 
 <!--
 Survey finding: attach this as a sub-issue of the run's parent issue (see
-plans/CLAUDE.md and plans/surveys/README.md) — do not label it `survey:<name>`,
+plans/CLAUDE.md and .claude/skills/_survey/conventions.md) — do not label it `survey:<name>`,
 that label is retired. Label it instead with:
   - the survey's own Category tag(s) (`dry`, `srp`, `testing`, `security`, …)
   - the survey-type label matching the parent issue (`health`, `ui`,
@@ -22,7 +22,7 @@ Search the parent issue's sub-issues (or the survey-type label) before filing:
 a re-run mostly re-derives findings that are already open, and those get a
 comment with the new evidence rather than a second issue.
 
-Field definitions live in plans/surveys/README.md. The six below are shared by
+Field definitions live in .claude/skills/_survey/conventions.md. The six below are shared by
 every survey; add whatever else your survey states (Category, Impact,
 Baseline measurement, Repro, Invariant violated, Gap, …).
 -->

@@ -1,3 +1,10 @@
+---
+name: survey-usability
+description: Run the code-blind usability survey: evaluate task flows, navigation and microcopy by using the app. Use when asked to run or edit the usability survey.
+---
+
+Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
+
 # Usability Survey
 
 Evaluate the app **as a UI/UX expert would: by using it, without reading its
@@ -6,7 +13,7 @@ for — quickly, confidently, without surprises — not whether the code behind
 the screen is well made.
 
 Shared process, scoring, and reporting rules live in [the shared survey
-conventions](./README.md). Read that first; this file states only what's
+conventions](../_survey/conventions.md). Read that first; this file states only what's
 specific to this survey, including the two shared fields it redefines
 (Evidence and Breadth).
 
@@ -30,7 +37,7 @@ belongs to one of them, hand it over in one line rather than reporting it here:
 - `data-integrity.md` — anything actually lost or corrupted.
 
 A defect two surveys both find is one issue: search open issues first, per
-[Reporting](./README.md#reporting), and comment rather than duplicate.
+[Reporting](../_survey/conventions.md#reporting), and comment rather than duplicate.
 
 ## Process
 
@@ -61,7 +68,7 @@ A defect two surveys both find is one issue: search open issues first, per
   across all themes is `health-ui.md`'s. Screenshot every step into the
   scratchpad; findings cite steps, not screenshots, since those cannot be
   attached to an issue. Environment limits are in [what this environment can and
-  cannot do](./README.md#what-this-environment-can-and-cannot-do): only the
+  cannot do](../_survey/conventions.md#what-this-environment-can-and-cannot-do): only the
   Tutorial vault is reachable, so the add-vault flow is walked up to the
   browser-permission or OAuth hand-off, or the calendar's `Check calendar`
   (its server-side fetch fails here), and no further. Load the large vault
@@ -102,7 +109,7 @@ sweep once per distinct screen.
 
 ## Output structure
 
-**Reporting:** per the [shared reporting conventions](./README.md#reporting),
+**Reporting:** per the [shared reporting conventions](../_survey/conventions.md#reporting),
 with survey-type label `ux`, including suggested improvements to this survey
 file itself.
 
@@ -125,12 +132,12 @@ One row per task × viewport: **completed** / **completed with friction** /
 ### 4. Category verdicts
 
 One line per category (1–8), per the [shared
-convention](./README.md#category-verdicts).
+convention](../_survey/conventions.md#category-verdicts).
 
 ### 5. Findings — top 10
 
 `Title`, `Recommended model`, `Problem` and `Fix` are the [shared finding
-fields](./README.md#finding-fields). This survey redefines two and adds four:
+fields](../_survey/conventions.md#finding-fields). This survey redefines two and adds four:
 
 - **Evidence** — replaces the file-and-quote rule: the reproduction steps from
   a named starting URL and viewport, plus the **verbatim on-screen text**
@@ -145,7 +152,7 @@ fields](./README.md#finding-fields). This survey redefines two and adds four:
 - **Impact** — 1–10 (10 = a core task cannot be completed, or the user loses
   work without noticing; 5 = a core task completes, but only after a detour or
   error most first-time users would hit; 1 = cosmetic).
-- **Task context** — per [the shared rule](./README.md#write-findings-down-to-sonnet-5-where-you-honestly-can),
+- **Task context** — per [the shared rule](../_survey/conventions.md#write-findings-down-to-sonnet-5-where-you-honestly-can),
   filled in the locate step.
 
 **Fails silently here** (what sets the tier): a fix that makes the reported
