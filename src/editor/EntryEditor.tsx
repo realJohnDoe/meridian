@@ -165,6 +165,12 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
 
   const { item, title, body, scheduled, duration, tracked, repeat, done, items: listItems, participants, priority, editScope } = entry
 
+  // A blank new draft opens ready to type; existing or title-prefilled entries don't steal focus.
+  useEffect(() => {
+    if (!item && !title) titleRef.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
+  }, [])
+
   const { effectiveKey, pendingKeys, handleAdd, handleRemove } = pendingLinks
 
   // `pendingKeys` is optimistic state for a pick not yet reflected in the store's

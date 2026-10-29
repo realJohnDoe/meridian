@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type * as ReactRouter from '@tanstack/react-router'
-import { render, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { useStore } from '@/store'
 import { setupStore, seedStore, installFakePersistence, makeOcc, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 
@@ -83,5 +83,17 @@ describe('/entry/new', () => {
     // Nothing created against a store that hasn't read every file yet: the
     // first save could otherwise take a slug an unparsed file already owns.
     expect([...useStore.getState().roots.keys()]).toEqual([])
+  })
+
+  it('focuses the Title of a blank new entry, but not a prefilled one', async () => {
+    searchMock.mockReturnValue({})
+    const { unmount } = render(<NewEntryPage />)
+    const title = await screen.findByPlaceholderText('Title')
+    expect(document.activeElement).toBe(title)
+    unmount()
+
+    searchMock.mockReturnValue({ title: 'Buy milk' })
+    render(<NewEntryPage />)
+    expect(document.activeElement).toBe(document.body)
   })
 })
