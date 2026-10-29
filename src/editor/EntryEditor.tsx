@@ -265,14 +265,14 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
               }}
             />
             <div className="flex items-center gap-2 mt-0.5 min-w-0">
-              {item && (
-                <p className="font-mono text-2xs text-muted-foreground truncate">{item.metadata.fileSlug}.md</p>
-              )}
               {/* On a brand-new entry this is a picker over where the file will
                   be created. On an existing one it is the move control — same
                   chip, but picking a vault opens the confirm dialog below
                   rather than silently re-targeting. */}
               <VaultChip vaultId={vaultId} onChange={onVaultChange} />
+              {item && (
+                <p className="font-mono text-2xs text-muted-foreground truncate">{item.metadata.fileSlug}.md</p>
+              )}
             </div>
           </div>
         </div>
@@ -305,8 +305,8 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="add">Add new occurrence</SelectItem>
-                  <SelectItem value="single">Edit this occurrence</SelectItem>
+                  <SelectItem value="add">Add another date</SelectItem>
+                  <SelectItem value="single">{isRecurring ? 'Edit this occurrence' : 'Edit this entry'}</SelectItem>
                   {isScheduled && <SelectItem value="future">Edit this and all following occurrences</SelectItem>}
                   {(isScheduled || isAfterCompletion) && <SelectItem value="all">Edit repeat pattern</SelectItem>}
                 </SelectContent>

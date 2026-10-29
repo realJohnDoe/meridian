@@ -105,7 +105,7 @@ export default function GeneralSettings() {
       </SettingsRow>
 
       <SettingsRow
-        label="Color occurrences by"
+        label="Color entries by"
         description="Type colors by event/task and priority. Vault colors by the vault an entry came from — vaults with no color set stay neutral, and tasks show a priority chip instead of a vault one."
       >
         <ToggleGroup

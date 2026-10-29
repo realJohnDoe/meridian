@@ -137,7 +137,7 @@ export default function AddVaultWizard() {
           if (!cancelled) setGithubPhase({ kind: 'picking', session, repos })
         } catch (e) {
           if (!cancelled) {
-            setGithubPhase({ kind: 'repos-error', session, message: e instanceof Error ? e.message : 'Could not load repositories.' })
+            setGithubPhase({ kind: 'repos-error', session, message: e instanceof TypeError ? "Couldn't reach GitHub — check your connection." : e instanceof Error ? e.message : 'Could not load repositories.' })
           }
         }
       })
@@ -195,7 +195,7 @@ export default function AddVaultWizard() {
       // the vault's id (and therefore its entry URLs) is derived from.
       setFeedName(current => current.trim().length > 0 ? current : result.name ?? 'Calendar')
     } catch (e) {
-      setFeedError(e instanceof Error ? e.message : 'Could not read that calendar.')
+      setFeedError(e instanceof TypeError ? "Couldn't reach that address — check it's an iCal (.ics) link." : e instanceof Error ? e.message : 'Could not read that calendar.')
     } finally {
       setChecking(false)
     }
