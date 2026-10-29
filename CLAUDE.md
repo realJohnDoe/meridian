@@ -121,7 +121,7 @@ look at it.
 npm view @typescript-eslint/typescript-estree@latest peerDependencies.typescript
 ```
 
-Last checked 2026-09-06: `>=4.8.4 <6.1.0` at both 8.65.0 and 8.69.0 (npm latest), against TypeScript 7.0.2. While that upper bound stays below 7, the pin stands — don't attempt the bump.
+Last checked 2026-10-29: `>=4.8.4 <6.1.0` at both 8.65.0 and 8.72.1 (npm latest), against TypeScript 7.0.2. While that upper bound stays below 7, the pin stands — don't attempt the bump.
 
 ## Domain vocabulary
 

@@ -110,7 +110,7 @@ export default function SwipeToDeleteRow({ occ, onSwipeDelete, disabled, childre
         // Kick off slide + collapse simultaneously.
         wrap.style.height = wrap.offsetHeight + 'px'
         wrap.style.overflow = 'hidden'
-        void wrap.offsetHeight  // force reflow so the fixed height is registered
+        wrap.getBoundingClientRect()  // force reflow so the fixed height is registered
         row.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1)'
         row.style.setProperty('--swipe-x', `-${rowW}px`)
         wrap.style.transition = 'height .22s ease, opacity .22s ease'
