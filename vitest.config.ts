@@ -154,7 +154,7 @@ export default defineConfig({
         // Re-measured 2026-09-12 (#1039): measured 96.96/92.85/100/100.
         'src/editor/cm/taskLines.ts': { statements: 92, branches: 88, functions: 95, lines: 95 },
         // Re-measured 2026-09-15 (#1101): measured 95.45/89.04/81.48/95.04.
-        'src/editor/cm/markdownFormatting.ts': { statements: 91, branches: 84, functions: 76, lines: 91 },
+        'src/editor/cm/markdownFormatting.ts': { statements: 91, branches: 91, functions: 76, lines: 91 },
         // Re-measured 2026-09-12 (#1039): measured 85.71/100/57.14/84.21.
         'src/editor/cm/ReactWidget.ts': { statements: 81, branches: 95, functions: 52, lines: 79 },
         // The only XSS gate between file-/feed-derived `url:` frontmatter and a
@@ -291,7 +291,7 @@ export default defineConfig({
         // carrying none of the edits. Measured 95.12/48.48/88.23/92.59 on
         // 2026-09-06, its first measurement: the `_entry*.tsx` exclusion glob
         // had kept it out of the report entirely.
-        'src/routes/_entry.entry.new.tsx': { statements: 92, branches: 44, functions: 85, lines: 90 },
+        'src/routes/_entry.entry.new.tsx': { statements: 92, branches: 54, functions: 85, lines: 90 },
         // Re-measured 2026-09-12 (#1039): all three measured 100/100/100/100
         // — floored at 97/97/97/97, not raised to 100 (see
         // responsive-modal.tsx above).
