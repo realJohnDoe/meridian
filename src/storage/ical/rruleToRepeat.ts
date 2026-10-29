@@ -318,10 +318,15 @@ function tryRepresent(parts: RRuleParts, anchor: Date): Repeat | null {
     return { ...base, ...yearMonthPart, byweekday: weekdays(byDay), bysetpos: pos }
   }
 
-  // A plain BYDAY with no position is every matching weekday of the month to
-  // the RFC, and dead data to the engine's yearly arm — it would fall through
-  // to the anchor's day-of-month.
-  if (bySetPos.length === 0) return null
+  // A plain BYDAY with no position is every matching weekday of the named
+  // months to the RFC, and dead data to the engine's yearly arm — it would fall
+  // through to the anchor's day-of-month. At INTERVAL=1 that is the weekly rule
+  // with the same BYMONTH limit, as in the monthly case above; any longer
+  // interval skips whole years, which a weekly rule cannot.
+  if (bySetPos.length === 0) {
+    if (interval > 1) return null
+    return { ...base, freq: 'weekly', ...monthPart, byweekday: weekdays(byDay) }
+  }
   if (bySetPos.some(p => p === 0)) return null
   // BYSETPOS picks once per *period*, and a yearly period is the whole year;
   // the engine picks once per month. The two coincide only when the year holds
