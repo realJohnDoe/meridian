@@ -156,6 +156,16 @@ describe('AddVaultWizard — iCal step', () => {
     expect(screen.queryByText(/events found/)).not.toBeInTheDocument()
   })
 
+  it('maps a network failure on the feed to an actionable message', async () => {
+    vi.mocked(previewIcalFeed).mockRejectedValue(new TypeError('Failed to fetch'))
+    goToIcalStep()
+
+    fireEvent.change(screen.getByPlaceholderText(/calendar\.google\.com/), { target: { value: 'not a url' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Check calendar' })); await Promise.resolve() })
+
+    expect(screen.getByText(/Couldn't reach that address/)).toBeInTheDocument()
+  })
+
   it('adds the calendar with the (possibly edited) name and navigates away', async () => {
     vi.mocked(previewIcalFeed).mockResolvedValue({ eventCount: 0 })
     goToIcalStep()
@@ -284,6 +294,14 @@ describe('AddVaultWizard — GitHub step — reusing an existing sign-in', () =>
       accessToken: 'at', refreshToken: 'rt', expiresAt: session.expiresAt,
     })
     expect(startGitHubSignIn).not.toHaveBeenCalled()
+  })
+
+  it('maps a network failure on the repo list to an actionable message', async () => {
+    vi.mocked(findReusableGitHubSession).mockResolvedValue(session)
+    vi.mocked(fetchInstalledRepos).mockRejectedValue(new TypeError('Failed to fetch'))
+    goToGitHubStep()
+
+    expect(await screen.findByText(/Couldn't reach GitHub/)).toBeInTheDocument()
   })
 
   it('shows an error, but keeps the "Signed in as" label, when the repo list fails to load', async () => {
