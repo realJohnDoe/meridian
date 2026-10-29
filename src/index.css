@@ -162,12 +162,11 @@
      (measured against the compiled bg-primary/text-primary-foreground utility
      classes in a real Chromium — dark clears 5.79:1 vs light's 3.25:1, and
      only dark clears AA's 4.5:1 body-text floor outright), but light reads
-     better in practice on this theme's indigo/red/orange family — kept per
-     design call, same kind of override .rose-pine-dawn/.solarized-light/
-     .solarized-dark/.catppuccin-latte make for their own light-surface chips
-     (see those blocks' comments). This is what event/priority-1/priority-2
-     inherit below via --color-event/-foreground aliasing --primary/
-     -foreground, so all four move together. */
+     better in practice on the indigo — kept per design call, same kind of
+     override .rose-pine-dawn/.solarized-light/.solarized-dark/
+     .catppuccin-latte make for their own light-surface chips (see those
+     blocks' comments). This is what event inherits below via
+     --color-event/-foreground aliasing --primary/-foreground. */
   --primary-foreground: var(--ink-light);
 
   /* On-accent ink pair — see --*-foreground assignments below */
@@ -187,15 +186,12 @@
   --priority-2:   oklch(0.76 0.17 48);    /* orange */
   --priority-3:   oklch(0.88 0.18 82);    /* yellow */
 
-  /* On-accent text — task/note/priority-3 are light pastels where dark ink
-     wins outright (WCAG agrees). priority-1/priority-2 get the same
-     light-ink design call as --primary-foreground above, for the same
-     reason (measured 2.79-2.85:1 for light vs 6.74-8.08:1 for dark on
-     these two — WCAG prefers dark, light reads better in practice). */
+  /* On-accent text — every domain color here is a light pastel where dark
+     ink wins outright (WCAG agrees). */
   --task-foreground:       var(--ink-dark);
   --note-foreground:       var(--ink-dark);
-  --priority-1-foreground: var(--ink-light);
-  --priority-2-foreground: var(--ink-light);
+  --priority-1-foreground: var(--ink-dark);
+  --priority-2-foreground: var(--ink-dark);
   --priority-3-foreground: var(--ink-dark);
 
   /* Ink for any bg-{color}/30 tinted chip — see the shared comment on
