@@ -124,7 +124,7 @@ export default function FileResultsList(props: Props) {
           // WikilinkPopup uses for its OccurrenceCard-wrapped matches.
           <div
             id={`search-option-${entry.entryKey}`}
-            className={cn('rounded-lg', highlighted && 'ring-2 ring-ring')}
+            className={cn('rounded-lg', highlighted && 'pointer-fine:ring-2 pointer-fine:ring-ring')}
           >
             <OccurrenceCard
               occ={occ}
