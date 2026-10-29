@@ -229,3 +229,18 @@ describe('formToRepeat', () => {
     expect(formToRepeat(form, DATE)).toEqual({ type: 'schedule', freq: 'daily', interval: 1 })
   })
 })
+
+describe('imported multi-position monthly repeats', () => {
+  // `tryRepresent` emits `bysetpos` as an array for "first and last Friday";
+  // the engine iterates it. Anchor 2026-06-05 is the first Friday of June.
+  const FIRST_FRIDAY = '2026-06-05'
+  // Known bug (#1115 §0): the form re-derives a single position from the
+  // anchor, so these are flattened. `it.fails` flips to a failure once fixed.
+  it.fails.each<[string, number[]]>([
+    ['first and last Friday', [1, -1]],
+    ['first and third Friday', [1, 3]],
+  ])('%s survives an open-and-Set cycle', (_label, bysetpos) => {
+    const repeat: Repeat = { type: 'schedule', freq: 'monthly', interval: 1, byweekday: ['fr'], bysetpos }
+    expect(roundTrip(repeat, FIRST_FRIDAY)).toEqual(repeat)
+  })
+})
