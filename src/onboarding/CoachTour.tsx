@@ -34,7 +34,9 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
   // The card sits at z-tour over an app that stays visible and clickable on
   // purpose — the tour points at the agenda, the search bar and the sidebar it
   // opens for the last step — so it can't be a ResponsiveModal: radix's
-  // backdrop would black out the very thing each step is pointing at. It still
+  // backdrop would black out the very thing each step is pointing at. That
+  // sidebar sheet is modal though, and sets `pointer-events: none` on <body>,
+  // so the card opts back in with `pointer-events-auto`. It still
   // owes a keyboard user the other half of `role="dialog" aria-modal`, so the
   // trap is explicit. Skip/Done (and Escape, below) are the ways out.
   useFocusTrap(cardRef, active)
@@ -148,7 +150,7 @@ export default function CoachTour({ setSidebarOpen, navigateHome }: Props) {
         aria-modal="true"
         aria-label={`Tour: ${step.title}`}
         tabIndex={-1}
-        className="fixed z-tour outline-none flex max-h-[70dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl
+        className="pointer-events-auto fixed z-tour outline-none flex max-h-[70dvh] flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-2xl
           inset-x-4 bottom-[calc(6rem_+_env(safe-area-inset-bottom,0px))]
           sm:inset-x-auto sm:left-1/2 sm:w-80 sm:-translate-x-1/2"
       >
