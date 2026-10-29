@@ -345,7 +345,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
               ) : (
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 rounded-lg border border-dashed border-input bg-card/50 pl-2 pr-2.5 py-2 text-left text-muted-foreground shadow-none transition-colors hover:bg-accent"
+                  className="flex w-full items-center gap-2 rounded-lg bg-primary/5 pl-2 pr-2.5 py-2 text-left text-primary shadow-none transition-colors hover:bg-primary/10"
                   onClick={() => setPickerOpen(true)}
                 >
                   <Plus size={13} className="shrink-0" />
