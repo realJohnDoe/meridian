@@ -20,6 +20,8 @@ setupStore()
 // effect runs — no mount-empty-then-rerender dance is needed here.
 let offsetHeightDescriptor: PropertyDescriptor | undefined
 let offsetWidthDescriptor: PropertyDescriptor | undefined
+let clientHeightDescriptor: PropertyDescriptor | undefined
+let clientWidthDescriptor: PropertyDescriptor | undefined
 let animateDescriptor: PropertyDescriptor | undefined
 
 beforeEach(() => {
@@ -27,6 +29,11 @@ beforeEach(() => {
   offsetWidthDescriptor  = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 600 })
   Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 600 })
+  // virtual-core's `getRect` reads clientWidth/clientHeight since 3.19; older releases read offset*.
+  clientHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientHeight')
+  clientWidthDescriptor  = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 600 })
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 600 })
   // jsdom has no Web Animations API. useVirtualFlip feature-detects and skips
   // without it, but stub it anyway so these tests exercise the real path
   // rather than passing only because the glide was skipped.
@@ -39,6 +46,8 @@ beforeEach(() => {
 afterEach(() => {
   if (offsetHeightDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeightDescriptor)
   if (offsetWidthDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor)
+  if (clientHeightDescriptor) Object.defineProperty(HTMLElement.prototype, 'clientHeight', clientHeightDescriptor)
+  if (clientWidthDescriptor) Object.defineProperty(HTMLElement.prototype, 'clientWidth', clientWidthDescriptor)
   if (animateDescriptor) Object.defineProperty(Element.prototype, 'animate', animateDescriptor)
   else delete (Element.prototype as { animate?: unknown }).animate
 })
