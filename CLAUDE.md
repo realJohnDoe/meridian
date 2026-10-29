@@ -19,8 +19,9 @@ Given two implementations with essentially equivalent behavior, prefer the
 one with less code. A shorter diff that does the same job is worth more than
 a longer one that merely feels more thorough — don't pad a change with extra
 abstraction, options, or handling the task doesn't need just to make it look
-more complete. This applies to edits to this file and to the survey files in
-`plans/surveys/` as much as to source: see that directory's `README.md` for
+more complete. This applies to edits to this file and to the survey skills in
+`.claude/skills/survey-*/` as much as to source: see
+`.claude/skills/_survey/conventions.md` for
 the same principle applied to keeping survey files from growing unchecked.
 
 ## Package manager
@@ -256,8 +257,8 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 Don't proactively start the dev server and drive it with `preview_*` tools to verify a change. Only do this when the user explicitly asks for it — they generally test UI changes themselves.
 
-**This does not apply to survey runs.** `plans/surveys/performance.md`,
-`product-niche.md`, `health-ui.md` and `usability.md` each specify a measurement or screenshot
+**This does not apply to survey runs.** the `survey-performance`,
+`survey-product-niche`, `survey-health-ui` and `survey-usability` skills each specify a measurement or screenshot
 pass as a required phase — dev server, browser, real numbers — and those
 surveys are the explicit ask. Skipping that phase because of the paragraph
 above is a silent failure: it lands as "partially assessed", which the survey

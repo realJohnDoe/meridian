@@ -7,7 +7,7 @@ One rule decides where anything in `plans/` belongs:
 | | Shape | Where it lives |
 |---|---|---|
 | A survey **run**, a survey **finding**, a plan **step**, a whole **plan**, an open **product decision** | **state** — it is open, then it is closed | a GitHub issue |
-| A standing investigation or measurement report (a spike, a gap survey, a one-off study — not a run of `plans/surveys/*.md`) | a **document** — nothing to close; it gets *edited* | a file in `plans/reports/` |
+| A standing investigation or measurement report (a spike, a gap survey, a one-off study — not a run of a `survey-*` skill) | a **document** — nothing to close; it gets *edited* | a file in `plans/reports/` |
 
 Anything with an open/closed state is an issue. Anything maintained as a
 document is a file. That is the whole rule, and it replaces every carve-out
@@ -55,7 +55,7 @@ query. `plan:<name>` is unchanged for a plan and its steps (`plan:tooling`,
 finding is still its own issue, labelled `decision-required` (this used to be
 `product-question` — same shape, renamed for consistency with the finding
 label of the same name). Carry the survey's own finding fields into the body
-(`plans/surveys/README.md` defines the shared six) and state the recommended
+(`.claude/skills/_survey/conventions.md` defines the shared six) and state the recommended
 model tier in the first line, as the report files used to.
 `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton.
 
@@ -85,11 +85,10 @@ coverage statement and what was deliberately not filed — stays reachable from
 the issue tracker rather than disappearing with the last finding.
 
 Standing investigation reports (not survey runs) still live in
-**`plans/reports/`**, beside `plans/surveys/` — `storage-backend.md`,
+**`plans/reports/`** — `storage-backend.md`,
 `vault-scaling.md`, `ical-rrule.md`, and similar one-off spikes and measurement
-studies. `plans/` itself then holds nothing but this file and those two
-directories: the runnable surveys, and the standing documents that aren't
-themselves survey runs. Everything with a state — including every survey
+studies. `plans/` itself then holds this file, `reports/` (the standing documents that
+aren't themselves survey runs), and the `surveys/` tombstone. Everything with a state — including every survey
 run — is in the tracker.
 
 ## Sizing PRs when writing a plan

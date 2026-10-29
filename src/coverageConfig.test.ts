@@ -74,7 +74,7 @@ describe('vitest.config.ts coverage exclusions', () => {
  * without a matching floor bump widens the slack, until the floor is no
  * longer guarding anything. 25 of 57 per-file floors (plus all 4 globals) had
  * drifted ≥10 points below measured before this guard existed; `store.ts` was
- * the worst, at 21.1 points of slack. `plans/surveys/health.md`'s Budget calls
+ * the worst, at 21.1 points of slack. the `survey-health` skill's Budget calls
  * a floor more than ~10 points under "guarding nothing" — this test makes
  * that threshold machine-checked instead of something only a periodic survey
  * catches.

@@ -10,4 +10,4 @@ It is kept at the old path because the published positioning post
 (`blog/1-meridian-why-i-built-a-markdown-first-calendar/`) links here, and that
 post is frozen — so the link is repaired at this end instead. Do not delete this
 file without first checking the post no longer points at it, and do not treat it
-as a survey: `plans/surveys/` otherwise holds only runnable survey procedures.
+as a survey: the runnable surveys are the `survey-*` skills in `.claude/skills/`.

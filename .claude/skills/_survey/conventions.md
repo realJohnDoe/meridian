@@ -1,12 +1,12 @@
 # Survey conventions
 
-Shared process, scoring, and reporting rules used by every survey in this
-directory (`health.md`, `performance.md`, `health-ui.md`,
-`data-integrity.md`, `product-niche.md`, `usability.md`). Each survey states only what's
+Shared process, scoring, and reporting rules used by every survey skill (`survey-health`, `survey-performance`, `survey-health-ui`,
+`survey-data-integrity`, `survey-product-niche`, `survey-usability`; each
+`../survey-*/SKILL.md`). This directory has no `SKILL.md` of its own, so it is
+not invocable — the surveys read it. Each survey states only what's
 specific to it — its categories, its findings cap, its target
 invariants/flows/niches — and points back here for the rest.
-Finished reports live in `plans/reports/` beside this directory rather than in
-it, so everything here is a runnable survey and none of it needs an exception.
+Finished reports live in `plans/reports/`, not here.
 A survey *run* produces no file at all — it is a parent issue with its findings
 as sub-issues; see **Reporting** below.
 
@@ -287,7 +287,7 @@ files"); this section states only what a survey run does.
 `data-integrity.md`'s "Known suspects" section, which appends a verdict to each
 suspect's hypothesis in-place, is unchanged: that survey keeps its suspects list
 live in the survey file itself. Survey files (`health.md`, `performance.md`,
-etc.) stay in `plans/surveys/`.
+etc.) are the `SKILL.md` files under `.claude/skills/survey-*/`.
 
 **Suggest improvements to the survey itself, as a diff on the survey file.**
 These survey files are themselves living specs, and a real run is evidence
@@ -295,7 +295,7 @@ about where they're unclear, stale, or wrong in a way a cold read never
 surfaces — an ambiguous instruction, a budget item that turned out to be
 unmeasurable, a category boundary that didn't hold, a scoring rule that
 produced a counterintuitive order, a "known suspect" that's now stale. After
-finishing a run, edit the survey `.md` file directly with the proposed
+finishing a run, edit the survey's `SKILL.md` directly with the proposed
 improvements, as its own commit separate from filing the run and from any
 fixes to the product itself — that way the suggestion shows up as an
 ordinary reviewable diff in the PR (GitHub's review UI, comments,
