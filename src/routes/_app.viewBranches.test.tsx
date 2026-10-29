@@ -58,8 +58,11 @@ beforeEach(() => {
     onchange: null,
     addEventListener() {},
     removeEventListener() {},
+    // Required by the MediaQueryList type; no code under test calls them.
+    /* eslint-disable @typescript-eslint/no-deprecated */
     addListener() {},
     removeListener() {},
+    /* eslint-enable @typescript-eslint/no-deprecated */
     dispatchEvent: () => false,
   })
   matches = {}

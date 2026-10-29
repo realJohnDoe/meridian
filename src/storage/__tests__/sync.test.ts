@@ -56,7 +56,7 @@ const { cacheStore, pendingMoves, storeState, notifyFns, roundTripLossMock } = v
   // user without reaching into sonner.
   notifyFns: {
     notify: vi.fn(), warn: vi.fn(), notifyError: vi.fn(),
-    warnWithDetails: vi.fn((msg: string, details: () => string) => { void msg; void details() }),
+    warnWithDetails: vi.fn((_msg: string, details: () => string) => { details() }),
   },
   // The round-trip guard is the only part of @/model stubbed here: it is
   // expected never to fire on a real file (see roundTripCheck.ts), so the tests

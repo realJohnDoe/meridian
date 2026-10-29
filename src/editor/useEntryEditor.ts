@@ -142,6 +142,7 @@ export function useEntryEditor(
    */
   const createdItem = useMemo(
     () => {
+      // eslint-disable-next-line @typescript-eslint/no-meaningless-void-operator -- dependency read, not a discarded call
       void storeItems // re-resolve when the store moves, not only when the key lands
       return createdKey ? (getFom().get(createdKey) ?? null) : null
     },
