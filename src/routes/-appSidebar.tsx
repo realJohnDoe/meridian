@@ -189,7 +189,7 @@ export default function AppSidebar() {
                         ) : (
                           <SidebarMenuButton
                             onClick={() => { close(); void navigate(keyRoute(key)) }}
-                            className="px-5 h-auto py-3 text-sm font-medium rounded-none"
+                            className="px-5 h-auto py-3 text-sm font-medium rounded-none focus-visible:ring-inset"
                           >
                             <span className="truncate">{title}</span>
                           </SidebarMenuButton>
