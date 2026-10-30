@@ -578,35 +578,34 @@ function applyFieldsToItem(item: StoreItem, fields: EditFields, touched?: Touche
 }
 
 /**
- * Push the editor's metadata onto a series' override children — "all events"
+ * Carry a series' metadata change onto its override children — "all events"
  * means all events, including occurrences the user has already overridden.
  *
- * Without this the override silently keeps the old value. Its stored metadata
- * was materialised from the series at parse time (see `effectiveNodeToStoreItems`,
- * which merges the node's inherited fields into every child), so once the series
- * moves on, collapse re-reads that inherited copy as a genuine divergence and
- * emits the stale value back onto the instance — leaving one occurrence behind
- * on a change the user asked to apply everywhere. Matches how calendar apps
- * treat the same choice.
+ * Field by field, and only where the child still holds the series' old value.
+ * A child's stored metadata was materialised from the series at parse time
+ * (see `effectiveNodeToStoreItems`), so a field it never overrode carries the
+ * series' value and must follow the series, or collapse re-reads the stale copy
+ * as a divergence and leaves that occurrence behind. A field it *did* override
+ * is its own and wins (#1191) — the same per-field rule Outlook and Google
+ * Calendar apply to a series-wide edit. Comparing old against new also keeps
+ * a field this save never touched out of the children entirely.
  *
- * Deliberately narrower than `applyFieldsToItem`. A child keeps:
- *  - `date`/`time` — the whole reason the override exists is to sit elsewhere;
- *  - `done` — an "all events" metadata change must not un-complete finished
- *    occurrences (and `seriesMeta` forces `done` to the series default, which
- *    would do exactly that);
- *  - `excluded` — a deleted occurrence stays deleted;
- *  - its unknown-key bag — an edit never mints unknown keys (see the invariant
- *    above `mergeOccMeta`), so there is nothing to propagate, and a child's own
- *    `owner: bob` must survive an edit that never mentioned `owner`.
- *
- * Spreading `occMeta`'s result rather than assembling a literal is the
- * sanctioned form — see the "Metadata constructors" note above.
+ * `done`, `excluded`, date/time and the unknown-key bag stay the child's own:
+ * an "all events" edit must not un-complete, undelete or move an override,
+ * and an edit never mints unknown keys (see the invariant above
+ * `mergeOccMeta`). Only the `extra` keys it overwrites are stripped, for the
+ * reason `occMeta` gives.
  */
-function applyFieldsToChildren(items: Entry['items'], seriesId: string, fields: EditFields, touched?: TouchedKeys): Entry['items'] {
-  return mapItems(items, i => {
-    if (isSeries(i) || i.ownerId !== seriesId) return i
-    return { ...i, metadata: { ...occMeta(i.metadata, fields, touched), done: i.metadata.done } }
-  })
+function inheritChanges(child: OccurrenceMetadata, from: OccurrenceMetadata, to: OccurrenceMetadata): OccurrenceMetadata {
+  const moved = (['participants', 'duration', 'priority'] as const)
+    .filter(k => !deepEqual(from[k], to[k]) && deepEqual(child[k], from[k]))
+  if (moved.length === 0) return child
+  return { ...child, ...Object.fromEntries(moved.map(k => [k, to[k]])), extra: withoutKeys(child.extra, moved) }
+}
+
+function applyFieldsToChildren(items: Entry['items'], seriesId: string, from: OccurrenceMetadata, to: OccurrenceMetadata): Entry['items'] {
+  return mapItems(items, i =>
+    isSeries(i) || i.ownerId !== seriesId ? i : { ...i, metadata: inheritChanges(i.metadata, from, to) })
 }
 
 // ── New-entry slug allocation ─────────────────────────────────────────────────
@@ -824,7 +823,7 @@ function applyAll(data: StoreData, occ: Occurrence, fields: EditFields, touched?
   if (before && after) items = filterItems(items, i => !(isChildOf(i, after.id) && dropsDay(before, after, i.date))) ?? items
   // …and onto the series' override children, so "all events" reaches the
   // occurrences the user already overrode — see `applyFieldsToChildren`.
-  if (occ.ownerId) items = applyFieldsToChildren(items, occ.ownerId, fields, touched)
+  if (before && after) items = applyFieldsToChildren(items, after.id, before.metadata, after.metadata)
   return { ...data, entries: withEntry(data.entries, editedEntry(entry, entry.key, fields, items, touched)) }
 }
 
@@ -961,12 +960,10 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
 
   const expand = (i: StoreItem): StoreItem[] => {
     if (i.id === series.id) return [capped, newLeg]
-    // Re-point overrides at/after occDate to the new series, applying the same
-    // metadata the new series root got. Without this they keep the value they
-    // inherited from the OLD series and collapse re-emits it as a divergence —
-    // the same defect `applyFieldsToChildren` fixes for scope 'all', and the
-    // same reasoning: "this and following" covers the overridden occurrences in
-    // that range too. `done`/`excluded`/date/time stay the child's own.
+    // Re-point overrides at/after occDate to the new series, carrying the
+    // series' metadata change onto them the way `applyFieldsToChildren` does
+    // for scope 'all': "this and following" covers the overridden occurrences
+    // in that range too.
     //
     // Unless the rule is going: there is no new series for them to hang off,
     // so they go with it — which is what the editor asks about before letting
@@ -974,7 +971,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
     if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
       return removing || dropsDay(series, leg, i.date)
         ? []
-        : [{ ...i, ownerId: newSeriesId, metadata: { ...occMeta(i.metadata, fields, touched), done: i.metadata.done } }]
+        : [{ ...i, ownerId: newSeriesId, metadata: inheritChanges(i.metadata, series.metadata, newMeta) }]
     }
     return [i]
   }
