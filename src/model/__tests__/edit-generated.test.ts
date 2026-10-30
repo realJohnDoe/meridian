@@ -33,8 +33,8 @@
  *  - a move (or an `add`) never lands on a slot another occurrence already
  *    holds: that slot's override key is the recurrence id, so the two are one row.
  *
- * Two exclusions are known bugs, each guarded by a comment naming its issue
- * (#1191, #1192) — drop the guard when the issue is fixed.
+ * One exclusion is a known bug, guarded by a comment naming its issue
+ * (#1191) — drop the guard when the issue is fixed.
  *
  * CI pins `seed`/`numRuns`; roam locally by raising `numRuns` and dropping
  * `seed`, and turn any find into an example test in `edits.test.ts`.
@@ -296,11 +296,7 @@ describe('applyEdit — generated (issue #1176)', () => {
         // 3. A queued save replayed with the pre-save occurrence changes nothing more.
         if (scope !== 'add') {
           const replay = applyEdit(after, occ, scope, fields, NEW_TARGET, changedEditFields(form, fields))
-          // A 'future' replay from a generated occurrence re-splits the series
-          // it has left (nothing stored names its new owner), writing a dead leg
-          // the expansion never shows: #1192.
-          if (scope === 'future' && !itemsOf(data).some(i => i.id === occ.id)) expect(titled(expand(replay))).toEqual(titled(occsAfter))
-          else expect(serializeOnly(replay)).toBe(serializeOnly(after))
+          expect(serializeOnly(replay)).toBe(serializeOnly(after))
         }
 
         // 4. A second save from the same session ≡ saving its fields once.
