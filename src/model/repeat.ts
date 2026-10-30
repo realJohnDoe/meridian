@@ -152,6 +152,11 @@ export function followDate(repeat: Repeat, from: string, to: string): Repeat {
 //     and third Friday"), or several weekdays under one position — rides
 //     through the form as `weekdayPattern` and is written back as it was,
 //     instead of being flattened to the single pattern the anchor date implies.
+//  4b. `wkst` is carried through as it was. A brand-new repeat takes the
+//     user's week-start setting instead (`RepeatFormContext.weekStart`); an
+//     existing one without `wkst` keeps none, since adding it would move the
+//     dates of a series that already exists. Either way it is written only for
+//     a weekly rule with an interval above 1, the only place it changes a date.
 //  5. `after_completion` has no form fields for weekdays, months, monthly mode
 //     or an end condition, so those are dropped from any `after_completion`
 //     repeat that passes through the form.
@@ -175,6 +180,8 @@ export interface RepeatForm {
   monthly: MonthlyMode
   /** An existing pattern the picker can't express, kept verbatim — see asymmetry 4a. */
   weekdayPattern?: { byweekday: Weekday[]; bysetpos: number | number[] }
+  /** Which weekday a weekly rule's weeks start on — see asymmetry 4b. */
+  wkst?: Weekday
   /**
    * `freq: 'yearly'` only: which calendar months the repeat spans, January-
    * first (index 0 = January … 11 = December). All-`false` means "no explicit
@@ -196,6 +203,8 @@ export interface RepeatFormContext {
   hasSchedule: boolean
   /** The item tracks completion, so "after completion" is an available mode. */
   hasTracking: boolean
+  /** The user's week-start setting, which a brand-new repeat counts weeks from. */
+  weekStart?: Weekday
 }
 
 /** Default weekday selection: the day matching `scheduledDate`, or Monday. */
@@ -222,7 +231,7 @@ export function defaultMonths(scheduledDate?: string | null): boolean[] {
 
 /** Derive editable form state from an existing Repeat value (or sensible defaults). */
 export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): RepeatForm {
-  const { scheduledDate, hasSchedule, hasTracking } = ctx
+  const { scheduledDate, hasSchedule, hasTracking, weekStart } = ctx
   const defaultFreq: RepeatFormFreq = hasTracking && !hasSchedule ? 'after_completion' : 'weekly'
 
   if (!repeat || repeat.type === 'after_completion') {
@@ -233,6 +242,7 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
       freq: repeat ? 'after_completion' : defaultFreq,
       wdays: defaultWdays(scheduledDate),
       monthly: 'same-day',
+      ...(weekStart ? { wkst: weekStart } : {}),
       months: NO_MONTHS(),
       endType: 'never',
       endVal: '',
@@ -278,6 +288,7 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
     wdays,
     monthly,
     ...(weekdayPattern ? { weekdayPattern } : {}),
+    ...(s.wkst ? { wkst: s.wkst } : {}),
     months,
     endType,
     endVal,
@@ -310,6 +321,7 @@ export function formToRepeat(form: RepeatForm, scheduledDate?: string | null): R
 
   if (freq === 'weekly') {
     r.byweekday = WDAY_CODES_MON_FIRST.filter((_, i) => wdays[i])
+    if (form.wkst && form.intervalNum > 1) r.wkst = form.wkst
   }
 
   if (freq === 'monthly' || freq === 'yearly') {
