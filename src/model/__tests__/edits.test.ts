@@ -231,6 +231,15 @@ describe('edit operations → serialized YAML', () => {
     expect(serializeData(next)).toMatchSnapshot()
   })
 
+  it('replaying a future-scope save with the pinned generated occurrence changes nothing (#1192)', () => {
+    const data = fixtureData('weekly-series')
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-04-20')
+    const fields = editFields(occ, { title: 'Renamed' })
+    const once = applyEdit(data, occ, 'future', fields, NEW_TARGET)
+    const twice = applyEdit(once, occ, 'future', fields, NEW_TARGET)
+    expect(serializeData(twice)).toBe(serializeData(once))
+  })
+
   it('future-scope at the series\' own anchor date edits the series, and does not split', () => {
     // Regression for the reported bug: editing "this and future" occurrences
     // of a daily series *on its very first occurrence* (so the split point

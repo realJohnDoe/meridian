@@ -1106,13 +1106,25 @@ export function applyEdit(
  * four at once, and it is the same question `editor/save.ts`'s `applyScope`
  * asks so that the editor's own view agrees with what lands here.
  *
- * A generated occurrence has no stored item to read, and its `ownerId` cannot
- * be stale for the same reason — nothing has re-homed it — so it passes
- * through untouched.
+ * A generated occurrence has no stored item to read, but a 'future' split
+ * re-homes it all the same: the series it names is capped before its date, and
+ * the leg split off from it is what produces that date now. So when the named
+ * series no longer has the day, the owner is whichever series does — otherwise
+ * a replayed 'future' save splits the capped series again and writes a dead leg
+ * (#1192).
  */
 function withLiveOwner(entry: Entry, occ: Occurrence): Occurrence {
   const stored = entry.items.find((i): i is OccurrenceEntry<OccurrenceMetadata> => !isSeries(i) && i.id === occ.id)
-  return stored && stored.ownerId !== occ.ownerId ? { ...occ, ownerId: stored.ownerId } : occ
+  const ownerId = stored ? stored.ownerId : generatedOwner(entry, occ)
+  return ownerId !== occ.ownerId ? { ...occ, ownerId } : occ
+}
+
+function generatedOwner(entry: Entry, occ: Occurrence): string | undefined {
+  const hasDay = (s: RepeatPattern<OccurrenceMetadata>) => seriesHasDay(s.date, s.time, s.repeat, occ.date)
+  const series = entry.items.filter(isSeries)
+  const named = series.find(s => s.id === occ.ownerId)
+  if (!named || hasDay(named)) return occ.ownerId
+  return series.find(hasDay)?.id ?? occ.ownerId
 }
 
 // ── Toggle done ───────────────────────────────────────────────────────────────
