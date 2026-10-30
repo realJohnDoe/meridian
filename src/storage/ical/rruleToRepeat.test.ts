@@ -2,20 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { rruleToRepeat, parseRRule } from './rruleToRepeat'
 import type { Repeat } from '@/types'
 
-/** Anchors and "now" are fixed so the bounded window is deterministic. */
-const NOW = new Date(2026, 7, 15) // 2026-08-15, a Saturday
-
 /** The mapped `Repeat`, or a failure naming what came back instead. */
 function repeatOf(rrule: string, anchor: Date): Repeat {
-  const mapped = rruleToRepeat(rrule, anchor, NOW)
-  if (mapped.kind !== 'repeat') throw new Error(`expected a repeat, got dates: ${mapped.dates.join(', ')}`)
+  const mapped = rruleToRepeat(rrule, anchor)
+  if (mapped.kind !== 'repeat') throw new Error(`expected a repeat, got ${mapped.kind}`)
   return mapped.repeat
-}
-
-function datesOf(rrule: string, anchor: Date): string[] {
-  const mapped = rruleToRepeat(rrule, anchor, NOW)
-  if (mapped.kind !== 'dates') throw new Error(`expected dates, got a repeat: ${JSON.stringify(mapped.repeat)}`)
-  return mapped.dates
 }
 
 describe('parseRRule', () => {
@@ -78,8 +69,8 @@ describe('rruleToRepeat — representable rules', () => {
     expect(repeatOf('FREQ=MONTHLY;BYMONTHDAY=1,-1', monday))
       .toEqual({ type: 'schedule', freq: 'monthly', bymonthday: [1, -1] })
     // Day 0 names nothing, and no month has a 32nd-from-last day.
-    expect(rruleToRepeat('FREQ=MONTHLY;BYMONTHDAY=0', monday).kind).toBe('dates')
-    expect(rruleToRepeat('FREQ=MONTHLY;BYMONTHDAY=-32', monday).kind).toBe('dates')
+    expect(rruleToRepeat('FREQ=MONTHLY;BYMONTHDAY=0', monday).kind).toBe('unsupported')
+    expect(rruleToRepeat('FREQ=MONTHLY;BYMONTHDAY=-32', monday).kind).toBe('unsupported')
   })
 
   it('maps a BYSETPOS list to bysetpos as an array', () => {
@@ -178,81 +169,18 @@ describe('rruleToRepeat — representable rules', () => {
   })
 })
 
-describe('rruleToRepeat — bounded expansion fallback', () => {
+describe('rruleToRepeat — unsupported rules', () => {
   const wednesday = new Date(2026, 7, 12) // 2026-08-12
 
-  it('expands "first and third Friday" (mixed ordinals)', () => {
-    const dates = datesOf('FREQ=MONTHLY;BYDAY=1FR,3FR', new Date(2026, 7, 7))
-    expect(dates.slice(0, 4)).toEqual(['2026-08-07', '2026-08-21', '2026-09-04', '2026-09-18'])
-  })
-
-  it('expands a yearly rule whose BYSETPOS spans the whole year', () => {
-    // The engine reads a position per month, the RFC once per period, and a
-    // yearly period is every month the rule names — so this is the first
-    // Monday of March and nothing in September.
-    const dates = datesOf('FREQ=YEARLY;BYMONTH=3,9;BYDAY=MO;BYSETPOS=1', new Date(2026, 2, 2))
-    expect(dates.slice(0, 3)).toEqual(['2026-03-02', '2027-03-01', '2028-03-06'])
-  })
-
-  it('expands an ordinal BYDAY that names several weekdays', () => {
-    // `1MO,1FR` is the first Monday *and* the first Friday; one `bysetpos`
-    // over their combined candidates would pick only whichever came first.
-    const dates = datesOf('FREQ=MONTHLY;BYDAY=1MO,1FR', new Date(2026, 0, 2))
-    expect(dates.slice(0, 4)).toEqual(['2026-01-02', '2026-01-05', '2026-02-02', '2026-02-06'])
-  })
-
-  // The window/COUNT/UNTIL mechanics below are about `expandRRule` itself, so
-  // they need a rule that still reaches it. `BYSETPOS` on a DAILY rule is that
-  // vehicle: it is declined because a one-day period gives a position nothing
-  // to pick from, while the walk ignores it and expands the plain weekday set —
-  // so these read exactly as they did when the weekday rule itself fell back.
-  const dailyWeekdays = 'FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=1'
-
-  it('stops at UNTIL', () => {
-    const dates = datesOf('FREQ=MONTHLY;BYDAY=1FR,3FR;UNTIL=20260930', new Date(2026, 7, 7))
-    expect(dates.at(-1)).toBe('2026-09-18')
-  })
-
-  it('counts COUNT from the anchor, not from the window', () => {
-    // Ten weekdays from the anchor — all inside the window, so all ten appear.
-    const dates = datesOf(`${dailyWeekdays};COUNT=10`, wednesday)
-    expect(dates).toHaveLength(10)
-    expect(dates.at(-1)).toBe('2026-08-25')
-  })
-
-  it('returns nothing for a series that ran out before the window', () => {
-    // COUNT=5 starting a decade ago: every occurrence predates the window.
-    expect(datesOf(`${dailyWeekdays};COUNT=5`, new Date(2010, 0, 4))).toEqual([])
-  })
-
-  it('reaches the window for an old open-ended series', () => {
-    const dates = datesOf(dailyWeekdays, new Date(2010, 0, 4))
-    expect(dates.length).toBeGreaterThan(500)
-    expect(dates[0]?.startsWith('2025-08')).toBe(true)
-  })
-
-  it('collapses a sub-daily rule to the days it touches', () => {
-    const dates = datesOf('FREQ=HOURLY;INTERVAL=6;COUNT=9', wednesday)
-    expect(dates).toEqual(['2026-08-12', '2026-08-13', '2026-08-14'])
-  })
-
-  it('falls back for parts it cannot express', () => {
-    expect(datesOf('FREQ=MONTHLY;BYDAY=1FR,3FR', wednesday).length).toBeGreaterThan(0)
-    expect(datesOf('FREQ=WEEKLY;BYWEEKNO=1', wednesday)).toBeDefined()
-  })
-
-  it('returns no dates at all for an unusable FREQ', () => {
-    expect(datesOf('FREQ=FORTNIGHTLY', wednesday)).toEqual([])
-    expect(datesOf('INTERVAL=2', wednesday)).toEqual([])
-  })
-
-  it('never claims a rule whose COUNT or UNTIL it could not read', () => {
-    expect(rruleToRepeat('FREQ=WEEKLY;COUNT=abc', wednesday).kind).toBe('dates')
-    expect(rruleToRepeat('FREQ=WEEKLY;UNTIL=notadate', wednesday).kind).toBe('dates')
-  })
-
-  it('caps a runaway rule rather than expanding forever', () => {
-    const dates = datesOf('FREQ=HOURLY', wednesday)
-    expect(dates.length).toBeLessThanOrEqual(750)
+  it.each([
+    'FREQ=MONTHLY;BYDAY=1FR,3FR',
+    'FREQ=WEEKLY;BYWEEKNO=1',
+    'FREQ=HOURLY;INTERVAL=6;COUNT=9',
+    'FREQ=FORTNIGHTLY',
+    'INTERVAL=2',
+    'FREQ=WEEKLY;COUNT=abc',
+    'FREQ=WEEKLY;UNTIL=notadate',
+  ])('reports %s as unsupported', rrule => {
+    expect(rruleToRepeat(rrule, wednesday).kind).toBe('unsupported')
   })
 })
