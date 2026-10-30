@@ -12,6 +12,8 @@ import {
 import { titleToSlug, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { diskPickDirectory } from './fs'
+import { SEEN_SKIPPED_PREFIX } from './icalBackend'
+import { clearVaultKey } from '@/lib/vaultStorage'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
 import { ensureFreshAccessToken } from './githubOAuth'
@@ -756,6 +758,7 @@ export async function removeVault(id: string): Promise<void> {
       await refreshTokenClear(id)
       await tokenExpiryClear(id)
     }
+    if (ref.kind === 'ical') clearVaultKey(SEEN_SKIPPED_PREFIX, id)
 
     await cacheDeleteAll(id)
     await updateVaultRefs(current => current.filter(r => r.id !== id))

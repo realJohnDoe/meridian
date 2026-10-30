@@ -22,6 +22,7 @@ import { SettingsSection, SettingsRow } from './SettingsSection'
 import { VaultImportRow } from './VaultImportRow'
 import { VaultMoveInRow } from './VaultMoveInRow'
 import { VaultInviteRow } from './VaultInviteRow'
+import { SkippedEvents } from './SkippedEvents'
 import { RemoveVaultRow } from './RemoveVaultRow'
 import { NewEntryDefaultsSection } from './NewEntryDefaultsSection'
 import { vaultSummary } from './vaultSummary'
@@ -88,6 +89,7 @@ export function VaultSettings({ vault }: Props) {
   const roots                  = useStore(s => s.roots)
   const lastRefreshed          = useStore(s => s.syncByVault.get(vault.id)?.lastSyncedAt ?? null)
   const needsAttention         = useStore(s => s.syncByVault.get(vault.id)?.needsAttention ?? null)
+  const skipped                = useStore(s => s.syncByVault.get(vault.id)?.skipped)
 
   // The one escape hatch for an archived entry nothing links to — hidden from
   // the calendar and search alike, so this is the only place left to find and
@@ -222,6 +224,10 @@ export function VaultSettings({ vault }: Props) {
               </Button>
             }
           />
+        )}
+
+        {skipped && skipped.length > 0 && (
+          <div className="px-4 py-3.5"><SkippedEvents events={skipped} /></div>
         )}
 
         {/* Mirrors SyncButton's popover rows for the attention kinds that can

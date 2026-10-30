@@ -2,6 +2,17 @@
 
 import type { FileConvention, EntryKey, RawScalar } from '@/fileIO'
 
+/**
+ * A calendar event left out of a subscription or import because its RRULE has
+ * no `Repeat` form: enough to tell the user which, and why. Here rather than in
+ * `storage/` because the store's `VaultSyncStatus` carries a subscription's list.
+ */
+export interface SkippedEvent {
+  uid:   string
+  title: string
+  rrule: string
+}
+
 export type Priority = 'high' | 'medium' | 'low'
 
 export type Weekday = 'mo' | 'tu' | 'we' | 'th' | 'fr' | 'sa' | 'su'
