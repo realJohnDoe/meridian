@@ -2,6 +2,9 @@ import type { StorageBackend, RawFile, PermissionOutcome } from './backend'
 import type { VaultKind } from '@/vaultRef'
 import { icsToEntries, shortHash, type SkippedEvent, type SynthesizedEntry } from './ical/icsToEntries'
 import { WORKER_ORIGIN } from './workerOrigin'
+import { warn } from './notifications'
+import { setVaultSync } from '@/storeBridge'
+import { readVaultJSON, writeVaultJSON } from '@/lib/vaultStorage'
 
 /**
  * A calendar subscription, as an ordinary storage backend.
@@ -51,6 +54,24 @@ export async function previewIcalFeed(feedUrl: string): Promise<{ name?: string;
   const synthesis = icsToEntries(await response.text())
   if (!synthesis) throw new IcalFetchError("That URL didn't return a calendar. Check you copied the iCal/ICS address rather than the calendar's web page.")
   return { ...(synthesis.calendarName ? { name: synthesis.calendarName } : {}), eventCount: synthesis.entries.length, skipped: synthesis.skipped }
+}
+
+/** Per-vault localStorage key: the UIDs a subscription had already left out, so only new ones are announced. */
+export const SEEN_SKIPPED_PREFIX = 'meridian_ical_skipped'
+
+/**
+ * Publish a refresh's left-out events to the vault's settings screen, and warn
+ * once about any not left out before. The first refresh only records a
+ * baseline: the add-subscription wizard has just listed those same events.
+ */
+function reportSkipped(vaultId: string, name: string, skipped: SkippedEvent[]): void {
+  setVaultSync(vaultId, { skipped })
+  const seen = readVaultJSON<string[] | null>(SEEN_SKIPPED_PREFIX, vaultId, null)
+  writeVaultJSON(SEEN_SKIPPED_PREFIX, vaultId, skipped.map(e => e.uid))
+  const fresh = seen ? skipped.filter(e => !seen.includes(e.uid)) : []
+  if (fresh.length === 0) return
+  const what = fresh.length === 1 ? 'a new event' : `${fresh.length} new events`
+  warn(`"${name}" left out ${what} whose repeat rule Meridian can’t express. Its settings list which.`)
 }
 
 interface FeedSnapshot {
@@ -109,6 +130,7 @@ export class IcalBackend implements StorageBackend {
 
         const synthesis = icsToEntries(await response.text())
         if (!synthesis) throw new Error(`"${this.name}" did not return a calendar.`)
+        reportSkipped(this.id, this.name, synthesis.skipped)
 
         const next: FeedSnapshot = {
           entries: synthesis.entries,

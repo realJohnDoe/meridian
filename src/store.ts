@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { StoreItem, Roots, Entries } from './types'
+import type { StoreItem, Roots, Entries, SkippedEvent } from './types'
 import type { LocalePrefs } from '@/model'
 import type { VaultRef } from './vaultRef'
 import type { OccColorBy } from './occView'
@@ -260,11 +260,13 @@ export interface VaultSyncStatus {
   readOnly:     boolean
   /** Set when the vault needs a user action to sync again; null otherwise. */
   needsAttention: VaultAttention | null
+  /** A calendar subscription's events left out on its last refresh; empty for every other vault. */
+  skipped:      readonly SkippedEvent[]
 }
 
 export const emptySyncStatus = (): VaultSyncStatus => ({
   dirtyCount: 0, error: null, offline: false, inProgress: false,
-  lastSyncedAt: null, readOnly: false, needsAttention: null,
+  lastSyncedAt: null, readOnly: false, needsAttention: null, skipped: [],
 })
 
 interface MeridianStore {

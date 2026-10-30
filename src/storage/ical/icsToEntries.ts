@@ -12,7 +12,7 @@
 // byte-identical files and reconcile sees no change at all.
 
 import { stringify } from 'yaml'
-import type { Repeat } from '@/types'
+import type { Repeat, SkippedEvent } from '@/types'
 import {
   parseIcs, components, textValue, propValue, prop, props, param, splitList, unescapeText,
   calendarName, type IcsComponent,
@@ -44,12 +44,7 @@ export interface IcalSynthesis {
   skipped: SkippedEvent[]
 }
 
-/** An event left out of a synthesis: enough to tell the user which, and why. */
-export interface SkippedEvent {
-  uid:   string
-  title: string
-  rrule: string
-}
+export type { SkippedEvent }
 
 /**
  * A short, stable, URL-safe hash of an event's `UID`.
@@ -310,7 +305,7 @@ function groupByUid(events: IcsComponent[]): EventGroup[] {
   return [...groups.values()]
 }
 
-function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | SkippedEvent | null {
+function synthesizeGroup(group: EventGroup): SynthesizedEntry | SkippedEvent | null {
   const { master } = group
   const timing = readTiming(master)
   if (!timing) return null // no usable DTSTART — not something the agenda can place
@@ -324,7 +319,7 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | Skipp
   let repeat: Repeat | undefined
   const rrule = propValue(master, 'RRULE')
   if (rrule) {
-    const mapped = rruleToRepeat(rrule, timing.start, now)
+    const mapped = rruleToRepeat(rrule, timing.start)
     // A rule the model cannot carry is left out rather than frozen into
     // explicit dates, which would silently stop where the expansion did.
     if (mapped.kind !== 'repeat') return { uid: group.uid, title, rrule }
@@ -351,12 +346,8 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | Skipp
  * actually hits, when a URL serves an HTML sign-in page instead of a feed. The
  * wizard turns that into "that URL doesn't look like a calendar" rather than an
  * empty vault with no explanation.
- *
- * `now` is injectable purely so the bounded RRULE expansion window is
- * deterministic in tests.
-
  */
-export function icsToEntries(text: string, now: Date = new Date()): IcalSynthesis | null {
+export function icsToEntries(text: string): IcalSynthesis | null {
   const calendar = parseIcs(text)
   if (!calendar) return null
 
@@ -364,7 +355,7 @@ export function icsToEntries(text: string, now: Date = new Date()): IcalSynthesi
   const seen = new Set<string>()
   const skipped: SkippedEvent[] = []
   for (const group of groupByUid(components(calendar, 'VEVENT'))) {
-    const entry = synthesizeGroup(group, now)
+    const entry = synthesizeGroup(group)
     if (entry && !('content' in entry)) skipped.push(entry)
     if (!entry || !('content' in entry)) continue
     // A hash collision (or a feed repeating a UID) must resolve the same way on
