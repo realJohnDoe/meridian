@@ -12,8 +12,7 @@ import { keySlug } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { toggleOccDone } from '@/occurrenceActions'
 import { getFom, getItems } from '@/storeBridge'
-import { readVaultStringArray } from '@/lib/vaultStorage'
-import { liveDefaultLists } from './defaultLists'
+import { liveDefaultLists, defaultParticipants } from './newEntryDefaults'
 import { type EntryState, type ItemType, ENTRY_DEFAULT } from './state'
 import { useEntryDialogs } from './useEntryDialogs'
 import { usePendingLinks } from './usePendingLinks'
@@ -60,8 +59,8 @@ export function useEntryEditor(
 ) {
   const today = useToday()
 
-  // Read from the *target* vault, not from whatever `loadDefaultParticipants`
-  // last cached: with the vault chip able to point a new entry elsewhere, the
+  // Read from the *target* vault, not from whatever vault
+  // was last cached: with the vault chip able to point a new entry elsewhere, the
   // seed has to match where the entry actually lands. `useVaultTarget` below
   // seeds its own state from the same helper, in this same mount render.
   //
@@ -84,12 +83,12 @@ export function useEntryEditor(
    */
   const [newEntryView] = useState<EntryState>(() => {
     const target = initialTargetVault(!initialOcc, seed?.vault)
-    const defaultParticipants = target
-      ? readVaultStringArray('meridian_default_participants', target)
+    const seedParticipants = target
+      ? defaultParticipants(target)
       : []
     const base = entryFromItem(null, initialScope, seed)
-    const seeded = defaultParticipants.length > 0
-      ? { ...base, participants: [...defaultParticipants] }
+    const seeded = seedParticipants.length > 0
+      ? { ...base, participants: [...seedParticipants] }
       : base
     return initialTitle ? { ...seeded, title: initialTitle } : seeded
   })
@@ -374,7 +373,7 @@ export function useEntryEditor(
     const target = saveNode(null, 'all', {
       item: null, title: listTitle, tracked: false, done: false,
       body: '', tags: [], items: [],
-      participants: vaultId ? readVaultStringArray('meridian_default_participants', vaultId) : [],
+      participants: vaultId ? defaultParticipants(vaultId) : [],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
     }, { targetVaultId: vaultId })
@@ -518,13 +517,11 @@ export function useEntryEditor(
   // Lands in `vaultId` (the parent entry's own vault), not `targetVaultId` (only
   // set while a brand-new entry hasn't saved yet) — the rewritten `[[slug]]`
   // link is resolved within that same vault. Participants are read straight
-  // from that vault's localStorage rather than the store's `defaultParticipants`,
-  // which only caches whichever vault is currently the *default* one and goes
-  // stale the moment the parent entry lives elsewhere.
+  // from that vault's localStorage, not the default vault's.
   const handlePromoteTask = (title: string, done: boolean): string | null => {
     const key = saveNode(null, 'all', {
       item: null, title, tracked: true, done,
-      body: '', tags: [], items: [], participants: vaultId ? readVaultStringArray('meridian_default_participants', vaultId) : [],
+      body: '', tags: [], items: [], participants: vaultId ? defaultParticipants(vaultId) : [],
       priority: null, scheduled: null, duration: '', repeat: null,
       editScope: 'all',
     }, { targetVaultId: vaultId })
@@ -547,7 +544,7 @@ export function useEntryEditor(
     onVaultChange: vaultTarget.onVaultChange && ((toVaultId: string) => {
       if (!createdKey && !entry.item) {
         resetPending(liveDefaultLists(toVaultId, useStore.getState().roots))
-        setEntry(prev => ({ ...prev, participants: readVaultStringArray('meridian_default_participants', toVaultId) }))
+        setEntry(prev => ({ ...prev, participants: defaultParticipants(toVaultId) }))
       }
       vaultTarget.onVaultChange?.(toVaultId)
     }),

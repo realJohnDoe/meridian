@@ -19,7 +19,6 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
-import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
 import {
@@ -28,7 +27,7 @@ import {
   previewVaultCopy, copyVaultInto,
 } from '@/vaultActions'
 import { SkippedEvents } from './SkippedEvents'
-import { ParticipantsRow, ListedOnRow, DEFAULT_LISTS_KEY, archiveEntry } from '@/editor'
+import { ParticipantsRow, ListedOnRow, defaultParticipants, saveDefaultParticipants, saveDefaultLists, storedDefaultLists, archiveEntry } from '@/editor'
 import { keyRoute } from '@/entryRoute'
 import { deleteWholeFileWithUndo } from '@/occurrenceActions'
 import type { VaultRef, IcsImportSummary } from '@/vaultActions'
@@ -175,15 +174,14 @@ export function VaultSettings({ vault }: Props) {
   /** How many events the picked file would import — `null` when it isn't a calendar. */
   const importCount = importPlan && importPlan.added + importPlan.updated
   const [participants, setParticipants] = useState<string[]>(
-    () => readVaultStringArray('meridian_default_participants', vault.id),
+    () => defaultParticipants(vault.id),
   )
 
   const [storedLists, setStoredLists] = useState<EntryKey[]>(
-    () => readVaultStringArray(DEFAULT_LISTS_KEY, vault.id) as EntryKey[],
+    () => storedDefaultLists(vault.id),
   )
 
-  const setDefaultParticipants = useStore(s => s.setDefaultParticipants)
-  const vaults                 = useStore(s => s.vaults)
+  const vaults = useStore(s => s.vaults)
   const items                  = useStore(s => s.items)
   const roots                  = useStore(s => s.roots)
   // A list deleted since it was picked drops off the row; the stale key leaves
@@ -228,15 +226,12 @@ export function VaultSettings({ vault }: Props) {
 
   function handleParticipantsChange(next: string[]) {
     setParticipants(next)
-    // The store action owns both the write and the "is this the vault whose
-    // values are currently loaded?" check, so Settings can edit any vault's
-    // defaults without disturbing the one a new entry would target.
-    setDefaultParticipants(vault.id, next)
+    saveDefaultParticipants(vault.id, next)
   }
 
   function handleDefaultListsChange(next: EntryKey[]) {
     setStoredLists(next)
-    writeVaultJSON(DEFAULT_LISTS_KEY, vault.id, next)
+    saveDefaultLists(vault.id, next)
   }
 
   async function handleSyncNow() {

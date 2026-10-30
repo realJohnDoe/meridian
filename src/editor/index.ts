@@ -3,7 +3,7 @@ export type { EntryEditorHooks } from './EntryEditor'
 export { default as EntryViewOnly } from './EntryViewOnly'
 export { default as ParticipantsRow } from './ParticipantsRow'
 export { default as ListedOnRow } from './ListedOnRow'
-export { DEFAULT_LISTS_KEY } from './defaultLists'
+export { storedDefaultLists, defaultParticipants, saveDefaultParticipants, saveDefaultLists } from './newEntryDefaults'
 
 // debug-only — still public surface
 export { default as RepeatDialog } from './dialogs/RepeatDialog'

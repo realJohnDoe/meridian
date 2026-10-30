@@ -6,7 +6,7 @@ import type { OccColorBy } from './occView'
 import { warmFileOccurrenceMap, buildBacklinkIndex } from './fileOccurrence'
 import { entryKey as makeEntryKey, isEntryKey, keyVaultId } from './fileIO'
 import type { EntryKey } from './fileIO'
-import { readVaultStringArray, writeVaultJSON, readVaultJSON, clearVaultKey } from '@/lib/vaultStorage'
+import { readVaultStringArray, readVaultJSON, clearVaultKey } from '@/lib/vaultStorage'
 
 /**
  * The "this occurrence has nobody on it" row in the people filter. A sentinel
@@ -391,11 +391,6 @@ interface MeridianStore {
    * consulted for a single vault (the new entry's target, or whichever vault
    * Settings has open).
    */
-  defaultParticipants:     string[]
-  /** Which vault `defaultParticipants` currently holds, so a stale read is detectable. */
-  defaultParticipantsVaultId: string | null
-  loadDefaultParticipants: (vaultId: string) => void
-  setDefaultParticipants:  (vaultId: string, participants: string[]) => void
 
   // ── View filter ───────────────────────────────────────────────────
   /**
@@ -633,19 +628,6 @@ export const useStore = create<MeridianStore>((set, get) => {
       next[idx] = toKey
       writeJSON(FAVORITES_KEY, next)
       set({ favorites: next })
-    },
-
-    defaultParticipants: [],
-    defaultParticipantsVaultId: null,
-    loadDefaultParticipants: (vaultId: string) => set({
-      defaultParticipants: readVaultStringArray('meridian_default_participants', vaultId),
-      defaultParticipantsVaultId: vaultId,
-    }),
-    setDefaultParticipants: (vaultId: string, participants: string[]) => {
-      writeVaultJSON('meridian_default_participants', vaultId, participants)
-      // Only mirror into the store when it is this vault's values on show —
-      // Settings can edit a vault other than the one a new entry would target.
-      if (get().defaultParticipantsVaultId === vaultId) set({ defaultParticipants: participants })
     },
 
     hiddenVaultIds:     [],
