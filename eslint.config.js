@@ -199,6 +199,11 @@ export default [
         // retry-after-refresh loop) — not a redundant check to fix.
         { allowConstantLoopConditions: true },
       ],
+      // Switches over unions must name every member; a `default` hides an added member.
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: false, allowDefaultCaseForExhaustiveSwitch: false },
+      ],
       '@typescript-eslint/no-deprecated': 'error',
       '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
 
@@ -327,6 +332,10 @@ export default [
       '@typescript-eslint/no-unnecessary-condition': [
         'error',
         { allowConstantLoopConditions: true },
+      ],
+      '@typescript-eslint/switch-exhaustiveness-check': [
+        'error',
+        { considerDefaultExhaustiveForUnions: false, allowDefaultCaseForExhaustiveSwitch: false },
       ],
       '@typescript-eslint/no-deprecated': 'error',
       '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
