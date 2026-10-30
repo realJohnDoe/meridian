@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import tsParser from '@typescript-eslint/parser'
-import tsPlugin from '@typescript-eslint/eslint-plugin'
+import tseslint from 'typescript-eslint'
 import importXPlugin from 'eslint-plugin-import-x'
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript'
 import reactHooksPlugin from 'eslint-plugin-react-hooks'
@@ -69,8 +68,8 @@ const reactHooksRules = reactHooksPlugin.configs['recommended-latest'].rules
 // blocks is safe and doesn't double-fire. Our own rule entries below (spread
 // after) override the preset's defaults where we need non-default options.
 const tsRecommendedTypeCheckedRules = {
-  ...tsPlugin.configs['flat/recommended-type-checked'][1].rules,
-  ...tsPlugin.configs['flat/recommended-type-checked'][2].rules,
+  ...tseslint.plugin.configs['flat/recommended-type-checked'][1].rules,
+  ...tseslint.plugin.configs['flat/recommended-type-checked'][2].rules,
 }
 
 export default [
@@ -80,7 +79,7 @@ export default [
   {
     files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
-      parser: tsParser,
+      parser: tseslint.parser,
       parserOptions: {
         project: './tsconfig.eslint.json',
         tsconfigRootDir: import.meta.dirname,
@@ -90,7 +89,7 @@ export default [
       reportUnusedDisableDirectives: 'error',
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
+      '@typescript-eslint': tseslint.plugin,
       'react-hooks': reactHooksPlugin,
       '@eslint-react': reactPlugin,
       'import-x': importXPlugin,
@@ -189,8 +188,8 @@ export default [
       // no-confusing-void-expression.
       //
       // Recount what the tier adds:
-      //   node --input-type=module -e "import p from '@typescript-eslint/eslint-plugin';
-      //   const f=n=>Object.assign({},...p.configs[n].filter(b=>b.rules).map(b=>b.rules));
+      //   node --input-type=module -e "import t from 'typescript-eslint';
+      //   const f=n=>Object.assign({},...t.plugin.configs[n].filter(b=>b.rules).map(b=>b.rules));
       //   const on=v=>v!=='off'&&!(Array.isArray(v)&&v[0]==='off');
       //   const r=new Set(Object.entries(f('flat/recommended-type-checked')).filter(([,v])=>on(v)).map(([k])=>k));
       //   console.log(Object.entries(f('flat/strict-type-checked')).filter(([k,v])=>on(v)&&!r.has(k)).map(([k])=>k).join('\n'))"
@@ -309,7 +308,7 @@ export default [
   {
     files: ['worker/src/**/*.ts'],
     languageOptions: {
-      parser: tsParser,
+      parser: tseslint.parser,
       parserOptions: {
         project: './worker/tsconfig.json',
         tsconfigRootDir: import.meta.dirname,
@@ -319,7 +318,7 @@ export default [
       reportUnusedDisableDirectives: 'error',
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
+      '@typescript-eslint': tseslint.plugin,
     },
     rules: {
       ...tsRecommendedTypeCheckedRules,
@@ -376,7 +375,7 @@ export default [
   {
     files: ['e2e/**/*.ts', 'playwright.config.ts'],
     languageOptions: {
-      parser: tsParser,
+      parser: tseslint.parser,
       parserOptions: {
         project: './tsconfig.e2e.json',
         tsconfigRootDir: import.meta.dirname,
@@ -386,7 +385,7 @@ export default [
       reportUnusedDisableDirectives: 'error',
     },
     plugins: {
-      '@typescript-eslint': tsPlugin,
+      '@typescript-eslint': tseslint.plugin,
     },
     rules: {
       ...tsRecommendedTypeCheckedRules,
