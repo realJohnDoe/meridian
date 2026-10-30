@@ -47,7 +47,7 @@ function debugPagePlugin(): Plugin {
             // Read debug.html and inject Vite HMR + React-refresh manually,
             // bypassing the PWA plugin's transformIndexHtml hook which would
             // otherwise replace our entry script with the main app's script.
-            let html = fs.readFileSync(resolve(__dirname, 'debug.html'), 'utf-8')
+            let html = fs.readFileSync(resolve(import.meta.dirname, 'debug.html'), 'utf-8')
             const viteHead = [
               `<script type="module" src="/meridian/@vite/client"></script>`,
               `<script type="module">`,
@@ -136,7 +136,7 @@ function spaFallbackPlugin(): Plugin {
     name: 'spa-404-fallback',
     apply: 'build',
     closeBundle() {
-      const outDir = resolve(__dirname, 'dist')
+      const outDir = resolve(import.meta.dirname, 'dist')
       fs.copyFileSync(resolve(outDir, 'index.html'), resolve(outDir, '404.html'))
     },
   }
@@ -212,7 +212,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   // Align dep pre-bundling target with the build target. Without this, Vite's
@@ -232,7 +232,7 @@ export default defineConfig({
     target: ['es2022', 'chrome102', 'firefox102', 'safari16'],
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
+        main: resolve(import.meta.dirname, 'index.html'),
       },
       // A barrel (index.ts) re-exporting from a module that itself depends
       // (directly or transitively) back on that barrel silently produces
