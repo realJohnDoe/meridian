@@ -10,8 +10,9 @@ import {
   addLocalVault, addIcalVault, addExampleVault, addGitHubVaultOAuth, startGitHubSignIn,
   findReusableGitHubSession, fetchInstalledRepos, isFolderPickerSupported,
   previewIcalFeed, GITHUB_APP_INSTALL_URL,
-  type ReusableGitHubSession, type InstalledRepo,
+  type ReusableGitHubSession, type InstalledRepo, type SkippedEvent,
 } from '@/vaultActions'
+import { SkippedEvents } from './SkippedEvents'
 
 type WizardStep = 'source' | 'github' | 'ical'
 type Source = 'local' | 'github' | 'ical' | 'example'
@@ -48,6 +49,7 @@ const TUTORIAL_CARD: { id: Source; Icon: typeof HardDrive; title: string; desc: 
 interface FeedPreview {
   name?:      string
   eventCount: number
+  skipped:    SkippedEvent[]
 }
 
 /**
@@ -279,6 +281,7 @@ export default function AddVaultWizard() {
             <p className="text-muted-foreground">
               {preview.eventCount} {preview.eventCount === 1 ? 'event' : 'events'} found
             </p>
+            <SkippedEvents events={preview.skipped} />
           </div>
         )}
 

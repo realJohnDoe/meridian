@@ -1,6 +1,6 @@
 import type { StorageBackend, RawFile, PermissionOutcome } from './backend'
 import type { VaultKind } from '@/vaultRef'
-import { icsToEntries, shortHash, type SynthesizedEntry } from './ical/icsToEntries'
+import { icsToEntries, shortHash, type SkippedEvent, type SynthesizedEntry } from './ical/icsToEntries'
 import { WORKER_ORIGIN } from './workerOrigin'
 
 /**
@@ -44,13 +44,13 @@ export class IcalFetchError extends Error {}
  * name and event count *before* the vault is created — which is also the only
  * point where a typo'd URL is cheap to correct.
  */
-export async function previewIcalFeed(feedUrl: string): Promise<{ name?: string; eventCount: number }> {
+export async function previewIcalFeed(feedUrl: string): Promise<{ name?: string; eventCount: number; skipped: SkippedEvent[] }> {
   const response = await fetch(proxyUrl(feedUrl))
   if (!response.ok) throw new IcalFetchError(await errorDescription(response))
 
   const synthesis = icsToEntries(await response.text())
   if (!synthesis) throw new IcalFetchError("That URL didn't return a calendar. Check you copied the iCal/ICS address rather than the calendar's web page.")
-  return { ...(synthesis.calendarName ? { name: synthesis.calendarName } : {}), eventCount: synthesis.entries.length }
+  return { ...(synthesis.calendarName ? { name: synthesis.calendarName } : {}), eventCount: synthesis.entries.length, skipped: synthesis.skipped }
 }
 
 interface FeedSnapshot {

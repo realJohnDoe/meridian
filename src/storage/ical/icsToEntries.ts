@@ -40,6 +40,15 @@ export interface IcalSynthesis {
   /** `X-WR-CALNAME`, when the feed sets one — the wizard offers it as the vault name. */
   calendarName?: string
   entries: SynthesizedEntry[]
+  /** Events left out because their RRULE has no `Repeat` form — see `rruleToRepeat`. */
+  skipped: SkippedEvent[]
+}
+
+/** An event left out of a synthesis: enough to tell the user which, and why. */
+export interface SkippedEvent {
+  uid:   string
+  title: string
+  rrule: string
 }
 
 /**
@@ -301,7 +310,7 @@ function groupByUid(events: IcsComponent[]): EventGroup[] {
   return [...groups.values()]
 }
 
-function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null {
+function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | SkippedEvent | null {
   const { master } = group
   const timing = readTiming(master)
   if (!timing) return null // no usable DTSTART — not something the agenda can place
@@ -313,29 +322,18 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null 
   for (const override of group.overrides) instances.push(...overrideInstances(override))
 
   let repeat: Repeat | undefined
-  let anchor = timing
   const rrule = propValue(master, 'RRULE')
   if (rrule) {
     const mapped = rruleToRepeat(rrule, timing.start, now)
-    if (mapped.kind === 'repeat') {
-      repeat = mapped.repeat
-    } else if (mapped.dates.length > 0) {
-      // Unrepresentable rule: the dates are emitted explicitly instead. The
-      // first becomes the entry's own `date`, the rest become `instances:` —
-      // which is how an entry with no `repeat` block still shows up on many
-      // days. Each carries its own time rather than relying on inheritance, so
-      // what the file says is what the agenda shows.
-      const [first, ...rest] = mapped.dates
-      if (first) anchor = { ...timing, date: first }
-      for (const date of rest) {
-        instances.push({ date, ...(timing.time ? { time: timing.time } : {}), ...(timing.duration ? { duration: timing.duration } : {}) })
-      }
-    }
+    // A rule the model cannot carry is left out rather than frozen into
+    // explicit dates, which would silently stop where the expansion did.
+    if (mapped.kind !== 'repeat') return { uid: group.uid, title, rrule }
+    repeat = mapped.repeat
   }
 
   const frontmatter = buildFrontmatter({
     title,
-    timing: anchor,
+    timing,
     ...(repeat ? { repeat } : {}),
     // Sorted so a feed that reorders its EXDATEs between refreshes still
     // produces byte-identical files, and reconcile stays quiet.
@@ -356,6 +354,7 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null 
  *
  * `now` is injectable purely so the bounded RRULE expansion window is
  * deterministic in tests.
+
  */
 export function icsToEntries(text: string, now: Date = new Date()): IcalSynthesis | null {
   const calendar = parseIcs(text)
@@ -363,9 +362,11 @@ export function icsToEntries(text: string, now: Date = new Date()): IcalSynthesi
 
   const entries: SynthesizedEntry[] = []
   const seen = new Set<string>()
+  const skipped: SkippedEvent[] = []
   for (const group of groupByUid(components(calendar, 'VEVENT'))) {
     const entry = synthesizeGroup(group, now)
-    if (!entry) continue
+    if (entry && !('content' in entry)) skipped.push(entry)
+    if (!entry || !('content' in entry)) continue
     // A hash collision (or a feed repeating a UID) must resolve the same way on
     // every device and every refresh, so the suffix comes from the order the
     // feed lists them in — not from a counter that depends on what else parsed.
@@ -376,5 +377,5 @@ export function icsToEntries(text: string, now: Date = new Date()): IcalSynthesi
   }
 
   const name = calendarName(calendar)
-  return { ...(name ? { calendarName: name } : {}), entries }
+  return { ...(name ? { calendarName: name } : {}), entries, skipped }
 }

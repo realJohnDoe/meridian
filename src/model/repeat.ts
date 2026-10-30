@@ -148,6 +148,10 @@ export function followDate(repeat: Repeat, from: string, to: string): Repeat {
 //  4. An `end: { type: 'until' }` carrying a `time` loses it: the form has no
 //     field for time-of-day on an end date, so `repeatToForm` reads only
 //     `date` into `endVal` and `formToRepeat` writes back `date` alone.
+//  4a. A weekday-pattern the picker cannot author — several positions ("first
+//     and third Friday"), or several weekdays under one position — rides
+//     through the form as `weekdayPattern` and is written back as it was,
+//     instead of being flattened to the single pattern the anchor date implies.
 //  5. `after_completion` has no form fields for weekdays, months, monthly mode
 //     or an end condition, so those are dropped from any `after_completion`
 //     repeat that passes through the form.
@@ -169,6 +173,8 @@ export interface RepeatForm {
    * `freq: 'yearly'` alike — both derive it from `scheduledDate` the same way.
    */
   monthly: MonthlyMode
+  /** An existing pattern the picker can't express, kept verbatim — see asymmetry 4a. */
+  weekdayPattern?: { byweekday: Weekday[]; bysetpos: number | number[] }
   /**
    * `freq: 'yearly'` only: which calendar months the repeat spans, January-
    * first (index 0 = January … 11 = December). All-`false` means "no explicit
@@ -250,6 +256,10 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
     WDAY_CODES_MON_FIRST.forEach((code, i) => { wdays[i] = selected.includes(code) })
   }
 
+  const beyondPicker = monthly === 'weekday-pattern' && s.byweekday && s.bysetpos !== undefined
+    && (Array.isArray(s.bysetpos) || s.byweekday.length > 1)
+  const weekdayPattern = beyondPicker ? { byweekday: s.byweekday!, bysetpos: s.bysetpos! } : undefined
+
   const months = MONTH_NUMBERS.map(m => !!s.bymonth?.includes(m))
 
   let endType: RepeatEndType = 'never'
@@ -267,6 +277,7 @@ export function repeatToForm(repeat: Repeat | null, ctx: RepeatFormContext): Rep
     freq: s.freq,
     wdays,
     monthly,
+    ...(weekdayPattern ? { weekdayPattern } : {}),
     months,
     endType,
     endVal,
@@ -307,6 +318,9 @@ export function formToRepeat(form: RepeatForm, scheduledDate?: string | null): R
       if (monthly === 'same-day') {
         // Yearly needs no field here at all — see asymmetry 1a in the header.
         if (freq === 'monthly') r.bymonthday = [d.getDate()]
+      } else if (form.weekdayPattern) {
+        r.byweekday = form.weekdayPattern.byweekday
+        r.bysetpos = form.weekdayPattern.bysetpos
       } else {
         const spec = monthlyWeekdaySpec(d)
         r.byweekday = spec.byweekday

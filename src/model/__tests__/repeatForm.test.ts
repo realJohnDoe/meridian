@@ -229,3 +229,26 @@ describe('formToRepeat', () => {
     expect(formToRepeat(form, DATE)).toEqual({ type: 'schedule', freq: 'daily', interval: 1 })
   })
 })
+
+describe('imported multi-position monthly repeats', () => {
+  // `tryRepresent` emits `bysetpos` as an array for "first and last Friday";
+  // the engine iterates it. Anchor 2026-06-05 is the first Friday of June.
+  const FIRST_FRIDAY = '2026-06-05'
+  it.each<[string, number[]]>([
+    ['first and last Friday', [1, -1]],
+    ['first and third Friday', [1, 3]],
+  ])('%s survives an open-and-Set cycle', (_label, bysetpos) => {
+    const repeat: Repeat = { type: 'schedule', freq: 'monthly', interval: 1, byweekday: ['fr'], bysetpos }
+    expect(roundTrip(repeat, FIRST_FRIDAY)).toEqual(repeat)
+  })
+
+  it('keeps several weekdays under one position', () => {
+    const repeat: Repeat = { type: 'schedule', freq: 'monthly', interval: 1, byweekday: ['mo', 'we'], bysetpos: 3 }
+    expect(roundTrip(repeat, '2026-06-17')).toEqual(repeat)
+  })
+
+  it('still re-anchors a single-position pattern the picker can express', () => {
+    const repeat: Repeat = { type: 'schedule', freq: 'monthly', interval: 1, byweekday: ['fr'], bysetpos: 1 }
+    expect(roundTrip(repeat, DATE)).toEqual({ ...repeat, byweekday: ['mo'], bysetpos: 3 })
+  })
+})

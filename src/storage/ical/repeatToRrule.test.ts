@@ -273,6 +273,13 @@ function ruleBodies(): Case[] {
       // No BYMONTH at all, so the day-naming part spans all twelve months.
       push(`FREQ=YEARLY${iv};BYMONTHDAY=15`, new Date(2025, 7, 15), YEARLY_WINDOW)
     }
+    // A weekday with no position, yearly: the weekly rule, as the monthly
+    // "every Friday of the month" is. Only at INTERVAL=1 (see STILL_DECLINED).
+    if (interval === 1) {
+      push('FREQ=YEARLY;BYMONTH=11;BYDAY=TH', new Date(2025, 10, 6), YEARLY_WINDOW)
+      push('FREQ=YEARLY;BYMONTH=3,9;BYDAY=MO,FR', new Date(2026, 2, 2), YEARLY_WINDOW)
+      push('FREQ=YEARLY;BYDAY=TH', new Date(2025, 7, 7), YEARLY_WINDOW)
+    }
   }
   return out
 }
@@ -312,9 +319,9 @@ const STILL_DECLINED: Array<{ rrule: string; anchor: Date; why: string }> = [
   // cannot say — and which `expandRRule` reads per month, so agreeing with it
   // would prove nothing.
   { rrule: 'FREQ=YEARLY;BYDAY=2MO', anchor: new Date(2026, 0, 12), why: 'an ordinal BYDAY with no BYMONTH counts within the year' },
-  // Every Thursday of November is the RFC's reading; the engine's yearly arm
-  // has no use for a weekday without a position.
-  { rrule: 'FREQ=YEARLY;BYMONTH=11;BYDAY=TH', anchor: new Date(2025, 10, 6), why: 'a yearly BYDAY with no position is dead data to the engine' },
+  // Every Thursday of November, every other year, skips whole years — which
+  // the weekly rule that rescues the INTERVAL=1 case cannot.
+  { rrule: 'FREQ=YEARLY;INTERVAL=2;BYMONTH=11;BYDAY=TH', anchor: new Date(2025, 10, 6), why: 'a yearly BYDAY with no position, at an interval the weekly reading cannot carry' },
 ]
 
 function repeatFor(c: Case): Repeat {

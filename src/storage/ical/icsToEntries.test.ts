@@ -159,24 +159,18 @@ describe('icsToEntries — recurrence', () => {
     ])
   })
 
-  it('emits explicit dates for an unrepresentable RRULE, with no repeat block', () => {
-    const fm = frontmatter(only(event([
+  it('leaves out an event whose RRULE the model cannot carry, naming it and its rule', () => {
+    const result = icsToEntries(event([
       'UID:a@example', 'DTSTART:20260807T090000', 'SUMMARY:First and third Friday',
       'RRULE:FREQ=MONTHLY;BYDAY=1FR,3FR',
-    ])))
-    expect(fm).not.toHaveProperty('repeat')
-    expect(fm['date']).toBe('2026-08-07')
-    const instances = fm['instances'] as Array<{ date: string; time?: string }>
-    expect(instances[0]).toEqual({ date: '2026-08-21', time: '09:00' })
-    expect(instances.length).toBeGreaterThan(10)
+    ]), NOW)
+    expect(result?.entries).toEqual([])
+    expect(result?.skipped).toEqual([{ uid: 'a@example', title: 'First and third Friday', rrule: 'FREQ=MONTHLY;BYDAY=1FR,3FR' }])
   })
 
-  it('stays a single occurrence when the RRULE is unusable', () => {
-    const fm = frontmatter(only(event([
-      'UID:a@example', 'DTSTART:20260817T090000', 'SUMMARY:X', 'RRULE:FREQ=FORTNIGHTLY',
-    ])))
-    expect(fm).not.toHaveProperty('repeat')
-    expect(fm).not.toHaveProperty('instances')
+  it('leaves out an event whose RRULE does not parse, like one it cannot carry', () => {
+    const result = icsToEntries(event(['UID:a@example', 'DTSTART:20260817T090000', 'SUMMARY:X', 'RRULE:FREQ=FORTNIGHTLY']), NOW)
+    expect(result?.skipped).toEqual([{ uid: 'a@example', title: 'X', rrule: 'FREQ=FORTNIGHTLY' }])
   })
 })
 

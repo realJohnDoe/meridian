@@ -27,6 +27,7 @@ import {
   GITHUB_APP_INSTALL_URL, APP_URL, exportVaultIcs, previewVaultIcsImport, importVaultIcs,
   previewVaultCopy, copyVaultInto,
 } from '@/vaultActions'
+import { SkippedEvents } from './SkippedEvents'
 import { ParticipantsRow, ListedOnRow, DEFAULT_LISTS_KEY, archiveEntry } from '@/editor'
 import { keyRoute } from '@/entryRoute'
 import { deleteWholeFileWithUndo } from '@/occurrenceActions'
@@ -645,7 +646,7 @@ export function VaultSettings({ vault }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Move &ldquo;{vault.name}&rdquo; into a vault</AlertDialogTitle>
             <AlertDialogDescription>
-              {moveInSummary(moveInPlan ?? { added: 0, updated: 0 })}
+              {moveInSummary(moveInPlan ?? { added: 0, updated: 0, skipped: [] })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col gap-3">
@@ -694,6 +695,7 @@ export function VaultSettings({ vault }: Props) {
                 ? 'Meridian couldn’t read that file as a calendar. Export your calendar as .ics and pick that file — not a link to it, and not a .zip.'
                 : importSummary(importPlan)}
             </AlertDialogDescription>
+            {importPlan && <SkippedEvents events={importPlan.skipped} />}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => { setImportText(null) }}>

@@ -49,6 +49,10 @@ After changing any files, check whether an open PR already covers the current br
 
 Once a PR is open, watch it for CI failures and fix them.
 
+Label every issue an agent creates `Sonnet` (well-scoped, mechanical) or
+`Opus` (needs design or cross-module reasoning), plus `Human` when it needs
+human judgement or an important decision before work can start.
+
 ## Dev server base path
 
 The app is served under `/meridian/` — not `/`. When using preview tools or navigating programmatically, always use this base path:

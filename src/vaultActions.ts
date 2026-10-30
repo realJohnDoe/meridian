@@ -3,10 +3,10 @@ export {
   setVaultColor, setVaultRetentionDays, setDefaultVault, reconnectVault, isFolderPickerSupported,
 } from '@/storage'
 export { previewIcalFeed } from '@/storage'
-export type { VaultRef } from '@/storage'
+export type { SkippedEvent, VaultRef } from '@/storage'
 export { syncToBackend, cacheDirtyCount } from '@/storage'
 
-import type { VaultRef } from '@/storage'
+import type { SkippedEvent, VaultRef } from '@/storage'
 import { entriesToIcs, planIcsImport, planEntryImport, vaultImportCandidates } from '@/storage'
 import { commitNext } from '@/storeCommit'
 import { useStore, vaultLayer } from '@/store'
@@ -35,6 +35,8 @@ export function exportVaultIcs(vaultId: string): string {
 export interface IcsImportSummary {
   added:   number
   updated: number
+  /** Events left out for a repeat rule Meridian can't express. */
+  skipped: SkippedEvent[]
 }
 
 /**
@@ -48,7 +50,7 @@ export interface IcsImportSummary {
  */
 export function previewVaultIcsImport(vaultId: string, text: string): IcsImportSummary | null {
   const plan = planIcsImport(vaultId, text)
-  return plan && { added: plan.added, updated: plan.updated }
+  return plan && { added: plan.added, updated: plan.updated, skipped: plan.skipped }
 }
 
 /**
@@ -62,7 +64,7 @@ export function importVaultIcs(vaultId: string, text: string): IcsImportSummary 
   const plan = planIcsImport(vaultId, text)
   if (!plan) return null
   commitNext(plan.next, plan.keys)
-  return { added: plan.added, updated: plan.updated }
+  return { added: plan.added, updated: plan.updated, skipped: plan.skipped }
 }
 
 /**
@@ -74,8 +76,8 @@ export function importVaultIcs(vaultId: string, text: string): IcsImportSummary 
  * `planEntryImport`.
  */
 export function previewVaultCopy(fromVaultId: string, toVaultId: string): IcsImportSummary {
-  const { added, updated } = planEntryImport(toVaultId, vaultImportCandidates(fromVaultId))
-  return { added, updated }
+  const { added, updated, skipped } = planEntryImport(toVaultId, vaultImportCandidates(fromVaultId))
+  return { added, updated, skipped }
 }
 
 /**
@@ -93,7 +95,7 @@ export function previewVaultCopy(fromVaultId: string, toVaultId: string): IcsImp
 export function copyVaultInto(fromVaultId: string, toVaultId: string): IcsImportSummary {
   const plan = planEntryImport(toVaultId, vaultImportCandidates(fromVaultId))
   commitNext(plan.next, plan.keys)
-  return { added: plan.added, updated: plan.updated }
+  return { added: plan.added, updated: plan.updated, skipped: plan.skipped }
 }
 
 export {

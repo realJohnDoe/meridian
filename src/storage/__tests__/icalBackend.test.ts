@@ -155,12 +155,12 @@ describe('IcalBackend', () => {
 describe('previewIcalFeed', () => {
   it('reports the calendar name and event count without registering anything', async () => {
     stubFetch(() => okFeed())
-    expect(await previewIcalFeed(FEED_URL)).toEqual({ name: 'Family', eventCount: 2 })
+    expect(await previewIcalFeed(FEED_URL)).toEqual({ name: 'Family', eventCount: 2, skipped: [] })
   })
 
   it('omits the name when the feed sets none', async () => {
     stubFetch(() => okFeed(FEED.replace('X-WR-CALNAME:Family\r\n', '')))
-    expect(await previewIcalFeed(FEED_URL)).toEqual({ eventCount: 2 })
+    expect(await previewIcalFeed(FEED_URL)).toEqual({ eventCount: 2, skipped: [] })
   })
 
   it('explains a URL that returns a web page instead of a feed', async () => {
