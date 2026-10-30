@@ -106,7 +106,10 @@ export default function RepeatDialog({
 
   const hasSched = !!scheduled
   const hasTrk   = tracked && itemType !== 'event'
-  const formCtx: RepeatFormContext = { scheduledDate: scheduled?.date, hasSchedule: hasSched, hasTracking: hasTrk }
+  const formCtx: RepeatFormContext = {
+    scheduledDate: scheduled?.date, hasSchedule: hasSched, hasTracking: hasTrk,
+    weekStart: (['su', 'mo', 'tu', 'we', 'th', 'fr', 'sa'] as const)[weekStartsOn(localePrefs)],
+  }
 
   const [state, dispatch] = useReducer(
     dialogReducer,

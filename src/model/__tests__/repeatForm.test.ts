@@ -252,3 +252,23 @@ describe('imported multi-position monthly repeats', () => {
     expect(roundTrip(repeat, DATE)).toEqual({ ...repeat, byweekday: ['mo'], bysetpos: 3 })
   })
 })
+
+describe('wkst', () => {
+  const biweekly: Repeat = { type: 'schedule', freq: 'weekly', interval: 2, byweekday: ['mo', 'fr'] }
+
+  it('survives an open-and-Set cycle', () => {
+    const repeat: Repeat = { ...biweekly, wkst: 'su' }
+    expect(roundTrip(repeat)).toEqual(repeat)
+  })
+
+  it('is not added to an existing repeat that had none', () => {
+    const form = repeatToForm(biweekly, { ...ctx(), weekStart: 'su' })
+    expect(formToRepeat(form, DATE)).toEqual(biweekly)
+  })
+
+  it('comes from the week-start setting for a new repeat, only where it changes a date', () => {
+    const form = repeatToForm(null, { ...ctx(), weekStart: 'su' })
+    expect(formToRepeat({ ...form, intervalNum: 2 }, DATE)).toMatchObject({ wkst: 'su' })
+    expect(formToRepeat(form, DATE)).not.toHaveProperty('wkst')
+  })
+})
