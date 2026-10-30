@@ -38,6 +38,13 @@ describe('planIcsImport', () => {
     expect(planIcsImport(TEST_VAULT, '<html>Please sign in</html>')).toBeNull()
   })
 
+  it('leaves out events whose repeat rule Meridian cannot express, and counts them', () => {
+    const odd = event(['UID:odd@example', 'DTSTART:20260807T090000', 'SUMMARY:Board', 'RRULE:FREQ=MONTHLY;BYDAY=1FR,3FR'])
+    const plan = planIcsImport(TEST_VAULT, calendar(LUNCH, odd))
+    expect(plan).toMatchObject({ added: 1, skipped: 1 })
+    expect(plan?.keys.map(keySlug)).toEqual(['lunch-with-sam'])
+  })
+
   it('names the files after the event titles, not after the UID hash', () => {
     const { slugs, added } = importInto(calendar(LUNCH, STANDUP))
 

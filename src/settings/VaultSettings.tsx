@@ -109,14 +109,17 @@ function eventCount(n: number): string {
  * replaces them wholesale — including anything the user changed about them
  * since. That is not something to discover afterwards.
  */
-function importSummary({ added, updated }: IcsImportSummary): string {
+function importSummary({ added, updated, skipped }: IcsImportSummary): string {
+  const left = skipped > 0
+    ? ` ${eventCount(skipped)} will be left out: ${skipped === 1 ? 'its repeat rule isn’t' : 'their repeat rules aren’t'} one Meridian can express, and importing ${skipped === 1 ? 'it' : 'them'} as fixed dates would silently stop.`
+    : ''
   if (added + updated === 0) {
-    return 'That file is a calendar, but it holds no events Meridian can place on a date.'
+    return `That file is a calendar, but it holds no events Meridian can place on a date.${left}`
   }
   const kept = 'They become ordinary entries you can edit, link to and delete — Meridian won’t keep them in step with the original calendar.'
-  if (updated === 0) return kept
+  if (updated === 0) return kept + left
   const already = `${updated} ${updated === 1 ? 'entry' : 'entries'}`
-  return `${eventCount(added)} will be added. ${already} imported from this calendar before will be replaced, losing any edits made here. ${kept}`
+  return `${eventCount(added)} will be added. ${already} imported from this calendar before will be replaced, losing any edits made here. ${kept}${left}`
 }
 
 /**
@@ -645,7 +648,7 @@ export function VaultSettings({ vault }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Move &ldquo;{vault.name}&rdquo; into a vault</AlertDialogTitle>
             <AlertDialogDescription>
-              {moveInSummary(moveInPlan ?? { added: 0, updated: 0 })}
+              {moveInSummary(moveInPlan ?? { added: 0, updated: 0, skipped: 0 })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col gap-3">

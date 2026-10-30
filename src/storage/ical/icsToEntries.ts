@@ -40,6 +40,8 @@ export interface IcalSynthesis {
   /** `X-WR-CALNAME`, when the feed sets one — the wizard offers it as the vault name. */
   calendarName?: string
   entries: SynthesizedEntry[]
+  /** Events dropped because `expand` was off and their rule has no `Repeat` form. */
+  skipped: number
 }
 
 /**
@@ -301,7 +303,7 @@ function groupByUid(events: IcsComponent[]): EventGroup[] {
   return [...groups.values()]
 }
 
-function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null {
+function synthesizeGroup(group: EventGroup, now: Date, expand: boolean): SynthesizedEntry | 'skipped' | null {
   const { master } = group
   const timing = readTiming(master)
   if (!timing) return null // no usable DTSTART — not something the agenda can place
@@ -319,6 +321,8 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null 
     const mapped = rruleToRepeat(rrule, timing.start, now)
     if (mapped.kind === 'repeat') {
       repeat = mapped.repeat
+    } else if (!expand) {
+      return 'skipped'
     } else if (mapped.dates.length > 0) {
       // Unrepresentable rule: the dates are emitted explicitly instead. The
       // first becomes the entry's own `date`, the rest become `instances:` —
@@ -356,16 +360,22 @@ function synthesizeGroup(group: EventGroup, now: Date): SynthesizedEntry | null 
  *
  * `now` is injectable purely so the bounded RRULE expansion window is
  * deterministic in tests.
+ *
+ * `expand: false` drops (and counts) events whose rule has no `Repeat` form
+ * instead of expanding them to dates. A subscription keeps expanding, since its
+ * window slides forward on every refresh; a one-time import would freeze it.
  */
-export function icsToEntries(text: string, now: Date = new Date()): IcalSynthesis | null {
+export function icsToEntries(text: string, now: Date = new Date(), expand = true): IcalSynthesis | null {
   const calendar = parseIcs(text)
   if (!calendar) return null
 
   const entries: SynthesizedEntry[] = []
   const seen = new Set<string>()
+  let skipped = 0
   for (const group of groupByUid(components(calendar, 'VEVENT'))) {
-    const entry = synthesizeGroup(group, now)
-    if (!entry) continue
+    const entry = synthesizeGroup(group, now, expand)
+    if (entry === 'skipped') skipped++
+    if (!entry || entry === 'skipped') continue
     // A hash collision (or a feed repeating a UID) must resolve the same way on
     // every device and every refresh, so the suffix comes from the order the
     // feed lists them in — not from a counter that depends on what else parsed.
@@ -376,5 +386,5 @@ export function icsToEntries(text: string, now: Date = new Date()): IcalSynthesi
   }
 
   const name = calendarName(calendar)
-  return { ...(name ? { calendarName: name } : {}), entries }
+  return { ...(name ? { calendarName: name } : {}), entries, skipped }
 }

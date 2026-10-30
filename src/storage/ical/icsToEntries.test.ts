@@ -171,6 +171,17 @@ describe('icsToEntries — recurrence', () => {
     expect(instances.length).toBeGreaterThan(10)
   })
 
+  it('drops and counts an unrepresentable RRULE when expansion is off', () => {
+    const ics = event([
+      'UID:a@example', 'DTSTART:20260807T090000', 'SUMMARY:First and third Friday',
+      'RRULE:FREQ=MONTHLY;BYDAY=1FR,3FR',
+    ])
+    const result = icsToEntries(ics, NOW, false)
+    expect(result?.entries).toEqual([])
+    expect(result?.skipped).toBe(1)
+    expect(icsToEntries(ics, NOW)?.skipped).toBe(0)
+  })
+
   it('stays a single occurrence when the RRULE is unusable', () => {
     const fm = frontmatter(only(event([
       'UID:a@example', 'DTSTART:20260817T090000', 'SUMMARY:X', 'RRULE:FREQ=FORTNIGHTLY',
