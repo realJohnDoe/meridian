@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
+import { Slot } from "radix-ui"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { useMediaQuery } from "@/hooks"
@@ -320,7 +320,7 @@ function SidebarGroupLabel({
   ref,
   ...props
 }: React.ComponentProps<"div"> & { asChild?: boolean }) {
-  const Comp = asChild ? Slot : "div"
+  const Comp = asChild ? Slot.Root : "div"
 
   return (
     <Comp
@@ -400,7 +400,7 @@ function SidebarMenuButton({
   isActive?: boolean
   tooltip?: string | React.ComponentProps<typeof TooltipContent>
 } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const Comp = asChild ? Slot : "button"
+  const Comp = asChild ? Slot.Root : "button"
   const { isMobile, state } = useSidebar()
 
   const button = (
