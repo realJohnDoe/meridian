@@ -12,7 +12,7 @@
 // byte-identical files and reconcile sees no change at all.
 
 import { stringify } from 'yaml'
-import type { Repeat } from '@/types'
+import type { Repeat, SkippedEvent } from '@/types'
 import {
   parseIcs, components, textValue, propValue, prop, props, param, splitList, unescapeText,
   calendarName, type IcsComponent,
@@ -44,12 +44,7 @@ export interface IcalSynthesis {
   skipped: SkippedEvent[]
 }
 
-/** An event left out of a synthesis: enough to tell the user which, and why. */
-export interface SkippedEvent {
-  uid:   string
-  title: string
-  rrule: string
-}
+export type { SkippedEvent }
 
 /**
  * A short, stable, URL-safe hash of an event's `UID`.

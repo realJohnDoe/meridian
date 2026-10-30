@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { IcalBackend, previewIcalFeed, IcalFetchError } from '@/storage/icalBackend'
+import { warn } from '@/storage/notifications'
+import { useStore } from '@/store'
+
+vi.mock('@/storage/notifications', () => ({ warn: vi.fn() }))
 
 const FEED = [
   'BEGIN:VCALENDAR', 'VERSION:2.0', 'X-WR-CALNAME:Family',
@@ -25,7 +29,16 @@ function stubFetch(responder: (call: { url: string; headers: Record<string, stri
 const okFeed = (body = FEED, headers: Record<string, string> = {}) =>
   new Response(body, { status: 200, headers })
 
-beforeEach(() => { calls = [] })
+beforeEach(() => {
+  calls = []
+  vi.mocked(warn).mockClear()
+  // This project runs without a DOM; the seen-skipped baseline lives in localStorage.
+  const data = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => data.set(k, v),
+  })
+})
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('IcalBackend', () => {
@@ -149,6 +162,39 @@ describe('IcalBackend', () => {
   it('reports a readable feed as granted', async () => {
     stubFetch(() => okFeed())
     expect(await new IcalBackend('x', 'X', FEED_URL).ensurePermission(true)).toBe('granted')
+  })
+})
+
+describe('IcalBackend left-out events', () => {
+  const event = (uid: string, rrule: string) =>
+    ['BEGIN:VEVENT', `UID:${uid}`, 'DTSTART:20260817T090000', `SUMMARY:${uid}`, `RRULE:${rrule}`, 'END:VEVENT']
+  const feedWith = (...events: string[][]) =>
+    ['BEGIN:VCALENDAR', 'VERSION:2.0', ...events.flat(), 'END:VCALENDAR'].join('\r\n')
+  const UNSUPPORTED = 'FREQ=MONTHLY;BYDAY=1FR,3FR'
+
+  it('publishes them on the vault sync status for the settings screen', async () => {
+    stubFetch(() => okFeed(feedWith(event('odd', UNSUPPORTED), event('ok', 'FREQ=WEEKLY'))))
+    await new IcalBackend('cal-skip', 'Family', FEED_URL).statAll()
+
+    expect(useStore.getState().syncByVault.get('cal-skip')?.skipped)
+      .toEqual([{ uid: 'odd', title: 'odd', rrule: UNSUPPORTED }])
+  })
+
+  it('warns once about newly left-out events, never on the first refresh', async () => {
+    let body = feedWith(event('a', UNSUPPORTED))
+    stubFetch(() => okFeed(body))
+    const backend = new IcalBackend('cal-notice', 'Family', FEED_URL)
+
+    await backend.statAll()   // baseline: the wizard already listed it
+    expect(warn).not.toHaveBeenCalled()
+
+    body = feedWith(event('a', UNSUPPORTED), event('b', UNSUPPORTED))
+    await backend.statAll()
+    expect(warn).toHaveBeenCalledOnce()
+    expect(vi.mocked(warn).mock.calls[0]?.[0]).toContain('a new event')
+
+    await backend.statAll()   // still left out, already announced
+    expect(warn).toHaveBeenCalledOnce()
   })
 })
 
