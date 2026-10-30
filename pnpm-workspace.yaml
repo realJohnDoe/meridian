@@ -12,6 +12,15 @@ packages:
 # still allowing the esbuild security patch (GHSA-gv7w-rqvm-qjhr) to install.
 minimumReleaseAge: 1440
 
+# ── Accepted audit advisories ─────────────────────────────────────────────────
+# GHSA-gcqx-w48m-w2h4 (low): deepmerge <=4.3.1 prototype poisoning. Build-time
+# only, via vite-plugin-pwa>workbox-build>@rollup/plugin-node-resolve. The
+# advisory names 4.3.2 as patched, but no such release exists on npm, so no
+# override can fix it. Drop once deepmerge publishes a patched release.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-gcqx-w48m-w2h4
+
 # allowBuilds: explicit allowlist for packages permitted to run install-time
 # build scripts. Only add packages here after reviewing what the script does.
 # esbuild  – compiles its Go-based JS bundler binary; required for Vite
