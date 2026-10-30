@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { coverageConfigDefaults, defineConfig } from 'vitest/config'
 
-const SRC_DIR = path.resolve(__dirname, './src')
+const SRC_DIR = path.resolve(import.meta.dirname, './src')
 const alias = { '@': SRC_DIR }
 const setupFiles = ['src/test-utils/setup.ts']
 
@@ -25,7 +25,7 @@ const setupFiles = ['src/test-utils/setup.ts']
  * moves buckets on its own.
  */
 function needsIsolation(relativePath: string): boolean {
-  const contents = fs.readFileSync(path.join(__dirname, relativePath), 'utf-8')
+  const contents = fs.readFileSync(path.join(import.meta.dirname, relativePath), 'utf-8')
   return (
     contents.includes('@vitest-environment jsdom') ||
     contents.includes('vi.mock(') ||
