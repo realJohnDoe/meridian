@@ -189,7 +189,7 @@ export default defineConfig({
         'src/storage/ical/icsParse.ts':      { statements: 92, branches: 85, functions: 95, lines: 95 },
         'src/storage/ical/icsDateTime.ts':   { statements: 95, branches: 90, functions: 95, lines: 95 },
         'src/storage/ical/icsToEntries.ts':  { statements: 90, branches: 82, functions: 95, lines: 94 },
-        'src/storage/ical/rruleToRepeat.ts': { statements: 87, branches: 81, functions: 86, lines: 94 },
+        'src/storage/ical/rruleToRepeat.ts': { statements: 87, branches: 83, functions: 95, lines: 97 },
         'src/storage/ical/repeatToRrule.ts': { statements: 92, branches: 88, functions: 95, lines: 95 },
         'src/storage/icalBackend.ts':        { statements: 93, branches: 85, functions: 95, lines: 95 },
         'src/editor/dialogs/RepeatDialog.tsx': { statements: 82, branches: 78, functions: 78, lines: 85 },

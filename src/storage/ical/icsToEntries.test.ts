@@ -6,7 +6,6 @@ import { icsToEntries, type SynthesizedEntry } from './icsToEntries'
 import { parseToStoreItems, roundTripLoss } from '@/model'
 import { isSeries } from '@/types'
 
-const NOW = new Date(2026, 7, 15) // 2026-08-15
 
 function fixture(name: string): string {
   return readFileSync(fileURLToPath(new URL(`./__fixtures__/${name}`, import.meta.url)), 'utf8')
@@ -34,7 +33,7 @@ const event = (lines: string[]) => wrap(['BEGIN:VEVENT', ...lines, 'END:VEVENT']
 
 /** The single entry a one-event feed produces. */
 function only(ics: string): SynthesizedEntry {
-  const result = icsToEntries(ics, NOW)
+  const result = icsToEntries(ics)
   if (!result) throw new Error('not a calendar')
   const [entry] = result.entries
   if (!entry) throw new Error(`no entries produced from:\n${ics}`)
@@ -43,12 +42,12 @@ function only(ics: string): SynthesizedEntry {
 
 describe('icsToEntries — basics', () => {
   it('returns null when the text is not a calendar', () => {
-    expect(icsToEntries('<html>Please sign in</html>', NOW)).toBeNull()
+    expect(icsToEntries('<html>Please sign in</html>')).toBeNull()
   })
 
   it('reads the calendar name', () => {
-    expect(icsToEntries(wrap('X-WR-CALNAME:Family'), NOW)?.calendarName).toBe('Family')
-    expect(icsToEntries(wrap('VERSION:2.0'), NOW)?.calendarName).toBeUndefined()
+    expect(icsToEntries(wrap('X-WR-CALNAME:Family'))?.calendarName).toBe('Family')
+    expect(icsToEntries(wrap('VERSION:2.0'))?.calendarName).toBeUndefined()
   })
 
   it('maps SUMMARY, DESCRIPTION, LOCATION and URL', () => {
@@ -73,12 +72,12 @@ describe('icsToEntries — basics', () => {
   it('skips a cancelled event', () => {
     const result = icsToEntries(event([
       'UID:a@example', 'DTSTART:20260817T090000', 'SUMMARY:Gone', 'STATUS:CANCELLED',
-    ]), NOW)!
+    ]))!
     expect(result.entries).toEqual([])
   })
 
   it('skips an event with no usable DTSTART', () => {
-    expect(icsToEntries(event(['UID:a@example', 'SUMMARY:No date']), NOW)!.entries).toEqual([])
+    expect(icsToEntries(event(['UID:a@example', 'SUMMARY:No date']))!.entries).toEqual([])
   })
 
   it('collects attendees as an extra field, with and without CN', () => {
@@ -163,13 +162,13 @@ describe('icsToEntries — recurrence', () => {
     const result = icsToEntries(event([
       'UID:a@example', 'DTSTART:20260807T090000', 'SUMMARY:First and third Friday',
       'RRULE:FREQ=MONTHLY;BYDAY=1FR,3FR',
-    ]), NOW)
+    ]))
     expect(result?.entries).toEqual([])
     expect(result?.skipped).toEqual([{ uid: 'a@example', title: 'First and third Friday', rrule: 'FREQ=MONTHLY;BYDAY=1FR,3FR' }])
   })
 
   it('leaves out an event whose RRULE does not parse, like one it cannot carry', () => {
-    const result = icsToEntries(event(['UID:a@example', 'DTSTART:20260817T090000', 'SUMMARY:X', 'RRULE:FREQ=FORTNIGHTLY']), NOW)
+    const result = icsToEntries(event(['UID:a@example', 'DTSTART:20260817T090000', 'SUMMARY:X', 'RRULE:FREQ=FORTNIGHTLY']))
     expect(result?.skipped).toEqual([{ uid: 'a@example', title: 'X', rrule: 'FREQ=FORTNIGHTLY' }])
   })
 })
@@ -184,7 +183,7 @@ describe('icsToEntries — RECURRENCE-ID overrides', () => {
     const result = icsToEntries(wrap([...master,
       'BEGIN:VEVENT', 'UID:a@example', 'RECURRENCE-ID:20260810T090000',
       'DTSTART:20260810T110000', 'DTEND:20260810T113000', 'SUMMARY:Weekly', 'END:VEVENT',
-    ].join('\r\n')), NOW)!
+    ].join('\r\n')))!
 
     expect(result.entries).toHaveLength(1) // one entry, not two
     expect(frontmatter(result.entries[0]!)['instances']).toEqual([{ date: '2026-08-10', time: '11:00', duration: '30 minutes' }])
@@ -194,7 +193,7 @@ describe('icsToEntries — RECURRENCE-ID overrides', () => {
     const result = icsToEntries(wrap([...master,
       'BEGIN:VEVENT', 'UID:a@example', 'RECURRENCE-ID:20260810T090000',
       'DTSTART:20260812T140000', 'DTEND:20260812T150000', 'SUMMARY:Weekly', 'END:VEVENT',
-    ].join('\r\n')), NOW)!
+    ].join('\r\n')))!
 
     expect(frontmatter(result.entries[0]!)['instances']).toEqual([
       { date: '2026-08-10', excluded: true },
@@ -207,7 +206,7 @@ describe('icsToEntries — RECURRENCE-ID overrides', () => {
       'BEGIN:VEVENT', 'UID:a@example', 'RECURRENCE-ID:20260810T090000',
       'DTSTART:20260810T110000', 'SUMMARY:Weekly', 'END:VEVENT',
       ...master,
-    ].join('\r\n')), NOW)!
+    ].join('\r\n')))!
 
     expect(result.entries).toHaveLength(1)
     expect(frontmatter(result.entries[0]!)['instances']).toEqual([{ date: '2026-08-10', time: '11:00' }])
@@ -224,7 +223,7 @@ describe('icsToEntries — slugs', () => {
   it('re-parsing an unchanged feed yields byte-identical slugs and content', () => {
     // The deterministic-id guarantee: a refresh that changed nothing must
     // produce the same bytes, so reconcile sees no change at all.
-    expect(icsToEntries(feed, NOW)).toEqual(icsToEntries(feed, NOW))
+    expect(icsToEntries(feed)).toEqual(icsToEntries(feed))
   })
 
   it('gives different UIDs different slugs', () => {
@@ -239,7 +238,7 @@ describe('icsToEntries — slugs', () => {
     ].join('\r\n'))
     // Same UID with no RECURRENCE-ID is one entry — the second is a duplicate,
     // not a second event, and the first one listed wins.
-    expect(icsToEntries(twice, NOW)!.entries).toHaveLength(1)
+    expect(icsToEntries(twice)!.entries).toHaveLength(1)
   })
 
   it('stays deterministic for an event with no UID', () => {
@@ -262,7 +261,7 @@ describe('icsToEntries — slugs', () => {
 
 describe('golden fixtures', () => {
   it('parses a Google export into the store with no round-trip loss', () => {
-    const result = icsToEntries(fixture('google.ics'), NOW)!
+    const result = icsToEntries(fixture('google.ics'))!
     expect(result.calendarName).toBe('Family')
     expect(result.entries).toHaveLength(2) // the cancelled event is skipped
 
@@ -277,7 +276,7 @@ describe('golden fixtures', () => {
   })
 
   it('maps the Google standup to a series with its exclusion', () => {
-    const [standup] = icsToEntries(fixture('google.ics'), NOW)!.entries
+    const [standup] = icsToEntries(fixture('google.ics'))!.entries
     const fm = frontmatter(standup!)
 
     expect(fm['title']).toBe('Team standup: morning')
@@ -294,7 +293,7 @@ describe('golden fixtures', () => {
   })
 
   it('parses an Outlook export into the store with no round-trip loss', () => {
-    const result = icsToEntries(fixture('outlook.ics'), NOW)!
+    const result = icsToEntries(fixture('outlook.ics'))!
     expect(result.calendarName).toBe('Work calendar')
     // The RECURRENCE-ID override folds into its master, so three VEVENTs
     // become two entries.
@@ -308,7 +307,7 @@ describe('golden fixtures', () => {
   })
 
   it('degrades an unrecognised Windows timezone to floating local time', () => {
-    const [review] = icsToEntries(fixture('outlook.ics'), NOW)!.entries
+    const [review] = icsToEntries(fixture('outlook.ics'))!.entries
     const fm = frontmatter(review!)
 
     // `W. Europe Standard Time` is not an IANA id, so the wall clock is kept

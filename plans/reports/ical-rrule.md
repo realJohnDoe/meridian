@@ -49,7 +49,7 @@ dates) which is why these sat unnoticed. The cross-engine corpus in
 reversion fails rather than passing vacuously.
 
 Everything else is either already representable, correctly declined and routed
-to the ICS importer's bounded-expansion fallback, or genuinely not worth
+to the ICS importer's skip list (the event is left out), or genuinely not worth
 building (sub-daily recurrence).
 
 ICS **export** now exists (`storage/ical/entriesToIcs.ts`, reached from
@@ -69,12 +69,12 @@ with each other:
 | Layer | File | Decides |
 |---|---|---|
 | Format + engine | `src/types.ts` (`Repeat`), `src/model/expansion.ts` | What a vault file *can* mean |
-| ICS import | `src/storage/ical/rruleToRepeat.ts` (`tryRepresent`) | Which RRULEs become a rule vs. dated instances |
+| ICS import | `src/storage/ical/rruleToRepeat.ts` (`tryRepresent`) | Which RRULEs become a rule vs. are skipped |
 | Authoring UI | `src/editor/dialogs/RepeatDialog.tsx`, `src/model/repeat.ts` | What a user can create |
 
 `tryRepresent` is worth reading as the closest thing to a live gap inventory —
-every `return null` in it is a rule the importer declines and routes to
-bounded expansion instead.
+every `return null` in it is a rule the importer declines, and the event is
+skipped. The RFC walk (`rruleOracle.ts`) survives only as the test oracle.
 
 Note that `repeat:` is written to YAML verbatim (`collapse.ts:82`,
 `result.repeat = s.repeat`) and read back with an unchecked cast
@@ -124,8 +124,7 @@ exporter usage is approximately zero; the fallback's own comment says as much.
 `BYSECOND`.** Structurally out of reach, not merely unimplemented: an
 occurrence carries one `time` and a series one anchor time, so "every 2 hours
 on weekdays" cannot be a rule without letting an occurrence hold a set of
-times. `expandSubDaily` already collapses these to the days they touch, which
-is the only sane rendering on a day-grid calendar. Supporting them properly is
+times. The importer skips them. Supporting them properly is
 a model change an order of magnitude larger than everything else on this page,
 for a rule type no personal calendar uses.
 

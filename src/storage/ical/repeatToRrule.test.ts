@@ -33,7 +33,8 @@
 // what is under test here: which *days* a rule selects.
 
 import { describe, it, expect } from 'vitest'
-import { rruleToRepeat, parseRRule, expandRRule } from './rruleToRepeat'
+import { rruleToRepeat, parseRRule } from './rruleToRepeat'
+import { expandRRule, MAX_OCCURRENCES } from './rruleOracle'
 import { repeatToRrule } from './repeatToRrule'
 import { expandRange } from '@/model'
 import { entryKey } from '@/fileIO'
@@ -55,8 +56,6 @@ const BASE = new Date(2025, 7, 4) // 2025-08-04, a Monday
 
 const ROOTS: Roots = new Map()
 
-/** `MAX_FALLBACK_OCCURRENCES` in `rruleToRepeat.ts`, which does not export it. */
-const FALLBACK_CAP = 750
 
 const iso = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -289,7 +288,7 @@ const CORPUS: Case[] = ruleBodies().flatMap(({ rrule, anchor, window }) =>
 )
 
 /** The corpus is built entirely from shapes the importer carries as rules. */
-const CLAIMED = CORPUS.filter(c => rruleToRepeat(c.rrule, c.anchor, NOW).kind === 'repeat')
+const CLAIMED = CORPUS.filter(c => rruleToRepeat(c.rrule, c.anchor).kind === 'repeat')
 
 /**
  * Shapes the importer still refuses, each sent to bounded expansion instead.
@@ -325,7 +324,7 @@ const STILL_DECLINED: Array<{ rrule: string; anchor: Date; why: string }> = [
 ]
 
 function repeatFor(c: Case): Repeat {
-  const mapped = rruleToRepeat(c.rrule, c.anchor, NOW)
+  const mapped = rruleToRepeat(c.rrule, c.anchor)
   if (mapped.kind !== 'repeat') throw new Error(`${c.rrule} was declined`)
   return mapped.repeat
 }
@@ -361,7 +360,7 @@ describe('the round-trip corpus', () => {
 
   it('leaves the shapes the engine cannot carry to bounded expansion', () => {
     for (const { rrule, anchor, why } of STILL_DECLINED) {
-      expect(rruleToRepeat(rrule, anchor, NOW).kind, `${rrule} — ${why}`).toBe('dates')
+      expect(rruleToRepeat(rrule, anchor).kind, `${rrule} — ${why}`).toBe('unsupported')
     }
   })
 
@@ -411,7 +410,7 @@ describe('the round-trip corpus', () => {
     // truncation check below carries the number. This is what keeps that copy
     // honest: the densest rule there is — one date per day, unbounded — runs
     // until the cap stops it, so its length *is* the cap.
-    expect(expandRRule(parseRRule('FREQ=DAILY'), BASE, NOW).length).toBe(FALLBACK_CAP)
+    expect(expandRRule(parseRRule('FREQ=DAILY'), BASE, NOW).length).toBe(MAX_OCCURRENCES)
   })
 
   it('never compares against a truncated expansion', () => {
@@ -426,7 +425,7 @@ describe('the round-trip corpus', () => {
       expect(iso(w.to) <= windowEnd, `${c.rrule}: window runs past the fallback's`).toBe(true)
 
       const all = expandRRule(parseRRule(c.rrule), c.anchor, w.now)
-      const cut = all.length >= FALLBACK_CAP && all[all.length - 1]! < iso(w.to)
+      const cut = all.length >= MAX_OCCURRENCES && all[all.length - 1]! < iso(w.to)
       expect(cut, `${c.rrule}: capped at ${all[all.length - 1] ?? '—'}, inside the window`).toBe(false)
     }
   })
@@ -752,7 +751,7 @@ describe('repeatToRrule — round-trips back through the importer', () => {
     for (const c of CLAIMED) {
       const repeat = repeatFor(c)
       const emitted = repeatToRrule(repeat, c.anchor)
-      const back = rruleToRepeat(emitted!, c.anchor, NOW)
+      const back = rruleToRepeat(emitted!, c.anchor)
       expect(back.kind, `${c.rrule} -> ${emitted!}`).toBe('repeat')
       if (back.kind === 'repeat') expect(back.repeat, `${c.rrule} -> ${emitted!}`).toEqual(repeat)
     }

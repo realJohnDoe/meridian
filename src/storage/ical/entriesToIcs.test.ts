@@ -213,7 +213,7 @@ describe('entriesToIcs — line folding', () => {
 describe('entriesToIcs — round trip through the importer', () => {
   it('a simple timed occurrence round-trips through icsToEntries unchanged in substance', () => {
     const ics = entriesToIcs([entry([occ()], { title: 'Standup' })], NOW)
-    const synthesis = icsToEntries(ics, NOW)
+    const synthesis = icsToEntries(ics)
     if (!synthesis) throw new Error('not a calendar')
     expect(synthesis.entries).toHaveLength(1)
     const [synthesized] = synthesis.entries
@@ -226,7 +226,7 @@ describe('entriesToIcs — round trip through the importer', () => {
     const s = series()
     const moved = occ({ id: 'occ:series-1|2026-08-24|09:00', ownerId: 'series-1', date: '2026-08-26', time: '14:00' })
     const ics = entriesToIcs([entry([s, moved])], NOW)
-    const synthesis = icsToEntries(ics, NOW)
+    const synthesis = icsToEntries(ics)
     if (!synthesis) throw new Error('not a calendar')
     const [synthesized] = synthesis.entries
     expect(synthesized!.content).toContain('excluded: true')
