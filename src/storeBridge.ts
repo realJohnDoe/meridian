@@ -100,8 +100,7 @@ export const setStoreState = useStore.setState
  * Eager and cross-vault by design: the Favorites list and the filter
  * popover both span every registered vault at once, so
  * neither can wait for a vault to "activate" the way the old per-vault
- * `loadVaultPrefs` did. `defaultParticipants` is the one field still loaded
- * lazily, one vault at a time — see `loadDefaultParticipants`.
+ * `loadVaultPrefs` did.
  *
  * Idempotent: calling it again is a re-read, not a change.
  */
@@ -112,10 +111,6 @@ export const loadGlobalPrefs = (vaultIds: string[]): void => {
   store.loadShowTasks(vaultIds)
   store.loadColorBy()
 }
-
-/** Load the one still-lazy per-vault pref: the participants seeded into new entries. */
-export const loadDefaultParticipants = (vaultId: string): void =>
-  useStore.getState().loadDefaultParticipants(vaultId)
 
 export const setDefaultVaultId = (id: string | null): void =>
   useStore.getState().setDefaultVaultId(id)

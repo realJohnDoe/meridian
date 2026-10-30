@@ -74,8 +74,6 @@ const {
       vaultLoadProgress: null as { loaded: number; total: number } | null,
       /** Vault ids whose cross-vault prefs were last (re)loaded — see loadGlobalPrefs. */
       prefsLoadedFor: null as string[] | null,
-      /** Vault whose lazy defaultParticipants were last loaded. */
-      participantsLoadedFor: null as string | null,
     },
     notifyFns: { notify: vi.fn(), notifyError: vi.fn(), warn: vi.fn() },
     syncFns: {
@@ -243,7 +241,6 @@ vi.mock('@/storeBridge', () => ({
     Object.assign(storeState, partial)
   }),
   loadGlobalPrefs: vi.fn((ids: string[]) => { callOrder.push('loadGlobalPrefs'); storeState.prefsLoadedFor = ids }),
-  loadDefaultParticipants: vi.fn((id: string) => { storeState.participantsLoadedFor = id }),
   getDefaultVaultId: vi.fn(() => storeState.defaultVaultId),
   setDefaultVaultId: vi.fn((id: string | null) => { storeState.defaultVaultId = id }),
 }))
@@ -285,7 +282,6 @@ beforeEach(() => {
   storeState.vaultLoading = false
   storeState.vaultLoadProgress = null
   storeState.prefsLoadedFor = null
-  storeState.participantsLoadedFor = null
   cacheConfig.rows.clear()
   callOrder.length = 0
   notifyFns.notify.mockClear()
@@ -774,8 +770,6 @@ describe('setDefaultVault', () => {
     setDefaultVault(GITHUB_REF.id)
 
     expect(storeState.defaultVaultId).toBe(GITHUB_REF.id)
-    // The lazily-loaded per-vault pref follows the target, since it seeds new entries.
-    expect(storeState.participantsLoadedFor).toBe(GITHUB_REF.id)
     expect(syncFns.syncOnActivate).not.toHaveBeenCalled()
     expect(storeState.layers.size).toBe(0)
   })

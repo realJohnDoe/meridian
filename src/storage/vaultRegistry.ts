@@ -22,7 +22,7 @@ import type { VaultRef, GitHubVaultRef, IcalVaultRef, VaultColor } from '@/vault
 import {
   getVaults, setStoreState, setVaultLayer, removeVaultLayer,
   setVaultSync, removeVaultSync, getUnreadableFiles, setUnreadableFiles,
-  loadGlobalPrefs, loadDefaultParticipants, getDefaultVaultId, setDefaultVaultId,
+  loadGlobalPrefs, getDefaultVaultId, setDefaultVaultId,
 } from '@/storeBridge'
 import { notify, notifyError, warn } from './notifications'
 import { mountBackend, unmountBackend } from './backends'
@@ -179,9 +179,6 @@ function reconcileDefaultVault(refs: VaultRef[], prefer?: string | null): void {
   if (current && writable.some(r => r.id === current)) return
   const next = writable.find(r => r.id === prefer)?.id ?? writable[0]?.id ?? null
   setDefaultVaultId(next)
-  // The one lazily-loaded per-vault pref follows the default: it seeds new
-  // entries, and a new entry goes to the default vault.
-  if (next) loadDefaultParticipants(next)
 }
 
 // ── ACTIVATION HELPERS ─────────────────────────────────────────
@@ -552,7 +549,6 @@ export function setDefaultVault(id: string): void {
   const ref = getVaults().find(v => v.id === id)
   if (!ref || !isWritableKind(ref)) return
   setDefaultVaultId(id)
-  loadDefaultParticipants(id)
   void activeVaultIdSave(id)
 }
 
