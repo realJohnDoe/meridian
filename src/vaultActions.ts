@@ -3,10 +3,10 @@ export {
   setVaultColor, setVaultRetentionDays, setDefaultVault, reconnectVault, isFolderPickerSupported,
 } from '@/storage'
 export { previewIcalFeed } from '@/storage'
-export type { VaultRef } from '@/storage'
+export type { SkippedEvent, VaultRef } from '@/storage'
 export { syncToBackend, cacheDirtyCount } from '@/storage'
 
-import type { VaultRef } from '@/storage'
+import type { SkippedEvent, VaultRef } from '@/storage'
 import { entriesToIcs, planIcsImport, planEntryImport, vaultImportCandidates } from '@/storage'
 import { commitNext } from '@/storeCommit'
 import { useStore, vaultLayer } from '@/store'
@@ -36,7 +36,7 @@ export interface IcsImportSummary {
   added:   number
   updated: number
   /** Events left out for a repeat rule Meridian can't express. */
-  skipped: number
+  skipped: SkippedEvent[]
 }
 
 /**

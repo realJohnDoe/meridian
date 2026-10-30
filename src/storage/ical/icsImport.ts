@@ -38,7 +38,7 @@ import { titleToSlug, keyToPath } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { getVaultLayer, getSlugSnapshot } from '@/storeBridge'
 import type { Entry } from '@/types'
-import { icsToEntries } from './icsToEntries'
+import { icsToEntries, type SkippedEvent } from './icsToEntries'
 
 /**
  * One event on its way into a vault, whatever it came from.
@@ -62,7 +62,7 @@ export interface IcsImportPlan {
   /** Entries a previous import of the same event made, which this one overwrites. */
   updated: number
   /** Events left out because their repeat rule can't be represented. */
-  skipped: number
+  skipped: SkippedEvent[]
   /** The store as it will be, ready for `commitNext`. */
   next:    StoreData
   /** Every key `next` touches — `commitNext`'s second argument. */
@@ -163,7 +163,7 @@ export function planEntryImport(vaultId: string, candidates: readonly ImportCand
     if (existing) updated++
     else added++
   }
-  return { added, updated, skipped: 0, next, keys }
+  return { added, updated, skipped: [], next, keys }
 }
 
 /**
@@ -174,7 +174,7 @@ export function planEntryImport(vaultId: string, candidates: readonly ImportCand
  * "that doesn't look like a calendar".
  */
 export function planIcsImport(vaultId: string, text: string): IcsImportPlan | null {
-  const synthesis = icsToEntries(text, new Date(), false)
+  const synthesis = icsToEntries(text)
   // `SynthesizedEntry` satisfies `ImportCandidate`; its `fileSlug` is the one
   // thing the planner deliberately does not take, since re-slugging is the
   // point (see this file's header).

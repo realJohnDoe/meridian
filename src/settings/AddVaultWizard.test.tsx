@@ -133,7 +133,7 @@ describe('AddVaultWizard — iCal step', () => {
   })
 
   it('previews the feed and seeds the name field from the result', async () => {
-    vi.mocked(previewIcalFeed).mockResolvedValue({ name: 'Team Calendar', eventCount: 3 })
+    vi.mocked(previewIcalFeed).mockResolvedValue({ name: 'Team Calendar', eventCount: 3, skipped: [] })
     goToIcalStep()
 
     fireEvent.change(screen.getByPlaceholderText(/calendar\.google\.com/), { target: { value: 'https://example.com/feed.ics' } })
@@ -167,7 +167,7 @@ describe('AddVaultWizard — iCal step', () => {
   })
 
   it('adds the calendar with the (possibly edited) name and navigates away', async () => {
-    vi.mocked(previewIcalFeed).mockResolvedValue({ eventCount: 0 })
+    vi.mocked(previewIcalFeed).mockResolvedValue({ eventCount: 0, skipped: [] })
     goToIcalStep()
 
     fireEvent.change(screen.getByPlaceholderText(/calendar\.google\.com/), { target: { value: 'https://example.com/feed.ics' } })

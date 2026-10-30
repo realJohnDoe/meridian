@@ -27,6 +27,7 @@ import {
   GITHUB_APP_INSTALL_URL, APP_URL, exportVaultIcs, previewVaultIcsImport, importVaultIcs,
   previewVaultCopy, copyVaultInto,
 } from '@/vaultActions'
+import { SkippedEvents } from './SkippedEvents'
 import { ParticipantsRow, ListedOnRow, DEFAULT_LISTS_KEY, archiveEntry } from '@/editor'
 import { keyRoute } from '@/entryRoute'
 import { deleteWholeFileWithUndo } from '@/occurrenceActions'
@@ -109,17 +110,14 @@ function eventCount(n: number): string {
  * replaces them wholesale — including anything the user changed about them
  * since. That is not something to discover afterwards.
  */
-function importSummary({ added, updated, skipped }: IcsImportSummary): string {
-  const left = skipped > 0
-    ? ` ${eventCount(skipped)} will be left out: ${skipped === 1 ? 'its repeat rule isn’t' : 'their repeat rules aren’t'} one Meridian can express, and importing ${skipped === 1 ? 'it' : 'them'} as fixed dates would silently stop.`
-    : ''
+function importSummary({ added, updated }: IcsImportSummary): string {
   if (added + updated === 0) {
-    return `That file is a calendar, but it holds no events Meridian can place on a date.${left}`
+    return 'That file is a calendar, but it holds no events Meridian can place on a date.'
   }
   const kept = 'They become ordinary entries you can edit, link to and delete — Meridian won’t keep them in step with the original calendar.'
-  if (updated === 0) return kept + left
+  if (updated === 0) return kept
   const already = `${updated} ${updated === 1 ? 'entry' : 'entries'}`
-  return `${eventCount(added)} will be added. ${already} imported from this calendar before will be replaced, losing any edits made here. ${kept}${left}`
+  return `${eventCount(added)} will be added. ${already} imported from this calendar before will be replaced, losing any edits made here. ${kept}`
 }
 
 /**
@@ -648,7 +646,7 @@ export function VaultSettings({ vault }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Move &ldquo;{vault.name}&rdquo; into a vault</AlertDialogTitle>
             <AlertDialogDescription>
-              {moveInSummary(moveInPlan ?? { added: 0, updated: 0, skipped: 0 })}
+              {moveInSummary(moveInPlan ?? { added: 0, updated: 0, skipped: [] })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex flex-col gap-3">
@@ -697,6 +695,7 @@ export function VaultSettings({ vault }: Props) {
                 ? 'Meridian couldn’t read that file as a calendar. Export your calendar as .ics and pick that file — not a link to it, and not a .zip.'
                 : importSummary(importPlan)}
             </AlertDialogDescription>
+            {importPlan && <SkippedEvents events={importPlan.skipped} />}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => { setImportText(null) }}>

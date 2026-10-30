@@ -17,6 +17,7 @@ export {
 export { previewIcalFeed } from './icalBackend'
 export { entriesToIcs } from './ical/entriesToIcs'
 export { planIcsImport, planEntryImport, vaultImportCandidates } from './ical/icsImport'
+export type { SkippedEvent } from './ical/icsToEntries'
 
 export { isFolderPickerSupported } from './fs'
 

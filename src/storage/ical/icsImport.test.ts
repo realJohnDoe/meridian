@@ -41,7 +41,7 @@ describe('planIcsImport', () => {
   it('leaves out events whose repeat rule Meridian cannot express, and counts them', () => {
     const odd = event(['UID:odd@example', 'DTSTART:20260807T090000', 'SUMMARY:Board', 'RRULE:FREQ=MONTHLY;BYDAY=1FR,3FR'])
     const plan = planIcsImport(TEST_VAULT, calendar(LUNCH, odd))
-    expect(plan).toMatchObject({ added: 1, skipped: 1 })
+    expect(plan).toMatchObject({ added: 1, skipped: [{ uid: 'odd@example', title: 'Board', rrule: 'FREQ=MONTHLY;BYDAY=1FR,3FR' }] })
     expect(plan?.keys.map(keySlug)).toEqual(['lunch-with-sam'])
   })
 
