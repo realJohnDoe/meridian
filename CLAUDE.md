@@ -49,6 +49,8 @@ After changing any files, check whether an open PR already covers the current br
 
 Once a PR is open, watch it for CI failures and fix them.
 
+Use the `tracemap-pr` skill from [realJohnDoe/tracemap](https://github.com/realJohnDoe/tracemap) (`skills/tracemap-pr/SKILL.md`) on every PR to add trace map images to its description; it decides itself when none would help.
+
 Label every issue an agent creates `Sonnet` (well-scoped, mechanical) or
 `Opus` (needs design or cross-module reasoning), plus `Human` when it needs
 human judgement or an important decision before work can start.
