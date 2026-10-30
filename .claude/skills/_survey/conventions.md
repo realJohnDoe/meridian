@@ -75,8 +75,8 @@ Three constraints bit more than one run mid-pass. Record them in the coverage
 statement up front rather than discovering them:
 
 - **Generate the gitignored types before trusting lint.** On a fresh worktree,
-  `pnpm install`, then `pnpm run build` (for `src/routeTree.gen.ts`) and
-  `pnpm --filter meridian-oauth-worker run cf-typegen` (for the worker types).
+  `pnpm install`, then `pnpm run build` (generates `src/routeTree.gen.ts` and
+  the worker types).
   Without them the type-aware rules flood with ~150 spurious errors that are
   **not** a finding. See `CLAUDE.md`'s linting section.
 - **Only the example (Tutorial) backend is reachable.** The automated browser

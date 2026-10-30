@@ -89,8 +89,7 @@ Always use `pnpm run build` (which runs `tsc -b`) to verify the full project bui
 The type-aware lint rules (`no-unsafe-*`, etc.) resolve types from **gitignored generated files**. On a fresh worktree these don't exist yet, so `pnpm run lint` reports a flood of spurious "type that cannot be resolved" / "error typed value" errors — the code is fine, the types just haven't been generated. **Don't hand-fix these or add `eslint-disable`s.** Generate the types first:
 
 ```bash
-pnpm run build                                          # regenerates src/routeTree.gen.ts (TanStack Router)
-pnpm --filter meridian-oauth-worker run cf-typegen      # regenerates worker/worker-configuration.d.ts (wrangler types)
+pnpm run build   # regenerates src/routeTree.gen.ts (TanStack Router) and worker/worker-configuration.d.ts (wrangler types, via the worker's pretypecheck)
 ```
 
 CI does exactly this before linting (`.github/workflows/build.yml`), which is why it stays green. The two known offenders:
