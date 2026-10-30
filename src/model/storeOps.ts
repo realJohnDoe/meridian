@@ -1085,7 +1085,6 @@ export function applyEdit(
     case 'single': return applySingle(data, live, fields, touchedKeys)
     case 'future': return applyFuture(data, live, fields, touchedKeys)
     case 'add':    return applyAdd(data, live, fields, touchedKeys)
-    default:       return data
   }
 }
 
