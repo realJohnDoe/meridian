@@ -7,7 +7,7 @@ import { readVaultStringArray, writeVaultJSON } from '@/lib/vaultStorage'
  * starts out on — `EntryKey`s of entries in that vault. Not applied when an
  * entry is promoted from a checklist line: that line already sits on a list.
  */
-export const DEFAULT_LISTS_KEY = 'meridian_default_lists'
+const DEFAULT_LISTS_KEY = 'meridian_default_lists'
 
 export const storedDefaultLists = (vaultId: string): EntryKey[] =>
   readVaultStringArray(DEFAULT_LISTS_KEY, vaultId) as EntryKey[]
@@ -22,7 +22,7 @@ export function liveDefaultLists(vaultId: string, roots: Roots): EntryKey[] {
 }
 
 /** Per-vault key for the participants a new entry starts out with. Keep byte-identical: it is what existing users' saved defaults sit under. */
-export const DEFAULT_PARTICIPANTS_KEY = 'meridian_default_participants'
+const DEFAULT_PARTICIPANTS_KEY = 'meridian_default_participants'
 
 export const defaultParticipants = (vaultId: string): string[] =>
   readVaultStringArray(DEFAULT_PARTICIPANTS_KEY, vaultId)
