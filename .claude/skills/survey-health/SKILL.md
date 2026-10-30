@@ -24,15 +24,9 @@ test-suite run ranks the largest *test* files, reads the test config, helpers an
 fixtures as its toolchain, and treats production modules as the thing under test
 rather than the thing surveyed.
 
-Say this explicitly, because leaving it implicit cost every prior run of this
-file: test code had never been surveyed at all — not because anyone judged it
-low-value, but because nothing said it was in scope. The 2026-09-12 run
-re-pointed these categories at the suite (#1065) and was the highest-yield run to
-date — ten findings, all ten fixed inside ~30 hours — and the categories
-transferred with no amendment at all:
-`dry` over duplicated fixtures and hand-rolled router mocks, `dead-code` over a
-232-line file whose subject was a hand-written copy of production, `performance`
-over the suite's own 226s of redundant isolation.
+Say which explicitly: until the 2026-09-12 run (#1065) re-pointed the
+categories at the suite, test code had never been surveyed, only because nothing
+said it was in scope. Alternate the corpus between runs.
 
 ## Process
 
@@ -156,7 +150,7 @@ One line per category (1–10). Verdicts follow the
 `Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
 the [shared finding fields](../_survey/conventions.md#finding-fields). This survey adds:
 
-- **Category** — one or more tags from: `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
+- **Category** — one or more tags from: `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`. As of 2026-10-30, `architecture`, `overengineering`, `srp` and `types` have no repo label, and an agent cannot create one; applying a missing label fails the whole issue create. Name those tags in the body instead.
 - **Impact** — 1–10 (10 = catastrophic/systemic; 5 = e.g. a DRY violation duplicated across ~4 files, or a missing error state on a primary user flow; 1 = trivial/cosmetic)
 - **Task context** — the block described in [writing findings down to Sonnet 5](../_survey/conventions.md#write-findings-down-to-sonnet-5-where-you-honestly-can): exact locations, the enumerated work, measured numbers, the trap with a file and line, any in-repo precedent, and — for an extraction — the seam verified in both directions.
 

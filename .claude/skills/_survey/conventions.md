@@ -277,7 +277,9 @@ files"); this section states only what a survey run does.
   **Search open parent issues (and their sub-issues) for the survey-type label
   first** — a re-run mostly re-derives findings that are already open, and
   those get a comment carrying the new run's evidence rather than a second
-  issue.
+  issue. Then read the most recent *closed* parent's "deliberately not filed"
+  section: a judgement made there (e.g. #1065 keeping `ci.yml`'s duplicate
+  worker job) is invisible to an open-issue search and gets re-derived otherwise.
 - A finding closes when a PR saying `Fixes #N` merges. Do not edit a file to
   close one. Dropping one as invalid or won't-fix is a close with `not planned`
   plus a comment saying why; deferring one is an open issue with a `deferred`
