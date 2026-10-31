@@ -315,7 +315,11 @@ export default defineConfig({
         // tutorial-card offer) and two settings screens, all previously at
         // ~0%. Measured 2026-09-06: AddVaultWizard.tsx 100/91.3/100/100;
         // VaultDetail.tsx and AppearanceSettings.tsx both 100/100/100/100.
-        'src/settings/AddVaultWizard.tsx': { statements: 95, branches: 86, functions: 95, lines: 95 },
+        // Split into IcalStep/GithubStep (#1209), re-measured 2026-10-31:
+        // wizard 100/100/100/100, IcalStep 100/84.6/100/100, GithubStep 100/85.7/100/100.
+        'src/settings/AddVaultWizard.tsx': { statements: 95, branches: 95, functions: 95, lines: 95 },
+        'src/settings/IcalStep.tsx': { statements: 95, branches: 80, functions: 95, lines: 95 },
+        'src/settings/GithubStep.tsx': { statements: 95, branches: 80, functions: 95, lines: 95 },
         // Re-measured 2026-09-12 (#1039): both measured 100/100/100/100 —
         // floored at 97/97/97/97, not raised to 100 (see responsive-modal.tsx
         // above).
