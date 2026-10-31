@@ -644,6 +644,13 @@ describe('THEME_CLASS', () => {
     expect(css).toContain(`.${cls} {`)
   })
 
+  // index.html's inline pre-paint script can't import THEME_CLASS, so it
+  // carries its own copy of the map; read it as text and pin the two together.
+  it.each(Object.entries(THEME_CLASS))('%s is in the index.html pre-paint script map', (id, cls) => {
+    const html = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8')
+    expect(html).toContain(`"${id}":"${cls}"`)
+  })
+
   it('resolves prefers-color-scheme to the branded pair, not a borrowed palette', () => {
     expect(THEME_CLASS.light).toBe('meridian-light')
     expect(THEME_CLASS.dark).toBe('meridian')

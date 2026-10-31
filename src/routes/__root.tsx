@@ -297,6 +297,9 @@ function Root() {
       enableSystem
       disableTransitionOnChange
       storageKey="meridian_theme"
+      // next-themes' own pre-paint <script> never runs client-side (React
+      // skips it and logs an error); index.html carries the real one.
+      scriptProps={{ type: 'application/json' }}
     >
       <ThemeColorSync />
       <VisibleViewportVars />

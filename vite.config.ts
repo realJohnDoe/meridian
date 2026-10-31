@@ -8,6 +8,7 @@ import path from 'path'
 import { resolve } from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
+import { createHash } from 'crypto'
 import type { Plugin } from 'vite'
 
 /**
@@ -95,9 +96,9 @@ function debugPagePlugin(): Plugin {
  * omitted rather than silently ignored.
  */
 function cspPlugin(): Plugin {
-  const csp = [
+  const csp = (scriptHashes: string[]) => [
     "default-src 'self'",
-    "script-src 'self'",
+    ["script-src 'self'", ...scriptHashes].join(' '),
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data:",
@@ -114,9 +115,14 @@ function cspPlugin(): Plugin {
     name: 'inject-csp',
     apply: 'build',
     transformIndexHtml(html) {
+      // Allow index.html's inline pre-paint theme script by hash, so the
+      // policy stays free of 'unsafe-inline' for scripts.
+      const hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
+        m => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`,
+      )
       return html.replace(
         '<meta charset="UTF-8" />',
-        `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${csp}">`,
+        `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${csp(hashes)}">`,
       )
     },
   }
