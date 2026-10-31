@@ -184,6 +184,83 @@ describe('mergeFileContent — items checklists merge line by line', () => {
   })
 })
 
+describe('mergeFileContent — series instances merge by date', () => {
+  const head = '---\ntitle: Run\ndate: 2026-04-06\nrepeat:\n  type: schedule\n  freq: daily\n'
+  const file = (...dates: string[]) =>
+    head + (dates.length ? 'instances:\n' + dates.map(d => `  - date: ${d}\n    done: true\n`).join('') : '') + '---\n'
+  const dates = (s: string | null) =>
+    (loadFile('r.md', s ?? '').rawNode.instances as Array<{ date: string }>).map(i => i.date)
+
+  it('keeps ticks made on different occurrences', () => {
+    const merged = mergeFileContent('r.md', file(), file('2026-04-06'), file('2026-04-07'))
+    expect(merged).not.toBeNull()
+    expect(dates(merged)).toEqual(['2026-04-06', '2026-04-07'])
+  })
+
+  it('drops an override one side removed and the other left alone', () => {
+    const merged = mergeFileContent('r.md', file('2026-04-06', '2026-04-07'), file('2026-04-06'), file('2026-04-06', '2026-04-07'))
+    expect(dates(merged)).toEqual(['2026-04-06'])
+  })
+
+  it('copies out when the series shape changed on either side', () => {
+    const split = file('2026-04-06').replace('freq: daily', 'freq: daily\n  end: 2026-04-08')
+    expect(mergeFileContent('r.md', file(), split, file('2026-04-10'))).toBeNull()
+  })
+
+  it('copies out when both sides edited the same override differently', () => {
+    const edit = (v: string) => file('2026-04-06').replace('done: true', v)
+    expect(mergeFileContent('r.md', file('2026-04-06'), edit('done: true\n    note: x'), edit('done: false'))).not.toBeNull()
+    expect(mergeFileContent('r.md', file('2026-04-06'), edit('done: false'), edit('done: 1'))).toBeNull()
+  })
+
+  // Shapes the generated suite (`merge-generated.test.ts`) found or can't
+  // isolate, pinned here so a regression fails on every run, not one in 20k.
+
+  it('copies out a rule change on one side against a new override on the other', () => {
+    const everyOther = file().replace('freq: daily', 'freq: daily\n  interval: 2')
+    expect(mergeFileContent('r.md', file(), everyOther, file('2026-04-07'))).toBeNull()
+  })
+
+  it('copies out an anchor move on one side against a new override on the other', () => {
+    const moved = file().replace('date: 2026-04-06', 'date: 2026-04-07')
+    expect(mergeFileContent('r.md', file(), moved, file('2026-04-06'))).toBeNull()
+  })
+
+  it('copies out two different rule changes', () => {
+    const everyOther = file().replace('freq: daily', 'freq: daily\n  interval: 2')
+    const moved = file().replace('date: 2026-04-06', 'date: 2026-04-07')
+    expect(mergeFileContent('r.md', file(), everyOther, moved)).toBeNull()
+  })
+
+  describe('a split series (legs under instances)', () => {
+    const leg = (date: string, end: string | null, ...ticks: string[]) => [
+      `  - date: ${date}`, '    repeat:', '      type: schedule', '      freq: daily',
+      ...(end ? ['      end:', '        type: until', `        date: ${end}`] : []),
+      ...(ticks.length ? ['    instances:', ...ticks.map(d => `      - date: ${d}\n        done: true`)] : []),
+    ].join('\n')
+    const split = (...legs: string[]) => `---\ntitle: Run\ninstances:\n${legs.join('\n')}\n---\n`
+    const base = split(leg('2026-04-06', '2026-04-09'), leg('2026-04-10', null))
+
+    it('merges ticks on different legs and on different days of one leg', () => {
+      const local  = split(leg('2026-04-06', '2026-04-09', '2026-04-07'), leg('2026-04-10', null, '2026-04-11'))
+      const remote = split(leg('2026-04-06', '2026-04-09'), leg('2026-04-10', null, '2026-04-12'))
+      const legs = loadFile('r.md', mergeFileContent('r.md', base, local, remote) ?? '').rawNode.instances as Array<{ instances?: Array<{ date: string }> }>
+      expect(legs.map(l => l.instances?.map(i => i.date))).toEqual([['2026-04-07'], ['2026-04-11', '2026-04-12']])
+    })
+
+    it('copies out a further split against a tick on the leg it caps', () => {
+      const resplit = split(leg('2026-04-06', '2026-04-09'), leg('2026-04-10', '2026-04-14'), leg('2026-04-15', null))
+      const ticked  = split(leg('2026-04-06', '2026-04-09'), leg('2026-04-10', null, '2026-04-16'))
+      expect(mergeFileContent('r.md', base, resplit, ticked)).toBeNull()
+    })
+
+    it('copies out a leg moved differently on each side', () => {
+      const movedTo = (d: string) => split(leg('2026-04-06', '2026-04-09'), leg(d, null))
+      expect(mergeFileContent('r.md', base, movedTo('2026-04-11'), movedTo('2026-04-12'))).toBeNull()
+    })
+  })
+})
+
 // ── mergeEditFields ────────────────────────────────────────────
 
 const FIELDS: EditFields = {

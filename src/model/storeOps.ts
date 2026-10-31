@@ -13,7 +13,7 @@ import { titleToSlug, entryKey as makeEntryKey, parseEntryKey } from '@/fileIO'
 import type { EntryKey, RawScalar } from '@/fileIO'
 import { dayBefore } from './dateUtils'
 import { stableOccId, ruleStartDate, seriesHasDay } from './expansion'
-import { followDate } from './repeat'
+import { followDate, repeatUntil } from './repeat'
 import { deepEqual } from './fieldRegistry'
 import { resolveWikilink, parseWikilinks, unwrapRef } from '../wikilinks'
 
@@ -503,6 +503,19 @@ function isChildOf(item: StoreItem, seriesId: string): boolean {
 type SeriesShape = Pick<RepeatPattern<OccurrenceMetadata>, 'date' | 'time' | 'repeat'>
 
 /**
+ * A pattern whose start is past its own `until` end: it generates nothing.
+ * An edit that would make one is refused — the store keeps what it had —
+ * the way a calendar's form refuses an end date before the start. The usual
+ * way there is "Edit repeat pattern" on the earlier leg of a split series,
+ * whose `until` the split wrote, moved past it. The editor's pickers stop
+ * that before it reaches here; this is the backstop.
+ */
+function startsAfterEnd(s: SeriesShape): boolean {
+  const until = repeatUntil(s.repeat)
+  return !!until && s.date > until
+}
+
+/**
  * Whether going from `before` to `after` takes away `day`: the old series had an
  * occurrence there and the new one doesn't. A change stored for that day was a
  * change to an occurrence that no longer exists, so it goes — Outlook drops
@@ -820,6 +833,7 @@ function applyAll(data: StoreData, occ: Occurrence, fields: EditFields, touched?
   const before = entry.items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined
   const after = items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined
   // The series always survives the filter, so the fallback never fires.
+  if (before && after && startsAfterEnd(after) && !startsAfterEnd(before)) return data
   if (before && after) items = filterItems(items, i => !(isChildOf(i, after.id) && dropsDay(before, after, i.date))) ?? items
   // …and onto the series' override children, so "all events" reaches the
   // occurrences the user already overrode — see `applyFieldsToChildren`.
@@ -933,6 +947,8 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
   const leg: SeriesShape = { date: ruleStartDate(newDate, scheduled?.time || null, newRepeat), time: scheduled?.time || null, repeat: newRepeat }
   const newMeta = seriesMeta(series.metadata, fields, touched)
   const removing = repeatRemoved(fields, touched)
+
+  if (!removing && startsAfterEnd(leg)) return data
 
   const capped: RepeatPattern<OccurrenceMetadata> = {
     ...series,

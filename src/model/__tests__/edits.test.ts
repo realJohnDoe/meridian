@@ -1018,6 +1018,61 @@ instances:
   })
 })
 
+describe('a pattern never starts after its own end', () => {
+  // Leg one of a split series: its `until` is the split's, which the
+  // "Edit repeat pattern" form shows but the user never typed.
+  const SPLIT = `---
+title: Run
+instances:
+  - date: 2026-03-02
+    repeat:
+      type: schedule
+      freq: daily
+      end:
+        type: until
+        date: 2026-03-04
+  - date: 2026-03-05
+    repeat:
+      type: schedule
+      freq: daily
+---
+`
+  const load = (src = SPLIT) => {
+    const parsed = parseToStoreItems('run.md', src, TEST_VAULT)
+    return dataOf(parsed.items, rootsOf(parsed.root))
+  }
+  const repeat = (end: string): Repeat => ({ type: 'schedule', freq: 'daily', end: { type: 'until', date: end } })
+
+  it.each([
+    ['all', '2026-03-02', '2026-03-05'],
+    ['future', '2026-03-03', '2026-03-06'],
+  ] as const)('at "%s", moving the start past the end changes nothing', (scope, from, to) => {
+    const data = load()
+    const occ = occOn(itemsOf(data), rootsIn(data), from)
+    const fields = editFields(occ, { scheduled: { date: to, time: '' }, repeat: repeat('2026-03-04') })
+    expect(applyEdit(data, occ, scope, fields, NEW_TARGET, new Set(['scheduled']))).toBe(data)
+  })
+
+  it('moving the start up to the end still lands', () => {
+    const data = load()
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-03-02')
+    const fields = editFields(occ, { scheduled: { date: '2026-03-04', time: '' }, repeat: repeat('2026-03-04') })
+    const next = applyEdit(data, occ, 'all', fields, NEW_TARGET, new Set(['scheduled']))
+    expect(expandRange(itemsOf(next), rootsIn(next), new Date('2026-03-01'), new Date('2026-03-06')).map(o => o.date))
+      .toEqual(['2026-03-04', '2026-03-05', '2026-03-06'])
+  })
+
+  it('a file that already starts after its end can still be edited', () => {
+    const broken = SPLIT.replace('date: 2026-03-04', 'date: 2026-03-01')
+    const data = load(broken)
+    const occ = occOn(itemsOf(data), rootsIn(data), '2026-03-05')
+    const leg = itemsOf(data).find(i => isSeries(i) && i.date === '2026-03-02')!
+    const fields = { ...editFields(occ, { title: 'Jog', repeat: repeat('2026-03-01') }), scheduled: { date: leg.date, time: '' } }
+    const anchorOcc = { ...occ, ownerId: leg.id, date: leg.date }
+    expect(applyEdit(data, anchorOcc, 'all', fields, NEW_TARGET, new Set(['title']))).not.toBe(data)
+  })
+})
+
 describe('unknown keys survive every edit scope', () => {
   it.each(['single', 'future', 'all', 'add'] as const)(
     '%s-scope edit keeps the series\' unknown keys',

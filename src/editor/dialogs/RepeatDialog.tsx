@@ -382,6 +382,7 @@ export default function RepeatDialog({
         <DatePickerDialog
           open={endCalOpen}
           initialDate={endVal}
+          min={scheduled?.date}
           onConfirm={setEndVal}
           onRemove={() => setEndVal('')}
           onClose={() => setEndCalOpen(false)}

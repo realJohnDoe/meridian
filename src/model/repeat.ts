@@ -84,6 +84,15 @@ export function monthlyWeekdaySpec(jsDate: Date): MonthlyWeekdaySpec {
 }
 
 /**
+ * The last day `repeat` may generate, when it ends on a date — the bound a
+ * pattern's own start can't pass (see `startsAfterEnd` in storeOps.ts, and the
+ * editor's date pickers, which grey out the days beyond it).
+ */
+export function repeatUntil(repeat: Repeat | null | undefined): string | undefined {
+  return repeat?.end?.type === 'until' ? repeat.end.date : undefined
+}
+
+/**
  * `repeat` with every part that only restates `from` — its weekday, its day of
  * the month, its "Nth weekday", its month — restated for `to` instead.
  *

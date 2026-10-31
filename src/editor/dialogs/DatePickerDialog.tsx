@@ -21,12 +21,15 @@ interface Props {
   onConfirm: (dateStr: string) => void
   onRemove: () => void
   onClose: () => void
+  /** ISO bounds, inclusive: days outside them are greyed out and can't be set. */
+  min?: string
+  max?: string
   /** Force the centered Dialog shell. Used when nesting this picker inside
    *  another drawer, to avoid stacking two bottom sheets on mobile. */
   forceDialog?: boolean
 }
 
-export default function DatePickerDialog({ open, initialDate, onConfirm, onRemove, onClose, forceDialog }: Props) {
+export default function DatePickerDialog({ open, initialDate, onConfirm, onRemove, onClose, min, max, forceDialog }: Props) {
   const ws       = useCalendarWeekStartsOn()
   const today    = startOfToday()
   const tomorrow = addDays(today, 1)
@@ -54,6 +57,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
     onClose()
   }
 
+  const outOfRange = (d: Date) => (!!min && fmtISO(d) < min) || (!!max && fmtISO(d) > max)
   const isToday    = !!selected && fmtISO(selected) === fmtISO(today)
   const isTomorrow = !!selected && fmtISO(selected) === fmtISO(tomorrow)
 
@@ -80,6 +84,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
               weekStartsOn={ws}
               selected={selected}
               onSelect={setSelected}
+              disabled={outOfRange}
               month={month}
               onMonthChange={setMonth}
               formatters={CALENDAR_FORMATTERS}
@@ -95,6 +100,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
               variant={isToday ? 'default' : 'outline'}
               size="sm"
               className="flex-1"
+              disabled={outOfRange(today)}
               onClick={() => selectDate(today)}
             >
               Today
@@ -103,6 +109,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
               variant={isTomorrow ? 'default' : 'outline'}
               size="sm"
               className="flex-1"
+              disabled={outOfRange(tomorrow)}
               onClick={() => selectDate(tomorrow)}
             >
               Tomorrow
@@ -114,7 +121,7 @@ export default function DatePickerDialog({ open, initialDate, onConfirm, onRemov
           onRemove={() => { onRemove(); onClose() }}
           onCancel={onClose}
           onSet={handleSet}
-          setDisabled={!selected}
+          setDisabled={!selected || outOfRange(selected)}
         />
 
       </ResponsiveModalContent>

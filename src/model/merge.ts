@@ -26,10 +26,12 @@
  * its description). The `items` checklist goes one level further and merges
  * line by line (`mergeItems`): it is the field two people share a shopping
  * list through, and one adding a line while the other ticks another is not an
- * overlap.
+ * overlap. A series' `instances` merge per date (`mergeInstances`) for the same
+ * reason — two devices ticking different days of one recurring task — as long
+ * as neither side changed the schedule they hang off.
  */
 
-import { loadFile } from '@/fileIO'
+import { loadFile, rawScalarValue } from '@/fileIO'
 import { saveFile } from './inheritance'
 import type { EditFields } from './storeOps'
 import { yamlKeyRole } from './fieldRegistry'
@@ -84,10 +86,22 @@ function mergeRawNodes(
   local:  Record<string, unknown>,
   remote: Record<string, unknown>,
 ): Record<string, unknown> | null {
+  // A series' rule, its anchor and its overrides are one shape: overrides hang
+  // off the dates the rule generates. So a new rule (or anchor) on one side
+  // can't be merged key by key with the other side's overrides — one could
+  // land on a date the merged rule no longer produces — nor with the other
+  // side's own rule change, which could combine into a schedule neither saw.
+  const moved = (side: typeof base, key: string) => !sameValue(base[key], side[key])
+  const reshaped = (side: typeof base) => moved(side, 'repeat') || moved(side, 'date')
+  const clash = (a: typeof base, b: typeof base) => reshaped(a) && (reshaped(b) || moved(b, 'instances'))
+  const isRule = [base, local, remote].some(n => 'repeat' in n)
+  if (isRule && (clash(local, remote) || clash(remote, local))) return null
+
   const out: Record<string, unknown> = {}
   for (const key of new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)])) {
     const picked = pickValue(base[key], local[key], remote[key])
       ?? (key === 'items' ? mergeItems(base[key], local[key], remote[key]) : null)
+      ?? (key === 'instances' ? mergeInstances(base, local, remote) : null)
     if (!picked) return null
     if (picked.value !== undefined) out[key] = picked.value
   }
@@ -149,6 +163,55 @@ function mergeItems(base: unknown, local: unknown, remote: unknown): { value: st
   return { value: out }
 }
 
+const isNodes = (v: unknown): v is Record<string, unknown>[] =>
+  v === undefined || (Array.isArray(v) && v.every(x => typeof x === 'object' && x !== null && !Array.isArray(x)))
+
+/**
+ * Merge a series' `instances` by `date`, each matched one through
+ * `mergeRawNodes` — so ticking different occurrences on two devices is not an
+ * overlap. A leg of a split series is an instance like any other, so this
+ * recurses into its own overrides, and `mergeRawNodes`' rule-change guard
+ * applies per leg: a `future` split caps one leg's `repeat` and re-homes its
+ * later overrides, which refuses against the other side's tick on that leg.
+ *
+ * Null — the conflict copy — when a side added or removed a leg, or has a
+ * dateless or duplicated date, so there is no identity to match on.
+ */
+function mergeInstances(
+  base: Record<string, unknown>, local: Record<string, unknown>, remote: Record<string, unknown>,
+): { value: unknown } | null {
+  const [bi, li, ri] = [base.instances, local.instances, remote.instances]
+  if (!isNodes(bi) || !isNodes(li) || !isNodes(ri)) return null
+  const index = (nodes: Record<string, unknown>[] = []) => {
+    const byDate = new Map(nodes.map(n => [rawScalarValue(n.date), n]))
+    const ok = byDate.size === nodes.length
+      && nodes.every(n => typeof rawScalarValue(n.date) === 'string')
+    return ok ? byDate : null
+  }
+  const b = index(bi), l = index(li), r = index(ri)
+  if (!b || !l || !r) return null
+
+  const out: Record<string, unknown>[] = []
+  for (const date of new Set([...b.keys(), ...l.keys(), ...r.keys()])) {
+    const [bn, ln, rn] = [b.get(date), l.get(date), r.get(date)]
+    // A leg added or removed on one side is a new schedule shape, not an edit.
+    if ((!bn || !ln || !rn) && [bn, ln, rn].some(n => n && 'repeat' in n)) return null
+    // Both sides hold it: merge field by field — against an empty base when
+    // both added it, since ticking a day and re-prioritising it each write a
+    // fresh override for the same date.
+    if (ln && rn) {
+      const merged = mergeRawNodes(bn ?? {}, ln, rn)
+      if (!merged) return null
+      out.push(merged)
+    } else {
+      const picked = pickValue(bn, ln, rn)
+      if (!picked) return null
+      if (picked.value !== undefined) out.push(picked.value as Record<string, unknown>)
+    }
+  }
+  return { value: out.length > 0 ? out : undefined }
+}
+
 /** Merge two bodies whole — see the no-diff3 note at the top of this file. */
 function mergeBody(base: string, local: string, remote: string): string | null {
   if (local === remote) return local
@@ -162,8 +225,9 @@ function mergeBody(base: string, local: string, remote: string): string | null {
  * the local edit was made from.
  *
  * Returns the merged file, or null when the two sides genuinely overlap (the
- * same frontmatter key or `items` line set to two different values, or both
- * bodies edited).
+ * same frontmatter key, `items` line or occurrence override set to two
+ * different values, a schedule change racing any other schedule or override
+ * change, or both bodies edited).
  * Null is not a failure: it is the signal that a conflict copy is the honest
  * outcome, and it is what the caller falls back to.
  *
