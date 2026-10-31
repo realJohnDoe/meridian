@@ -38,6 +38,16 @@ describe('mergeFileContent — the disjoint case', () => {
     expect(body).toBe('Nudeln am Dienstag')
   })
 
+  it('keeps every value the way the user wrote it', () => {
+    const base = `---\ntitle: Dentist\nzip: 01234\nphone: +49123456789\ndiscord: 1234567890123456789\nconfirmed: "yes"\nversion: 1.0\n---\n\nBody\n`
+    const local = base.replace('title: Dentist', 'title: Dentist (moved)')
+    const remote = base.replace('Body', 'Body, plus remote text')
+    const merged = mergeFileContent('d.md', base, local, remote)!
+    for (const line of ['zip: 01234', 'phone: +49123456789', 'discord: 1234567890123456789', 'confirmed: "yes"', 'version: 1.0']) {
+      expect(merged).toContain(line)
+    }
+  })
+
   it('is symmetric — the same two edits merge the same way from either side', () => {
     const a = '---\ntitle: Essensplan\nrepeat: weekly\n---\n'
     const b = '---\ntitle: Essensplan\n---\n\nNudeln am Dienstag\n'
