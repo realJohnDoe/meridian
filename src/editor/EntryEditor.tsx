@@ -260,8 +260,14 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
               placeholder="Title"
               rows={1}
               value={title}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault()
+                  viewRef.current?.focus()
+                }
+              }}
               onChange={e => {
-                setEntry(prev => ({ ...prev, title: e.target.value }))
+                setEntry(prev => ({ ...prev, title: e.target.value.replace(/\r?\n/g, ' ') }))
                 autoResize(e.target)
                 if (editScope !== 'add') scheduleAutoSave(viewRef.current?.state.doc.toString().trimEnd() ?? '')
               }}
