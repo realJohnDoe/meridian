@@ -198,9 +198,8 @@ export default function AddVaultWizard() {
       setFeedName(current => current.trim().length > 0 ? current : result.name ?? 'Calendar')
     } catch (e) {
       setFeedError(e instanceof TypeError ? "Couldn't reach that address — check it's an iCal (.ics) link." : e instanceof Error ? e.message : 'Could not read that calendar.')
-    } finally {
-      setChecking(false)
     }
+    setChecking(false)
   }
 
   async function handleAddFeed() {

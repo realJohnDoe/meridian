@@ -166,9 +166,11 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
   const { item, title, body, scheduled, duration, tracked, repeat, done, items: listItems, participants, priority, editScope } = entry
 
   // A blank new draft opens ready to type; existing or title-prefilled entries don't steal focus.
+  // Held in a mount ref rather than an exhaustive-deps suppression, which makes
+  // the React Compiler skip the whole component.
+  const blankOnMountRef = useRef(!item && !title)
   useEffect(() => {
-    if (!item && !title) titleRef.current?.focus()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only
+    if (blankOnMountRef.current) titleRef.current?.focus()
   }, [])
 
   const { effectiveKey, pendingKeys, handleAdd, handleRemove } = pendingLinks
