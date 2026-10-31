@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 interface UseCarouselPreviewOptions {
   get: () => string | null
@@ -24,8 +24,10 @@ interface UseCarouselPreviewResult {
  * would otherwise briefly mislabel the topbar on the next visit to the route.
  */
 export function useCarouselPreview({ get, set }: UseCarouselPreviewOptions): UseCarouselPreviewResult {
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `set` is expected to be a stable setState/store-setter identity, not a fresh closure each render; re-running this per render would fire the cleanup (clearing the preview) on every unrelated render.
-  useEffect(() => () => set(null), [])
+  // Mount ref, not an exhaustive-deps suppression (which makes the React
+  // Compiler skip the hook): cleanup must fire on unmount only, not per render.
+  const setRef = useRef(set)
+  useEffect(() => () => setRef.current(null), [])
   return {
     onPreview: set,
     // Guarded so a stray fire while already clear does nothing — mirrors

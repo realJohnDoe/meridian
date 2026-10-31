@@ -88,15 +88,15 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
   // genuinely only runs once — a later activeMonth change (paging while the
   // panel stays open) moves the highlight but must not also drag the strip
   // along with it.
+  const mountKeyRef = useRef(activeKey)
   useLayoutEffect(() => {
     const container = containerRef.current
-    const chip = chipElsRef.current[activeKey]
+    const chip = chipElsRef.current[mountKeyRef.current]
     if (!container || !chip) return
     const target = chip.offsetLeft - container.clientWidth / 2 + chip.offsetWidth / 2
     const max = Math.max(0, container.scrollWidth - container.clientWidth)
     const left = Math.min(Math.max(target, 0), max)
     container.scrollTo({ left, behavior: 'auto' })
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately mount-only, see comment above
   }, [])
 
   // Paging while the strip stays open (see the module comment) moves the

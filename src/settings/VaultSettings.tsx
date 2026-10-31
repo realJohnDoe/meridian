@@ -110,13 +110,9 @@ export function VaultSettings({ vault }: Props) {
     if (days !== (vault.retentionDays ?? null)) void setVaultRetentionDays(vault.id, days)
   }
 
-  async function handleSyncNow() {
+  function handleSyncNow() {
     setSyncing(true)
-    try {
-      await syncToBackend(vault.id)
-    } finally {
-      setSyncing(false)
-    }
+    return syncToBackend(vault.id).finally(() => setSyncing(false))
   }
 
   function handleExport() {
