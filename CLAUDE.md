@@ -290,3 +290,17 @@ These bit us repeatedly; follow them to avoid a long debug loop:
 - **Don't hard-navigate (`window.location`) straight to an `/entry/<vault>/<slug>` URL** — it races vault loading, so the entry isn't in the store yet and you get "Item not found". Instead load `/meridian/`, wait for `[data-testid="entry-card"]` to appear, then click the card's `button[aria-label="<title>"]` (SPA nav, no reload).
 - **Example-vault slugs:** "Welcome to Meridian" = `01-start-here`; the notes it lists are `everything-is-a-list`, `tasks-and-events`, `recurring-events`, `links-and-backlinks`, `favorites`, `frontmatter-reference`, `install-as-an-app`, `make-it-yours`. The entries those link on to are `buy-groceries`, `book-dentist`, `plan-the-week`, `lunch-with-sam`, `team-standup`, `morning-run` and `dev-notes`. Source of truth: the `id:` fields in `src/storage/devFixtures/tutorialVault.ts`.
 - **Inspect CM6 state from the page:** `document.querySelector('.cm-content').cmTile.view` gives the `EditorView` (read `view.state`, `dispatch`, etc.).
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context; `GLOSSARY.md` serves as the context file. See `docs/agents/domain.md`.
