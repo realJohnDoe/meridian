@@ -29,7 +29,7 @@
  * overlap.
  */
 
-import { loadFile } from '@/fileIO'
+import { loadFile, rawScalarValue } from '@/fileIO'
 import { saveFile } from './inheritance'
 import type { EditFields } from './storeOps'
 import { yamlKeyRole } from './fieldRegistry'
@@ -172,9 +172,9 @@ function mergeInstances(
   const [bi, li, ri] = [base.instances, local.instances, remote.instances]
   if (!isNodes(bi) || !isNodes(li) || !isNodes(ri)) return null
   const index = (nodes: Record<string, unknown>[] = []) => {
-    const byDate = new Map(nodes.map(n => [n.date, n]))
+    const byDate = new Map(nodes.map(n => [rawScalarValue(n.date), n]))
     const ok = byDate.size === nodes.length
-      && nodes.every(n => typeof n.date === 'string' && !('repeat' in n) && !('instances' in n))
+      && nodes.every(n => typeof rawScalarValue(n.date) === 'string' && !('repeat' in n) && !('instances' in n))
     return ok ? byDate : null
   }
   const b = index(bi), l = index(li), r = index(ri)
