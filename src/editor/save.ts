@@ -163,14 +163,23 @@ function currentFields(item: Occurrence, editScope: EditScope, next: EditFields)
   // An excluded row is a deleted occurrence — never live state to read back.
   // Its stale date/done would otherwise win every field this save didn't
   // itself touch.
-  if (!live || isSeries(live) || live.excluded) {
+  const occ = live && !isSeries(live) && !live.excluded ? live : undefined
+  // At scope all/future the form edits the series, so it shows the series'
+  // values even when opened from an override — otherwise the override's own
+  // fields would be written onto the whole series (#1191). `done` stays the
+  // occurrence's: a series has none of its own to show.
+  const series = (editScope === 'all' || editScope === 'future') && item.ownerId
+    ? entry.items.find(i => isSeries(i) && i.id === item.ownerId)
+    : undefined
+  const metadata = series ? { ...series.metadata, done: (occ ?? item).metadata.done } : occ?.metadata
+  if (!metadata) {
     return { ...next, title: entry.root.title, body: entry.root.body ?? '', tags: [...entry.root.tags], items: [...entry.root.items] }
   }
 
   // A one-entry Roots map: `joinFileMeta` only ever looks up this key, and
   // building it here keeps the store's full roots map out of this path.
-  const joined = joinFileMeta(item.entryKey, live.metadata, new Map([[item.entryKey, entry.root]]))
-  return editFieldsOf(entryFromOccurrence({ ...live, metadata: joined }, editScope, getItems()))
+  const joined = joinFileMeta(item.entryKey, metadata, new Map([[item.entryKey, entry.root]]))
+  return editFieldsOf(entryFromOccurrence({ ...(occ ?? item), metadata: joined }, editScope, getItems()))
 }
 
 /**

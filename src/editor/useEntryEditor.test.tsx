@@ -124,6 +124,25 @@ describe('useEntryEditor', () => {
     expect(result.current.entry.repeat).toEqual({ type: 'schedule', freq: 'daily' })
   })
 
+  it('at "all" scope an override shows and keeps its series\' values apart from its own (#1191)', () => {
+    const series = makeSeries({
+      id: 'series-1', entryKey: testKey('note.md'), date: '2026-05-26', time: null,
+      metadata: { participants: [], priority: 'low' },
+    })
+    const occ = makeOcc({ id: 'occ-1', entryKey: testKey('note.md'), ownerId: 'series-1', date: '2026-09-10', time: null, metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', priority: 'high' } })
+    seedStore([series, occ], makeRoots('note.md'))
+    const { result } = renderHook(() => useEntryEditor(occ))
+
+    act(() => { result.current.handleScopeChange('all') })
+    expect(result.current.entry.priority).toBe('low')
+
+    act(() => { result.current.dialogHandlers.onDurConfirm('1 hour') })
+
+    const [root, child] = useStore.getState().items
+    expect(root?.metadata).toMatchObject({ priority: 'low', duration: '1 hour' })
+    expect(child?.metadata).toMatchObject({ priority: 'high', duration: '1 hour' })
+  })
+
   // The next two were found by `singleWriter.test.tsx`'s generated sequences,
   // and pinned here as the flows a person would actually perform. Both are the
   // same staleness: `useEntryEditor` pins `entry.item` for the session, a
