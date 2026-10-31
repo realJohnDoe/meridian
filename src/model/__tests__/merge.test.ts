@@ -181,6 +181,36 @@ const FIELDS: EditFields = {
   tracked: false, done: false, priority: null, scheduled: null, duration: '', repeat: null,
 }
 
+describe('mergeFileContent — series instances merge by date', () => {
+  const head = '---\ntitle: Run\ndate: 2026-04-06\nrepeat:\n  type: schedule\n  freq: daily\n'
+  const file = (...dates: string[]) =>
+    head + (dates.length ? 'instances:\n' + dates.map(d => `  - date: ${d}\n    done: true\n`).join('') : '') + '---\n'
+  const dates = (s: string | null) =>
+    (loadFile('r.md', s ?? '').rawNode.instances as Array<{ date: string }>).map(i => i.date)
+
+  it('keeps ticks made on different occurrences', () => {
+    const merged = mergeFileContent('r.md', file(), file('2026-04-06'), file('2026-04-07'))
+    expect(merged).not.toBeNull()
+    expect(dates(merged)).toEqual(['2026-04-06', '2026-04-07'])
+  })
+
+  it('drops an override one side removed and the other left alone', () => {
+    const merged = mergeFileContent('r.md', file('2026-04-06', '2026-04-07'), file('2026-04-06'), file('2026-04-06', '2026-04-07'))
+    expect(dates(merged)).toEqual(['2026-04-06'])
+  })
+
+  it('copies out when the series shape changed on either side', () => {
+    const split = file('2026-04-06').replace('freq: daily', 'freq: daily\n  end: 2026-04-08')
+    expect(mergeFileContent('r.md', file(), split, file('2026-04-10'))).toBeNull()
+  })
+
+  it('copies out when both sides edited the same override differently', () => {
+    const edit = (v: string) => file('2026-04-06').replace('done: true', v)
+    expect(mergeFileContent('r.md', file('2026-04-06'), edit('done: true\n    note: x'), edit('done: false'))).not.toBeNull()
+    expect(mergeFileContent('r.md', file('2026-04-06'), edit('done: false'), edit('done: 1'))).toBeNull()
+  })
+})
+
 describe('mergeEditFields', () => {
   it('writes a touched field and leaves an untouched one at the store value', () => {
     const base    = FIELDS

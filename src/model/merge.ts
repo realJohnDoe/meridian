@@ -87,6 +87,7 @@ function mergeRawNodes(
   for (const key of new Set([...Object.keys(base), ...Object.keys(local), ...Object.keys(remote)])) {
     const picked = pickValue(base[key], local[key], remote[key])
       ?? (key === 'items' ? mergeItems(base[key], local[key], remote[key]) : null)
+      ?? (key === 'instances' ? mergeInstances(base, local, remote) : null)
     if (!picked) return null
     if (picked.value !== undefined) out[key] = picked.value
   }
@@ -146,6 +147,52 @@ function mergeItems(base: unknown, local: unknown, remote: unknown): { value: st
     if (picked.value !== undefined) out.push(picked.value as string)
   }
   return { value: out }
+}
+
+const isNodes = (v: unknown): v is Record<string, unknown>[] =>
+  v === undefined || (Array.isArray(v) && v.every(x => typeof x === 'object' && x !== null && !Array.isArray(x)))
+
+/**
+ * Merge a series' `instances` overrides by `date`, each matched override
+ * through `mergeRawNodes` — so ticking different occurrences on two devices
+ * is not an overlap.
+ *
+ * Null — the conflict copy — when the two sides could disagree about the
+ * series' *shape*: any `repeat` differs (a `future` split caps a leg's repeat
+ * and re-homes later overrides, so a tick merged in by date could land under a
+ * leg that no longer generates it), any override is itself a leg (carries
+ * `repeat` or `instances`), or a side has a dateless or duplicated date and so
+ * no identity to match on.
+ */
+function mergeInstances(
+  base: Record<string, unknown>, local: Record<string, unknown>, remote: Record<string, unknown>,
+): { value: unknown } | null {
+  if (!sameValue(base.repeat, local.repeat) || !sameValue(base.repeat, remote.repeat)) return null
+  const [bi, li, ri] = [base.instances, local.instances, remote.instances]
+  if (!isNodes(bi) || !isNodes(li) || !isNodes(ri)) return null
+  const index = (nodes: Record<string, unknown>[] = []) => {
+    const byDate = new Map(nodes.map(n => [n.date, n]))
+    const ok = byDate.size === nodes.length
+      && nodes.every(n => typeof n.date === 'string' && !('repeat' in n) && !('instances' in n))
+    return ok ? byDate : null
+  }
+  const b = index(bi), l = index(li), r = index(ri)
+  if (!b || !l || !r) return null
+
+  const out: Record<string, unknown>[] = []
+  for (const date of new Set([...b.keys(), ...l.keys(), ...r.keys()])) {
+    const [bn, ln, rn] = [b.get(date), l.get(date), r.get(date)]
+    if (bn && ln && rn) {
+      const merged = mergeRawNodes(bn, ln, rn)
+      if (!merged) return null
+      out.push(merged)
+    } else {
+      const picked = pickValue(bn, ln, rn)
+      if (!picked) return null
+      if (picked.value !== undefined) out.push(picked.value as Record<string, unknown>)
+    }
+  }
+  return { value: out.length > 0 ? out : undefined }
 }
 
 /** Merge two bodies whole — see the no-diff3 note at the top of this file. */
