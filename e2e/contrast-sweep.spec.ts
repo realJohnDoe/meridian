@@ -138,7 +138,7 @@ const ROUTES = [
   { path: '/notes', ready: '[data-testid="entry-card"]' },
   { path: '/day/2026-09-04', ready: '[data-topbar]' },
   { path: '/week/2026-09-04', ready: '[data-topbar]' },
-  { path: '/calendar/2026-09', ready: '[data-topbar]' },
+  { path: '/calendar/2026-09-01', ready: '[data-topbar]' },
   { path: '/entry/example/01-start-here', ready: '[data-flow-screen]' },
   { path: '/entry/new', ready: '[data-flow-screen]' },
   { path: '/settings', ready: '[data-flow-screen]' },
@@ -187,39 +187,39 @@ const ROUTES = [
  */
 const FLOOR: Record<string, Record<string, number>> = {
   meridian: {
-    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
+    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09-01': 2,
     '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
   'meridian-light': {
-    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
+    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09-01': 2,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
   },
   'tokyo-night': {
-    '/': 1, '/unscheduled': 1, '/notes': 1, '/day/2026-09-04': 1, '/week/2026-09-04': 1, '/calendar/2026-09': 1,
+    '/': 1, '/unscheduled': 1, '/notes': 1, '/day/2026-09-04': 1, '/week/2026-09-04': 1, '/calendar/2026-09-01': 1,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
   },
   'catppuccin-latte': {
-    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09': 3,
+    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09-01': 3,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
   },
   'catppuccin-mocha': {
-    '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09': 0,
+    '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
     '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
   'rose-pine-dawn': {
-    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09': 3,
+    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09-01': 3,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
   },
   'solarized-light': {
-    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09': 3,
+    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09-01': 3,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 2,
   },
   'solarized-dark': {
-    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09': 2,
+    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09-01': 2,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 2,
   },
   dracula: {
-    '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09': 0,
+    '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
     '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
 }

@@ -8,8 +8,8 @@ import { THEMES } from '@/settings'
 
 const {
   restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
-  resetCalendarOnVaultChange, onVaultChanged, triggerVaultChanged, startCrossTabSync, stopCrossTabSync,
-  flushActiveAutoSave, callOrder, navigateMock, routeIds,
+  getCurrentDate, resetCalendarOnVaultChange, onVaultChanged, triggerVaultChanged, startCrossTabSync, stopCrossTabSync,
+  flushActiveAutoSave, callOrder, navigateMock, routeIds, router,
 } = vi.hoisted(() => {
   const listeners = new Set<(change: { contentReplaced: boolean }) => void>()
   const stopCrossTabSync = vi.fn()
@@ -23,6 +23,7 @@ const {
     callOrder,
     requestScrollToToday: vi.fn(),
     setCurrentDate: vi.fn(),
+    getCurrentDate: vi.fn(() => ''),
     resetCalendarOnVaultChange: vi.fn(),
     startCrossTabSync: vi.fn(() => stopCrossTabSync),
     stopCrossTabSync,
@@ -35,6 +36,7 @@ const {
     // Mutable so tests can flip between "inside the app shell" and "outside
     // it" (e.g. /_entry, /settings) without re-mocking per test.
     routeIds: { current: ['/_app'] as string[] },
+    router: { state: { location: { pathname: '/' } }, navigate: vi.fn() },
   }
 })
 
@@ -50,13 +52,14 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
     createRootRoute: (opts: Record<string, unknown>) => ({ ...opts }),
     Outlet: () => <div data-testid="outlet" />,
     useNavigate: () => navigateMock,
+    useRouter: () => router,
     useRouterState: <T,>({ select }: { select: (s: { matches: { routeId: string }[] }) => T }) =>
       select({ matches: routeIds.current.map(routeId => ({ routeId })) }),
   }
 })
 
 vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync }))
-vi.mock('@/calendar', () => ({ requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange }))
+vi.mock('@/calendar', () => ({ requestScrollToToday, getCurrentDate, setCurrentDate, resetCalendarOnVaultChange }))
 vi.mock('@/autoSaveFlushPort', () => ({ flushActiveAutoSave }))
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }))
 
@@ -78,6 +81,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   callOrder.length = 0
   routeIds.current = ['/_app']
+  router.state.location.pathname = '/'
 })
 
 afterEach(() => { vi.useRealTimers() })
@@ -435,9 +439,10 @@ describe('__root — resuming', () => {
   })
 
   // Mobile PWAs freeze timers rather than reload, so a resume days later would
-  // otherwise leave the agenda parked on a stale "today".
-  it('re-scrolls to today when the calendar day changed while suspended', () => {
+  // otherwise leave the calendar parked on a stale "today".
+  it('moves the agenda to the new today when the selected day was today', () => {
     vi.setSystemTime(new Date('2026-06-15T09:00:00'))
+    getCurrentDate.mockReturnValue('2026-06-15')
     render(<Root />)
 
     setVisibility('hidden')
@@ -445,13 +450,43 @@ describe('__root — resuming', () => {
     setVisibility('visible')
 
     expect(requestScrollToToday).toHaveBeenCalledTimes(1)
-    // Resets the cross-view "current date" too, not just Agenda's own scroll
-    // target — otherwise resuming on Month/Day would carry over a stale day.
     expect(setCurrentDate).toHaveBeenCalledWith('2026-06-18')
+    expect(router.navigate).not.toHaveBeenCalled()
   })
 
-  it('re-scrolls only once per day change, not on every subsequent resume', () => {
+  // Day/Week/Month carry the selected day in the URL, so the move is a
+  // navigation — otherwise the screen would stay on yesterday while the
+  // sidebar targets today.
+  it.each(['day', 'week', 'calendar'])('navigates /%s to the new today when the selected day was today', view => {
+    vi.setSystemTime(new Date('2026-06-15T23:58:00'))
+    getCurrentDate.mockReturnValue('2026-06-15')
+    router.state.location.pathname = `/${view}/2026-06-15`
+    render(<Root />)
+
+    vi.setSystemTime(new Date('2026-06-16T00:02:00'))
+    setVisibility('visible')
+
+    expect(router.navigate).toHaveBeenCalledWith({ to: `/${view}/$date`, params: { date: '2026-06-16' }, replace: true })
+    expect(setCurrentDate).not.toHaveBeenCalled()
+  })
+
+  it('leaves a day the user browsed to alone', () => {
     vi.setSystemTime(new Date('2026-06-15T09:00:00'))
+    getCurrentDate.mockReturnValue('2026-06-20')
+    router.state.location.pathname = '/day/2026-06-20'
+    render(<Root />)
+
+    vi.setSystemTime(new Date('2026-06-16T09:00:00'))
+    setVisibility('visible')
+
+    expect(router.navigate).not.toHaveBeenCalled()
+    expect(requestScrollToToday).not.toHaveBeenCalled()
+    expect(setCurrentDate).not.toHaveBeenCalled()
+  })
+
+  it('follows only once per day change, not on every subsequent resume', () => {
+    vi.setSystemTime(new Date('2026-06-15T09:00:00'))
+    getCurrentDate.mockReturnValue('2026-06-15')
     render(<Root />)
 
     vi.setSystemTime(new Date('2026-06-18T09:00:00'))
@@ -459,24 +494,11 @@ describe('__root — resuming', () => {
     setVisibility('visible')
 
     expect(requestScrollToToday).toHaveBeenCalledTimes(1)
-    expect(setCurrentDate).toHaveBeenCalledTimes(1)
-  })
-
-  // Crossing midnight while merely backgrounded for a few minutes is still a
-  // day change, and should behave the same as a multi-day suspend.
-  it('treats a midnight crossing as a day change', () => {
-    vi.setSystemTime(new Date('2026-06-15T23:58:00'))
-    render(<Root />)
-
-    vi.setSystemTime(new Date('2026-06-16T00:02:00'))
-    setVisibility('visible')
-
-    expect(requestScrollToToday).toHaveBeenCalledTimes(1)
-    expect(setCurrentDate).toHaveBeenCalledWith('2026-06-16')
   })
 
   it('ignores a time change that stays inside the same day', () => {
     vi.setSystemTime(new Date('2026-06-15T09:00:00'))
+    getCurrentDate.mockReturnValue('2026-06-15')
     render(<Root />)
 
     vi.setSystemTime(new Date('2026-06-15T23:00:00'))

@@ -75,7 +75,7 @@ describe('AppSidebar — calendar nav', () => {
     renderSidebar()
     fireEvent.click(screen.getByRole('button', { name: 'Month' }))
 
-    expect(navigateMock).toHaveBeenCalledWith({ to: '/calendar/$month', params: { month: '2026-06' } })
+    expect(navigateMock).toHaveBeenCalledWith({ to: '/calendar/$date', params: { date: '2026-06-15' } })
   })
 
   it('navigates to Week, carrying the current date', () => {

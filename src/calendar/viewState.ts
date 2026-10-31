@@ -101,10 +101,14 @@ interface CalendarViewState {
   overdueCollapsed: boolean | null
   /**
    * ISO date (`YYYY-MM-DD`) of the day last focused across the calendar
-   * views — kept in sync with agenda's scroll position, the day carousel's
-   * route param, and month's day-of-month (see setCurrentMonthKeepingDay).
-   * Read by the sidebar so switching between Agenda/Month/Week/Day lands on
-   * this day instead of resetting to today.
+   * views. Day/Week/Month carry the selected day in their own `$date` route
+   * param — the URL owns it there, and each route only mirrors it here on
+   * change. Agenda has no such param (its selected day is the top of its
+   * scroll position, too live to route), so there the store owns it, via
+   * `setAgendaTopDate`/`markAgendaScrolled`. Only one calendar view is
+   * mounted at a time, so the two never race. Read by the sidebar so
+   * switching between Agenda/Month/Week/Day lands on this day instead of
+   * resetting to today.
    */
   currentDate: string
   /**
@@ -312,6 +316,10 @@ export function useCurrentDate(): string {
   return useZustandStore(calendarView, s => s.currentDate)
 }
 
+export function getCurrentDate(): string {
+  return calendarView.getState().currentDate
+}
+
 /**
  * Small backlogs are worth seeing on open; past this many overdue groups the
  * unstated default flips to collapsed instead — see `overdueCollapsed`'s own
@@ -389,38 +397,27 @@ export function setAgendaTopDate(key: string): void {
   calendarView.setState({ agendaTopDate: key, currentDate: key })
 }
 
-/** Records the day currently focused — e.g. the day view's route param on
- * mount/swipe, or month's day-of-month via setCurrentMonthKeepingDay. */
+/** Mirrors a calendar route's `$date` param — see `currentDate`'s doc comment. */
 export function setCurrentDate(dateKey: string): void {
   calendarView.setState({ currentDate: dateKey })
 }
 
 /**
- * Updates currentDate when the month carousel pages to a new month, keeping
- * the same day-of-month (clamped to the target month's last day) instead of
- * jumping to the 1st — e.g. paging from Sep 8 to October lands on Oct 8; Jan
- * 31 to February lands on Feb 28.
+ * The date in `monthKey`'s month (any `YYYY-MM…` key) with `reference`'s
+ * day-of-month, clamped to that month's last day — paging from Sep 8 to
+ * October lands on Oct 8; Jan 31 to February lands on Feb 28.
  */
-export function setCurrentMonthKeepingDay(monthKey: string): void {
-  const day = Number(calendarView.getState().currentDate.slice(8, 10))
+export function monthDayKeptDate(monthKey: string, reference: string): string {
   const [y = NaN, m = NaN] = monthKey.split('-').map(Number)
-  const daysInMonth = new Date(y, m, 0).getDate()
-  const clampedDay = Math.min(day, daysInMonth)
-  calendarView.setState({ currentDate: `${monthKey}-${String(clampedDay).padStart(2, '0')}` })
+  const day = Math.min(Number(reference.slice(8, 10)), new Date(y, m, 0).getDate())
+  return `${monthKey.slice(0, 7)}-${String(day).padStart(2, '0')}`
 }
 
 /**
- * Pure calculation behind setCurrentWeekKeepingWeekday: the date, within the
- * week containing `dateKey`, that falls on the same weekday as `reference`.
- * Exported separately (not folded into the setter below) so a week the swipe
- * carousel is still previewing — not yet committed to `currentDate` — can be
- * given the same weekday-preserving treatment for display purposes without
- * writing to the store; see `weekPreview`'s consumer in `_app.tsx`.
- *
- * `dateKey` is any date within the target week, not necessarily its start —
- * the route param itself isn't guaranteed to be week-start-normalized on
- * first mount (see WeekView), so normalization happens here via `ws` rather
- * than being required of the caller.
+ * The date, within the week containing `dateKey`, that falls on the same
+ * weekday as `reference` — paging from Wed Aug 12 to the next week lands on
+ * Wed Aug 19. `dateKey` is any date within the target week, not necessarily
+ * its start; normalization happens here via `ws`.
  */
 export function weekdayKeptDate(dateKey: string, reference: string, ws: 0 | 1 | 6): string {
   const [ny = NaN, nm = NaN, nd = NaN] = dateKey.split('-').map(Number)
@@ -431,16 +428,6 @@ export function weekdayKeptDate(dateKey: string, reference: string, ws: 0 | 1 | 
   const offsetDays = differenceInCalendarDays(referenceDateObj, weekStartFor(referenceDateObj, ws))
 
   return fmtISO(addDays(newWeekStart, offsetDays))
-}
-
-/**
- * Updates currentDate when the week carousel pages to a new week, keeping
- * the same weekday instead of jumping to the week's first day — e.g. paging
- * from Wed Aug 12 to the next week lands on Wed Aug 19. Mirrors
- * setCurrentMonthKeepingDay's day-of-month preservation.
- */
-export function setCurrentWeekKeepingWeekday(dateKey: string, ws: 0 | 1 | 6): void {
-  calendarView.setState({ currentDate: weekdayKeptDate(dateKey, calendarView.getState().currentDate, ws) })
 }
 
 /** Clears the pending scroll target and records the date scrolled to, in one

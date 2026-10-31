@@ -1,33 +1,34 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { fmtISO, fmtMonth, parseMonth } from '@/model'
-import { setCurrentMonthKeepingDay } from '@/calendar'
+import { fmtISO, parseMonth } from '@/model'
+import { setCurrentDate, monthDayKeptDate } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 
 const MonthView = lazy(() => import('@/calendar').then(m => ({ default: m.MonthView })))
 
-export const Route = createFileRoute('/_app/calendar/$month')({
+export const Route = createFileRoute('/_app/calendar/$date')({
+  // Month URLs used to carry just `YYYY-MM`; keep those links working.
+  params: { parse: ({ date }) => ({ date: /^\d{4}-\d{2}$/.test(date) ? `${date}-01` : date }) },
   component: CalendarPage,
 })
 
 function CalendarPage() {
-  const { month: monthStr } = Route.useParams()
+  const { date } = Route.useParams()
   const navigate = useNavigate()
 
-  const month = useMemo(() => parseMonth(monthStr), [monthStr])
+  const month = useMemo(() => parseMonth(date), [date])
 
-  // Keeps the cross-view "current date" in sync with whichever month this
-  // route is showing — mount, chevron nav, and carousel swipe-commit all go
-  // through this param — so the sidebar's Day switch lands on the same
-  // day-of-month rather than resetting to today.
-  useEffect(() => setCurrentMonthKeepingDay(monthStr), [monthStr])
+  // `date` is the selected day, not the month — MonthView derives the month
+  // from it. The URL owns it; this only mirrors it for the sidebar.
+  useEffect(() => setCurrentDate(date), [date])
 
   // replace: true — paging to a neighbouring month is view state, not a
   // navigation event; mobile calendar conventions (Apple/Google/Outlook/
   // Fantastical) don't let a paging gesture push a back-stack entry per month.
+  // Keeps the selected day-of-month rather than jumping to the 1st.
   const onNavigateMonth = useCallback(
-    (d: Date) => navigate({ to: '/calendar/$month', params: { month: fmtMonth(d) }, replace: true }),
-    [navigate],
+    (d: Date) => navigate({ to: '/calendar/$date', params: { date: monthDayKeptDate(fmtISO(d), date) }, replace: true }),
+    [navigate, date],
   )
   const onDayClick = useCallback(
     (d: Date) => navigate({ to: '/day/$date', params: { date: fmtISO(d) } }),

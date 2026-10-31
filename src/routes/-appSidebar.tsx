@@ -74,7 +74,7 @@ export default function AppSidebar() {
       Icon: AlignLeft, label: 'Agenda', active: pathname === '/',
       onClick: () => { close(); if (pathname !== '/') requestScrollToDate(currentDate); void navigate({ to: '/' }) },
     },
-    { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); void navigate({ to: '/calendar/$month', params: { month: currentDate.slice(0, 7) } }) } },
+    { Icon: CalendarDays,  label: 'Month',  active: pathname.startsWith('/calendar'), onClick: () => { close(); void navigate({ to: '/calendar/$date', params: { date: currentDate } }) } },
     { Icon: CalendarRange, label: 'Week',   active: pathname.startsWith('/week'),     onClick: () => { close(); void navigate({ to: '/week/$date', params: { date: currentDate } }) } },
     { Icon: CalendarClock, label: 'Day',    active: isDayView,                        onClick: () => { close(); void navigate({ to: '/day/$date', params: { date: currentDate } }) } },
   ]

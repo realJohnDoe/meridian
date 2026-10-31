@@ -9,7 +9,8 @@ import {
   useMonthPreview, useDayPreview, useWeekPreview, setMonthPreview, setDayPreview, setWeekPreview,
   useAgendaAnchor, useAgendaScrollTarget, useAgendaTopDate,
   requestScrollToToday, requestScrollToDate, setAgendaTopDate, markAgendaScrolled,
-  setCurrentWeekKeepingWeekday,
+  weekdayKeptDate,
+  monthDayKeptDate,
   useQuickNavBrowsePreview, setQuickNavBrowsePreview, toggleQuickNav, closeQuickNav,
 } from './viewState'
 
@@ -133,32 +134,31 @@ describe('useQuickNavBrowsePreview / closeQuickNav', () => {
   })
 })
 
-describe('setCurrentWeekKeepingWeekday', () => {
+describe('weekdayKeptDate', () => {
   it('preserves the weekday offset when paging to a later week', () => {
     // 2026-08-12 is a Wednesday; Monday-start week runs Aug 10-16.
-    calendarView.setState({ currentDate: '2026-08-12' })
-    setCurrentWeekKeepingWeekday('2026-08-17', 1) // next week's Monday
-    expect(calendarView.getState().currentDate).toBe('2026-08-19') // next Wednesday
+    expect(weekdayKeptDate('2026-08-17', '2026-08-12', 1)).toBe('2026-08-19') // next Wednesday
   })
 
   it('normalizes an arbitrary date within the target week to the same result as its week start', () => {
-    calendarView.setState({ currentDate: '2026-08-12' })
-    setCurrentWeekKeepingWeekday('2026-08-20', 1) // a Thursday within the same target week
-    expect(calendarView.getState().currentDate).toBe('2026-08-19')
+    expect(weekdayKeptDate('2026-08-20', '2026-08-12', 1)).toBe('2026-08-19')
   })
 
   it('respects a Sunday-start week convention', () => {
     // Sunday-start week containing Aug 12 (Wed) runs Aug 9-15; offset is 3 days.
-    calendarView.setState({ currentDate: '2026-08-12' })
-    setCurrentWeekKeepingWeekday('2026-08-16', 0) // next week's Sunday
-    expect(calendarView.getState().currentDate).toBe('2026-08-19')
+    expect(weekdayKeptDate('2026-08-16', '2026-08-12', 0)).toBe('2026-08-19')
   })
 
   it('carries the offset correctly across a year boundary', () => {
     // 2025-12-31 is a Wednesday; Monday-start week runs Dec 29 - Jan 4, offset 2 days.
-    calendarView.setState({ currentDate: '2025-12-31' })
-    setCurrentWeekKeepingWeekday('2026-01-05', 1) // next week's Monday
-    expect(calendarView.getState().currentDate).toBe('2026-01-07')
+    expect(weekdayKeptDate('2026-01-05', '2025-12-31', 1)).toBe('2026-01-07')
+  })
+})
+
+describe('monthDayKeptDate', () => {
+  it('keeps the day-of-month, clamped to the target month', () => {
+    expect(monthDayKeptDate('2026-10-01', '2026-09-08')).toBe('2026-10-08')
+    expect(monthDayKeptDate('2026-02-01', '2026-01-31')).toBe('2026-02-28')
   })
 })
 

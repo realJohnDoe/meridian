@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
 import { useMatch, useNavigate } from '@tanstack/react-router'
 import { fmtTopBarMonth } from '@/format'
-import { fmtMonth, parseMonth } from '@/model'
+import { fmtISO, parseMonth } from '@/model'
 import { useToday } from '@/hooks'
-import { useMonthPreview, MonthStrip } from '@/calendar'
+import { useMonthPreview, MonthStrip, monthDayKeptDate } from '@/calendar'
 import { previewAware, type ViewChrome } from './-viewChrome'
 
 /**
@@ -16,16 +16,20 @@ export function useMonthChrome(): ViewChrome | null {
   const navigate = useNavigate()
   const today = useToday()
   const monthPreview = useMonthPreview()
-  const match = useMatch({ from: '/_app/calendar/$month', shouldThrow: false })
+  const match = useMatch({ from: '/_app/calendar/$date', shouldThrow: false })
+  const routeDate = match?.params.date
 
-  // Shared by the month strip's chip taps — same replace: true paging
-  // semantics as the chevrons below and as the swipe carousel.
+  // Shared by the chevrons and the month strip's chip taps — same replace:
+  // true paging semantics as the swipe carousel, and the same kept
+  // day-of-month (see CalendarPage).
   const navigateToMonth = useCallback(
-    (d: Date) => navigate({ to: '/calendar/$month', params: { month: fmtMonth(d) }, replace: true }),
-    [navigate],
+    (d: Date) => {
+      if (routeDate) void navigate({ to: '/calendar/$date', params: { date: monthDayKeptDate(fmtISO(d), routeDate) }, replace: true })
+    },
+    [navigate, routeDate],
   )
 
-  const monthViewDate = match ? parseMonth(match.params.month) : null
+  const monthViewDate = routeDate ? parseMonth(routeDate) : null
   // monthPreview (set by the swipe carousel on touchend / crossing the
   // halfway point) shows the label the gesture is heading toward immediately,
   // ahead of the route committing — chevron navigation and Today still key
@@ -38,10 +42,10 @@ export function useMonthChrome(): ViewChrome | null {
     label: fmtTopBarMonth(monthDisplayDate, today),
     paging: {
       unit: 'month',
-      onPrev: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)) }, replace: true }),
-      onNext: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)) }, replace: true }),
+      onPrev: () => navigateToMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() - 1, 1)),
+      onNext: () => navigateToMonth(new Date(monthViewDate.getFullYear(), monthViewDate.getMonth() + 1, 1)),
     },
-    onToday: () => void navigate({ to: '/calendar/$month', params: { month: fmtMonth(today) } }),
+    onToday: () => void navigate({ to: '/calendar/$date', params: { date: fmtISO(today) } }),
     quickNav: () => <MonthStrip activeMonth={monthDisplayDate} onNavigateMonth={navigateToMonth} />,
   }
 }

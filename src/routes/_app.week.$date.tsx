@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO, weekStartsOn } from '@/model'
 import { useStore } from '@/store'
 import { useOpenEntry } from '@/hooks'
-import { setCurrentWeekKeepingWeekday, useQuickNavBrowsePreview, setQuickNavBrowsePreview } from '@/calendar'
+import { setCurrentDate, weekdayKeptDate, useQuickNavBrowsePreview, setQuickNavBrowsePreview } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 import { newEntryRoute } from '@/entryRoute'
 
@@ -36,21 +36,17 @@ function WeekPage() {
     if (quickNavPreview !== null && quickNavPreview === date) setQuickNavBrowsePreview(null)
   }, [quickNavPreview, date])
 
-  // Keeps the cross-view "current date" in sync with whichever week this
-  // route is showing, preserving the weekday rather than jumping to the
-  // week's first day — mount, chevron nav, and carousel swipe-commit all go
-  // through this param — so the sidebar's Day switch lands on the same
-  // weekday rather than resetting to the week's Monday. `date` need not
-  // already be week-start-normalized (see WeekView); setCurrentWeekKeepingWeekday
-  // normalizes it internally.
-  useEffect(() => setCurrentWeekKeepingWeekday(date, ws), [date, ws])
+  // `date` is the selected day, not the week start — WeekView derives the
+  // week from it. The URL owns it; this only mirrors it for the sidebar.
+  useEffect(() => setCurrentDate(date), [date])
 
   const onOpen = useOpenEntry()
   // replace: true — paging to a neighbouring week is view state, not a
-  // navigation event; mirrors the day/month carousels' onNavigate*.
+  // navigation event; mirrors the day/month carousels' onNavigate*. Lands on
+  // the selected day's weekday in the new week, not on its first day.
   const onNavigateWeek = useCallback(
-    (d: Date) => navigate({ to: '/week/$date', params: { date: fmtISO(d) }, replace: true }),
-    [navigate],
+    (weekStart: Date) => navigate({ to: '/week/$date', params: { date: weekdayKeptDate(fmtISO(weekStart), date, ws) }, replace: true }),
+    [navigate, date, ws],
   )
   const onDayClick = useCallback(
     (d: Date) => navigate({ to: '/day/$date', params: { date: fmtISO(d) } }),

@@ -1,11 +1,11 @@
-import { createRootRoute, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
+import { createRootRoute, Outlet, useNavigate, useRouter, useRouterState } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { startOfToday } from 'date-fns'
 import { ThemeProvider, useTheme } from 'next-themes'
 import { fmtISO } from '@/model'
 import { useVisibleViewportCssVars } from '@/hooks'
 import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync } from '@/storage'
-import { requestScrollToToday, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
+import { requestScrollToToday, getCurrentDate, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
 import { flushActiveAutoSave } from '@/autoSaveFlushPort'
 import { Toaster } from '@/components/ui/sonner'
 
@@ -201,8 +201,9 @@ function Root() {
   // Tracks the calendar day the app was last known to be on, so a resume
   // after a multi-day background suspend (mobile PWAs freeze timers rather
   // than reload) can tell "today changed while we were away" from an
-  // ordinary tab switch and re-scroll the agenda to today accordingly.
+  // ordinary tab switch and move the calendar to the new today accordingly.
   const lastActiveDayRef = useRef(startOfToday().getTime())
+  const router = useRouter()
 
   useEffect(() => {
     void restoreVaults()
@@ -232,14 +233,21 @@ function Root() {
       }
       autoSyncTick()
       const day = startOfToday().getTime()
-      if (day !== lastActiveDayRef.current) {
-        lastActiveDayRef.current = day
+      if (day === lastActiveDayRef.current) return
+      // Follow the day change only if the selected day *was* today: a day
+      // the user deliberately browsed to stays put, as in other calendars.
+      const wasToday = getCurrentDate() === fmtISO(new Date(lastActiveDayRef.current))
+      lastActiveDayRef.current = day
+      if (!wasToday) return
+      const todayKey = fmtISO(new Date(day))
+      // Day/Week/Month: the URL owns the selected day, so move it there and
+      // let the route mirror it. Elsewhere there is no route param to move.
+      const view = /^\/(day|week|calendar)\//.exec(router.state.location.pathname)?.[1]
+      if (view) {
+        void router.navigate({ to: `/${view}/$date` as '/day/$date', params: { date: todayKey }, replace: true })
+      } else {
         requestScrollToToday()
-        // Also resets the cross-view "current date" (calendar/viewState.ts),
-        // not just Agenda's own scroll target — otherwise resuming on Month
-        // or Day after a multi-day suspend would leave the sidebar carrying
-        // over whatever stale day was in view when the app was backgrounded.
-        setCurrentDate(fmtISO(new Date(day)))
+        setCurrentDate(todayKey)
       }
     }
     window.addEventListener('online', onOnline)
@@ -255,7 +263,7 @@ function Root() {
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('pagehide', flushAll)
     }
-  }, [])
+  }, [router])
 
   // When a vault activates with *different* content, discard the previous
   // vault's calendar-view state (saved agenda scroll, cached occurrence
