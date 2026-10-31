@@ -1,4 +1,3 @@
-import { useCallback } from 'react'
 import { useMatch, useNavigate } from '@tanstack/react-router'
 import { fmtTopBarMonth } from '@/format'
 import { fmtISO, parseMonth } from '@/model'
@@ -17,25 +16,21 @@ export function useMonthChrome(): ViewChrome | null {
   const today = useToday()
   const monthPreview = useMonthPreview()
   const match = useMatch({ from: '/_app/calendar/$date', shouldThrow: false })
-  const routeDate = match?.params.date
+  if (!match) return null
+  const routeDate = match.params.date
 
   // Shared by the chevrons and the month strip's chip taps — same replace:
   // true paging semantics as the swipe carousel, and the same kept
   // day-of-month (see CalendarPage).
-  const navigateToMonth = useCallback(
-    (d: Date) => {
-      if (routeDate) void navigate({ to: '/calendar/$date', params: { date: monthDayKeptDate(fmtISO(d), routeDate) }, replace: true })
-    },
-    [navigate, routeDate],
-  )
+  const navigateToMonth = (d: Date) =>
+    void navigate({ to: '/calendar/$date', params: { date: monthDayKeptDate(fmtISO(d), routeDate) }, replace: true })
 
-  const monthViewDate = routeDate ? parseMonth(routeDate) : null
+  const monthViewDate = parseMonth(routeDate)
   // monthPreview (set by the swipe carousel on touchend / crossing the
   // halfway point) shows the label the gesture is heading toward immediately,
   // ahead of the route committing — chevron navigation and Today still key
   // off the route's own monthViewDate.
-  const monthDisplayDate = monthViewDate && previewAware(monthViewDate, monthPreview, parseMonth)
-  if (!monthViewDate || !monthDisplayDate) return null
+  const monthDisplayDate = previewAware(monthViewDate, monthPreview, parseMonth)
 
   return {
     kind: 'month',

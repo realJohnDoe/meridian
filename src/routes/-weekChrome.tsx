@@ -36,7 +36,7 @@ export function useWeekChrome(): ViewChrome | null {
   // kept — the quick-nav panel's anchor month and highlighted day both key
   // off this (see below) rather than the route param directly, so they track
   // a swipe in progress instead of only jumping once it commits.
-  const currentDisplayDate = previewAware(routeDate, weekPreview, key => weekdayKeptDate(key, routeDate, ws))
+  const currentDisplayDate = new Date(previewAware(routeDate, weekPreview, key => weekdayKeptDate(key, routeDate, ws)) + 'T00:00:00')
 
   return {
     kind: 'week',
@@ -59,8 +59,8 @@ export function useWeekChrome(): ViewChrome | null {
         // highlighted day. currentDisplayDate rather than the plain
         // route param so both track an in-progress swipe (see its
         // own comment above) instead of only jumping once it commits.
-        anchorMonth={parseDateString(currentDisplayDate) ?? weekDisplayStart}
-        highlightDates={[parseDateString(currentDisplayDate) ?? weekDisplayStart]}
+        anchorMonth={currentDisplayDate}
+        highlightDates={[currentDisplayDate]}
         monthNav={monthNav}
         onSelectDay={iso => {
           void navigate({ to: '/week/$date', params: { date: iso } })
