@@ -10,7 +10,7 @@ export { NO_PARTICIPANT, hideParticipants, hideVaults } from './useCalendarFilte
 export { weekStartFor, firstWeekStartInMonth } from './weekRange'
 export {
   resetCalendarOnVaultChange, useMonthPreview, useDayPreview, useWeekPreview, useAgendaTopDate, requestScrollToToday,
-  requestScrollToDate, useCurrentDate, setCurrentDate, setCurrentMonthKeepingDay, setCurrentWeekKeepingWeekday,
+  requestScrollToDate, useCurrentDate, getCurrentDate, setCurrentDate, monthDayKeptDate,
   weekdayKeptDate, useQuickNavOpen, toggleQuickNav, closeQuickNav,
   useQuickNavBrowsePreview, setQuickNavBrowsePreview,
 } from './viewState'

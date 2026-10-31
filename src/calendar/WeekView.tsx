@@ -13,8 +13,7 @@ import { weekStartFor } from './weekRange'
 const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
 interface Props {
-  /** Any day within the target week — normalized to its week start below, so
-   * callers (e.g. the sidebar's `currentDate`) don't need to pre-normalize. */
+  /** The selected day — the week shown is the one containing it. */
   date: Date
   onOpen: (occ: Occurrence, scope?: EditScope) => void
   onNavigateWeek?: (weekStart: Date) => void
@@ -27,10 +26,7 @@ interface Props {
 // A horizontal carousel of PANE_COUNT weeks centered on the current one — see
 // DayView's header comment for the full seam explanation (Embla mechanics,
 // vertical scroll-sync via useTimelineScrollSync). `date` may be any day
-// within the week; the carousel keys off its normalized week start so
-// navigating from an arbitrary weekday (e.g. the sidebar's `currentDate`)
-// still lands on the right pane, and the URL canonicalizes to the week start
-// on the first swipe (see onCommit below).
+// within the week; the carousel keys off its normalized week start.
 export default function WeekView({ date, onOpen, onNavigateWeek, onDayClick, onCreate }: Props) {
   const localePrefs = useStore(s => s.localePrefs)
   const ws = weekStartsOn(localePrefs)

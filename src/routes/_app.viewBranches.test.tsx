@@ -106,18 +106,18 @@ describe('_app — per-view topbar label and paging', () => {
   })
 
   it('month view: labels by the matched month, pages by one month, and Today navigates to this month', () => {
-    matches = { '/_app/calendar/$month': { params: { month: '2026-09' } } }
+    matches = { '/_app/calendar/$date': { params: { date: '2026-09-15' } } }
     render(<AppLayout />)
 
     expect(screen.getByText(fmtTopBarMonth(new Date(2026, 8, 1), TODAY))).toBeInTheDocument()
 
     screen.getByLabelText('Next month').click()
-    expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$month', params: { month: '2026-10' }, replace: true })
+    expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$date', params: { date: '2026-10-15' }, replace: true })
     screen.getByLabelText('Previous month').click()
-    expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$month', params: { month: '2026-08' }, replace: true })
+    expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$date', params: { date: '2026-08-15' }, replace: true })
 
     screen.getByLabelText('Today').click()
-    expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$month', params: { month: '2026-09' } })
+    expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$date', params: { date: '2026-09-15' } })
   })
 
   it('unscheduled tasks view: a fixed "Unscheduled Tasks" label, no paging chevrons, and no Today button', () => {

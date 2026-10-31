@@ -276,10 +276,12 @@ export default defineConfig({
         // all measured 100/100/100/100 — floored at 97/97/97/97 rather than
         // raised to 100 (see responsive-modal.tsx above). -weekChrome.tsx and
         // -agendaChrome.tsx are untouched: neither drifted ≥10 points.
+        // -weekChrome.tsx branches re-measured 100 after #1204 dropped its
+        // parse fallbacks, so floored at 97 like the others.
         'src/routes/-viewChrome.ts': { statements: 97, branches: 97, functions: 97, lines: 97 },
         'src/routes/-useViewChrome.ts': { statements: 97, branches: 97, functions: 97, lines: 97 },
         'src/routes/-dayChrome.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
-        'src/routes/-weekChrome.tsx': { statements: 88, branches: 78, functions: 75, lines: 90 },
+        'src/routes/-weekChrome.tsx': { statements: 88, branches: 97, functions: 75, lines: 90 },
         'src/routes/-monthChrome.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
         'src/routes/-listChrome.ts': { statements: 97, branches: 97, functions: 97, lines: 97 },
         'src/routes/-agendaChrome.tsx': { statements: 92, branches: 82, functions: 95, lines: 95 },

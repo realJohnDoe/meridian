@@ -66,7 +66,7 @@ const APP_ROUTES = [
   { path: '/notes', ready: '[data-testid="entry-card"]' },
   { path: '/day/2026-09-04', ready: '[data-topbar]' },
   { path: '/week/2026-09-04', ready: '[data-topbar]' },
-  { path: '/calendar/2026-09', ready: '[data-topbar]' },
+  { path: '/calendar/2026-09-01', ready: '[data-topbar]' },
 ]
 
 /**

@@ -65,7 +65,7 @@ const { useWeekChrome } = await import('./-weekChrome')
 const { useMonthChrome } = await import('./-monthChrome')
 const { useAgendaChrome } = await import('./-agendaChrome')
 const { useViewChrome } = await import('./-useViewChrome')
-const { useQuickNavOpen, toggleQuickNav, closeQuickNav, useCurrentDate } = await import('@/calendar')
+const { useQuickNavOpen, toggleQuickNav, closeQuickNav } = await import('@/calendar')
 
 const TODAY = new Date(2026, 8, 15) // September 15 2026, matching the sibling _app tests
 
@@ -176,16 +176,20 @@ describe('useWeekChrome', () => {
     expect(result.current).toBeNull()
   })
 
-  it('quick-nav: picking a day sets it current before navigating, so the weekday is not kept', () => {
+  it('quick-nav: picking a day navigates to that exact day, which the URL then carries', () => {
     matches = { '/_app/week/$date': { params: { date: '2026-09-14' } } }
-    const { result } = renderHook(() => ({ chrome: useWeekChrome(), current: useCurrentDate() }))
+    const { result } = renderHook(() => useWeekChrome())
 
-    act(() => { (panelProps(result.current.chrome?.quickNav?.('strip')) as MiniMonthProps).onSelectDay('2026-09-02') })
-    // Without the setCurrentDate first, WeekPage's own effect would run the
-    // target through setCurrentWeekKeepingWeekday and land the previously
-    // selected weekday instead of the day actually picked.
-    expect(result.current.current).toBe('2026-09-02')
+    act(() => { (panelProps(result.current?.quickNav?.('strip')) as MiniMonthProps).onSelectDay('2026-09-02') })
     expect(navigateSpy).toHaveBeenCalledWith({ to: '/week/$date', params: { date: '2026-09-02' } })
+  })
+
+  it('pages by seven days from the selected day, keeping its weekday', () => {
+    matches = { '/_app/week/$date': { params: { date: '2026-09-17' } } }
+    const { result } = renderHook(() => useWeekChrome())
+
+    result.current?.paging?.onNext()
+    expect(navigateSpy).toHaveBeenCalledWith({ to: '/week/$date', params: { date: '2026-09-24' }, replace: true })
   })
 
   it('quick-nav: browsing a month lands on that month\'s first full week, not on its 1st', () => {
@@ -212,13 +216,13 @@ describe('useMonthChrome', () => {
   })
 
   it('quick-nav: the month strip pages with the same replace semantics as the chevrons', () => {
-    matches = { '/_app/calendar/$month': { params: { month: '2026-09' } } }
+    matches = { '/_app/calendar/$date': { params: { date: '2026-09-15' } } }
     const { result } = renderHook(() => useMonthChrome())
 
     const props = (panelProps(result.current?.quickNav?.('strip')) as MonthStripProps)
     expect(props.activeMonth.getMonth()).toBe(8)
     props.onNavigateMonth(new Date(2026, 11, 1))
-    expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$month', params: { month: '2026-12' }, replace: true })
+    expect(navigateSpy).toHaveBeenCalledWith({ to: '/calendar/$date', params: { date: '2026-12-15' }, replace: true })
   })
 })
 

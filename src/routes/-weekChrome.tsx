@@ -5,7 +5,7 @@ import { useToday } from '@/hooks'
 import { useStore } from '@/store'
 import {
   useWeekPreview, useQuickNavOpen, closeQuickNav, MiniMonth, weekStartFor,
-  firstWeekStartInMonth, useCurrentDate, setCurrentDate, weekdayKeptDate,
+  firstWeekStartInMonth, weekdayKeptDate,
   setQuickNavBrowsePreview,
 } from '@/calendar'
 import { previewAware, type ViewChrome } from './-viewChrome'
@@ -20,44 +20,33 @@ export function useWeekChrome(): ViewChrome | null {
   const today = useToday()
   const weekPreview = useWeekPreview()
   const quickNavOpen = useQuickNavOpen()
-  const currentDate = useCurrentDate()
   const ws = weekStartsOn(useStore(s => s.localePrefs))
   const match = useMatch({ from: '/_app/week/$date', shouldThrow: false })
 
-  // The route param need not already be week-start-normalized (see WeekView),
-  // so it's normalized here before anything reads it.
-  const weekStartDate = match ? weekStartFor(new Date(match.params.date + 'T00:00:00'), ws) : null
+  if (!match) return null
+  // The route param is the selected day, not the week start (see WeekView).
+  const routeDate = match.params.date
+  const selectedDate = new Date(routeDate + 'T00:00:00')
   // weekPreview (set by the swipe carousel on touchend / crossing the halfway
   // point) shows the label the gesture is heading toward immediately, ahead
   // of the route committing — chevron navigation and Today still key off the
-  // route's own weekStartDate.
-  const weekDisplayStart = weekStartDate && previewAware(weekStartDate, weekPreview, parseDateString)
-  // currentDate carried forward into the previewed week, same weekday kept —
-  // the quick-nav panel's anchor month and highlighted day both key off this
-  // (see below) rather than currentDate directly, so they track a swipe in
-  // progress instead of only jumping once it commits.
-  const currentDisplayDate = previewAware(currentDate, weekPreview, key => weekdayKeptDate(key, currentDate, ws))
-  if (!weekStartDate || !weekDisplayStart) return null
+  // route's own selected day.
+  const weekDisplayStart = previewAware(weekStartFor(selectedDate, ws), weekPreview, parseDateString)
+  // The selected day carried forward into the previewed week, same weekday
+  // kept — the quick-nav panel's anchor month and highlighted day both key
+  // off this (see below) rather than the route param directly, so they track
+  // a swipe in progress instead of only jumping once it commits.
+  const currentDisplayDate = new Date(previewAware(routeDate, weekPreview, key => weekdayKeptDate(key, routeDate, ws)) + 'T00:00:00')
 
   return {
     kind: 'week',
     label: fmtTopBarMonth(weekDisplayStart, today),
     paging: {
       unit: 'week',
-      onPrev: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, -7)) }, replace: true }),
-      onNext: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(weekStartDate, 7)) }, replace: true }),
+      onPrev: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(selectedDate, -7)) }, replace: true }),
+      onNext: () => void navigate({ to: '/week/$date', params: { date: fmtISO(addDays(selectedDate, 7)) }, replace: true }),
     },
-    onToday: () => {
-      // WeekPage's own effect always runs the route date through
-      // setCurrentWeekKeepingWeekday, which preserves the *previously*
-      // selected weekday rather than adopting the target date's own — see
-      // its own doc comment. Setting currentDate here first means that
-      // effect reads it back as already-today and no-ops, so "Today"
-      // actually lands currentDate (and the quick-nav highlight) on today
-      // instead of on today's week with the old weekday kept.
-      setCurrentDate(fmtISO(today))
-      void navigate({ to: '/week/$date', params: { date: fmtISO(today) } })
-    },
+    onToday: () => void navigate({ to: '/week/$date', params: { date: fmtISO(today) } }),
     quickNav: monthNav => (
       <MiniMonth
         open={quickNavOpen}
@@ -67,17 +56,13 @@ export function useWeekChrome(): ViewChrome | null {
         // (any week straddling a month boundary), and anchoring to
         // weekDisplayStart while highlighting currentDisplayDate
         // opened the panel on a month that didn't contain its own
-        // highlighted day. currentDisplayDate rather than plain
-        // currentDate so both track an in-progress swipe (see its
+        // highlighted day. currentDisplayDate rather than the plain
+        // route param so both track an in-progress swipe (see its
         // own comment above) instead of only jumping once it commits.
-        anchorMonth={parseDateString(currentDisplayDate) ?? weekDisplayStart}
-        highlightDates={[parseDateString(currentDisplayDate) ?? weekDisplayStart]}
+        anchorMonth={currentDisplayDate}
+        highlightDates={[currentDisplayDate]}
         monthNav={monthNav}
         onSelectDay={iso => {
-          // See the "Today" handler above: set currentDate directly
-          // so the picked day — not the previously selected weekday
-          // — is what ends up highlighted and current.
-          setCurrentDate(iso)
           void navigate({ to: '/week/$date', params: { date: iso } })
           closeQuickNav()
         }}
@@ -91,9 +76,7 @@ export function useWeekChrome(): ViewChrome | null {
           // label from the month strip highlighting the month
           // just tapped. Land on that month's first proper week
           // instead, so both agree.
-          const iso = fmtISO(firstWeekStartInMonth(d, ws))
-          setCurrentDate(iso)
-          void navigate({ to: '/week/$date', params: { date: iso }, replace: true })
+          void navigate({ to: '/week/$date', params: { date: fmtISO(firstWeekStartInMonth(d, ws)) }, replace: true })
         }}
         // Same firstWeekStartInMonth landing as the commit above, computed
         // here rather than by the route file so day and week never have to
