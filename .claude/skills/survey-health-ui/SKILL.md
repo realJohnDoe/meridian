@@ -37,15 +37,17 @@ are specific to this survey:
   ```js
   import * as babel from '@babel/core'
   import { reactCompilerPreset } from '@vitejs/plugin-react'
-  const { preset } = reactCompilerPreset({ target: '19' })   // matches vite.config.ts
-  const out = babel.transformSync(src, {
+  const events = []
+  const { preset } = reactCompilerPreset({ target: '19',      // matches vite.config.ts
+    logger: { logEvent: (file, e) => events.push([file, e]) } })
+  babel.transformSync(src, {
     filename, presets: [preset], parserOpts: { plugins: ['jsx', 'typescript'] },
     configFile: false, babelrc: false,
   })
-  // memoized iff the output imports 'react/compiler-runtime' and calls _c(n)
+  // every e.kind === 'CompileError' is one function the compiler skipped, with its reason
   ```
 
-  Counting `_c(` per file turns this into a census over a whole directory, not just a two-case fixture — which is how a partially-memoized component library shows up at all. Clean up the driver afterwards.
+  Run it over every non-test `.tsx`/`use*.ts` for a census: the logger names each skipped function and why, per function rather than per file — counting `_c(` in the output misses a skipped component in a file whose siblings compiled. Don't substitute a lint dry-run: on 2026-10-31 `react-hooks/todo` + `rule-suppression` at `error` reported 2 of 6 real bail-outs (#1203). Clean up the driver afterwards.
 
 ## Budget
 
@@ -73,8 +75,13 @@ are specific to this survey:
   session has no `preview_*` tooling, drive Chromium yourself rather than
   skipping: `@playwright/test` is a devDependency and `e2e/` is the worked
   example — `pnpm exec vite --port <unique> --strictPort`, then
-  `import { chromium } from '@playwright/test'`, at 390×844 and 1440×900, setting
-  the theme in an init script per palette. If even that is unavailable, say so in
+  `import { chromium } from '@playwright/test'` launched with
+  `executablePath: '/opt/pw-browsers/chromium'` (the pinned version's own browser
+  is not installed), at 390×844 and 1440×900, setting `meridian_theme` (and
+  `meridian.tourDone`, or the tour's controls pollute every measurement) in an
+  init script. A touch-target probe must count an absolute `::before`/`::after`
+  toward the hit area — `IconButton` and `Checkbox` extend theirs that way and
+  otherwise read as false positives. If even that is unavailable, say so in
   the coverage statement and mark the affected categories **partially assessed**;
   an admitted gap beats an impression inferred from tokens.
 - **Audit the gates' own config, not just their exit codes.** A green gate says nothing about whether it is still aimed at the right files. Check every path in the lint, coverage and smoke-test configs against the filesystem: per-file coverage thresholds naming a moved file, exclusion globs whose stated rationale has been outgrown by a file that has since tripled in size, and route lists that a new route does not automatically join. These fail *open* — Vitest, for one, accepts a threshold for a nonexistent path and exits 0 with no warning — so nothing surfaces them but this check.
@@ -112,6 +119,7 @@ defects, and must not consume a slot in the top-N findings list below.
 the [shared finding fields](../_survey/conventions.md#finding-fields). This survey adds:
 
 - **Category** — one or more tags from: `component-architecture` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `a11y` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
+  (only `ux`, `performance`, `toolchain`, `dry`, `testing`, `security`, `dead-code` and `dependencies` exist as repo labels, and issue creation rejects a missing one — label with the nearest existing one and keep the exact tag in the body)
 - **Impact** — 1–10 (10 = catastrophic/systemic; 5 = e.g. a UI pattern duplicated across ~4 components, or a missing error state on a primary user flow; 1 = trivial/cosmetic)
 
 **Fails silently here** (what sets the tier): a broken interaction only
