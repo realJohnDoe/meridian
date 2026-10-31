@@ -311,3 +311,37 @@ describe('applyEdit — generated (issue #1176)', () => {
     )
   })
 })
+
+describe('applyEdit — single re-time then future re-time (issue #1230)', () => {
+  it('leaves the edited day with one occurrence, at the new time, where the editor finds it', () => {
+    fc.assert(
+      fc.property(shapeArb, fc.nat(40), (raw, pick) => {
+        // Excluded overrides are left out so the only stub on the edited day is the re-time's own.
+        const shape = { ...raw, time: '09:00', overrides: raw.overrides.filter(o => o.kind !== 'excluded') }
+        fc.pre(shape.repeat.kind !== 'afterCompletion')
+        const data = build(shape)
+        const inner = expand(data).filter(o => o.date > shape.date && o.date >= '2026-03-05' && o.date <= '2026-05-20')
+        fc.pre(inner.length > 0)
+        const occ = inner[pick % inner.length]!
+
+        const form1 = formFor(occ, data, 'single')
+        const fields1 = { ...form1, scheduled: { date: occ.date, time: '09:30' } }
+        const moved = applyEdit(data, occ, 'single', fields1, NEW_TARGET, changedEditFields(form1, fields1))
+        const pinned = follow(moved, occ)
+        expect(pinned.time).toBe('09:30')
+
+        const form2 = formFor(pinned, moved, 'future')
+        const fields2 = { ...form2, scheduled: { date: occ.date, time: '08:45' } }
+        const after = applyEdit(moved, pinned, 'future', fields2, NEW_TARGET, changedEditFields(form2, fields2))
+        const occsAfter = expand(after)
+
+        expect(occsAfter.filter(o => o.date === occ.date).map(slot)).toEqual([`${occ.date} 08:45`])
+        expect(occsAfter.filter(o => o.date >= occ.date).every(o => o.time === '08:45')).toBe(true)
+        expect(follow(after, pinned).time).toBe('08:45')
+        expect(itemsOf(after).some(i => !('repeat' in i) && i.excluded && i.date === occ.date)).toBe(false)
+        expect(titled(expand(parse(serializeOnly(after))))).toEqual(titled(occsAfter))
+      }),
+      { seed: 20261031, numRuns: 100 },
+    )
+  })
+})
