@@ -302,7 +302,14 @@ async function resolveCollision(
   // One attempt only: a refusal here means the path is moving under us, and
   // the copy-out below is the answer that cannot lose anything.
   if (remote && baseContent !== undefined) {
-    const merged = mergeFileContent(path, baseContent, localContent, remote.content)
+    // A version that won't parse (a hand edit elsewhere) means "cannot merge",
+    // not a failed cycle: fall through to the copy-out, which cannot lose anything.
+    let merged: string | null = null
+    try {
+      merged = mergeFileContent(path, baseContent, localContent, remote.content)
+    } catch {
+      journal('collision-copied', vaultId, path, { ...facts(), note: 'merge-unparseable' }, backend.kind)
+    }
     if (merged !== null) {
       try {
         const written = await backend.write(path, merged, remote.version)
