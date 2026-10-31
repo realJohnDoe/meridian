@@ -61,10 +61,14 @@ A defect two surveys both find is one issue: search open issues first, per
   worked example; pass `executablePath`, per `playwright.config.ts`'s
   `CHROMIUM_PATH` note). Mobile is primary: 390×844 with `hasTouch` and `isMobile`
   set; desktop at 1440×900. Within a task, move by tapping, never `page.goto`:
-  a reload resets the Tutorial vault and every edit the task made. On every
-  list card, try swipe in both directions and long-press — the 2026-09-23 run
-  missed swipe-to-delete, the only delete with Undo, until the PR history
-  named it. Use the default theme plus one dark theme — contrast
+  a reload resets the Tutorial vault and every edit the task made — so keep
+  one browser alive across steps (a driver that polls a scratchpad directory
+  for snippets works; a local HTTP control port is refused by the sandbox), and
+  start it and vite with the maximum background timeout, since the default
+  stops both mid-run. Probe what no task crosses: swipe both ways and
+  long-press every list card, and open every settings sub-screen, each vault's
+  own included — runs missed swipe-to-delete (2026-09-23) and the vault
+  screen's `Archived` list (2026-10-31) until the PR history named them. Use the default theme plus one dark theme — contrast
   across all themes is `health-ui.md`'s. Screenshot every step into the
   scratchpad; findings cite steps, not screenshots, since those cannot be
   attached to an issue. Environment limits are in [what this environment can and
