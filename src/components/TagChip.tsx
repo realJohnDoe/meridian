@@ -30,7 +30,8 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
   const removeButton = interactive && onRemove && (
     <button
       type="button"
-      className="p-0 flex items-center rounded-sm opacity-60 hover:opacity-100 focus:outline-none"
+      // Hit area extends right/vertically only: the topic button sits 2px to the left.
+      className="relative p-0 flex items-center rounded-sm opacity-60 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-y-3 before:-right-3 before:left-0 before:content-['']"
       onClick={e => { e.stopPropagation(); onRemove() }}
       aria-label={`Remove ${label}`}
     >
@@ -48,7 +49,7 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
           // <button> can't contain another <button>).
           <button
             type="button"
-            className="cursor-pointer underline underline-offset-2 decoration-current/60"
+            className="relative cursor-pointer underline underline-offset-2 decoration-current/60 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-y-3 before:inset-x-0 before:content-['']"
             onClick={onNavigate}
           >
             {label}
@@ -87,7 +88,7 @@ export function AddChip({ label, onClick }: AddChipProps) {
   return (
     <button
       type="button"
-      className={cn(badgeVariants({ variant: 'link' }), 'cursor-pointer gap-1')}
+      className={cn(badgeVariants({ variant: 'link' }), "relative cursor-pointer gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-y-3 before:inset-x-0 before:content-['']")}
       onClick={onClick}
     >
       <Plus size={9} />
