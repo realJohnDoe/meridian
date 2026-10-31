@@ -5,7 +5,7 @@ import { OccurrenceCard } from '@/components'
 import { useStore } from '@/store'
 import { useEntryAccess } from '@/hooks'
 import { fmtShort } from '@/format'
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@/components/primitives/badge'
 import SwipeToDeleteRow from './SwipeToDeleteRow'
 
 interface Props {

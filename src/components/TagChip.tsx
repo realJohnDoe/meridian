@@ -1,5 +1,5 @@
 import { Plus, X } from 'lucide-react'
-import { Badge, badgeVariants } from './ui/badge'
+import { Badge, badgeVariants } from './primitives/badge'
 import { cn } from '@/lib/cn'
 
 interface TagChipProps {

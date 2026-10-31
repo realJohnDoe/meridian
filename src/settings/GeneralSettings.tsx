@@ -5,7 +5,7 @@ import type { OccColorBy } from '@/occView'
 import { setDefaultVault } from '@/vaultActions'
 import { isWritableVault } from '@/vaultRef'
 import { cn } from '@/lib/cn'
-import { badgeVariants } from '@/components/ui/badge'
+import { badgeVariants } from '@/components/primitives/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,

@@ -15,7 +15,7 @@ import {
 } from '@/components/primitives/responsive-modal'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { segmentedGroupVariants, segmentedItemVariants } from '../segmentedGroup'
-import { badgeVariants } from '@/components/ui/badge'
+import { badgeVariants } from '@/components/primitives/badge'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import { NumberUnitInput } from './NumberUnitInput'
