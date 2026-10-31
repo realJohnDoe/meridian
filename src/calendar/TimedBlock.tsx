@@ -72,6 +72,10 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
   const dimmed = isDimmed(o)
 
   const showBadges = dh >= EVENT_BADGE_MIN_HOURS
+  // Whole 16px title lines that fit between the block's vertical padding (8 or
+  // 4px per side), so a short block truncates to one line instead of cutting
+  // the second in half.
+  const titleLines = Math.max(1, Math.floor((height - (showBadges ? 16 : 8)) / 16))
   const badgeWidthGate = durationLabel ? BADGE_WIDTH_GATE : TIME_ONLY_WIDTH_GATE
   const ariaLabel = [o.metadata.title, timeLabel, o.metadata.duration, chip?.label].filter(Boolean).join(', ')
 
@@ -98,10 +102,15 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
       onClick={() => onOpen(o)}
       aria-label={ariaLabel}
     >
-      <div className={cn(
-        'w-full shrink-0 font-semibold overflow-hidden',
-        compact ? 'whitespace-normal break-words line-clamp-2' : 'text-ellipsis whitespace-nowrap',
-      )}>
+      <div
+        className={cn(
+          'w-full shrink-0 font-semibold overflow-hidden',
+          compact
+            ? cn('whitespace-normal line-clamp-2', titleLines > 1 && 'break-words')
+            : 'text-ellipsis whitespace-nowrap',
+        )}
+        style={compact ? { WebkitLineClamp: Math.min(titleLines, 2) } : undefined}
+      >
         {o.metadata.title}
       </div>
       {showBadges && (
