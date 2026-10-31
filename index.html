@@ -34,7 +34,21 @@
     <meta name="theme-color" content="#011227" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#e8edf4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#011227" />
-<title>Meridian</title>
+    <!-- Pre-paint theme class. next-themes ships the same script, but React never
+         executes a <script> it renders client-side, so without this the first
+         paint is :root's default (Meridian Dark) until ThemeProvider's effect
+         runs. Keep the map in step with THEME_CLASS in routes/__root.tsx —
+         routes/__root.test.tsx pins the two together. -->
+    <script>
+      (function () {
+        var m = {"light":"meridian-light","dark":"meridian","meridian":"meridian","meridian-light":"meridian-light","tokyo-night":"tokyo-night","catppuccin-latte":"catppuccin-latte","catppuccin-mocha":"catppuccin-mocha","rose-pine-dawn":"rose-pine-dawn","solarized-light":"solarized-light","solarized-dark":"solarized-dark","dracula":"dracula"};
+        var t = 'system';
+        try { t = localStorage.getItem('meridian_theme') || t; } catch (e) {}
+        if (t === 'system') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        if (m[t]) document.documentElement.classList.add(m[t]);
+      })();
+    </script>
+    <title>Meridian</title>
     <meta name="description" content="Tasks and a calendar that are actually good on your phone, stored as plain Markdown files you own. A free, open-source PWA for Obsidian and Markdown vault users.">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Meridian">
