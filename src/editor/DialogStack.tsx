@@ -5,7 +5,7 @@ import SeriesDeleteDialog from './dialogs/SeriesDeleteDialog'
 import PriorityDrawer from './dialogs/PriorityDrawer'
 import TimePickerDialog from './dialogs/TimePickerDialog'
 import DurationDialog from './dialogs/DurationDialog'
-import { fmtISO } from '@/model'
+import { fmtISO, repeatUntil } from '@/model'
 import { useToday } from '@/hooks'
 import { itemTypeOf, type EntryState } from './state'
 import type { DialogHandlers } from './useEntryEditor'
@@ -29,6 +29,9 @@ export default function DialogStack({ entry, handlers }: Props) {
       <DatePickerDialog
         open={activeDialog === 'dlgSched'}
         initialDate={entry.scheduled?.date || fmtISO(today)}
+        // A pattern can't start after its own end — the `until` a split wrote
+        // onto the earlier leg is the usual one (see `startsAfterEnd`).
+        max={repeatUntil(entry.repeat)}
         onConfirm={onDateConfirm}
         onRemove={onDateRemove}
         onClose={onClose}

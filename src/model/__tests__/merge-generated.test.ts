@@ -13,9 +13,8 @@
  *    date — the split-vs-tick race the issue warns about — vanishes from the
  *    expansion and fails here.
  *  - Liveness: when neither side changed the series' shape (a split, or a
- *    rule or anchor edit at scope `all`), the base has no two instances on one
- *    date, and the union has no conflict, the merge must not fall back to a
- *    conflict copy. After a shape change a copy is always
+ *    rule or anchor edit at scope `all`) and the union has no conflict, the
+ *    merge must not fall back to a conflict copy. After a shape change a copy is always
  *    allowed; it is the safe answer, not a lost update.
  *
  * CI pins `seed`/`numRuns`; roam locally by raising `numRuns` and dropping
@@ -23,7 +22,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
-import { TEST_VAULT, NEW_TARGET, dataOf, rootsOf, itemsOf, rootsIn, serializeOnly, frontmatterOf } from './helpers'
+import { TEST_VAULT, NEW_TARGET, dataOf, rootsOf, itemsOf, rootsIn, serializeOnly } from './helpers'
 import { applyEdit, toggleDone } from '@/model/storeOps'
 import type { EditFields, StoreData } from '@/model/storeOps'
 import { parseToStoreItems } from '@/model/storeItems'
@@ -130,12 +129,6 @@ function union(b: View, l: View, r: View): View | null {
   return out
 }
 
-/** A base the merge refuses by design: two instances share a date, so neither has an identity. */
-function duplicateDates(source: string): boolean {
-  const dates = ((frontmatterOf(source).instances ?? []) as Array<{ date: unknown }>).map(i => String(i.date))
-  return new Set(dates).size !== dates.length
-}
-
 const caseArb = fc.record({
   freq: fc.constantFrom('daily', 'weekly'),
   // The shared history: ticks, and possibly a split, so legs are in the base.
@@ -160,7 +153,7 @@ describe('mergeFileContent — generated series edits (#1222)', () => {
           const actual = view(merged)
           for (const [date, slot] of expected!) if (!('title' in slot)) delete actual.get(date)?.title
           expect(actual).toEqual(expected)
-        } else if (![...local, ...remote].some(reshapes) && !duplicateDates(base)) {
+        } else if (![...local, ...remote].some(reshapes)) {
           expect(expected).toBeNull()
         }
       }),
