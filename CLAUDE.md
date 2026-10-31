@@ -47,8 +47,6 @@ Once the first changeset of a session/task has been applied and verified (build/
 
 After changing any files, check whether an open PR already covers the current branch; if the changes aren't included in any open PR yet, open a new one.
 
-Once a PR is open, watch it for CI failures and fix them.
-
 Use the `tracemap-pr` skill from [realJohnDoe/tracemap](https://github.com/realJohnDoe/tracemap) (`skills/tracemap-pr/SKILL.md`) on every PR to add trace map images to its description; it decides itself when none would help.
 
 Label every issue an agent creates `Sonnet` (well-scoped, mechanical) or
