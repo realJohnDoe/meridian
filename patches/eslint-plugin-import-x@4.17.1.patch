@@ -1,0 +1,23 @@
+diff --git a/lib/rules/no-internal-modules.js b/lib/rules/no-internal-modules.js
+index cf3696278157c4a5b2623ed634ef367387b042bc..92b9e7cb39bc7f7164ff626be8871ccf5fc21e54 100644
+--- a/lib/rules/no-internal-modules.js
++++ b/lib/rules/no-internal-modules.js
+@@ -1,4 +1,4 @@
+-import { makeRe } from 'minimatch';
++import { minimatch } from 'minimatch';
+ import { importType, createRule, moduleVisitor, resolve, } from '../utils/index.js';
+ function normalizeSep(somePath) {
+     return somePath.split('\\').join('/');
+@@ -67,10 +67,10 @@ export default createRule({
+     create(context) {
+         const options = context.options[0] || {};
+         const allowRegexps = (options.allow || [])
+-            .map(p => makeRe(p))
++            .map(p => ({ test: s => minimatch(s, p) }))
+             .filter(Boolean);
+         const forbidRegexps = (options.forbid || [])
+-            .map(p => makeRe(p))
++            .map(p => ({ test: s => minimatch(s, p) }))
+             .filter(Boolean);
+         function reachingAllowed(importPath) {
+             return allowRegexps.some(re => re.test(importPath));
