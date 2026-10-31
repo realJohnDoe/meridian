@@ -32,6 +32,7 @@
 import { loadFile } from '@/fileIO'
 import { saveFile } from './inheritance'
 import type { EditFields } from './storeOps'
+import { yamlKeyRole } from './fieldRegistry'
 
 /**
  * Structural equality for parsed-YAML values and editor field values alike:
@@ -225,9 +226,9 @@ export function mergeFileContent(
   remote: string,
 ): string | null {
   if (local === remote) return local
-  const b = loadFile(path, base)
-  const l = loadFile(path, local)
-  const r = loadFile(path, remote)
+  const b = loadFile(path, base, yamlKeyRole)
+  const l = loadFile(path, local, yamlKeyRole)
+  const r = loadFile(path, remote, yamlKeyRole)
 
   const rawNode = mergeRawNodes(b.rawNode, l.rawNode, r.rawNode)
   if (rawNode === null) return null
