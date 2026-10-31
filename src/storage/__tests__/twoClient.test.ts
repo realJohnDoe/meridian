@@ -299,4 +299,17 @@ describe('two-client concurrent edits', () => {
     expect(copy).toBeDefined()
     expect(remote.get(copy ?? '')?.content).toContain("A's rewrite")
   })
+
+  it('a hand-broken remote file does not wedge the rest of the vault (#1221)', async () => {
+    remote.seed('a-note.md', `---\ntitle: A\n---\n\nx\n`)
+    remote.seed('z-note.md', `---\ntitle: Z\n---\n\nz\n`)
+    const A = makeClient('deviceA'); registerVaults(A)
+    await sync(A)
+    remote.seed('a-note.md', `---\ntitle: [A\n---\n\nhand edit\n`)
+    await settle(writeEntityToCache(entryKey(A.vaultId, 'a-note'), `---\ntitle: A2\n---\n\nx\n`))
+    await settle(writeEntityToCache(entryKey(A.vaultId, 'z-note'), `---\ntitle: Z2\n---\n\nz\n`))
+    await sync(A)
+    expect(remote.get('z-note.md')!.content).toContain('Z2')
+    expect(useStore.getState().syncByVault.get(A.vaultId)?.offline).toBe(false)
+  })
 })
