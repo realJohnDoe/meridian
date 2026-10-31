@@ -13,7 +13,7 @@ import {
   ResponsiveModalActions,
 } from '@/components/primitives/responsive-modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { badgeVariants } from '@/components/ui/badge'
+import { badgeVariants } from '@/components/primitives/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/cn'

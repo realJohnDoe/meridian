@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { Badge } from '@/components/ui/badge'
+import { Badge } from '@/components/primitives/badge'
 
 interface Props {
   label: string

@@ -1,8 +1,10 @@
 import * as React from 'react'
 import { useMediaQuery } from '@/hooks'
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/dialog'
-import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerActions } from '../ui/drawer'
+import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerFooter } from '../ui/drawer'
+import { X } from 'lucide-react'
 import { Separator } from './separator'
+import { Button } from './button'
 import { cn } from '@/lib/cn'
 
 const ModalContext = React.createContext(false) // false = mobile (drawer)
@@ -109,14 +111,24 @@ function ResponsiveModalActions(props: ResponsiveModalActionsProps) {
   const removeLabel = props.removeLabel ?? 'Remove'
   const isDesktop = React.use(ModalContext)
   return (
-    <DrawerActions
-      onRemove={onRemove}
-      onCancel={onCancel}
-      onSet={onSet}
-      removeLabel={removeLabel}
-      setDisabled={setDisabled}
-      className={isDesktop ? 'pb-4' : undefined}
-    />
+    <>
+      <Separator />
+      <DrawerFooter className={isDesktop ? 'pb-4' : undefined}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+          onClick={onRemove}
+        >
+          <X size={13} />
+          {removeLabel}
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
+          <Button size="sm" disabled={setDisabled} onClick={onSet}>Set</Button>
+        </div>
+      </DrawerFooter>
+    </>
   )
 }
 
