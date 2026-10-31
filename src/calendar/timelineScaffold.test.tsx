@@ -147,11 +147,18 @@ describe('timeline scaffold — the now-line span each pane needs', () => {
   })
 
   it('puts both panes’ lines at the same vertical position for the same clock', () => {
-    const { container: dayEl, unmount } = renderDay()
-    const dayTop = dayEl.querySelector<HTMLElement>('.now-line')!.style.top
-    unmount()
+    // Same clock for both renders: on the real one they can straddle a minute
+    // boundary and land a minute apart.
+    vi.useFakeTimers({ toFake: ['Date'], now: TODAY })
+    try {
+      const { container: dayEl, unmount } = renderDay()
+      const dayTop = dayEl.querySelector<HTMLElement>('.now-line')!.style.top
+      unmount()
 
-    const { container: weekEl } = renderWeek()
-    expect(weekEl.querySelector<HTMLElement>('.now-line')!.style.top).toBe(dayTop)
+      const { container: weekEl } = renderWeek()
+      expect(weekEl.querySelector<HTMLElement>('.now-line')!.style.top).toBe(dayTop)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

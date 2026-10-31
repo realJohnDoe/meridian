@@ -116,12 +116,12 @@ export function foldEdits(prev: Edits, from: EntryState, to: EntryState, view: E
 }
 
 /**
- * The fields whose meaning depends on the edit scope — the three `applyScope`
- * re-derives. `scheduled` and `repeat` name this occurrence at 'single' and
- * the series at 'all'/'future'; `done` is blanked for 'add', which is about to
- * create a different occurrence entirely.
+ * The fields whose meaning depends on the edit scope. `scheduled`, `repeat`
+ * and the occurrence-level `participants`/`priority`/`duration` name this
+ * occurrence at 'single' and the series at 'all'/'future' (#1191); `done` is
+ * blanked for 'add', which is about to create a different occurrence entirely.
  */
-const SCOPED_FIELDS = ['scheduled', 'repeat', 'done'] as const satisfies ReadonlyArray<keyof EditFields>
+const SCOPED_FIELDS = ['scheduled', 'repeat', 'done', 'participants', 'priority', 'duration'] as const satisfies ReadonlyArray<keyof EditFields>
 
 /**
  * Drop the scope-dependent edits, for a scope change.
@@ -132,7 +132,7 @@ const SCOPED_FIELDS = ['scheduled', 'repeat', 'done'] as const satisfies Readonl
  * answer at the *old* scope — is not a baseline for anything at the new one.
  * Carrying either across is how a scope switch turns into a phantom second
  * writer. The old form-and-base pair did the same thing by overwriting these
- * three on every scope change; here it is one place and says why.
+ * on every scope change; here it is one place and says why.
  *
  * Everything else is scope-independent (a title is the file's title at every
  * scope) and rides through untouched.

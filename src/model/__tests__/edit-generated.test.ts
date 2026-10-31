@@ -33,9 +33,6 @@
  *  - a move (or an `add`) never lands on a slot another occurrence already
  *    holds: that slot's override key is the recurrence id, so the two are one row.
  *
- * One exclusion is a known bug, guarded by a comment naming its issue
- * (#1191) — drop the guard when the issue is fixed.
- *
  * CI pins `seed`/`numRuns`; roam locally by raising `numRuns` and dropping
  * `seed`, and turn any find into an example test in `edits.test.ts`.
  */
@@ -174,8 +171,9 @@ function changeArb(scope: EditScope, afterCompletion: boolean): fc.Arbitrary<Cha
 
 /** What the editor's form holds for `occ` at `scope` (cf. `editor/save.ts`'s `applyScope`). */
 function formFor(occ: Occurrence, data: StoreData, scope: EditScope): EditFields {
-  const m = occ.metadata
   const series = itemsOf(data).find(i => 'repeat' in i && i.id === occ.ownerId)
+  // At all/future the form shows the series' own values, not the override's.
+  const m = series && scope !== 'single' && scope !== 'add' ? { ...occ.metadata, ...series.metadata, done: occ.metadata.done } : occ.metadata
   const scheduled = scope === 'all' && series
     ? { date: series.date, time: series.time ?? '' }
     : { date: occ.date, time: occ.time ?? '' }
@@ -258,9 +256,6 @@ describe('applyEdit — generated (issue #1176)', () => {
         // The editor never offers 'future' on an after_completion series
         // (`EntryEditor.tsx`'s scope select), so it has no split to check.
         if (scope === 'future') fc.pre(!ac)
-        // All/future write every occurrence field, touched or not, so an
-        // override's own priority is lost or spreads to the series: #1191.
-        if (scope === 'all' || scope === 'future') fc.pre(!shape.overrides.some(o => o.kind === 'priority'))
         const form = formFor(occ, data, scope)
         const fields = withChange(form, change)
         const target = { date: fields.scheduled!.date, time: fields.scheduled!.time || null }
@@ -284,7 +279,9 @@ describe('applyEdit — generated (issue #1176)', () => {
           case 'future': {
             const covered = (o: { date: string }) => scope === 'all' || o.date >= occ.date
             const prio = change.kind === 'priority' ? change.value : undefined
-            const expected = before.map(o => !covered(o) || prio === undefined ? view(o) : view({ ...o, metadata: { ...o.metadata, priority: prio ?? undefined } }))
+            // An override's own priority wins over the series' change (#1191).
+            const inherits = (o: Occurrence) => o.metadata.priority === (shape.priority ?? undefined)
+            const expected = before.map(o => !covered(o) || prio === undefined || !inherits(o) ? view(o) : view({ ...o, metadata: { ...o.metadata, priority: prio ?? undefined } }))
             expect(views(occsAfter)).toEqual(expected.sort())
           }
         }
