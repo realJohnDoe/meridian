@@ -37,6 +37,25 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run test:coverage
       - run: pnpm run knip
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  e2e:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Only dist/ is needed here; the type checks in `pnpm run build` already
+      # run in the job above.
+      - run: pnpm exec vite build
       # Layout regressions are invisible to every other gate here: all of src/
       # tests under jsdom, which has no layout engine and therefore no opinion
       # about heights, scrolling, or where anything lands on screen — see
@@ -45,10 +64,9 @@ jobs:
       # why pixel-sampling, and why axe-core alone can't do it; it's ratcheted
       # per (theme, route) rather than gated as a hard pass/fail, so a
       # regression in one combo can't hide behind an improvement in another.
-      # Both specs serve the dist/ that `pnpm run build` produced above,
-      # through the same `webServer` in playwright.config.ts.
-      - run: pnpm exec playwright install --with-deps chromium
+      # Both specs serve the dist/ that `pnpm run build` produces, through the
+      # same `webServer` in playwright.config.ts. Its own job so the slowest
+      # two steps (unit coverage and this) run side by side instead of in
+      # series. `--only-shell`: headless runs only use the headless shell.
+      - run: pnpm exec playwright install --with-deps --only-shell chromium
       - run: pnpm run test:e2e
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: dist

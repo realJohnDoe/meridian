@@ -9,7 +9,7 @@ import { defineConfig } from '@playwright/test'
  *
  * Needs `pnpm run build` first: `webServer` below serves the built `dist/`
  * through `vite preview`, the same way `pnpm run preview` does. It does not
- * run the build itself, matching the CI step ordering in `build.yml`.
+ * run the build itself, matching `build.yml`'s e2e job.
  *
  * `CHROMIUM_PATH`, if set, launches that binary instead of the browser
  * Playwright would otherwise resolve — this sandbox's preinstalled chromium
@@ -31,6 +31,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
+  // Playwright defaults to half the cores on CI — 2 on GitHub's 4-vCPU runner.
+  workers: process.env.CI ? 4 : undefined,
   reporter: process.env.CI ? 'github' : 'list',
   webServer: {
     command: `pnpm exec vite preview --host ${HOST} --port ${PORT} --strictPort`,
