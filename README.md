@@ -2,8 +2,7 @@
 
 **Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**
 
-<img src="public/screenshots/agenda-narrow.png" width="340" alt="Meridian's agenda view on a phone, showing scheduled tasks and events grouped by day." />
-<video src="public/screenshots/capture-narrow.mp4" width="340" autoplay loop muted playsinline title="Capturing a task on a phone: tap the bar, type, press Enter.">Capture demo: <a href="public/screenshots/capture-narrow.mp4">tap the bar, type &quot;Call mom&quot;, press Enter — a task dated today.</a></video>
+<img src="public/screenshots/capture-narrow.webp" width="340" alt="Meridian on a phone: the agenda, then tapping the bottom bar, typing 'Call mom' and pressing Enter creates a task dated today." />
 
 **Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 
