@@ -49,6 +49,10 @@ function auditRoundTrip(parsed: Array<{ path: string; content: string; result: P
   )
 }
 
+/**
+ * Parse a whole vault in one synchronous loop. This is on the first-paint path
+ * and file-linear (~700 ms at 10 000 files in dev); batching it is #1265.
+ */
 export function parseFiles(
   files: Array<{ path: string; content: string }>,
   vaultId: string,

@@ -69,8 +69,8 @@ window.__perf = (() => {
    * Wait until no Long Animation Frame has ended in the last quietMs, or
    * timeoutMs total elapses — whichever comes first. LoAF, not longtask, is
    * the signal: it's what actually captured the cold-start confounds (idle
-   * warm-up, Dexie's cache write) a scroll-flow profile ran into (finding 4,
-   * plans/reports/vault-scaling.md) as attributed entries, including bursts
+   * warm-up, Dexie's cache write) a scroll-flow profile ran into (#1264) as
+   * attributed entries, including bursts
    * of individually-short callbacks that never cross the longtask
    * threshold. Meant to run right before a flow that wants to measure
    * steady-state cost rather than whatever cold-start work is still

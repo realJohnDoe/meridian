@@ -118,6 +118,9 @@ export default function AgendaView({ onOpen }: Props) {
   // store subscriptions and a backlink lookup) in one synchronous commit.
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
+    // Scroll cost tracks this — the loaded run — not the ~26 mounted rows: a
+    // row measuring differently from its estimate rebuilds measurements up to
+    // `count`. See #1264.
     count: rows.length,
     getScrollElement: () => scRef.current,
     // `count` is rows.length, so the virtualizer only ever asks for i in range.
