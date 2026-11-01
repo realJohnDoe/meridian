@@ -3,6 +3,7 @@
 **Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**
 
 <img src="public/screenshots/agenda-narrow.png" width="340" alt="Meridian's agenda view on a phone, showing scheduled tasks and events grouped by day." />
+<video src="public/screenshots/capture-narrow.mp4" width="340" autoplay loop muted playsinline title="Capturing a task on a phone: tap the bar, type, press Enter.">Capture demo: <a href="public/screenshots/capture-narrow.mp4">tap the bar, type &quot;Call mom&quot;, press Enter — a task dated today.</a></video>
 
 **Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 
@@ -37,7 +38,7 @@ The first row is the one that can't be added later. Google Calendar and Todoist 
 
 Everything else:
 
-- **Built for the phone** — one-handed capture and navigation, not a desktop layout squeezed narrow. Add it to your home screen or desktop like any native app (it's a PWA).
+- **Built for the phone** — capture is one tap on the bar at the bottom of the screen, the title, and Enter: a task dated today. One-handed capture and navigation, not a desktop layout squeezed narrow. Add it to your home screen or desktop like any native app (it's a PWA).
 - **Recurrence that bends to real life** — daily, weekly, monthly, yearly, custom intervals, weekday-specific patterns, and "repeat N days after completion" — plus per-occurrence overrides and several patterns in one entry, without fiddling with a wizard. [The full model →](#4-a-recurrence-model-that-bends-to-real-life)
 - **One kind of entry, on as many lists as you like** — tasks, events and notes are all the same kind of thing, so you never have to decide whether something is a task, a subtask or a project. "Pizza" can sit on *This Week* and on *Cooking* at once; a task can be a subtask of a project and still be tagged, and still hang off an event. [How that works →](#3-lists-model-hierarchies)
 - **Agenda, day, and month views** — tasks and events together, in whatever layout suits the moment.
