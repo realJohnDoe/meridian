@@ -1,4 +1,4 @@
-import { format, isValid, parseISO, addDays, startOfDay, endOfDay } from 'date-fns'
+import { isValid, parseISO, addDays, startOfDay, endOfDay } from 'date-fns'
 
 import { scalarToString } from './fieldRegistry'
 
@@ -15,8 +15,13 @@ export function weekStartsOn(prefs: LocalePrefs): 0 | 1 | 6 {
   return 1
 }
 
+const pad2 = (n: number): string => String(n).padStart(2, '0')
+
+// Hand-rolled rather than date-fns `format()`, which re-tokenises its pattern on every call
+// and dominated expansion time. Keeps format()'s throw on an Invalid Date.
 export function fmtISO(d: Date): string {
-  return format(d, 'yyyy-MM-dd')
+  if (Number.isNaN(d.getTime())) throw new RangeError('Invalid time value')
+  return `${String(d.getFullYear()).padStart(4, '0')}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
 /** Format a Date as `YYYY-MM` for use in calendar route params. */
@@ -58,7 +63,7 @@ export function fmtT(v: unknown, hour12 = false): string | null {
     const h = v.getHours(), m = v.getMinutes()
     if (!h && !m) return null
     if (hour12) return toHour12(h, m)
-    return format(v, 'HH:mm')
+    return `${pad2(h)}:${pad2(m)}`
   }
   return null
 }

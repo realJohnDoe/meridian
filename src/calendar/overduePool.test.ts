@@ -45,7 +45,7 @@ function toEntries(items: StoreItem[], roots: Roots = ROOTS): Entries {
 }
 
 const pool = (items: StoreItem[], filter: FilterOccs = noFilter) =>
-  computeOverduePool(null, toEntries(items), ROOTS, TODAY, filter).groups
+  computeOverduePool(null, toEntries(items), ROOTS, TODAY, filter, 'none').groups
 
 describe('computeOverduePool', () => {
   it('collapses a year of an undone weekly task into one group with its count and oldest date', () => {
@@ -164,20 +164,28 @@ describe('computeOverduePool', () => {
 
   it('returns the identical cache when every input keeps its identity', () => {
     const entries = toEntries([occ('a', '2026-06-10')])
-    const first = computeOverduePool(null, entries, ROOTS, TODAY, noFilter)
-    const second = computeOverduePool(first, entries, ROOTS, new Date(2026, 5, 15), noFilter)
+    const first = computeOverduePool(null, entries, ROOTS, TODAY, noFilter, 'none')
+    const second = computeOverduePool(first, entries, ROOTS, new Date(2026, 5, 15), noFilter, 'none')
 
     expect(second).toBe(first)
+  })
+
+  it('keys on filterKey, not on the filterOccs identity', () => {
+    const entries = toEntries([occ('a', '2026-06-10')])
+    const first = computeOverduePool(null, entries, ROOTS, TODAY, noFilter, 'k')
+
+    expect(computeOverduePool(first, entries, ROOTS, TODAY, x => x, 'k')).toBe(first)
+    expect(computeOverduePool(first, entries, ROOTS, TODAY, noFilter, 'other')).not.toBe(first)
   })
 
   it('recomputes when items change, re-expanding only the changed entry', () => {
     const KEY2 = testKey('other.md')
     const roots: Roots = new Map([...ROOTS, [KEY2, makeRootMeta('other.md')]])
     const entries = toEntries([occ('a', '2026-06-10')], roots)
-    const first = computeOverduePool(null, entries, roots, TODAY, noFilter)
+    const first = computeOverduePool(null, entries, roots, TODAY, noFilter, 'none')
     const next = new Map(entries)
     next.set(KEY2, { key: KEY2, root: roots.get(KEY2)!, items: [occ('b', '2026-06-11', { entryKey: KEY2 })] })
-    const second = computeOverduePool(first, next, roots, TODAY, noFilter)
+    const second = computeOverduePool(first, next, roots, TODAY, noFilter, 'none')
 
     expect(second).not.toBe(first)
     expect(second.groups.map(g => g.key)).toEqual(['a', 'b'])
@@ -196,7 +204,7 @@ describe('computeOverduePool', () => {
 
   it('carries the file-level title onto the representative occurrence', () => {
     const roots: Roots = new Map([[KEY, makeRootMeta('note.md', { title: 'Pay the invoice' })]])
-    const { groups } = computeOverduePool(null, toEntries([occ('a', '2026-06-10')], roots), roots, TODAY, noFilter)
+    const { groups } = computeOverduePool(null, toEntries([occ('a', '2026-06-10')], roots), roots, TODAY, noFilter, 'none')
 
     const rep: Occurrence = groups[0]!.occ
     expect(rep.metadata.title).toBe('Pay the invoice')

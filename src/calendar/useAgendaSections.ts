@@ -94,7 +94,7 @@ export function useAgendaSections(
   const { filterOccs, filterKey } = useCalendarFilter()
 
   const cachedPool = overduePoolSlot.get(SECTIONS_CACHE_KEY) ?? null
-  const pool = computeOverduePool(cachedPool, entries, roots, today, filterOccs)
+  const pool = computeOverduePool(cachedPool, entries, roots, today, filterOccs, filterKey)
   if (pool !== cachedPool) {
     overduePoolSlot.set(SECTIONS_CACHE_KEY, pool)
   }
