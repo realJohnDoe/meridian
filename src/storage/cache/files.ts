@@ -193,6 +193,9 @@ export async function markMerged(
   if (wrote) publishCacheChange(vaultId, [path])
 }
 
+/** Rows per `applyRemoteBatch` transaction. */
+const REMOTE_BATCH_CHUNK = 500
+
 /**
  * Bulk-write freshly-pulled remote content as clean — but skip any record a
  * local edit or delete has touched since the caller's cacheLoadAll snapshot
@@ -208,9 +211,10 @@ export async function markMerged(
  * (typically the user's still-in-progress edit) rather than either the
  * pre-edit snapshot or the now-superseded remote content.
  *
- * One transaction for the whole pull: 21 s for 30 000 rows on first connect
- * (2026-08-28). Chunking it, without splitting a chunk's check from its write,
- * is #1266.
+ * One transaction per chunk, not per pull: a single transaction held the
+ * store for 21 s at 30 000 rows on first connect (2026-08-28). Each chunk's
+ * dirty check and write share a transaction, so a concurrent local edit still
+ * can't be clean-stamped over.
  */
 export async function applyRemoteBatch(
   vaultId: string,
@@ -219,18 +223,20 @@ export async function applyRemoteBatch(
   const d = await cacheInit()
   const now = Date.now()
   const written: string[] = []
-  await d.transaction('rw', d.files, async () => {
-    const keys = records.map(r => vp(vaultId, r.path))
-    const existingRecords = await d.files.bulkGet(keys)
-    const toPut: DexieFileRow[] = []
-    records.forEach((r, i) => {
-      const existing = existingRecords[i]
-      if (existing && existing.dirty !== DIRTY_BY_STATUS.clean) return
-      toPut.push({ vaultPath: vp(vaultId, r.path), vaultId, ...r, dirty: DIRTY_BY_STATUS.clean, updatedAt: now })
-      written.push(r.path)
+  for (let i = 0; i < records.length; i += REMOTE_BATCH_CHUNK) {
+    const chunk = records.slice(i, i + REMOTE_BATCH_CHUNK)
+    await d.transaction('rw', d.files, async () => {
+      const existingRecords = await d.files.bulkGet(chunk.map(r => vp(vaultId, r.path)))
+      const toPut: DexieFileRow[] = []
+      chunk.forEach((r, j) => {
+        const existing = existingRecords[j]
+        if (existing && existing.dirty !== DIRTY_BY_STATUS.clean) return
+        toPut.push({ vaultPath: vp(vaultId, r.path), vaultId, ...r, dirty: DIRTY_BY_STATUS.clean, updatedAt: now })
+        written.push(r.path)
+      })
+      if (toPut.length > 0) await d.files.bulkPut(toPut)
     })
-    if (toPut.length > 0) await d.files.bulkPut(toPut)
-  })
+  }
   publishCacheChange(vaultId, written)
   return written
 }
