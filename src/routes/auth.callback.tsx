@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { toast } from 'sonner'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultOAuth, reauthGitHubVault,
@@ -129,7 +130,7 @@ function AuthCallbackPage() {
 
   async function connect(tokens: OAuthTokens, repo: InstalledRepo) {
     setPhase({ kind: 'connecting' })
-    await addGitHubVaultOAuth({
+    const vaultId = await addGitHubVaultOAuth({
       owner:        repo.owner,
       repo:         repo.repo,
       branch:       repo.branch,
@@ -138,6 +139,19 @@ function AuthCallbackPage() {
       expiresAt:    tokens.expiresAt,
     })
     void navigate({ to: '/' })
+    if (!vaultId) return
+    // Sharing is taught once the user has something to share: right after
+    // their first GitHub vault, the only kind another person can join. "Once"
+    // falls out of the condition — any later GitHub vault isn't the only one.
+    await waitForVaultsLoaded()
+    if (useStore.getState().vaults.filter(v => v.kind === 'github').length === 1) {
+      toast('Invite someone to this calendar?', {
+        description: 'Add a collaborator on GitHub and send them an invite message.',
+        duration: 15000,
+        action: { label: 'Invite', onClick: () => void navigate({ to: '/settings/vault/$vaultId', params: { vaultId } }) },
+        cancel: { label: 'Not now', onClick: () => {} },
+      })
+    }
   }
 
   if (phase.kind === 'exchanging') return <CenteredMessage title="Finishing sign-in…" />
