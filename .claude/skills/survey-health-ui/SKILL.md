@@ -135,7 +135,7 @@ Rank and report findings per the [shared convention](../_survey/conventions.md#r
 
 **Breadth-in-files under-ranks concentrated findings — say so rather than inflating it.** A god component is, by construction, one file: the whole defect is that N repetitions of one concern live in the same place. So `(impact × breadth) ÷ effort` scores it below a one-line lint tweak whose guard happens to span 100 files, and the ranking then contradicts this survey's own instruction to prefer systemic and structural issues. Do not fix this by padding the breadth count. Report the honest file count, and where the rank and the impact disagree, add one line under the summary table saying which findings the formula demotes and why. The reader can then re-sort on impact, which is what the separate-fields rule is for.
 
-List the **top 10 findings**, numbered (the category verdicts above reference
+List the **top 7 findings**, numbered (the category verdicts above reference
 these numbers), per [Don't pad the findings
 list](../_survey/conventions.md#dont-pad-the-findings-list) and [prefer systemic
 findings](../_survey/conventions.md#finding-fields).

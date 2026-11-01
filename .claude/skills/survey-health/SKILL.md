@@ -166,7 +166,7 @@ Rank and report findings per the [shared convention](../_survey/conventions.md#r
 
 When the ranking formula puts a low-impact finding above a high-impact one (a wide, cheap toolchain fix outranking a narrow correctness bug, say), **say so in one line under the summary table** and name which finding a reader sorting by raw impact should look at first. The same note covers the other way the formula distorts: when a real finding falls out of the top N purely on effort — the usual case being an architecture finding, which is both the highest-weight category and the most expensive to fix — name it in one line below the findings rather than dropping it silently, so "category 1: clean" never appears when the truth is "category 1's finding didn't survive the divisor". The formula is a default order, not a claim about what matters most, and silently shipping an inverted order makes the table read as the latter.
 
-List the **top 10 findings**, numbered (the category verdicts above reference
+List the **top 7 findings**, numbered (the category verdicts above reference
 these numbers), per [Don't pad the findings
 list](../_survey/conventions.md#dont-pad-the-findings-list) and [prefer systemic
 findings](../_survey/conventions.md#finding-fields).
