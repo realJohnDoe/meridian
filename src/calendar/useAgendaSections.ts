@@ -86,6 +86,7 @@ export function useAgendaSections(
   anchor: Date = today,
 ): { rows: AgendaRow[]; goToRowIndex: number } {
   const items = useStore(s => s.items)
+  const entries = useStore(s => s.entries)
   const roots = useStore(s => s.roots)
   const ws = weekStartsOn(useStore(s => s.localePrefs))
 
@@ -121,7 +122,7 @@ export function useAgendaSections(
     return onIdle(() => { setPoolPending(false) })
   }, [poolPending])
 
-  const pool = poolPending ? null : computeOverduePool(cachedPool, items, roots, today, filterOccs, filterKey)
+  const pool = poolPending ? null : computeOverduePool(cachedPool, entries, roots, today, filterOccs, filterKey)
   if (pool && pool !== cachedPool) {
     overduePoolSlot.set(SECTIONS_CACHE_KEY, pool)
   }

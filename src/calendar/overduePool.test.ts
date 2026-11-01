@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { StoreItem, StoreOcc, StoreSeries, Roots, Occurrence } from '@/types'
+import type { StoreItem, StoreOcc, StoreSeries, Roots, Occurrence, Entries, Entry } from '@/types'
 import { computeOverduePool } from './overduePool'
 import type { FilterOccs } from './useCalendarFilter'
 import { testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
@@ -34,8 +34,18 @@ function override(id: string, ownerId: string, date: string, over: Partial<Store
   return { ...occ(id, date), source: 'generated', ownerId, ...over }
 }
 
+/** Entries from items, one entry per distinct `entryKey` (default KEY). */
+function toEntries(items: StoreItem[], roots: Roots = ROOTS): Entries {
+  const byKey = new Map<Entry['key'], StoreItem[]>()
+  for (const i of items) byKey.set(i.entryKey, [...(byKey.get(i.entryKey) ?? []), i])
+  return new Map([...byKey].map(([key, its]) => [
+    key,
+    { key, root: roots.get(key) ?? makeRootMeta('note.md'), items: its as Entry['items'] },
+  ]))
+}
+
 const pool = (items: StoreItem[], filter: FilterOccs = noFilter) =>
-  computeOverduePool(null, items, ROOTS, TODAY, filter, 'none').groups
+  computeOverduePool(null, toEntries(items), ROOTS, TODAY, filter, 'none').groups
 
 describe('computeOverduePool', () => {
   it('collapses a year of an undone weekly task into one group with its count and oldest date', () => {
@@ -153,33 +163,48 @@ describe('computeOverduePool', () => {
   })
 
   it('returns the identical cache when every input keeps its identity', () => {
-    const items = [occ('a', '2026-06-10')]
-    const first = computeOverduePool(null, items, ROOTS, TODAY, noFilter, 'none')
-    const second = computeOverduePool(first, items, ROOTS, new Date(2026, 5, 15), noFilter, 'none')
+    const entries = toEntries([occ('a', '2026-06-10')])
+    const first = computeOverduePool(null, entries, ROOTS, TODAY, noFilter, 'none')
+    const second = computeOverduePool(first, entries, ROOTS, new Date(2026, 5, 15), noFilter, 'none')
 
     expect(second).toBe(first)
   })
 
   it('keys on filterKey, not on the filterOccs identity', () => {
-    const items = [occ('a', '2026-06-10')]
-    const first = computeOverduePool(null, items, ROOTS, TODAY, noFilter, 'k')
+    const entries = toEntries([occ('a', '2026-06-10')])
+    const first = computeOverduePool(null, entries, ROOTS, TODAY, noFilter, 'k')
 
-    expect(computeOverduePool(first, items, ROOTS, TODAY, x => x, 'k')).toBe(first)
-    expect(computeOverduePool(first, items, ROOTS, TODAY, noFilter, 'other')).not.toBe(first)
+    expect(computeOverduePool(first, entries, ROOTS, TODAY, x => x, 'k')).toBe(first)
+    expect(computeOverduePool(first, entries, ROOTS, TODAY, noFilter, 'other')).not.toBe(first)
   })
 
-  it('recomputes when items change', () => {
-    const items = [occ('a', '2026-06-10')]
-    const first = computeOverduePool(null, items, ROOTS, TODAY, noFilter, 'none')
-    const second = computeOverduePool(first, [...items, occ('b', '2026-06-11')], ROOTS, TODAY, noFilter, 'none')
+  it('recomputes when items change, re-expanding only the changed entry', () => {
+    const KEY2 = testKey('other.md')
+    const roots: Roots = new Map([...ROOTS, [KEY2, makeRootMeta('other.md')]])
+    const entries = toEntries([occ('a', '2026-06-10')], roots)
+    const first = computeOverduePool(null, entries, roots, TODAY, noFilter, 'none')
+    const next = new Map(entries)
+    next.set(KEY2, { key: KEY2, root: roots.get(KEY2)!, items: [occ('b', '2026-06-11', { entryKey: KEY2 })] })
+    const second = computeOverduePool(first, next, roots, TODAY, noFilter, 'none')
 
     expect(second).not.toBe(first)
     expect(second.groups.map(g => g.key)).toEqual(['a', 'b'])
+    expect(second.perEntry.get(KEY)).toBe(first.perEntry.get(KEY))
+  })
+
+  it('picks each group\'s oldest occurrence when entries\' overdue dates interleave', () => {
+    // Same series id in two entries is contrived, so interleave via one series
+    // whose override sits in the same entry as a later standalone: the union
+    // of per-entry lists must still report the true oldest per group.
+    const groups = pool([series('s1', '2026-06-01'), occ('x', '2026-06-03')])
+    const s1 = groups.find(g => g.key === 's1')!
+    expect(s1.oldest).toEqual(new Date(2026, 5, 1))
+    expect(s1.count).toBe(2)
   })
 
   it('carries the file-level title onto the representative occurrence', () => {
     const roots: Roots = new Map([[KEY, makeRootMeta('note.md', { title: 'Pay the invoice' })]])
-    const { groups } = computeOverduePool(null, [occ('a', '2026-06-10')], roots, TODAY, noFilter, 'none')
+    const { groups } = computeOverduePool(null, toEntries([occ('a', '2026-06-10')], roots), roots, TODAY, noFilter, 'none')
 
     const rep: Occurrence = groups[0]!.occ
     expect(rep.metadata.title).toBe('Pay the invoice')
