@@ -64,7 +64,7 @@ describe('rowSortKey', () => {
   it.each([
     ['high', 0], ['medium', 1], ['low', 2], [undefined, 3],
   ] as const)('groups an undone link to a %s-priority task with prioKey %i', (priority, rank) => {
-    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Task', done: false, priority } })
+    const occ = makeOcc({ time: null, metadata: { fileSlug: 'note', title: 'Task', done: false, priority } })
     expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 0, typeKey: 3, prioKey: rank, jsTimeMs: 0, title: 'Task' })
   })
 
@@ -73,7 +73,7 @@ describe('rowSortKey', () => {
   })
 
   it('groups a done task-link into the dimmed bucket, same type/priority key as an open task', () => {
-    const occ = makeOcc({ metadata: { fileSlug: 'note', title: 'Finished', done: true } })
+    const occ = makeOcc({ time: null, metadata: { fileSlug: 'note', title: 'Finished', done: true } })
     expect(rowSortKey(linkRow(0, occ), NOW)).toEqual({ bucket: 1, typeKey: 3, prioKey: 3, jsTimeMs: 0, title: 'Finished' })
   })
 
@@ -104,9 +104,9 @@ describe('ItemsList sort order (end-to-end via rowSortKey)', () => {
     const note        = makeOcc({ date: '', metadata: { fileSlug: 'note', title: 'Note' } })
     const laterEvent   = makeOcc({ date: '2099-01-02', time: '09:00', metadata: { fileSlug: 'note', title: 'Later', jsTime: new Date('2099-01-02T09:00:00') } })
     const soonerEvent  = makeOcc({ date: '2099-01-01', time: '09:00', metadata: { fileSlug: 'note', title: 'Sooner', jsTime: FUTURE } })
-    const highTask     = makeOcc({ metadata: { fileSlug: 'note', title: 'High prio', done: false, priority: 'high' } })
-    const lowTask      = makeOcc({ metadata: { fileSlug: 'note', title: 'Low prio', done: false, priority: 'low' } })
-    const doneTaskLink = makeOcc({ metadata: { fileSlug: 'note', title: 'Done link', done: true } })
+    const highTask     = makeOcc({ time: null, metadata: { fileSlug: 'note', title: 'High prio', done: false, priority: 'high' } })
+    const lowTask      = makeOcc({ time: null, metadata: { fileSlug: 'note', title: 'Low prio', done: false, priority: 'low' } })
+    const doneTaskLink = makeOcc({ time: null, metadata: { fileSlug: 'note', title: 'Done link', done: true } })
 
     const rows: Row[] = [
       linkRow(10, doneTaskLink),
@@ -125,8 +125,8 @@ describe('ItemsList sort order (end-to-end via rowSortKey)', () => {
       entry.kind === 'link' ? occ?.metadata.title : entry.text,
     )
 
-    // Notes (typeKey -1) lead, then timed events (typeKey 2) by time, then
-    // unprioritized/task-typed rows (typeKey 3): prioritized links, then
+    // Notes (typeKey -1) lead, then timed items (typeKey 2) by time, then
+    // untimed task-typed rows (typeKey 3): prioritized links, then
     // plain checklist-text tasks last (their own prio rank sits past every
     // link's), each tier by title — then the same rule again for the
     // dimmed bucket, then the broken link last.
