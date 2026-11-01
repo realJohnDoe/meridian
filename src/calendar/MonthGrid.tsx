@@ -15,7 +15,7 @@ import { monthGridCells } from './monthGridCells'
 const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useNow } from './useNow'
-import { useToday, useOccPainter } from '@/hooks'
+import { useToday, useOccPainter, useMediaQuery, useOpenEntry } from '@/hooks'
 import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
@@ -36,6 +36,9 @@ interface CalCellProps {
   hiddenBarCount: number
   barCoverCount: number
   onDayClick: (date: Date) => void
+  /** Present from `sm` up, where pills are wide enough to tap: each pill then
+   *  opens its entry. Absent on phones, where the whole cell is the day link. */
+  onOpenEntry?: (occ: Occurrence) => void
   /** Passed down rather than hooked per cell — one store subscription per
    *  pane instead of one per day (see `useOccPainter`). */
   painter: OccPainter
@@ -47,7 +50,7 @@ interface CalCellProps {
 // auto-caches occsByDay, and useToday only updates at midnight), so the
 // React Compiler's own per-prop memoization already skips this render when
 // nothing relevant changed.
-function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes, hiddenBarCount, barCoverCount, onDayClick, painter }: CalCellProps) {
+function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes, hiddenBarCount, barCoverCount, onDayClick, onOpenEntry, painter }: CalCellProps) {
   const isToday = sameDay(date, today)
 
   const occCount = dayOccs.length + barCoverCount
@@ -64,18 +67,24 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
   const shown = overflowing ? Math.max(0, capacity - 1) : dayOccs.length
   const hiddenCount = (dayOccs.length - shown) + hiddenBarCount
 
+  // The day button is a sibling layer behind the content, not an ancestor of
+  // the pills — nested buttons are invalid HTML. The content layer is
+  // pointer-events-none so the empty area and "+N" fall through to it; pills
+  // opt back in.
   return (
-    <SurfaceButton
-      className={cn(CELL_CLASS, 'hover:bg-muted/70', other && 'opacity-25')}
-      onClick={() => onDayClick(date)}
-      aria-label={ariaLabel}
-    >
+    <div className={cn(CELL_CLASS, 'relative flex hover:bg-muted/70', other && 'opacity-25')}>
+      <SurfaceButton
+        className="absolute inset-0 h-full w-full rounded-[inherit]"
+        onClick={() => onDayClick(date)}
+        aria-label={ariaLabel}
+      />
       <span className={cn(
         BADGE_CLASS,
+        'pointer-events-none relative',
         isToday && 'bg-primary text-primary-foreground font-bold',
       )}>{date.getDate()}</span>
       <div
-        className={OCC_LIST_CLASS}
+        className={cn(OCC_LIST_CLASS, 'pointer-events-none relative')}
         style={reservedLanes ? { marginTop: reservedLanes * (rowH + ROW_GAP) } : undefined}
       >
         {dayOccs.slice(0, shown).map(o => (
@@ -84,14 +93,15 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
             hue={painter.hue(o)}
             dimmed={isDimmed(o)}
             title={o.metadata.title}
-            className="px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs w-full"
+            onClick={onOpenEntry && (() => onOpenEntry(o))}
+            className={cn('px-0.5 sm:px-1.5 py-px text-3xs sm:text-xs w-full', onOpenEntry && 'pointer-events-auto')}
           />
         ))}
         {overflowing && (
           <div className="text-3xs sm:text-2xs text-foreground px-0.5 sm:px-1">+{hiddenCount}</div>
         )}
       </div>
-    </SurfaceButton>
+    </div>
   )
 }
 
@@ -118,6 +128,8 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
   const items = useStore(s => s.items)
   const roots = useStore(s => s.roots)
   const { filterOccs } = useCalendarFilter()
+  const openEntry = useOpenEntry()
+  const pillsOpenEntry = useMediaQuery('(min-width: 640px)') // Tailwind `sm`
 
   const m = month.getMonth()
   const y = month.getFullYear()
@@ -249,6 +261,7 @@ export default function MonthGrid({ monthKey, ws, rowH, barTop, gridH, onDayClic
                     hiddenBarCount={hiddenBarCount}
                     barCoverCount={dayBars.length}
                     onDayClick={onDayClick}
+                    onOpenEntry={pillsOpenEntry ? o => void openEntry(o) : undefined}
                     painter={painter}
                   />
                 )
