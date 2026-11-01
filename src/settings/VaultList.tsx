@@ -26,7 +26,7 @@ export default function VaultList() {
   return (
     <SettingsSection
       title="Vaults"
-      description="Where your entries live. Every vault stays mounted and syncing."
+      description="Where your entries live. Every vault stays connected and syncing."
     >
       {sortVaults(vaults).map(vault => {
         const attention = syncByVault.get(vault.id)?.needsAttention ?? null
