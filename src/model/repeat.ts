@@ -17,6 +17,8 @@ const WDAY_NAME_BY_JS_DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursd
 /** Calendar month numbers in `RepeatForm.months` index order — 0 = January … 11 = December. */
 const MONTH_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
+const FREQ_TO_UNIT_SINGULAR: Record<ScheduleFreq, string> = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' }
+
 // ── Interval string format: "2 weeks", "1 day", "3 months", … ────────────────
 
 export type IntervalParts = { n: number; unit: DurationUnit }
@@ -38,10 +40,23 @@ const FREQ_TO_DURATION_UNIT: Record<ScheduleFreq, DurationUnit> = {
   daily: 'days', weekly: 'weeks', monthly: 'months', yearly: 'years',
 }
 
-/** The Repeat chip's value text: "every 2 weeks", "every day", "2 days after completion". */
-export function formatRepeatChip(repeat: Repeat): string {
+const WDAY_SHORT: Record<Weekday, string> = { mo: 'Mon', tu: 'Tue', we: 'Wed', th: 'Thu', fr: 'Fri', sa: 'Sat', su: 'Sun' }
+const WDAY_CODES_SUN_FIRST: Weekday[] = ['su', ...WDAY_CODES_MON_FIRST.slice(0, 6)]
+
+/**
+ * The Repeat chip's value text: "every week", "every 2 weeks", "Mon, Wed, Fri",
+ * "every 2 weeks on Mon, Wed", "2 days after completion". Weekdays are listed in
+ * `weekStartsOn` order (date-fns convention, 0 = Sunday). Monthly and yearly
+ * rules deliberately stay at "every month" / "every year".
+ */
+export function formatRepeatChip(repeat: Repeat, weekStartsOn: 0 | 1 | 6 = 1): string {
   if (repeat.type === 'after_completion') return `${repeat.interval} after completion`
-  return `every ${serialiseDuration(repeat.interval ?? 1, FREQ_TO_DURATION_UNIT[repeat.freq])}`
+  const n = repeat.interval ?? 1
+  const every = n === 1 ? `every ${FREQ_TO_UNIT_SINGULAR[repeat.freq]}` : `every ${serialiseDuration(n, FREQ_TO_DURATION_UNIT[repeat.freq])}`
+  if (repeat.freq !== 'weekly' || !repeat.byweekday?.length) return every
+  const order = [...WDAY_CODES_SUN_FIRST.slice(weekStartsOn), ...WDAY_CODES_SUN_FIRST.slice(0, weekStartsOn)]
+  const days = order.filter(d => repeat.byweekday!.includes(d)).map(d => WDAY_SHORT[d]).join(', ')
+  return n === 1 ? days : `${every} on ${days}`
 }
 
 // ── Monthly weekday spec ──────────────────────────────────────────────────────

@@ -24,7 +24,7 @@ import { cn } from '@/lib/cn'
 import { itemTypeOf, type EntryState, type ItemType } from './state'
 import type { LucideIcon } from 'lucide-react'
 import { formatDurationChip, fmtDuration, fmtShort } from '@/format'
-import { fmtT, parseDateString, formatRepeatChip } from '@/model'
+import { fmtT, parseDateString, formatRepeatChip, weekStartsOn } from '@/model'
 import { useStore } from '@/store'
 import type { PendingLinks } from './usePendingLinks'
 import { useAllParticipants } from '@/hooks'
@@ -138,6 +138,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
   // ListedOnRow/EntryBody/ItemsList props are `?:`, not `| null` — coalesce once here.
   const openWikilink = handleOpenWikilink ?? undefined
   const hour12             = useStore(s => s.localePrefs.hour12)
+  const localePrefs        = useStore(s => s.localePrefs)
   const backlinks          = useStore(s => s.backlinks)
   // Per vault, and named: with several vaults registered, "changes aren't
   // saved" has to say *which* vault it is talking about. Retires the hardcoded
@@ -361,7 +362,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
                 )}
                 {showRepeat && (
                   <PropChip icon={Repeat} label="Repeat" pressed={!!repeat} onClick={() => handleOpenRepeatDlg(itemType)}
-                    value={repeat ? formatRepeatChip(repeat) : undefined} />
+                    value={repeat ? formatRepeatChip(repeat, weekStartsOn(localePrefs)) : undefined} />
                 )}
               </div>
             )}

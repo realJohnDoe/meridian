@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { repeatToForm, formToRepeat, monthlyWeekdaySpec, defaultMonths } from '../repeat'
-import type { Repeat } from '@/types'
+import { repeatToForm, formToRepeat, monthlyWeekdaySpec, defaultMonths, formatRepeatChip } from '../repeat'
+import type { Repeat, Weekday } from '@/types'
 
 // The scheduled date every anchored case below hangs off: Monday 2026-06-15,
 // the third Monday of June 2026.
@@ -270,5 +270,26 @@ describe('wkst', () => {
     const form = repeatToForm(null, { ...ctx(), weekStart: 'su' })
     expect(formToRepeat({ ...form, intervalNum: 2 }, DATE)).toMatchObject({ wkst: 'su' })
     expect(formToRepeat(form, DATE)).not.toHaveProperty('wkst')
+  })
+})
+
+describe('formatRepeatChip', () => {
+  const weekly = (byweekday: Weekday[], interval?: number): Repeat => ({ type: 'schedule', freq: 'weekly', byweekday, interval })
+  it('drops the 1 from single-interval rules', () => {
+    expect(formatRepeatChip({ type: 'schedule', freq: 'weekly' })).toBe('every week')
+    expect(formatRepeatChip({ type: 'schedule', freq: 'daily' })).toBe('every day')
+    expect(formatRepeatChip({ type: 'schedule', freq: 'daily', interval: 3 })).toBe('every 3 days')
+  })
+  it('names the weekdays', () => {
+    expect(formatRepeatChip(weekly(['fr', 'mo', 'we']))).toBe('Mon, Wed, Fri')
+    expect(formatRepeatChip(weekly(['mo', 'we'], 2))).toBe('every 2 weeks on Mon, Wed')
+  })
+  it('follows the week-start order', () => {
+    expect(formatRepeatChip(weekly(['mo', 'su']), 0)).toBe('Sun, Mon')
+    expect(formatRepeatChip(weekly(['mo', 'su']), 1)).toBe('Mon, Sun')
+    expect(formatRepeatChip(weekly(['mo', 'sa']), 6)).toBe('Sat, Mon')
+  })
+  it('keeps after-completion text', () => {
+    expect(formatRepeatChip({ type: 'after_completion', interval: '2 days' })).toBe('2 days after completion')
   })
 })
