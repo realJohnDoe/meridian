@@ -70,6 +70,8 @@ const SETTLE_TIMEOUT_MS = Number(arg('settle-timeout-ms', 45_000))
 async function startDevServer() {
   const child = spawn('pnpm', ['exec', 'vite', '--host', HOST, '--port', String(PORT), '--strictPort'], {
     stdio: ['ignore', 'pipe', 'pipe'],
+    // Own process group, so killServer can take down the pnpm → pnpm → vite chain.
+    detached: true,
   })
   let log = ''
   child.stdout.on('data', d => { log += d })
@@ -82,8 +84,13 @@ async function startDevServer() {
     if (exit !== null) throw new Error(`vite exited (${exit}) before serving ${BASE}\n${log}`)
     try { await fetch(`${BASE}/`); return child } catch { await sleep(250) }
   }
-  child.kill()
+  killServer(child)
   throw new Error(`vite never answered ${BASE} in ${STARTUP_TIMEOUT_MS / 1000}s\n${log}`)
+}
+
+// `pnpm exec` spawns a grandchild vite; signal the whole group, not the wrapper.
+function killServer(child) {
+  try { process.kill(-child.pid) } catch { child.kill() }
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
@@ -504,7 +511,7 @@ try {
   }
 } finally {
   await browser.close().catch(() => {})
-  server.kill()
+  killServer(server)
   mkdirSync(new URL('./results/', import.meta.url), { recursive: true })
   const file = new URL(`./results/${new Date().toISOString().replace(/[:.]/g, '-')}.json`, import.meta.url)
   writeFileSync(file, JSON.stringify(runs, null, 2))
