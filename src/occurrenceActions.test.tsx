@@ -261,7 +261,7 @@ describe('deleteOccurrenceWithUndo', () => {
 
     expect(findOverrideFor('series-1')?.excluded).toBe(true)
     expect(persistence.writes).toEqual([])
-    expect(screen.getByText('Deleted: Standup')).toBeInTheDocument()
+    expect(screen.getByText(/^Deleted Standup on /)).toBeInTheDocument()
 
     act(() => { vi.advanceTimersByTime(4100) })
 

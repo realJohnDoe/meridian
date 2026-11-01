@@ -1,8 +1,9 @@
 import { toast } from 'sonner'
-import { toggleDone, excludeOccurrence, hasSiblingOccurrences, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, deleteSeries, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
+import { parseDateString, toggleDone, excludeOccurrence, hasSiblingOccurrences, deletionEndsAfterCompletionSeries, deleteByEntryKey, deleteFollowing, deleteSeries, occFromAppMeta, freeEntryKey, moveEntryKey } from '@/model'
 import { occIsRecur } from './occView'
 import { isStandaloneOcc } from './types'
 import type { Occurrence, OccurrenceEntry, OccurrenceMetadata, Entries, Entry, StoreItem } from './types'
+import { fmtShort } from './format'
 import { keySlug, keyVaultId } from './fileIO'
 import type { EntryKey } from './fileIO'
 import { isWritableVault } from './vaultRef'
@@ -44,11 +45,21 @@ function restoreEntries(snapshot: { entries: Entries }, entryKeys: readonly Entr
   persistEntries(restored, keys)
 }
 
+// `label` is a ready-made message for a delete narrower than the whole entry,
+// so the toast says how much went; without it the whole entry did. Undated
+// occurrences have no date to name, so they fall back to the plain message.
+const scoped = (o: Occurrence, fmt: (date: string) => string): string | undefined => {
+  const d = parseDateString(o.date)
+  return d ? fmt(fmtShort(d)) : undefined
+}
+const onDate   = (o: Occurrence) => scoped(o, d => `Deleted ${o.metadata.title} on ${d}`)
+const fromDate = (o: Occurrence) => scoped(o, d => `Deleted ${o.metadata.title} from ${d} on`)
+
 function showDeleteToast(
   title: string,
   commitFn: () => void,
   undoFn: () => void,
-  opts?: { endsSeries?: boolean },
+  opts?: { endsSeries?: boolean; label?: string },
 ): void {
   if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
   if (_toastId !== null) { toast.dismiss(_toastId); _toastId = null }
@@ -56,7 +67,7 @@ function showDeleteToast(
   _pendingCommit = commitFn
   const message = opts?.endsSeries
     ? `Deleted: ${title} — this series only repeats after completion, so it ends here.`
-    : `Deleted: ${title}`
+    : opts?.label ?? `Deleted: ${title}`
   const toastFn = opts?.endsSeries ? toast.warning : toast
   _toastId = toastFn(message, {
     duration: TOAST_MS,
@@ -167,7 +178,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
       // landed on this entry in between.
       () => { persistEntries(getSnapshot(), [o.entryKey]) },
       () => { cancelled = true; restoreEntries(snapshot, [o.entryKey]) },
-      { endsSeries },
+      { endsSeries, label: onDate(o) },
     )
     return () => { if (!cancelled) setData(next.entries) }
   } else {
@@ -214,7 +225,7 @@ export function deleteOccurrenceWithUndo(o: Occurrence): void {
   showDeleteToast(o.metadata.title,
     () => { persistEntries(getSnapshot(), [o.entryKey]) },
     () => { restoreEntries(snapshot, [o.entryKey]) },
-    { endsSeries },
+    { endsSeries, label: onDate(o) },
   )
 }
 
@@ -226,6 +237,7 @@ export function deleteFutureWithUndo(o: Occurrence): void {
   showDeleteToast(o.metadata.title,
     () => { persistEntries(getSnapshot(), [o.entryKey]) },
     () => { restoreEntries(snapshot, [o.entryKey]) },
+    { label: fromDate(o) },
   )
 }
 
@@ -242,6 +254,7 @@ export function deleteSeriesWithUndo(o: Occurrence): void {
   showDeleteToast(o.metadata.title,
     () => { persistEntries(getSnapshot(), [o.entryKey]) },
     () => { restoreEntries(snapshot, [o.entryKey]) },
+    { label: `Deleted all of ${o.metadata.title}` },
   )
 }
 
