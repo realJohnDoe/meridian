@@ -419,6 +419,13 @@ the deferral stands — but its cost is not the expansion this report measured:
 `toggleRecompute` was 10 ms, and a CPU profile put 84% of the toggle in
 `computeOverduePool` (performance survey #1250, finding #1252).
 
+**The gate has since fired.** After #1251–#1255 landed, the same command
+(`--sizes 3000,10000 --skip-pipeline --skip-dexie`, before and after on one
+machine) gave toggle 633 → 207 ms and 2 920 → 596 ms, and `vaultPaintMs`
+1 496 → 1 007 ms and 4 294 → 2 366 ms. Scroll did not move: p50 83.3 ms with
+28/30 janky frames at mixed/10 000. Per the paragraph above, scroll is now the
+first flow to break, and this finding should be re-tiered upward.
+
 **Ruled out by inspection — do not re-investigate without new evidence.**
 
 - *Row mounting* — 26 mounted rows at both sizes, measured.
