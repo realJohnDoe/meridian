@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { EditorState } from '@codemirror/state'
-import { EditorView, type DecorationSet, type WidgetType } from '@codemirror/view'
+import { EditorView, runScopeHandlers, type DecorationSet, type WidgetType } from '@codemirror/view'
 import { forceParsing } from '@codemirror/language'
 import {
   markdownLanguage,
@@ -336,5 +336,19 @@ describe('decoration plugins rebuild on update', () => {
     const ranges = hideRanges(view)
     expect(ranges).toHaveLength(1)
     expect(ranges[0]!.from).toBe(0)
+  })
+})
+
+describe('markdownLanguage keymap', () => {
+  it('Enter on a task item continues the list with a fresh checkbox', () => {
+    const view = mkView('- [ ] a')
+    view.dispatch({ selection: { anchor: view.state.doc.length } })
+    const handled = runScopeHandlers(
+      view,
+      new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13 }),
+      'editor',
+    )
+    expect(handled).toBe(true)
+    expect(view.state.doc.toString()).toBe('- [ ] a\n- [ ] ')
   })
 })
