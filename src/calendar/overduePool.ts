@@ -42,14 +42,14 @@ export interface OverdueGroup {
 
 /**
  * The overdue pass's own one-entry cache, mirroring AgendaSectionCache. Held by
- * useAgendaSections' module-level slot and invalidated on the identity of every
- * input — see computeOverduePool.
+ * useAgendaSections' module-level slot and invalidated on the identity of items/roots, the day, and the filterKey
+ * string (not the filterOccs callback) — see computeOverduePool.
  */
 export interface OverduePoolCache {
   items: StoreItem[]
   roots: Roots
   todayMs: number
-  filterOccs: FilterOccs
+  filterKey: string
   groups: OverdueGroup[]
 }
 
@@ -119,10 +119,11 @@ export function computeOverduePool(
   roots: Roots,
   today: Date,
   filterOccs: FilterOccs,
+  filterKey: string,
 ): OverduePoolCache {
   const todayMs = today.getTime()
 
-  if (prev && prev.items === items && prev.roots === roots && prev.todayMs === todayMs && prev.filterOccs === filterOccs) {
+  if (prev && prev.items === items && prev.roots === roots && prev.todayMs === todayMs && prev.filterKey === filterKey) {
     return prev
   }
 
@@ -152,5 +153,5 @@ export function computeOverduePool(
   const byRepresentative = new Map([...byKey.values()].map(g => [g.occ, g]))
   const groups = sortOccs([...byRepresentative.keys()], today).flatMap(occ => byRepresentative.get(occ) ?? [])
 
-  return { items, roots, todayMs, filterOccs, groups }
+  return { items, roots, todayMs, filterKey, groups }
 }
