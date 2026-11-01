@@ -116,16 +116,23 @@ export default function AgendaView({ onOpen }: Props) {
   // section pools every undone past task with no cap — on a large vault that
   // was thousands of AgendaRows (each with three touch listeners, two
   // store subscriptions and a backlink lookup) in one synchronous commit.
+  // A row measuring differently from its estimate makes the virtualizer
+  // rebuild its measurements from that row to the end of the loaded run, so
+  // scroll cost tracks `count`, not the ~26 mounted rows (#1264). Two things
+  // keep each rebuild cheap: getItemKey is stable (it is one of the
+  // virtualizer's measurement deps, so a fresh closure made every render —
+  // every scroll step — rebuild from row 0), and estimates are computed once
+  // per row list rather than once per rebuild.
+  const estimates = useMemo(() => rows.map(r => estimateRow(r, extraMeta)), [rows, extraMeta])
+  const getItemKey = useCallback((i: number) => rows[i]!.key, [rows])
+
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
-    // Scroll cost tracks this — the loaded run — not the ~26 mounted rows: a
-    // row measuring differently from its estimate rebuilds measurements up to
-    // `count`. See #1264.
     count: rows.length,
     getScrollElement: () => scRef.current,
     // `count` is rows.length, so the virtualizer only ever asks for i in range.
-    estimateSize: i => estimateRow(rows[i]!, extraMeta),
-    getItemKey: i => rows[i]!.key,
+    estimateSize: i => estimates[i]!,
+    getItemKey,
     overscan: 8,
     initialOffset,
     initialMeasurementsCache,

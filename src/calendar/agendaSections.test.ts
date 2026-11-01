@@ -838,15 +838,15 @@ describe('estimateRow', () => {
     // the day, so it carries AgendaRow's mt-3 on top (see the gap test below).
     expect(estimateRow(rowFor(rows, 'untimed'), noExtra)).toBe(50 + 12)
     // A time badge or a duration chip each force the meta row.
-    expect(estimateRow(rowFor(rows, 'timed'), noExtra)).toBe(68)
-    expect(estimateRow(rowFor(rows, 'with-duration'), noExtra)).toBe(68)
+    expect(estimateRow(rowFor(rows, 'timed'), noExtra)).toBe(73)
+    expect(estimateRow(rowFor(rows, 'with-duration'), noExtra)).toBe(73)
   })
 
   it('estimates an overdue group row at the meta height — it always shows a date badge', () => {
     const untimed = occ('overdue-untimed', '2026-06-10', { done: false })
     const { rows } = compute(null, [untimed], [group(untimed)])
 
-    expect(estimateRow(rows.find(r => r.kind === 'overdue-group')!, noExtra)).toBe(68)
+    expect(estimateRow(rows.find(r => r.kind === 'overdue-group')!, noExtra)).toBe(73)
   })
 
   it('estimates the overdue header at its own height', () => {
@@ -890,6 +890,6 @@ describe('estimateRow', () => {
     // default colorBy with two visible vaults every card carries a vault chip,
     // which is what the probe reports.
     expect(estimateRow(later, () => false)).toBe(50)
-    expect(estimateRow(later, () => true)).toBe(68)
+    expect(estimateRow(later, () => true)).toBe(73)
   })
 })

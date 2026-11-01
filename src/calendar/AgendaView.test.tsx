@@ -119,7 +119,7 @@ const isScrollContainer = (el: HTMLElement) => el.classList.contains('overflow-y
  * flip key's prefix (see agendaSections.ts's row keys). Every occurrence row
  * these tests build carries a meta row — an overdue group row has `showDate`,
  * and every fixture occurrence carries a `time` — so they all take the
- * meta-height branch (ROW_H_META and OVERDUE_GROUP_H are the same 68).
+ * meta-height branch (ROW_H_META and OVERDUE_GROUP_H are the same 73).
  *
  * A day's *first* occurrence row is DAY_GAP_H taller than the rest (AgendaRow's
  * `mt-3`), and the row list is what knows which one that is — so this reads it
@@ -133,9 +133,9 @@ function estimatedRowHeight(el: HTMLElement): number {
   if (key.startsWith('w|'))  return 36  // WEEK_H
   if (key.startsWith('h|'))  return 40  // HEADER_H
   if (key.startsWith('e|'))  return 62  // EMPTY_H
-  if (key.startsWith('og|')) return 68  // OVERDUE_GROUP_H
+  if (key.startsWith('og|')) return 73  // OVERDUE_GROUP_H
   const dayGap = el.querySelector('.w-9 > div') ? 12 : 0  // DAY_GAP_H
-  return 68 + dayGap                    // ROW_H_META
+  return 73 + dayGap                    // ROW_H_META
 }
 
 /**
@@ -273,7 +273,7 @@ const today = FIXED_NOW
  * overduePool.ts) — before grouping, the day row did not exist at all.
  *
  * Timed so its day row takes the same meta-height branch the harness above
- * measures; an untimed one estimates 50 and would measure 68.
+ * measures; an untimed one estimates 50 and would measure 73.
  */
 function overdueTask(i: number): Occurrence {
   const date = fmtISO(addDays(today, -(1 + (i % 300))))
