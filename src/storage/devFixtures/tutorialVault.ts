@@ -77,6 +77,7 @@ items:
   - "[[links-and-backlinks]]"
   - "[[favorites]]"
   - "[[frontmatter-reference]]"
+  - "[[share-a-calendar]]"
   - "[[install-as-an-app]]"
   - "[[make-it-yours]]"
 date: "${d(0)}"
@@ -94,6 +95,7 @@ list — its items, listed under **Items** at the bottom, link to everything bel
 - [[links-and-backlinks]] — connect entries with wikilinks
 - [[favorites]] — pin the entries you reach for most
 - [[frontmatter-reference]] — every field, in one place
+- [[share-a-calendar]] — one calendar for your household or team
 - [[install-as-an-app]] — add Meridian to your home screen or desktop
 - [[make-it-yours]] — start your own vault
 
@@ -382,6 +384,32 @@ decides whether it's a note, event, or task (see [[everything-is-a-list]]).
 
 Recurring items add \`defaults:\` (shared across occurrences) and \`instances:\`
 (per-occurrence overrides).`,
+    },
+
+    // ── share-a-calendar: the README's second promise — several people, one repo ──
+    {
+      id: 'share-a-calendar',
+      content: `---
+title: Share a calendar
+items:
+  - "[[make-it-yours]]"
+  - "[[lunch-with-sam]]"
+---
+
+A GitHub vault is just a repo, so sharing it is sharing the repo. Everyone you
+invite reads and writes the same files — no event belongs to whoever created it.
+
+1. Set up a **GitHub repository** vault (see [[make-it-yours]]).
+2. Open the **menu** (☰), tap **Settings**, then **Vaults**, then that vault.
+3. Under **Invite someone**, tap **Add collaborator on GitHub** and add them there.
+4. Tap **Copy invite message** and send it. They open Meridian, sign in with
+   GitHub, and pick the repo — that's their whole setup.
+
+People you only *name* need nothing at all: \`participants\` are just names in a
+file (see [[lunch-with-sam]]), so a child or a partner can be on the calendar
+without an account. Use **Filter by person** in the top bar to see one person's
+entries, and **Settings → Color entries by → Vault** to tell a shared calendar
+from your own.`,
     },
 
     // ── install-as-an-app: PWA install, per-OS ──
