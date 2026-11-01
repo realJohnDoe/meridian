@@ -1,6 +1,6 @@
-import { markdown } from '@codemirror/lang-markdown'
-import { Autolink } from '@lezer/markdown'
-import { syntaxHighlighting, HighlightStyle, syntaxTree } from '@codemirror/language'
+import { commonmarkLanguage, markdownKeymap, pasteURLAsLink } from '@codemirror/lang-markdown'
+import { Autolink, type MarkdownParser } from '@lezer/markdown'
+import { syntaxHighlighting, HighlightStyle, syntaxTree, Language, LanguageSupport } from '@codemirror/language'
 import { tags as t } from '@lezer/highlight'
 import {
   ViewPlugin,
@@ -10,8 +10,9 @@ import {
   EditorView,
   type ViewUpdate,
   type Command,
+  keymap,
 } from '@codemirror/view'
-import { RangeSetBuilder, EditorSelection } from '@codemirror/state'
+import { RangeSetBuilder, EditorSelection, Prec } from '@codemirror/state'
 import { focusedCursorLines } from './viewUtils'
 import { buildTaskLineMap } from './taskLines'
 import { isSafeUrl } from '../urlSafety'
@@ -20,7 +21,14 @@ import { isSafeUrl } from '../urlSafety'
 
 // Enable GFM autolinking so bare URLs / emails become `URL` nodes we can render
 // as clickable links (see the URL branch in buildHideDecorations).
-export const markdownLanguage = markdown({ extensions: [Autolink] })
+//
+// Built from lang-markdown's pieces rather than `markdown()`: its default
+// `htmlTagLanguage` keeps lang-html (and the JS/CSS grammars) in the bundle.
+// Keeps what the app uses of it: list-continuing Enter/Backspace and URL paste.
+export const markdownLanguage = new LanguageSupport(
+  new Language(commonmarkLanguage.data, (commonmarkLanguage.parser as MarkdownParser).configure([Autolink]), [], 'markdown'),
+  [pasteURLAsLink, Prec.high(keymap.of(markdownKeymap))],
+)
 
 // ── Highlight style ───────────────────────────────────────────────
 
