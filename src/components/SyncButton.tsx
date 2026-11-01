@@ -46,7 +46,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
           lets the user attempt. */}
       {status.readOnly && (
         <p className="text-2xs text-muted-foreground pl-5">
-          {vault.kind === 'ical' ? 'Subscription — read-only.' : 'Read-only — changes aren’t saved.'}
+          {vault.kind === 'ical' ? 'Subscription — read-only.' : 'Sandbox — your changes last until you reload.'}
         </p>
       )}
 

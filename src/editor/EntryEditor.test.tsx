@@ -171,7 +171,7 @@ describe('EntryEditor — no vault to save to', () => {
 // #1120's product question: with only the read-only Tutorial vault registered,
 // a brand-new entry now falls back to the Tutorial's own sandbox vault (see
 // useVaultTarget.ts's initialTargetVault) instead of the "no vault" case above
-// — so it shows the same "read-only — changes aren't saved" banner an existing
+// — so it shows the same sandbox banner an existing
 // Tutorial entry already gets, not the "add a vault" one.
 describe('EntryEditor — new entry in the Tutorial sandbox', () => {
   function NewEntryHarness({ title }: { title: string }) {
@@ -179,13 +179,13 @@ describe('EntryEditor — new entry in the Tutorial sandbox', () => {
     return <EntryEditor hooks={hooks} items={[]} roots={useStore.getState().roots} />
   }
 
-  it('shows the read-only banner, not the no-vault one', () => {
+  it('shows the sandbox banner, not the no-vault one', () => {
     useStore.setState({ defaultVaultId: null, vaults: [{ id: 'example', name: 'Tutorial', kind: 'example' }] })
     useStore.getState().setVaultSync('example', { readOnly: true })
 
     render(<NewEntryHarness title="Call the plumber" />)
 
-    expect(screen.getByText(/tutorial is read-only/i)).toBeInTheDocument()
+    expect(screen.getByText(/tutorial is a sandbox/i)).toBeInTheDocument()
     expect(screen.queryByText(/no vault to save to yet/i)).not.toBeInTheDocument()
     expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive/)
   })

@@ -97,7 +97,7 @@ list — its items, listed under **Items** at the bottom, link to everything bel
 - [[install-as-an-app]] — add Meridian to your home screen or desktop
 - [[make-it-yours]] — start your own vault
 
-This is a read-only sandbox — poke around freely. When you're ready, [[make-it-yours]].`,
+This is a sandbox — poke around freely. When you're ready, [[make-it-yours]].`,
     },
 
     // ── everything-is-a-list: philosophy #1, the centrepiece ──
@@ -110,7 +110,7 @@ items:
   - "[[recurring-events]]"
   - "[[buy-groceries]]"
   - "[ ] Tick a box to see a subtask"
-  - "[ ] Notice it doesn't stick here — this sandbox is read-only"
+  - "[ ] Notice it doesn't stick here — this sandbox resets on reload"
   - "[x] Add your own vault to make it real"
 ---
 
@@ -148,7 +148,7 @@ Meridian has no "type" field. What an entry *is* comes from which fields it carr
 A task doesn't need a date — leave it off and it waits in Unscheduled Tasks, like
 [[book-dentist]]. Find undated items from the search bar at the bottom.
 
-> This sandbox is read-only, so ticking a checkbox won't stick. [[make-it-yours]] to make it real.`,
+> In this sandbox, ticking a checkbox lasts only until you reload. [[make-it-yours]] to make it real.`,
     },
 
     // ── buy-groceries: dated task with checkbox subtask items ──
@@ -424,7 +424,7 @@ items:
   - "[[install-as-an-app]]"
 ---
 
-This Tutorial vault is **read-only** — edits and new entries won't be saved here.
+This Tutorial vault is a **sandbox** — edits and new entries last only until you reload.
 
 To use Meridian for real:
 
