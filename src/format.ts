@@ -6,7 +6,13 @@ export { addDays, isSameDay as sameDay }
 
 const thisYear = () => new Date().getFullYear()
 
-export const fmtShort = (d: Date): string => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', ...(d.getFullYear() !== thisYear() && { year: 'numeric' }) })
+// Shared formatters for the same reason as model/dateUtils' toHour12: every
+// mounted agenda row formats a date, and toLocaleDateString with options
+// builds a fresh Intl.DateTimeFormat per call.
+const shortFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
+const shortYearFmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+
+export const fmtShort = (d: Date): string => (d.getFullYear() !== thisYear() ? shortYearFmt : shortFmt).format(d)
 
 export function fmtTopBarMonth(d: Date, today: Date): string {
   const opts: Intl.DateTimeFormatOptions = { month: 'long' }
