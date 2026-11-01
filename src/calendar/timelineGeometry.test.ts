@@ -24,7 +24,8 @@ describe('formatHourBoundary', () => {
   // either way and nothing else would notice the regression.
   it('formats each (hour, clock) label at most once', () => {
     formatHourBoundary(9, true)  // ensure the 12h table exists
-    const spy = vi.spyOn(Date.prototype, 'toLocaleTimeString')
+    // `format` is a getter on the prototype (it returns a bound function).
+    const spy = vi.spyOn(Intl.DateTimeFormat.prototype, 'format', 'get')
     try {
       for (let h = 0; h <= 24; h++) formatHourBoundary(h, true)
       expect(spy).not.toHaveBeenCalled()

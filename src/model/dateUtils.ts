@@ -36,9 +36,14 @@ export function parseMonth(s: string): Date {
   return new Date(y, m - 1, 1)
 }
 
+// One shared formatter: toLocaleTimeString with options builds a fresh
+// Intl.DateTimeFormat per call, which was the top app-code cost of an agenda
+// scroll step (#1264) — every newly mounted timed row formats its time.
+const hour12Fmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+
 function toHour12(h: number, m: number): string {
   const d = new Date(); d.setHours(h, m, 0, 0)
-  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
+  return hour12Fmt.format(d)
 }
 
 /** Format an `HH:mm`-prefixed string per locale, either as 24h (sliced as-is) or 12h with AM/PM. */
