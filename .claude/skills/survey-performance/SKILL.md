@@ -36,45 +36,48 @@ Findings must be anchored to one or more of these flows — an issue that no com
   - **Baseline:** the measured cost (ms of handler time, render count, chunk kB, time-to-interactive) on the test vault.
   - **Measurement recipe:** the exact, re-runnable steps that produced the number — the instrumentation snippet (`performance.mark`/`performance.measure` pairs, a render counter, `why-did-you-render`-style logging), where it was patched in, the interaction performed, and how the number was read out. This recipe is the acceptance test for the fix: after the fix, rerun it and compare.
   - Instrumentation is temporary — patch it in, measure, and revert; do not leave measurement code in the working tree.
-- **How to measure in this environment:** start the dev server via the preview tools (follow the preview gotchas in CLAUDE.md — worktree-specific launch config, unique port, SPA-navigate instead of hard-navigating to an entry URL), drive the flows via the browser tools, and read numbers via `javascript_tool` (e.g. `performance.getEntriesByType('measure')`, patched-in counters on `window`). For render counts, a module-level counter incremented in the component body and read from the console is fine. For bundle findings, `pnpm run build` output is the measurement.
-- **No `preview_*` tooling is not a reason to skip the measurement pass** — check
-  before planning around it, because this survey's entire value is in phase 2 and
-  a run that quietly drops it lands as "partially assessed" without anyone seeing
-  that nothing was measured. `scripts/perf/stress.mjs` launches Chromium itself
-  via `@playwright/test` (a devDependency) and needs no preview tools at all, so it
-  is both the primary harness above and the fallback here; for the four flows it
-  does not cover, drive your own Chromium the same way (`pnpm exec vite --port
-  <unique> --strictPort`, then `import { chromium } from '@playwright/test'`), with
-  `e2e/` as the worked example. Only if even that is unavailable: say so in the
-  coverage statement, mark the flows **traced, not measured**, and flag every
-  finding that rests on an unmade measurement.
+- **How to measure in this environment:** Playwright, not `preview_*` tools —
+  their absence is never a reason to skip phase 2. `scripts/perf/stress.mjs`
+  launches its own Chromium; for the four flows it does not cover, drive your own
+  the same way (`pnpm exec vite --port <unique> --strictPort`, then `chromium` from
+  `@playwright/test` with `executablePath: '/opt/pw-browsers/chromium'`, plus
+  `addInitScript` for `meridian_bigvault` and `probe.mjs`'s `PROBE`). Three
+  instruments carried the 2026-11-01 run, none needing a source patch:
+  - **Input → next paint** is the Event Timing API
+    (`PerformanceObserver({ type: 'event', durationThreshold: 16 })`): `duration`
+    is exactly the perceived-latency number below, `processingEnd −
+    processingStart` the synchronous handler part. No app selectors to rot.
+  - **Render counts** via a `__REACT_DEVTOOLS_GLOBAL_HOOK__` stub installed by
+    init script, walking the committed tree in `onCommitFiberRoot` and counting
+    function fibers with `flags & 1` (PerformedWork). Descend only where
+    `fiber.child !== fiber.alternate?.child`: a bailed-out subtree keeps its old
+    fibers *and their stale flags*, and counting them inflated one run's numbers
+    several-fold.
+  - **Attribution** via a CDP `Profiler` session around the interaction,
+    aggregated by *inclusive* time per `/src/` frame — that names the component
+    or hook that started the work, which self time (date-fns, React internals)
+    does not.
+
+  For bundle findings, `pnpm run build` output is the measurement; build once
+  more with `--sourcemap --outDir <scratch>` to attribute a chunk to packages.
 - **React Compiler is enabled** (`vite.config.ts` applies `reactCompilerPreset`; components and hooks are auto-memoized at build time). Static "missing `memo`" / "unstable props defeat memoization" reasoning does not transfer to this codebase — memoization findings must be backed by runtime render counts, never by code inspection alone.
 - **Dev-mode numbers are relative, not absolute.** The dev server runs unminified dev-mode React, which overstates ms costs. Treat dev-server measurements as baselines for before/after comparison, not as absolute latency claims. Measure flow 6 (cold start, first paint, service-worker behavior) and all bundle findings against the production build (`pnpm run build` + `vite preview`) — and since the big-vault generator is dev-only, accept the small example vault for prod-build measurements and state that limitation in the coverage statement.
 - **Only the example (Tutorial) backend is measurable** — see [what this environment can and cannot do](../_survey/conventions.md#what-this-environment-can-and-cannot-do). Record the other two as "traced, not measured".
 - **Measure amplification, not vibes.** "Missing `memo`" is not a finding by itself. A finding must show _amplification with a number attached_: this click re-renders N components (counted), this handler runs X ms of synchronous work before paint (measured), this module adds Y kB to the entry chunk (from build output). Count subscribers via grep where relevant, but the headline evidence is runtime measurement.
-- **Perceived performance counts as performance.** A toggle that persists in 300 ms but paints the checkmark optimistically in 16 ms is _fast_; one that paints after persistence is _slow_ even if total work is identical. Measure when pixels change (mark in the handler, measure in a `requestAnimationFrame`-after-commit or paint-adjacent callback), not just how much work runs.
+- **Perceived performance counts as performance.** A toggle that persists in 300 ms but paints the checkmark optimistically in 16 ms is _fast_; one that paints after persistence is _slow_ even if total work is identical. Measure when pixels change (Event Timing `duration`, above), not just how much work runs.
 - Evaluate the code on its merits, per [Running a survey](../_survey/conventions.md#running-a-survey) — here "this is debounced" and "this is cached" are the claims to verify, against the measurements as well as the code.
 
 ## Budget
 
 - **Use the existing big-vault generator — do not write a new one** ([recipe](../_survey/conventions.md#what-this-environment-can-and-cannot-do)). The example vault is too small to expose scaling problems; run all measurements against the generated one and note its size in the coverage statement.
 - **Use the existing stress harness too — do not hand-roll instrumentation it
-  already has.** `scripts/perf/` (`stress.mjs`, `probe.mjs`, `table.mjs`, plus its
-  own README) measures three of the seven flows above directly — cold start,
-  toggling a task, agenda scroll — as well as the parse/derive pipeline stage by
-  stage (`parseToStoreItems`, `deriveViews`, `buildBacklinkIndex`,
-  `computeExpansionCache`, `computeAgendaSections`, `rankByQuery`,
-  `updateFileOccurrenceMap`) and the Dexie path, over the generated vault from 300
-  to 30 000 files, with a fresh browser context per size so one size's IndexedDB
-  and heap cannot leak into the next one's numbers. Read
-  `scripts/perf/README.md` before writing your first `performance.mark`, and
-  reserve hand-instrumentation for the four flows it does not cover (search, new
-  item, metadata edit, editor keystrokes). Say in the coverage statement which
-  numbers came from the harness and which you patched in. Two caveats it states
-  itself: nothing in CI runs it, so a result is a point-in-time artefact of one
-  machine (the numbers worth keeping are in
-  [vault-scaling.md](../../../plans/reports/vault-scaling.md)), and it runs against the dev
-  server, so read the scaling curve rather than the absolute milliseconds.
+  already has.** `scripts/perf/` measures cold start, toggling and agenda scroll
+  plus the pipeline stage by stage; read its README (phases, caveats) first, and
+  say in the coverage statement which numbers came from it. **Its pipeline stages
+  do not sum to its UI flows** — on 2026-11-01 `toggleRecompute` was 10 ms at
+  mixed/10 000 while the real toggle took 2.4 s, because the cost sat in a pass
+  (`computeOverduePool`) no stage models. A UI number with no matching stage is
+  the cue to take a CPU profile, not to trust the stages.
 - Skim the full directory tree so nothing is invisible to you.
 - Read closely: the store (`store.ts`, `storeBridge.ts`) and every selector/subscription pattern it exposes; the components rendered per occurrence/row in agenda view (these multiply — a small waste per row is a big waste per screen); the toggle/save/commit path (`occurrenceActions.ts`, `storeCommit.ts`, `persistencePort.ts`); the search implementation (`search/`) end to end from keystroke to result click; the editor's update/decoration path; the route definitions and what each view mounts.
 - **Read the build and loading story, not just the source:** the Vite config, route-level lazy loading (or its absence), the service worker / PWA caching setup, and the dependency list for heavyweight imports reachable from the entry point. Run the production build and record chunk sizes.
@@ -162,8 +165,7 @@ Ranking and bullets: see [Running a survey](../_survey/conventions.md#running-a-
 **Scope:** the cost of moving between views and dates.
 
 - Views that fully unmount/remount and recompute everything on every switch when the data didn't change
-- No caching/reuse of expensive per-view derivations (expanded occurrences, month grids) across navigation
-- Effects re-running on navigation due to unstable dependencies
+- Expensive derivations (expanded occurrences, month grids) not reused across navigation — most often a module-level cache that *exists* but is keyed on something minted per mount (a `useCallback`, a fresh object), so it misses on every remount; PRs #289, #417, #555 and the overdue pool's `filterOccs` key are this one class. Same for effects with unstable dependencies.
 - Missing `key`-stability causing list teardown/re-creation instead of reconciliation
 
 ### 5. Bundle size & startup
