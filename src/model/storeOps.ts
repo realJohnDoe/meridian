@@ -974,6 +974,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
         metadata: newMeta,
       }
 
+  const editedIsStored = entry.items.some(i => !isSeries(i) && i.id === occ.id)
   const expand = (i: StoreItem): StoreItem[] => {
     if (i.id === series.id) return [capped, newLeg]
     // Re-point overrides at/after occDate to the new series, carrying the
@@ -985,6 +986,14 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
     // so they go with it — which is what the editor asks about before letting
     // this run.
     if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
+      // The edited occurrence is an override too, but unlike the others it was
+      // just told to join the leg, so it takes the leg's slot rather than
+      // keeping its own — and the stub that hid its pre-override slot goes
+      // with it (#1230). Kept rather than dropped so the editor bound to its
+      // id follows it onto the new slot.
+      if (!removing && i.date === occDate && (i.id === occ.id || (i.excluded && editedIsStored))) {
+        return i.excluded ? [] : [{ ...i, ownerId: newSeriesId, date: newDate, time: leg.time, metadata: inheritChanges(i.metadata, series.metadata, newMeta) }]
+      }
       return removing || dropsDay(series, leg, i.date)
         ? []
         : [{ ...i, ownerId: newSeriesId, metadata: inheritChanges(i.metadata, series.metadata, newMeta) }]
