@@ -9,7 +9,12 @@ import type { AgendaRow } from './agendaSections'
 // HEADER_H:    the overdue toggle row.
 // MONTH_H:     the big per-month divider ("August 2026").
 // WEEK_H:      the smaller per-week divider ("Week 32, Aug 3 – 9").
-// ROW_H_META:  OccurrenceCard min-h-11 + py-2 padding + a meta row + AgendaRow mb-1.5 (6) ≈ 68px
+// ROW_H_META:  OccurrenceCard with one line of meta chips (67, measured) + AgendaRow
+//              mb-1.5 (6) = 73px. A chip is 21px, not text-2xs's 10px: it
+//              inherits body's 1.5 line-height (15) + py-0.5 (4) + border (2).
+//              Being 5px short here made nearly every mounted row re-measure,
+//              and each re-measure rebuilds the virtualizer's measurements to
+//              the end of the loaded run — the scroll cost of #1264.
 // ROW_H_PLAIN: the same card with no meta row, so it sits on its min-h-11 (44)
 //              floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
 //              uses for exactly this shape.
@@ -27,13 +32,13 @@ import type { AgendaRow } from './agendaSections'
 const HEADER_H = 40
 const MONTH_H = 60
 const WEEK_H = 36
-const ROW_H_META = 68
+const ROW_H_META = 73
 const ROW_H_PLAIN = 50
 const EMPTY_H = 62
 const DAY_GAP_H = 12
 // OVERDUE_GROUP_H: the same card as ROW_H_META — an overdue group row always
 // shows its oldest date, so its meta row is never absent.
-const OVERDUE_GROUP_H = 68
+const OVERDUE_GROUP_H = 73
 
 /**
  * The two inputs to `OccurrenceCard`'s meta row that a row list can't see,

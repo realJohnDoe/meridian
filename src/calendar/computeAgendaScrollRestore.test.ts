@@ -72,8 +72,8 @@ beforeEach(() => {
 describe('offsetOfRow', () => {
   it('sums estimated row sizes above the target when nothing is measured yet', () => {
     const { rows, goToRowIndex } = agenda()
-    // WEEK_H (36) + a badged, timed occurrence row (ROW_H_META 68 + DAY_GAP_H 12).
-    expect(offsetOfRow(rows, goToRowIndex, [], noExtra)).toBe(116)
+    // WEEK_H (36) + a badged, timed occurrence row (ROW_H_META 73 + DAY_GAP_H 12).
+    expect(offsetOfRow(rows, goToRowIndex, [], noExtra)).toBe(121)
   })
 
   it('prefers a measured size over the estimate, matched by row key', () => {
@@ -99,10 +99,10 @@ describe('computeAgendaScrollRestore', () => {
 
     const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex, noExtra))
 
-    // The week divider (36) plus one timed occurrence row (68) above the
+    // The week divider (36) plus one timed occurrence row (73 + 12) above the
     // overdue header. Starting anywhere else means the first painted frame
     // shows the wrong day and has to be corrected by a visible scroll.
-    expect(result.current.initialOffset).toBe(116)
+    expect(result.current.initialOffset).toBe(121)
   })
 
   it('prefers real measured sizes from the snapshot, matched by row key', () => {
@@ -129,7 +129,7 @@ describe('computeAgendaScrollRestore', () => {
 
     const { result } = renderHook(() => computeAgendaScrollRestore(true, rows, goToRowIndex, noExtra))
 
-    expect(result.current.initialOffset).toBe(30 + 80)
+    expect(result.current.initialOffset).toBe(30 + 85)
   })
 
   // The cold-start regression this whole seeding mechanism exists for: on a
@@ -144,7 +144,7 @@ describe('computeAgendaScrollRestore', () => {
     expect(pending).toBe(true)
 
     const { result } = renderHook(() => computeAgendaScrollRestore(pending, rows, goToRowIndex, noExtra))
-    expect(result.current.initialOffset).toBe(116)
+    expect(result.current.initialOffset).toBe(121)
     expect(result.current.initialOffset).not.toBe(calendarView.getState().agendaScrollOffset)
   })
 
