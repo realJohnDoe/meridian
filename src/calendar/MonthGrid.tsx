@@ -72,7 +72,7 @@ function CalCell({ date, other, dayOccs, today, maxVisible, rowH, reservedLanes,
   // pointer-events-none so the empty area and "+N" fall through to it; pills
   // opt back in.
   return (
-    <div className={cn(CELL_CLASS, 'relative flex hover:bg-muted/70', other && 'opacity-25')}>
+    <div className={cn(CELL_CLASS, 'relative hover:bg-muted/70', other && 'opacity-25')}>
       <SurfaceButton
         className="absolute inset-0 h-full w-full rounded-[inherit]"
         onClick={() => onDayClick(date)}

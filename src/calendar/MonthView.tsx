@@ -3,7 +3,6 @@ import { useStore } from '@/store'
 import { fmtMonth, parseMonth, weekStartsOn } from '@/model'
 import MonthGrid from './MonthGrid'
 import { CELL_CLASS, BADGE_CLASS, OCC_LIST_CLASS, BADGE_H } from './timelineGeometry'
-import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import { useCarousel } from './useCarousel'
 import { useCarouselPreview } from './useCarouselPreview'
@@ -12,9 +11,8 @@ import { occRadius } from '@/components/primitives/occurrence-variants'
 import { calendarView, setMonthPreview } from './viewState'
 
 // Fallback for the occurrence-list start offset until it's measured: cell top
-// padding 3px + the badge's own height + badge mb-px 1px + the 8px flex gap
-// inherited from Button.
-const BAR_TOP_FALLBACK = 3 + BADGE_H + 1 + 8
+// padding 3px + the badge's own height + badge mb-px 1px.
+const BAR_TOP_FALLBACK = 3 + BADGE_H + 1
 const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 
 // ── MonthView ─────────────────────────────────────────────────
@@ -69,7 +67,7 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
   }, [emblaRef])
 
   const rowSentinelRef = useRef<HTMLDivElement>(null)
-  const chromeSentinelRef = useRef<HTMLButtonElement>(null)
+  const chromeSentinelRef = useRef<HTMLDivElement>(null)
   const occListRef = useRef<HTMLDivElement>(null)
 
   const [rowH, setRowH] = useState(0)
@@ -123,11 +121,13 @@ export default function MonthView({ month, onNavigateMonth, onDayClick }: Props)
       </div>
 
       {/* Invisible cell replica: measures the offset from the cell top to where
-          the occurrence list begins, so the bar overlay aligns with real rows. */}
-      <SurfaceButton ref={chromeSentinelRef} aria-hidden tabIndex={-1} className={cn('invisible absolute pointer-events-none', CELL_CLASS)}>
+          the occurrence list begins, so the bar overlay aligns with real rows.
+          A plain div like CalCell's own — not a Button, whose gap-2 would put
+          the bars 8px below the single-day rows. */}
+      <div ref={chromeSentinelRef} aria-hidden className={cn('invisible absolute pointer-events-none', CELL_CLASS)}>
         <span className={BADGE_CLASS}>0</span>
         <div ref={occListRef} className={OCC_LIST_CLASS} />
-      </SurfaceButton>
+      </div>
 
       <div className="flex-1 overflow-hidden pb-1 flex flex-col">
         {/* Embla viewport → container → panes. touch-pan-y lets a vertical drag
