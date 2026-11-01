@@ -462,6 +462,8 @@ To use Meridian for real:
 3. Or **Local folder** — pick a folder; Meridian reads and writes plain \`.md\` files
    there, with no lock-in (Chrome or Edge, desktop or Android; not available in
    Safari or Firefox).
+4. Coming from another calendar? Export it as \`.ics\` and use **Import calendar** on
+   your new vault — your events come in as ordinary entries, no retyping.
 
 Once you've selected a writable vault, everything works: create entries, tick tasks done,
 set up recurring events, and link files with wikilinks.
