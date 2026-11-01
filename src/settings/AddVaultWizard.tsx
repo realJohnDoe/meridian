@@ -28,7 +28,7 @@ const SOURCE_CARDS: { id: Source; Icon: typeof HardDrive; title: string; desc: s
     id:    'ical',
     Icon:  CalendarDays,
     title: 'Calendar subscription',
-    desc:  'Paste an iCal address from Google, Outlook, Apple or anywhere else. Read-only — its events appear alongside your own.',
+    desc:  'Paste an iCal address from Google, Outlook, Apple or anywhere else. Read-only — its events appear alongside your own, and you can move them into a vault later to edit them.',
   },
 ]
 
