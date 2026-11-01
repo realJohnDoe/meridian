@@ -26,6 +26,10 @@ export function setupStore(): void {
     // defaultVaultId is where a brand-new entry goes (see saveNode); without it
     // creating an entry in a test would have no target vault at all.
     useStore.setState({ localePrefs: { hour12: false, firstDayOfWeek: 1 }, defaultVaultId: TEST_VAULT })
+    // Again here, not only in afterEach: a hook the previous test left mounted
+    // (testing-library unmounts after this file's afterEach) re-renders on
+    // that reset and refills the caches it just cleared.
+    resetCalendarOnVaultChange()
   })
   afterEach(() => {
     useStore.setState(initialStoreState, true)
