@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Occurrence } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
@@ -92,12 +92,15 @@ export default function FileResultsList(props: Props) {
 
   useEffect(() => { onResultsChange?.(results) }, [results, onResultsChange])
 
+  // Stable, as in AgendaView: a fresh getItemKey rebuilds every row's measurement on each render (#1264).
+  const getItemKey = useCallback((i: number) => results[i]!.entry.entryKey, [results])  // count === results.length
+
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
     count: results.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => ROW_H,
-    getItemKey: i => results[i]!.entry.entryKey,  // count === results.length
+    getItemKey,
     overscan: 8,
   })
 
