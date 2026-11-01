@@ -226,7 +226,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
         {readOnlyVault && (
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 mb-3 text-xs text-muted-foreground">
             <Info size={14} className="shrink-0" />
-            {readOnlyVault.name} is read-only — changes aren&rsquo;t saved.
+            {readOnlyVault.name} is a sandbox — your changes last until you reload.
           </div>
         )}
 
