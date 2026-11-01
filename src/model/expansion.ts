@@ -937,6 +937,16 @@ function dedupeAndSort(occs: OccurrenceEntry<AppMetadata>[]): OccurrenceEntry<Ap
  * for callers that already have one — typically because they're calling this
  * (or `expandWithMultiday`) more than once against the same `items`. Omit it
  * and one is built internally, exactly as before.
+ *
+ * **Cost scales with occurrences produced, not with files.** At 30 000 files
+ * (`testVaultGen`, measured 2026-08-28), the flat shape (no recurrence, ~23 k
+ * occurrences in the agenda window) expanded in 72 ms; the default mix (15%
+ * weekly series, ~836 k occurrences) took 7.1 s, for the same file count and
+ * bytes. So budget a range by what it emits: one `weekly / [mo,we,fr]` series
+ * is ~195 occurrences over the agenda's −365/+90 days and a daily one ~455, and
+ * 50 daily habits outweigh 20 000 one-shot notes. The same holds for memory: an
+ * expanded occurrence is ~320 bytes of live heap, so the tab's JS heap — not
+ * IndexedDB, which held those 30 000 files in 42 MB — is what runs out first.
  */
 export function expandRange(
   items: StoreItem[],

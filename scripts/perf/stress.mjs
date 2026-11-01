@@ -145,9 +145,9 @@ async function heapMB(page) {
  * `.overflow-y-auto`, which `scripts/layout-smoke.mjs` already depends on, so
  * CI breaks with it rather than after it.
  *
- * The numbers those flows did produce are recorded in
- * `plans/reports/vault-scaling.md`; that section of the report cannot be
- * reproduced by re-running this harness.
+ * Their last numbers (2026-08-28) are in git history, in the since-deleted
+ * `plans/reports/vault-scaling.md`; the performance survey now drives those
+ * flows with its own driver (see the survey's parent issue, e.g. #1250).
  */
 async function measureUI(browser, spec) {
   const { context, page, crashes } = await freshPage(browser, spec)
@@ -203,10 +203,8 @@ async function measureUI(browser, spec) {
     // 2. Scroll the agenda hard — virtualizer + per-row render cost under load.
     // __perf.settle() waits out whatever cold-start background work (idle
     // warm-up, Dexie's cache write) is still mid-flight before the timed loop
-    // starts — added after finding 4's first profile (finding #4 in
-    // plans/reports/vault-scaling.md) showed every prior reading was
-    // dominated by exactly that,
-    // not by scrolling. __perf.loafsIn() then reads the frame's attribution
+    // starts — added after #1264's first profile showed every prior reading
+    // was dominated by exactly that, not by scrolling. __perf.loafsIn() then reads the frame's attribution
     // from the one page-lifetime LoAF observer __perf itself keeps (see
     // probe.mjs), windowed to just the timed loop — settling first and
     // reading from that shared, already-running observer (rather than a

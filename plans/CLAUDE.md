@@ -86,7 +86,7 @@ the issue tracker rather than disappearing with the last finding.
 
 Standing investigation reports (not survey runs) still live in
 **`plans/reports/`** — `storage-backend.md`,
-`vault-scaling.md`, `ical-rrule.md`, and similar one-off spikes and measurement
+`ical-rrule.md`, and similar one-off spikes and measurement
 studies. `plans/` itself then holds this file, `reports/` (the standing documents that
 aren't themselves survey runs), and the `surveys/` tombstone. Everything with a state — including every survey
 run — is in the tracker.

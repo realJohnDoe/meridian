@@ -21,8 +21,9 @@ node scripts/perf/stress.mjs --skip-pipeline --skip-dexie # UI flows only
 ```
 
 Results are printed per size and written to `scripts/perf/results/<iso>.json`,
-which is gitignored: a run is a point-in-time artefact of one machine, and the
-numbers worth keeping live in `plans/reports/vault-scaling.md`.
+which is gitignored: a run is a point-in-time artefact of one machine. Numbers
+worth keeping go on the issue they settle (a survey run's parent issue, or the
+finding itself), with the commit they were taken against.
 
 ## What it measures
 
@@ -56,21 +57,15 @@ and heap can never leak into the next one's numbers.
 Three UI flows, deliberately: cold start, toggling a task, and scrolling the
 agenda. The view switches, search, opening an entry and the CodeMirror
 keystroke measurement were removed — the reasoning is on `measureUI` in
-`stress.mjs`. The `pipeline` and `dexie` phases are untouched and are what
-verify five of the six findings recorded in `plans/reports/vault-scaling.md`.
+`stress.mjs`.
 
-**This directory outlived its expiry, deliberately.** It existed to verify
-those findings by re-measurement and was scoped to be deleted with the last
-one, on the assumption every finding would be fixed. Three were **deferred**
-instead (#4, #5, #6 — see "Where the findings went" in the report), and the
-plan for picking each of them up later *is* a `stress.mjs` invocation, so
-deleting this directory would strand all three. Nothing in CI runs it, so it
-can still rot unnoticed. If a re-run fails to launch, the likeliest cause by
-far is harness bit-rot rather than the app — but diagnose it before concluding
-that, because the earlier wording ("treat that as expected maintenance") told
-you the answer before you looked, and this harness is the only way to settle
-vault-scaling findings #4, #5 and #6. A launch failure that turns out to be the
-app is exactly the case that instruction would have buried.
+**Why it stays.** It is the measurement recipe for #1264 (scroll), #1265
+(`parseFiles`) and #1266 (`applyRemoteBatch`), and the performance survey's
+primary harness. Nothing in CI runs it, so it can rot unnoticed: if a re-run
+fails to launch, diagnose it before blaming harness bit-rot — a launch failure
+that turns out to be the app is exactly the case that assumption buries.
+It also tends to hang after writing its results file; the results are complete
+once `wrote …` is printed.
 
 ## Two things `knip.json` carries for this directory
 

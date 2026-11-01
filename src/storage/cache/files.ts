@@ -207,6 +207,10 @@ export async function markMerged(
  * the store — a skipped path's cache and store both keep whatever they held
  * (typically the user's still-in-progress edit) rather than either the
  * pre-edit snapshot or the now-superseded remote content.
+ *
+ * One transaction for the whole pull: 21 s for 30 000 rows on first connect
+ * (2026-08-28). Chunking it, without splitting a chunk's check from its write,
+ * is #1266.
  */
 export async function applyRemoteBatch(
   vaultId: string,
