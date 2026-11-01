@@ -1,4 +1,5 @@
-import type { StoreItem, Roots, Occurrence } from '@/types'
+import type { StoreItem, Entries, Roots, Occurrence } from '@/types'
+import type { EntryKey } from '@/fileIO'
 import { isSeries, isTracked } from '@/types'
 import { addDays } from '@/format'
 import { dayRange, expandWithMultiday, OVERDUE_LOOKBACK_DAYS } from '@/model'
@@ -46,10 +47,16 @@ export interface OverdueGroup {
  * string (not the filterOccs callback) — see computeOverduePool.
  */
 export interface OverduePoolCache {
-  items: StoreItem[]
+  entries: Entries
   roots: Roots
   todayMs: number
   filterKey: string
+  /**
+   * Each entry's *unfiltered* overdue occurrences, reusable while that `Entry`
+   * keeps its reference (the `updateFileOccurrenceMap` rule) so an edit
+   * re-expands only the entries it touched.
+   */
+  perEntry: Map<EntryKey, Occurrence[]>
   groups: OverdueGroup[]
 }
 
@@ -101,13 +108,11 @@ function overdueCandidates(items: StoreItem[]): StoreItem[] {
  * The overdue section's own pass: expand the overdue candidate items over the
  * whole past lookback, keep what is actually overdue, and group it by series.
  *
- * Deliberately independent of the agenda's expansion window. The overdue pool
- * used to be assembled from the agenda's own expanded days, which is why that
- * window had to reach 365 days back before the agenda could paint its first
- * frame — the single largest reason for it. Running the pass over a *filtered*
- * item set instead makes it proportional to undone tasks rather than to every
- * occurrence in a year, exactly and with no second implementation of "which
- * dates does this repeat rule produce".
+ * Deliberately independent of the agenda's expansion window (see
+ * OVERDUE_LOOKBACK_DAYS), and incremental per entry: expansion of one entry
+ * depends only on that entry, so only entries whose `Entry` reference changed
+ * are re-expanded — in one batched call — and a full recompute happens only
+ * when the day changes.
  *
  * `prev` is returned by reference whenever every input's identity is unchanged,
  * so the groups array stays stable and computeAgendaSections can reuse the
@@ -115,7 +120,7 @@ function overdueCandidates(items: StoreItem[]): StoreItem[] {
  */
 export function computeOverduePool(
   prev: OverduePoolCache | null,
-  items: StoreItem[],
+  entries: Entries,
   roots: Roots,
   today: Date,
   filterOccs: FilterOccs,
@@ -123,8 +128,20 @@ export function computeOverduePool(
 ): OverduePoolCache {
   const todayMs = today.getTime()
 
-  if (prev && prev.items === items && prev.roots === roots && prev.todayMs === todayMs && prev.filterKey === filterKey) {
+  if (prev && prev.entries === entries && prev.roots === roots && prev.todayMs === todayMs && prev.filterKey === filterKey) {
     return prev
+  }
+
+  const reusable = prev && prev.todayMs === todayMs ? prev : null
+  const perEntry = new Map<EntryKey, Occurrence[]>()
+  const changed: StoreItem[] = []
+  for (const [key, entry] of entries) {
+    const cached = reusable?.entries.get(key) === entry ? reusable.perEntry.get(key) : undefined
+    if (cached) perEntry.set(key, cached)
+    else {
+      perEntry.set(key, [])
+      changed.push(...overdueCandidates(entry.items))
+    }
   }
 
   // Through the end of *yesterday*: overdue is a whole-day notion (the agenda's
@@ -132,18 +149,25 @@ export function computeOverduePool(
   // matter how early this morning it was due. dayRange rather than a bare
   // midnight `to`, or every timed occurrence on that last day would be dropped.
   const { from, to } = dayRange(addDays(today, -OVERDUE_LOOKBACK_DAYS), addDays(today, -1))
-  const occs = filterOccs(expandWithMultiday(overdueCandidates(items), roots, from, to).filter(isOverdue))
+  for (const occ of expandWithMultiday(changed, roots, from, to)) {
+    if (isOverdue(occ)) perEntry.get(occ.entryKey)?.push(occ)
+  }
 
-  // expandWithMultiday returns ascending by instant, so the first occurrence
-  // seen for a key is that group's oldest and no second pass is needed.
+  // A union of per-entry lists is not globally ascending, so each group's
+  // oldest is an explicit min rather than "first seen".
   const byKey = new Map<string, OverdueGroup>()
-  for (const occ of occs) {
-    const jsTime = occ.metadata.jsTime
-    if (!jsTime) continue
-    const key = occ.ownerId ?? occ.id
-    const group = byKey.get(key)
-    if (group) group.count++
-    else byKey.set(key, { key, occ, count: 1, oldest: jsTime })
+  for (const list of perEntry.values()) {
+    for (const occ of filterOccs(list)) {
+      const jsTime = occ.metadata.jsTime
+      if (!jsTime) continue
+      const key = occ.ownerId ?? occ.id
+      const group = byKey.get(key)
+      if (!group) byKey.set(key, { key, occ, count: 1, oldest: jsTime })
+      else {
+        group.count++
+        if (jsTime < group.oldest) { group.occ = occ; group.oldest = jsTime }
+      }
+    }
   }
 
   // Sorted like every other list of occurrences in the calendar — priority,
@@ -153,5 +177,5 @@ export function computeOverduePool(
   const byRepresentative = new Map([...byKey.values()].map(g => [g.occ, g]))
   const groups = sortOccs([...byRepresentative.keys()], today).flatMap(occ => byRepresentative.get(occ) ?? [])
 
-  return { items, roots, todayMs, filterKey, groups }
+  return { entries, roots, todayMs, filterKey, perEntry, groups }
 }
