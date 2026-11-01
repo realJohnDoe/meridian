@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type * as ReactRouter from '@tanstack/react-router'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { toast } from 'sonner'
 import { useStore } from '@/store'
 import { setupStore } from '@/test-utils'
 
@@ -43,6 +44,8 @@ vi.mock('@/vaultActions', () => ({
 // The createFileRoute mock hands back the plain options object at runtime, but
 // the static type still describes the real Route, which exposes neither
 // `component` nor `validateSearch`. Re-describe it for the type checker.
+vi.mock('sonner', () => ({ toast: vi.fn() }))
+
 const { Route } = await import('./auth.callback')
 const routeOptions = Route as unknown as {
   component: () => React.ReactElement
@@ -159,6 +162,50 @@ describe('auth.callback — repository fan-out', () => {
       expect.objectContaining({ repo: 'journal', accessToken: 'at' }),
     ))
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith({ to: '/' }))
+  })
+
+  describe('invite prompt', () => {
+    const ghVault = (id: string) => ({
+      id, name: `acme/${id}`, kind: 'github' as const,
+      github: { owner: 'acme', repo: id, branch: 'main' },
+    })
+
+    async function connectNotes() {
+      completeGitHubSignIn.mockResolvedValue(TOKENS)
+      fetchInstalledRepos.mockResolvedValue([repo('notes')])
+      render(<AuthCallbackPage />)
+      fireEvent.click(await screen.findByRole('button', { name: 'acme/notes' }))
+      await waitFor(() => expect(navigateMock).toHaveBeenCalledWith({ to: '/' }))
+      await new Promise(r => setTimeout(r, 0)) // let the post-navigate check settle
+    }
+
+    it('offers to invite someone after the first GitHub vault, leading to its settings', async () => {
+      addGitHubVaultOAuth.mockImplementation(() => {
+        useStore.setState({ vaultLoading: false, vaults: [ghVault('notes')] })
+        return Promise.resolve('notes')
+      })
+      await connectNotes()
+
+      await waitFor(() => expect(toast).toHaveBeenCalledWith('Invite someone to this calendar?', expect.anything()))
+      const { action } = vi.mocked(toast).mock.calls[0]![1]!
+      if (action && typeof action === 'object' && 'onClick' in action) action.onClick({} as React.MouseEvent<HTMLButtonElement>)
+      expect(navigateMock).toHaveBeenCalledWith({ to: '/settings/vault/$vaultId', params: { vaultId: 'notes' } })
+    })
+
+    it('stays quiet when a GitHub vault already existed', async () => {
+      addGitHubVaultOAuth.mockImplementation(() => {
+        useStore.setState({ vaultLoading: false, vaults: [ghVault('journal'), ghVault('notes')] })
+        return Promise.resolve('notes')
+      })
+      await connectNotes()
+      expect(toast).not.toHaveBeenCalled()
+    })
+
+    it('stays quiet when connecting failed', async () => {
+      useStore.setState({ vaultLoading: false, vaults: [] })
+      await connectNotes()
+      expect(toast).not.toHaveBeenCalled()
+    })
   })
 
   // Signed in but the GitHub App isn't installed anywhere — this is the

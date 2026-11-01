@@ -634,7 +634,8 @@ export interface GitHubOAuthVaultConfig {
   expiresAt:    number
 }
 
-export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<void> {
+/** Resolves to the new vault's id, or `undefined` when connecting failed (already notified). */
+export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<string | undefined> {
   try {
     await cacheInit()
     const id = newVaultId(`${cfg.owner}/${cfg.repo}`, await takenVaultIds())
@@ -662,6 +663,7 @@ export async function addGitHubVaultOAuth(cfg: GitHubOAuthVaultConfig): Promise<
       github: { owner: cfg.owner, repo: cfg.repo, branch: cfg.branch },
     }
     await registerAndMount(ref, backend)
+    return id
   } catch (e) {
     console.error('[vault] addGitHubVaultOAuth failed:', e)
     notifyError('Could not connect GitHub vault', e)
