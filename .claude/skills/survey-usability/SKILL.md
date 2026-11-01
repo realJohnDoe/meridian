@@ -138,7 +138,7 @@ One row per task × viewport: **completed** / **completed with friction** /
 One line per category (1–8), per the [shared
 convention](../_survey/conventions.md#category-verdicts).
 
-### 5. Findings — top 10
+### 5. Findings — top 7
 
 `Title`, `Recommended model`, `Problem` and `Fix` are the [shared finding
 fields](../_survey/conventions.md#finding-fields). This survey redefines two and adds four:
