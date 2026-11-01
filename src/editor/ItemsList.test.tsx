@@ -325,7 +325,7 @@ describe('ItemsList wikilink rows', () => {
 })
 
 describe('ItemsList link picker', () => {
-  it('excludes files already linked in items from the "Link file" list', () => {
+  it('excludes files already linked in items from the "Link an entry" list', () => {
     const roots = makeRoots('current.md')
     roots.set(testKey('other.md'), makeRootMeta('other.md', { title: 'Other File' }))
     roots.set(testKey('third.md'), makeRootMeta('third.md', { title: 'Third File' }))
@@ -338,7 +338,7 @@ describe('ItemsList link picker', () => {
     expect(screen.getByText('Third File')).toBeInTheDocument()
   })
 
-  it('reopens a done file when it is picked from the "Link file" list', () => {
+  it('reopens a done file when it is picked from the "Link an entry" list', () => {
     const doneOcc = makeOcc({ id: 'occ-1', entryKey: testKey('done.md'), date: '2020-01-01', metadata: { vaultId: TEST_VAULT, fileSlug: 'done.md', title: 'Old Task', done: true } })
     const roots = makeRoots('current.md')
     roots.set(testKey('done.md'), makeRootMeta('done.md', { title: 'Old Task' }))

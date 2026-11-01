@@ -332,7 +332,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
                 <div className="rounded-lg border border-input bg-background">
                   <CommandInput
                     wrapperClassName="border-b-0"
-                    placeholder="Add item or link file…"
+                    placeholder="Add an item or link an entry…"
                     value={pickerQuery}
                     onValueChange={setPickerQuery}
                     onKeyDown={e => {
@@ -384,7 +384,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
                     </CommandGroup>
                   )}
                   {filtered.length > 0 && (
-                    <CommandGroup heading="Link file">
+                    <CommandGroup heading="Link an entry">
                       {filtered.slice(0, 8).map(e => (
                         <CommandItem
                           key={e.fileSlug}
