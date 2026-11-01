@@ -83,8 +83,8 @@ Files you own only stay yours if your edits actually arrive. That plumbing is ta
 1. **Open the app** at [realjohndoe.github.io/meridian](https://realjohndoe.github.io/meridian/).
 2. Try the **Tutorial vault** to get a feel for the interface — click through the onboarding tour.
 3. When you're ready, connect your own storage:
-   - **GitHub** (recommended) — click "Connect GitHub repo", **Sign in with GitHub**, and pick the repository to use — no token to create by hand. Meridian reads and writes files directly, so you can reach your vault from any device.
-   - **Local folder** — click "Connect local folder" and pick a directory. Chrome or Edge, desktop or Android; not available in Safari or Firefox.
+   - **GitHub** (recommended) — Menu → **Settings** → **Add vault** → **GitHub repository**, sign in, then pick a repository that has Meridian's GitHub App installed (the picker links to creating a new empty repo and to installing the app) — no token to create by hand. Meridian reads and writes files directly, so you can reach your vault from any device.
+   - **Local folder** — Menu → **Settings** → **Add vault** → **Local folder**, then pick a directory. Chrome or Edge, desktop or Android; not available in Safari or Firefox.
    - **Coming from another calendar?** Export it as `.ics` and use **Import calendar** on your new vault (or subscribe first and **Move into a vault** later) — no retyping.
 4. Create your first entry with the **+** button and start building your calendar.
 
