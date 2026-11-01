@@ -417,7 +417,7 @@ machine, so compare shapes rather than ms): toggle 143 / 764 / 2 380 ms and
 `vaultPaintMs` 749 / 1 907 / 4 016 ms. Toggle is still seconds at 10 000, so
 the deferral stands — but its cost is not the expansion this report measured:
 `toggleRecompute` was 10 ms, and a CPU profile put 84% of the toggle in
-`computeOverduePool` (performance survey, same date).
+`computeOverduePool` (performance survey #1250, finding #1252).
 
 **Ruled out by inspection — do not re-investigate without new evidence.**
 
