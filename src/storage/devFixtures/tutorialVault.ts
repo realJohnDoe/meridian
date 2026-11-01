@@ -233,7 +233,7 @@ items:
 Real schedules are messy, so Meridian's recurrence goes well past "repeats weekly."
 
 It repeats on a schedule you set, and any single occurrence can be changed without
-touching the rest. See [[team-standup]] — a Mon/Wed/Fri event where the past occurrences
+touching the rest. See [[team-standup]] — a Mon/Wed/Fri task where the past occurrences
 are ticked done while future ones stay open. Tasks repeat the same way: [[morning-run]].
 
 **Editing one occurrence.** Recurring items support the same per-occurrence edit scopes
@@ -247,7 +247,7 @@ That part is standard. What isn't: you can mix multiple patterns in one item, li
 *first and second Friday* of the month, instead of being locked to a single rule.`,
     },
 
-    // ── team-standup: recurring event ──
+    // ── team-standup: recurring task ──
     {
       id: 'team-standup',
       content: `---
@@ -264,7 +264,7 @@ defaults:
   done: false
 ${recDone}---
 
-A **recurring event** that repeats Mon/Wed/Fri.
+A **recurring task** that repeats Mon/Wed/Fri.
 
 It repeats on a schedule, and any single occurrence can be overridden — here the
 past ones are marked done while future ones stay open.
