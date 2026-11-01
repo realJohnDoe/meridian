@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { ChevronDown } from 'lucide-react'
 import type { Occurrence, EditScope } from '@/types'
@@ -98,16 +98,13 @@ export default function OccurrenceList({ occs, onOpen, onToggleDone, onSwipeDele
     return out
   }, [occs, doneOpen])
 
-  // Stable, as in AgendaView: a fresh getItemKey rebuilds every row's measurement on each render (#1264).
-  const getItemKey = useCallback((i: number) => rows[i]!.key, [rows])
-
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scRef.current,
     // `count` is rows.length, so the virtualizer only ever asks for i in range.
     estimateSize: i => rows[i]!.kind === 'done-header' ? DONE_HEADER_H : ROW_H,
-    getItemKey,
+    getItemKey: i => rows[i]!.key,
     overscan: 8,
   })
 

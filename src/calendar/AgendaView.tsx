@@ -116,20 +116,16 @@ export default function AgendaView({ onOpen }: Props) {
   // section pools every undone past task with no cap — on a large vault that
   // was thousands of AgendaRows (each with three touch listeners, two
   // store subscriptions and a backlink lookup) in one synchronous commit.
-  // Must be stable across renders: getItemKey is one of the virtualizer's
-  // measurement deps, so a fresh closure each render (and it re-renders on
-  // every scroll step) rebuilt the measurements of every loaded row — a
-  // scroll cost growing with the loaded run rather than the ~26 mounted rows
-  // (#1264).
-  const getItemKey = useCallback((i: number) => rows[i]!.key, [rows])
-
   // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Virtual's useVirtualizer() returns functions the compiler can't memoize safely; it correctly skips optimizing this component instead.
   const virtualizer = useVirtualizer({
+    // Scroll cost tracks this — the loaded run — not the ~26 mounted rows: a
+    // row measuring differently from its estimate rebuilds measurements up to
+    // `count`. See #1264.
     count: rows.length,
     getScrollElement: () => scRef.current,
     // `count` is rows.length, so the virtualizer only ever asks for i in range.
     estimateSize: i => estimateRow(rows[i]!, extraMeta),
-    getItemKey,
+    getItemKey: i => rows[i]!.key,
     overscan: 8,
     initialOffset,
     initialMeasurementsCache,
