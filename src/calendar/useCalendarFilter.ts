@@ -129,9 +129,7 @@ export function describeFilter(
  * on that string rather than on this callback's identity — so a piece of
  * filter STATE left out of *both* would be invisible to the cache, not merely
  * to the memo. Archived is not filter state (see `hideArchived`'s comment),
- * so it needs no such entry. (`overduePool.ts` still keys on the callback by
- * reference; its pass runs over a filtered item set, so a thrash there costs
- * one cheap re-expansion rather than the agenda's rows.)
+ * so it needs no such entry.
  */
 export function useCalendarFilter() {
   const hiddenVaultIds     = useStore(s => s.hiddenVaultIds)
