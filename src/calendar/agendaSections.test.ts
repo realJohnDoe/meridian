@@ -357,10 +357,10 @@ describe('computeAgendaSections', () => {
   it('re-sorts the touched day so a completed task sinks below the open one', () => {
     const all = baseOccs()
     const first = compute(null, all, noGroups)
-    expect(itemIds(findDay(first.sections, '2026-06-15'))).toEqual(['today-event', 'today-task-a', 'today-task-b'])
+    expect(itemIds(findDay(first.sections, '2026-06-15'))).toEqual(['today-task-a', 'today-task-b', 'today-event'])
 
     const second = compute(first, overlay(all, 'today-task-a', { done: true }), noGroups)
-    expect(itemIds(findDay(second.sections, '2026-06-15'))).toEqual(['today-event', 'today-task-b', 'today-task-a'])
+    expect(itemIds(findDay(second.sections, '2026-06-15'))).toEqual(['today-task-b', 'today-event', 'today-task-a'])
     expect(findDay(second.sections, '2026-06-15')?.items[2]!.metadata.done).toBe(true)
   })
 

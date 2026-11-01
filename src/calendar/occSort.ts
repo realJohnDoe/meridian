@@ -22,8 +22,9 @@ export function priorityRank(priority: string | undefined): number {
 }
 
 // Type sub-order (0-3) within a bucket — multiday events, then untimed
-// single-day events, then timed events, then tasks/notes (which carry no
-// type distinction of their own, so priority/time/title decide between them).
+// single-day events, then everything timed (events, tasks and notes alike, so
+// a day reads top-to-bottom as clock time), then untimed tasks/notes (which
+// carry no type distinction of their own, so priority/title decide between them).
 // Exported so other contexts that sort a mix of occurrences and non-occurrence
 // rows (ItemsList) can assign the same key to the occurrences among them —
 // see SortKey below.
@@ -34,8 +35,8 @@ export function typeKey(o: Occurrence): number {
 
   if (isEvent && isMultiday) return 0   // multiday events
   if (isEvent && !hasTimed)  return 1   // untimed single-day events
-  if (isEvent &&  hasTimed)  return 2   // timed events
-  return 3                              // tasks / notes
+  if (hasTimed)              return 2   // timed events, tasks and notes
+  return 3                              // untimed tasks / notes
 }
 
 /**
@@ -59,6 +60,8 @@ export interface SortKey {
 export function compareSortKeys(a: SortKey, b: SortKey): number {
   const bd = a.bucket - b.bucket; if (bd) return bd
   const td = a.typeKey - b.typeKey; if (td) return td
+  // Timed items (typeKey 2): clock time outranks priority.
+  if (a.typeKey === 2 && a.jsTimeMs !== b.jsTimeMs) return a.jsTimeMs - b.jsTimeMs
   const pd = a.prioKey - b.prioKey; if (pd) return pd
   if (a.jsTimeMs !== b.jsTimeMs) return a.jsTimeMs - b.jsTimeMs
   return a.title.localeCompare(b.title)
