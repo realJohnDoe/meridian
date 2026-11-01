@@ -31,7 +31,7 @@ import { mountBackend, unmountBackend } from './backends'
 import { updateSyncUI } from './syncUI'
 import { syncOnActivate } from './syncScheduler'
 import { dropSyncState } from './syncState'
-import { parseFiles, reportParseFailures } from './parseReport'
+import { parseVaultFiles, reportParseFailures } from './parseReport'
 
 // ── VAULT-CHANGE NOTIFICATION ──────────────────────────────────
 
@@ -212,7 +212,7 @@ async function hydrateFromCache(vaultId: string): Promise<boolean> {
     setVaultUnreadable(vaultId, [])
     return false
   }
-  const { entries, failures, auditRoundTrip } = parseFiles(cached, vaultId)
+  const { entries, failures, auditRoundTrip } = await parseVaultFiles(cached, vaultId)
   setVaultLayer(vaultId, entries)
   setVaultUnreadable(vaultId, failures)
   reportParseFailures(failures)
@@ -234,7 +234,7 @@ async function mountExampleVault(): Promise<void> {
   const backend = new ExampleBackend()
   mountBackend(backend)
   const files = await backend.readAll()
-  const { entries, failures, auditRoundTrip } = parseFiles(files, backend.id)
+  const { entries, failures, auditRoundTrip } = await parseVaultFiles(files, backend.id)
   setVaultLayer(backend.id, entries)
   setVaultUnreadable(backend.id, failures)
   reportParseFailures(failures)

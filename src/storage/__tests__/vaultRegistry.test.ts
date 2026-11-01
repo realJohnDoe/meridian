@@ -82,7 +82,7 @@ const {
       syncOnActivate: vi.fn(async () => {}),
       // Echo one entry per file so "did the cache paint?" is observable
       // via storeState.items.length.
-      parseFiles: vi.fn((files: Array<{ path: string; content: string }>) => ({
+      parseVaultFiles: vi.fn(async (files: Array<{ path: string; content: string }>) => ({
         entries: new Map(files.map(f => [
           f.path,
           { key: f.path, root: { body: f.content }, items: [{ entryKey: f.path }] },
@@ -252,7 +252,7 @@ vi.mock('@/storage/syncScheduler', () => ({ syncOnActivate: syncFns.syncOnActiva
 vi.mock('@/storage/syncState', () => ({ dropSyncState: syncFns.dropSyncState }))
 
 vi.mock('@/storage/parseReport', () => ({
-  parseFiles: syncFns.parseFiles,
+  parseVaultFiles: syncFns.parseVaultFiles,
   reportParseFailures: syncFns.reportParseFailures,
 }))
 
@@ -288,7 +288,7 @@ beforeEach(() => {
   notifyFns.notifyError.mockClear()
   notifyFns.warn.mockClear()
   syncFns.syncOnActivate.mockClear()
-  syncFns.parseFiles.mockClear()
+  syncFns.parseVaultFiles.mockClear()
   syncFns.reportParseFailures.mockClear()
   syncFns.updateSyncUI.mockClear()
   backendConfig.localPermission = 'granted'

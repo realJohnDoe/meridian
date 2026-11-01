@@ -49,33 +49,49 @@ function auditRoundTrip(parsed: Array<{ path: string; content: string; result: P
   )
 }
 
-/**
- * Parse a whole vault in one synchronous loop. This is on the first-paint path
- * and file-linear (~700 ms at 10 000 files in dev); batching it is #1265.
- */
-export function parseFiles(
-  files: Array<{ path: string; content: string }>,
-  vaultId: string,
-): { entries: Entries; failures: ParseFailure[]; auditRoundTrip: () => void } {
+type ParsedVault = { entries: Entries; failures: ParseFailure[]; auditRoundTrip: () => void }
+
+/** Returns the per-file step and the result it accumulates into. */
+function parser(vaultId: string): { step: (f: { path: string; content: string }) => void; out: ParsedVault } {
   const entries: Entries = new Map()
   const failures: ParseFailure[] = []
   const parsed: Array<{ path: string; content: string; result: ParseResult }> = []
-  for (const { path, content } of files) {
-    try {
-      const result = parseToStoreItems(path, content, vaultId)
-      entries.set(result.key, result)
-      // The round-trip guard is deferred (see auditRoundTrip above), but the
-      // parse it needs is kept here rather than redone: it is only sound on an
-      // UNEDITED round trip — after an edit, an intentional change reads as a
-      // "loss" — so it must see the file exactly as it was loaded.
-      parsed.push({ path, content, result })
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e)
-      failures.push({ path, key: pathToKey(vaultId, path), message })
-      console.warn('[vault] parse failed for', path, e)
-    }
+  return {
+    out: { entries, failures, auditRoundTrip: () => { auditRoundTrip(parsed) } },
+    step: ({ path, content }) => {
+      try {
+        const result = parseToStoreItems(path, content, vaultId)
+        entries.set(result.key, result)
+        // The round-trip guard is deferred (see auditRoundTrip above), but the
+        // parse it needs is kept here rather than redone: it is only sound on an
+        // UNEDITED round trip — after an edit, an intentional change reads as a
+        // "loss" — so it must see the file exactly as it was loaded.
+        parsed.push({ path, content, result })
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        failures.push({ path, key: pathToKey(vaultId, path), message })
+        console.warn('[vault] parse failed for', path, e)
+      }
+    },
   }
-  return { entries, failures, auditRoundTrip: () => { auditRoundTrip(parsed) } }
+}
+
+/** Parse files synchronously — for small batches (a reconcile's changed files). */
+export function parseFiles(files: Array<{ path: string; content: string }>, vaultId: string): ParsedVault {
+  const { step, out } = parser(vaultId)
+  files.forEach(step)
+  return out
+}
+
+/**
+ * Parse a whole vault in idle-sized batches so the file-linear cost (~700 ms at
+ * 10 000 files) never lands as one long task on the first-paint path. Nothing
+ * is returned until every file is done, so the caller publishes the layer once
+ * and no consumer sees a half-parsed vault.
+ */
+export function parseVaultFiles(files: Array<{ path: string; content: string }>, vaultId: string): Promise<ParsedVault> {
+  const { step, out } = parser(vaultId)
+  return new Promise(resolve => { runInIdleBatches(files, step, () => { resolve(out) }, 100) })
 }
 
 /**

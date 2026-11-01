@@ -214,7 +214,7 @@ import { onCacheChange } from '@/storage/cache/broadcast'
 import { syncToBackend, autoSyncTick, flushPendingPush, syncOnActivate, scheduleAutoPush } from '@/storage/syncScheduler'
 import { resetSyncBackoff, dropAllSyncState } from '@/storage/syncState'
 import { writeEntityToCache, deleteFromBackend } from '@/storage/entityWrites'
-import { parseFiles, reportParseFailures } from '@/storage/parseReport'
+import { parseFiles, parseVaultFiles, reportParseFailures } from '@/storage/parseReport'
 import { mountBackend, unmountAllBackends } from '@/storage/backends'
 import { syncJournalEvents, clearSyncJournal, syncJournalDump } from '@/storage/syncJournal'
 
@@ -2473,6 +2473,17 @@ describe('parseFiles', () => {
       expect(f.path).toMatch(/\.md$/)
       expect(f.message.length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('parseVaultFiles', () => {
+  it('yields the same result as parseFiles, but only once every file is parsed', async () => {
+    const files = Array.from({ length: 40 }, (_, i) => ({ path: `n${i}.md`, content: `---\ntitle: N${i}\n---` }))
+    files.push({ path: 'bad.md', content: '---\ntitle: A\ntitle: B\n---' })
+    const sync = parseFiles(files, VAULT)
+    const idle = await parseVaultFiles(files, VAULT)
+    expect([...idle.entries.keys()]).toEqual([...sync.entries.keys()])
+    expect(idle.failures.map(f => f.key)).toEqual([K('bad')])
   })
 })
 
