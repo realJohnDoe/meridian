@@ -143,6 +143,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
   // saved" has to say *which* vault it is talking about. Retires the hardcoded
   // "Tutorial vault" string — the Tutorial vault is simply the read-only vault
   // most people meet first.
+  const vaultName          = useStore(s => s.vaults.find(v => v.id === vaultId)?.name)
   const readOnlyVault      = useStore(s =>
     s.vaults.find(v => v.id === vaultId && (s.syncByVault.get(v.id)?.readOnly ?? false)))
   const titleRef  = useRef<HTMLTextAreaElement>(null)
@@ -210,7 +211,16 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
         {archived && (
           <div className="flex items-center gap-2 rounded-lg bg-warning px-3 py-2 mb-3 text-xs text-warning-foreground shadow-(--shadow-card)">
             <Archive size={14} className="shrink-0" />
-            <span className="flex-1">Archived — hidden from the calendar and search.</span>
+            <span className="flex-1">
+              Archived — hidden from the calendar and search.
+              {vaultId && vaultName && (
+                <> Find it under Settings →{' '}
+                  <Link to="/settings/vault/$vaultId" params={{ vaultId }} className="underline">
+                    {vaultName}
+                  </Link>
+                </>
+              )}
+            </span>
             <Button
               variant="ghost"
               size="sm"

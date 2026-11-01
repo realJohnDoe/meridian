@@ -119,6 +119,16 @@ describe('EntryEditor — archived banner', () => {
     expect(screen.getByRole('button', { name: 'Unarchive' })).toBeInTheDocument()
   })
 
+  it('links the banner to the entry’s own vault settings', () => {
+    const occ = makeOcc({ id: 'occ-link', entryKey: testKey('old-task.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'old-task.md', title: 'Old Task' } })
+    seedStore([occ], makeRoots('old-task.md', { archived: true }))
+    useStore.setState({ vaults: [{ id: TEST_VAULT, name: 'Work', kind: 'local' }] })
+
+    render(<ArchiveHarness occ={occ} roots={archivedRoots(occ, 'Old Task', true)} />)
+
+    expect(screen.getByRole('link', { name: 'Work' })).toHaveAttribute('href', `/settings/vault/${TEST_VAULT}`)
+  })
+
   it('shows no banner for an ordinary, unarchived entry', () => {
     const occ = makeOcc({ id: 'occ-plain', entryKey: testKey('plain-task.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'plain-task.md', title: 'Plain Task' } })
     seedStore([occ], makeRoots('plain-task.md'))
