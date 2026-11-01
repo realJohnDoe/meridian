@@ -22,7 +22,7 @@ export function priorityRank(priority: string | undefined): number {
 }
 
 // Type sub-order (0-3) within a bucket — multiday events, then untimed
-// single-day events, then everything timed (events, tasks and notes alike, so
+// single-day events, then everything timed (events and tasks alike, so
 // a day reads top-to-bottom as clock time), then untimed tasks/notes (which
 // carry no type distinction of their own, so priority/title decide between them).
 // Exported so other contexts that sort a mix of occurrences and non-occurrence
@@ -35,7 +35,7 @@ export function typeKey(o: Occurrence): number {
 
   if (isEvent && isMultiday) return 0   // multiday events
   if (isEvent && !hasTimed)  return 1   // untimed single-day events
-  if (hasTimed)              return 2   // timed events, tasks and notes
+  if (hasTimed)              return 2   // timed events and tasks
   return 3                              // untimed tasks / notes
 }
 
