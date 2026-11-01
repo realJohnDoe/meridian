@@ -39,6 +39,9 @@ const overdueGroups = (rows: AgendaRow[]) =>
  * divider rows the loaded run happens to carry. */
 const content = (rows: AgendaRow[]) => rows.filter(r => r.kind !== 'month' && r.kind !== 'week')
 
+/** Lets the overdue pool's deferred first computation land (see useAgendaSections). */
+const landPool = () => act(() => new Promise<void>(resolve => { setTimeout(resolve, 0) }))
+
 describe('the agenda\'s loaded run', () => {
   // First paint used to expand the whole ±455-day window regardless of what
   // the user could see. Under incremental loading the default is three
@@ -83,7 +86,7 @@ describe('useAgendaSections', () => {
     expect(occIdsFor(result.current.rows, '2026-06-15')).toEqual(['today-1'])
   })
 
-  it('summarises an undone past task in overdue while leaving it on its own day', () => {
+  it('summarises an undone past task in overdue while leaving it on its own day', async () => {
     const overdueTask = makeOcc({ id: 'overdue-1', date: '2026-06-10', time: null, metadata: { fileSlug: 'other.md', title: 'Old task', done: false } })
     const pastEvent = makeOcc({
       id: 'past-event-1',
@@ -94,6 +97,7 @@ describe('useAgendaSections', () => {
     seedStore([overdueTask, pastEvent], new Map([...makeRoots('note.md'), ...makeRoots('other.md')]))
 
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
+    await landPool()
     const { rows, goToRowIndex } = result.current
 
     // The past day keeps *both* occurrences — undone tasks are no longer hoisted
@@ -110,11 +114,12 @@ describe('useAgendaSections', () => {
   // Scroll-to-today targets the overdue header when there is one, so this is
   // what the agenda actually opens on: the overdue work itself, with Today
   // directly below it.
-  it('expands the overdue section by default, keeping its header as the scroll target', () => {
+  it('expands the overdue section by default, keeping its header as the scroll target', async () => {
     const overdueTask = makeOcc({ id: 'overdue-1', date: '2026-06-10', time: null, metadata: { fileSlug: 'note', title: 'Old task', done: false } })
     seedStore([overdueTask], makeRoots('note.md'))
 
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
+    await landPool()
     const { rows, goToRowIndex } = result.current
 
     // the task on its own past day → overdue header → its group row → today.
@@ -126,12 +131,13 @@ describe('useAgendaSections', () => {
     expect(target?.kind === 'header' && target.count).toBe(1)
   })
 
-  it('collapses the overdue section to just its header when the user collapses it', () => {
+  it('collapses the overdue section to just its header when the user collapses it', async () => {
     const overdueTask = makeOcc({ id: 'overdue-1', date: '2026-06-10', time: null, metadata: { fileSlug: 'note', title: 'Old task', done: false } })
     seedStore([overdueTask], makeRoots('note.md'))
     collapseOverdue()
 
     const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
+    await landPool()
     const { rows, goToRowIndex } = result.current
 
     // The divider stays — and stays where scroll-to-today lands — but it is the
@@ -141,6 +147,19 @@ describe('useAgendaSections', () => {
     const target = rows[goToRowIndex]
     expect(target?.kind).toBe('header')
     expect(target?.kind === 'header' && target.count).toBe(1)
+  })
+
+  // #1254: the pool's first computation is the expensive one and nothing but
+  // the overdue block reads it, so the first paint goes without it.
+  it('paints without the overdue block first, then splices it in once the deferred pool lands', async () => {
+    const overdueTask = makeOcc({ id: 'overdue-1', date: '2026-06-10', time: null, metadata: { fileSlug: 'note', title: 'Old task', done: false } })
+    seedStore([overdueTask], makeRoots('note.md'))
+
+    const { result } = renderHook(() => useAgendaSections(TODAY, NOW))
+    expect(content(result.current.rows).map(r => r.kind)).toEqual(['occ', 'day-empty'])
+
+    await landPool()
+    expect(content(result.current.rows).map(r => r.kind)).toEqual(['occ', 'header', 'overdue-group', 'day-empty'])
   })
 
   it('points goToRowIndex at today\'s own badged row when there is no overdue section', () => {

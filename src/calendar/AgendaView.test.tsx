@@ -291,13 +291,23 @@ const renderedCards = () => screen.getAllByRole('button').filter(el => el.getAtt
  */
 const overdueGroupRows = () => [...document.querySelectorAll<HTMLElement>('[data-flip-key^="og|"]')]
 
+/**
+ * Mount, then let the overdue pool's deferred first computation land — it
+ * waits for an idle callback after first paint (see useAgendaSections), and
+ * these tests are about the block itself, not its arrival.
+ */
+async function renderAgenda(onOpen = vi.fn()): Promise<void> {
+  render(<AgendaView onOpen={onOpen} />)
+  await act(async () => { vi.advanceTimersByTime(1); await Promise.resolve() })
+}
+
 describe('AgendaView', () => {
-  it('mounts only a viewport-sized window of rows, not the whole overdue section', () => {
+  it('mounts only a viewport-sized window of rows, not the whole overdue section', async () => {
     const occs = Array.from({ length: 500 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
     expandOverdue()
 
-    render(<AgendaView onOpen={vi.fn()} />)
+    await renderAgenda()
 
     // The overdue section holds all 500, but virtualization is row-granular:
     // only the 600px viewport plus overscan may mount (observed: 8). Under
@@ -310,11 +320,11 @@ describe('AgendaView', () => {
     expect(mounted).toBeLessThan(40)
   })
 
-  it('renders the overdue header and its grouped task, and leaves the task on its own day', () => {
+  it('renders the overdue header and its grouped task, and leaves the task on its own day', async () => {
     const task = makeOcc({ id: 'overdue-1', date: fmtISO(addDays(today, -3)), time: '09:00', metadata: { fileSlug: 'note', title: 'Pay the invoice', done: false } })
     seedStore([task], makeRoots('note.md'))
 
-    render(<AgendaView onOpen={vi.fn()} />)
+    await renderAgenda()
 
     expect(screen.getByText('Overdue')).toBeInTheDocument()
     // Twice: once summarised in the overdue block, once on 3 days ago — which
@@ -324,7 +334,7 @@ describe('AgendaView', () => {
     expect(within(overdueGroupRows()[0]!).getByText('Pay the invoice')).toBeInTheDocument()
   })
 
-  it('shows a count on a group standing for more than one occurrence, and none on a single', () => {
+  it('shows a count on a group standing for more than one occurrence, and none on a single', async () => {
     // Weekly from a fortnight ago: two overdue slots (-14, -7) plus today's,
     // which is not overdue. One series, one row, ×2.
     const weekly = makeSeries({
@@ -341,7 +351,7 @@ describe('AgendaView', () => {
       ...makeRoots('plants.md', { title: 'Water the plants' }),
     ]))
 
-    render(<AgendaView onOpen={vi.fn()} />)
+    await renderAgenda()
 
     // One row per series; the standalone is its own group and carries no count.
     expect(overdueGroupRows()).toHaveLength(2)
@@ -357,13 +367,13 @@ describe('AgendaView', () => {
     expect(within(overdueHeader).getByText('2')).toBeInTheDocument()
   })
 
-  it('expands a small overdue backlog by default, mounting its rows', () => {
+  it('expands a small overdue backlog by default, mounting its rows', async () => {
     // Below OVERDUE_AUTO_COLLAPSE_THRESHOLD (viewState.ts) — the count-based
     // default should leave this expanded with no override needed.
     const occs = Array.from({ length: 2 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
 
-    render(<AgendaView onOpen={vi.fn()} />)
+    await renderAgenda()
 
     // The count rides beside the label rather than inside it, so the divider
     // still reads exactly "Overdue".
@@ -384,11 +394,11 @@ describe('AgendaView', () => {
   // default once it passes the threshold is what keeps the button's landing
   // spot small, without hiding the work: the header still carries the count
   // and a toggle.
-  it('collapses a large overdue backlog by default, leaving only the header', () => {
+  it('collapses a large overdue backlog by default, leaving only the header', async () => {
     const occs = Array.from({ length: 20 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
 
-    render(<AgendaView onOpen={vi.fn()} />)
+    await renderAgenda()
 
     expect(screen.getByText('Overdue')).toBeInTheDocument()
     expect(screen.getByText('20')).toBeInTheDocument()
@@ -401,26 +411,26 @@ describe('AgendaView', () => {
     expect(overdueGroupRows().length).toBeGreaterThan(0)
   })
 
-  it('renders only the header once the user collapses the overdue section', () => {
+  it('renders only the header once the user collapses the overdue section', async () => {
     // Below the auto-collapse threshold, so this is exercising the explicit
     // override winning over the count-based default, not the default itself.
     const occs = Array.from({ length: 2 }, (_, i) => overdueTask(i))
     seedStore(occs, makeRoots('note.md'))
     collapseOverdue()
 
-    render(<AgendaView onOpen={vi.fn()} />)
+    await renderAgenda()
 
     expect(screen.getByText('Overdue')).toBeInTheDocument()
     expect(screen.getByText('2')).toBeInTheDocument()
     expect(overdueGroupRows()).toHaveLength(0)
   })
 
-  it('calls onOpen with the representative occurrence when an overdue group row is clicked', () => {
+  it('calls onOpen with the representative occurrence when an overdue group row is clicked', async () => {
     const task = makeOcc({ id: 'overdue-1', date: fmtISO(addDays(today, -3)), time: '09:00', metadata: { fileSlug: 'note', title: 'Pay the invoice', done: false } })
     seedStore([task], makeRoots('note.md'))
 
     const onOpen = vi.fn()
-    render(<AgendaView onOpen={onOpen} />)
+    await renderAgenda(onOpen)
 
     fireEvent.click(within(overdueGroupRows()[0]!).getByLabelText('Pay the invoice'))
 
@@ -529,6 +539,22 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     await settle()
 
     expect(calendarView.getState().agendaTopDate).toBe(before)
+  })
+
+  // #1254: the overdue pool's first computation waits until after first paint,
+  // so on a cold start the block splices in above today's row a beat later.
+  // Holding today's row there (the ordinary anchor correction) would push the
+  // block out of view above — it has to land exactly where a warm mount's
+  // scroll-to-today would have, on the Overdue header.
+  it('shows the overdue block at the top when it arrives after first paint', async () => {
+    seedStore([todayTask(), ...upcoming(), ...overdue(2)], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await settle()
+
+    // The Overdue header's own row is the one the viewport rests on, exactly
+    // where a warm mount's scroll-to-today would have landed.
+    const header = document.querySelector('[data-flip-key="h|__overdue__"]')!.parentElement!
+    expect(header.style.transform).toBe(`translateY(${scrollContainer().scrollTop}px)`)
   })
 
   it('holds the visible day when a vault sync lands past-dated content above it', async () => {

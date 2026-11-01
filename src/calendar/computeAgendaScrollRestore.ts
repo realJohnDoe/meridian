@@ -161,6 +161,9 @@ export function findAnchorIndex(rows: AgendaRow[], anchor: ScrollAnchor, exclude
   return rows.findIndex(r => r.dateKey >= anchor.dateKey)
 }
 
+/** The overdue block's rows — its toggle header (the only 'header' row) and its groups. */
+const isOverdueRow = (r: AgendaRow | undefined): boolean => r?.kind === 'header' || r?.kind === 'overdue-group'
+
 /**
  * Keeps the agenda on the day it is already showing when `rows` is rebuilt by
  * something *other* than the user scrolling.
@@ -298,8 +301,17 @@ export function useAnchoredAgendaScroll(
     // instead of from a position they have already left.
     if (touchingRef.current) { captureAnchor(); return }
 
-    const index = findAnchorIndex(rows, anchor, excludeKey)
+    let index = findAnchorIndex(rows, anchor, excludeKey)
     if (index < 0) return
+    // The overdue block splices in directly above today's first row, so when
+    // it *arrives* right above the row the viewport rests on — the cold
+    // start's deferred pool (see useAgendaSections), or a sync landing the
+    // first overdue task — pin to its top instead, which is where
+    // scroll-to-today would have landed. Holding the old row would push the
+    // block out of view above, hiding exactly the work the agenda opens on.
+    if (!isOverdueRow(prevRows[anchor.index - 1])) {
+      while (isOverdueRow(rows[index - 1])) index--
+    }
     // Same index means nothing above the viewport was added or removed, so
     // there is nothing to correct — and re-pinning anyway would snap a mid-row
     // position flush to the top on every rebuild, once a minute.

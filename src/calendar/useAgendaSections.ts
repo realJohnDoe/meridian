@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useStore } from '@/store'
+import { onIdle } from '@/lib/idle'
 import { weekStartsOn } from '@/model'
 import { agendaChunkRun } from './agendaChunks'
 import { useAgendaChunks } from './useAgendaChunks'
@@ -8,8 +10,13 @@ import {
   computeAgendaSections,
   type AgendaRow,
 } from './agendaSections'
-import { computeOverduePool } from './overduePool'
+import { computeOverduePool, type OverdueGroup } from './overduePool'
 import { SECTIONS_CACHE_KEY, sectionsCacheSlot, overduePoolSlot } from './expansionCaches'
+
+/** The overdue groups while the cold-start pool is still pending — a stable
+ * reference, so computeAgendaSections never mistakes it for a computed pool
+ * (it reuses the built overdue section on `groups` identity). */
+const POOL_PENDING: OverdueGroup[] = []
 
 export type { AgendaRow } from './agendaSections'
 export { estimateRow, type ExtraMetaProbe } from './agendaRowHeights'
@@ -92,15 +99,37 @@ export function useAgendaSections(
   const chunkOccs = useAgendaChunks(items, roots, agendaChunkRun(loadedRun), ws)
   const { filterOccs, filterKey } = useCalendarFilter()
 
+  // The pool's *first* computation — a cold start, or the first agenda mount
+  // after a vault change — is one expansion of every undone task over the
+  // whole overdue lookback, and nothing but the overdue block itself reads it.
+  // So it waits until after first paint: the agenda paints its day rows with
+  // no overdue block, and the block lands from an idle callback (measured
+  // 1.7 s of a 4.5 s cold start at 10 000 files). Every later computation
+  // reuses or rebuilds from a warm cache, so it stays synchronous.
+  //
+  // Landing late is safe for the scroll position: the block splices in
+  // directly above today's first row, which is where the cold start rested,
+  // and useAnchoredAgendaScroll keeps it in view rather than pushing it above
+  // the viewport — see its own note on a block arriving above the anchor.
+  //
+  // State rather than a read of overduePoolSlot alone, so the re-render that
+  // picks the pool up is React's to schedule (and the compiler's to see).
   const cachedPool = overduePoolSlot.get(SECTIONS_CACHE_KEY) ?? null
-  const pool = computeOverduePool(cachedPool, items, roots, today, filterOccs, filterKey)
-  if (pool !== cachedPool) {
+  const [poolPending, setPoolPending] = useState(cachedPool === null)
+  useEffect(() => {
+    if (!poolPending) return
+    return onIdle(() => { setPoolPending(false) })
+  }, [poolPending])
+
+  const pool = poolPending ? null : computeOverduePool(cachedPool, items, roots, today, filterOccs, filterKey)
+  if (pool && pool !== cachedPool) {
     overduePoolSlot.set(SECTIONS_CACHE_KEY, pool)
   }
+  const overdueGroups = pool?.groups ?? POOL_PENDING
 
-  // Needs pool.groups.length for its count-based default, so this reads after
+  // Needs the group count for its count-based default, so this reads after
   // the pool above rather than alongside filterOccs/filterKey.
-  const overdueCollapsed = useOverdueCollapsed(pool.groups.length)
+  const overdueCollapsed = useOverdueCollapsed(overdueGroups.length)
 
   // now ticks once a minute (see useNow), but a remounted AgendaView
   // allocates a fresh Date even within the same tick — bucket to that same
@@ -110,7 +139,7 @@ export function useAgendaSections(
   const nowBucket = new Date(Math.floor(now.getTime() / 60_000) * 60_000)
 
   const cached = sectionsCacheSlot.get(SECTIONS_CACHE_KEY) ?? null
-  const next = computeAgendaSections(cached, chunkOccs, pool.groups, today, nowBucket, filterOccs, filterKey, anchor, overdueCollapsed, ws)
+  const next = computeAgendaSections(cached, chunkOccs, overdueGroups, today, nowBucket, filterOccs, filterKey, anchor, overdueCollapsed, ws)
   if (next !== cached) {
     sectionsCacheSlot.set(SECTIONS_CACHE_KEY, next)
   }
