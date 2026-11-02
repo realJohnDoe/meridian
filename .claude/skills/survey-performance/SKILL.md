@@ -41,8 +41,9 @@ Findings must be anchored to one or more of these flows — an issue that no com
   launches its own Chromium; for the four flows it does not cover, drive your own
   the same way (`pnpm exec vite --port <unique> --strictPort`, then `chromium` from
   `@playwright/test` with `executablePath: '/opt/pw-browsers/chromium'`, plus
-  `addInitScript` for `meridian_bigvault` and `probe.mjs`'s `PROBE`). Three
-  instruments carried the 2026-11-01 run, none needing a source patch:
+  `addInitScript` for `meridian_bigvault` and `probe.mjs`'s `PROBE`). A working
+  driver with all three instruments below is in #1250's body (additions in
+  #1289) — start from it rather than rewriting one. None needs a source patch:
   - **Input → next paint** is the Event Timing API
     (`PerformanceObserver({ type: 'event', durationThreshold: 16 })`): `duration`
     is exactly the perceived-latency number below, `processingEnd −
@@ -57,6 +58,17 @@ Findings must be anchored to one or more of these flows — an issue that no com
     aggregated by *inclusive* time per `/src/` frame — that names the component
     or hook that started the work, which self time (date-fns, React internals)
     does not.
+  - **When `duration` is large but the handler and LoAF script are small**, the
+    time is in the compositor, which a JS profile cannot see: take a Chromium
+    trace (`browser.startTracing` with `cc`/`viz`) and A/B the suspect CSS by
+    init script. Headless here is a *software* compositor, so paint-bound
+    numbers (#1291's `backdrop-filter`) are upper bounds — say so, and ask for
+    a GPU re-measure in the finding.
+  - **A cache miss that one sequence shows and another doesn't** is attributed
+    by pushing hit/miss tuples from the render-phase cache into a global, then
+    reverting. Whether a module-level cache hits depends on the steps before the
+    measured one (#1290 only missed once the agenda's anchor had moved), so
+    record the full sequence in the recipe.
 
   For bundle findings, `pnpm run build` output is the measurement; build once
   more with `--sourcemap --outDir <scratch>` to attribute a chunk to packages.
@@ -74,10 +86,11 @@ Findings must be anchored to one or more of these flows — an issue that no com
   already has.** `scripts/perf/` measures cold start, toggling and agenda scroll
   plus the pipeline stage by stage; read its README (phases, caveats) first, and
   say in the coverage statement which numbers came from it. **Its pipeline stages
-  do not sum to its UI flows** — on 2026-11-01 `toggleRecompute` was 10 ms at
-  mixed/10 000 while the real toggle took 2.4 s, because the cost sat in a pass
-  (`computeOverduePool`) no stage models. A UI number with no matching stage is
-  the cue to take a CPU profile, not to trust the stages.
+  do not sum to its UI flows** (#1252's cost sat in a pass no stage models): a
+  UI number with no matching stage is the cue to take a CPU profile. **Its
+  scroll flow jumps 900 px per frame** — a whole new screen of rows each frame,
+  janky even at 300 files — so it measures mount cost, not scaling; pair it
+  with a ~120 px/frame run before calling scroll a finding.
 - Skim the full directory tree so nothing is invisible to you.
 - Read closely: the store (`store.ts`, `storeBridge.ts`) and every selector/subscription pattern it exposes; the components rendered per occurrence/row in agenda view (these multiply — a small waste per row is a big waste per screen); the toggle/save/commit path (`occurrenceActions.ts`, `storeCommit.ts`, `persistencePort.ts`); the search implementation (`search/`) end to end from keystroke to result click; the editor's update/decoration path; the route definitions and what each view mounts.
 - **Read the build and loading story, not just the source:** the Vite config, route-level lazy loading (or its absence), the service worker / PWA caching setup, and the dependency list for heavyweight imports reachable from the entry point. Run the production build and record chunk sizes.
