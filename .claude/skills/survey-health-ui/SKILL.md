@@ -63,10 +63,8 @@ are specific to this survey:
   phone-layout defects of 2026-08/09 (light-theme chip borders, four successive
   passes at chip contrast, low-contrast text tiers across nine themes, banner
   contrast, touching date cells) were all found by hand, by the user, after a UI
-  survey had passed over the same files. `CLAUDE.md`'s "don't proactively drive
-  the dev server" rule does not apply to a survey run, and this is the pass it
-  exempts; until 2026-09-13 this file never asked for it, while `CLAUDE.md` said
-  it did.
+  survey had passed over the same files; until 2026-09-13 this file never
+  asked for this pass.
 
   Read the two CI gates first so the pass is spent on what they cannot see:
   `e2e/contrast-sweep.spec.ts` is an enforced contrast floor across all nine

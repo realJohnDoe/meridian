@@ -1,0 +1,45 @@
+name: Open PR
+
+# Every agent branch gets a PR on its first push. Opening one is the
+# workflow's job rather than the agent's, because the cloud agent's system
+# prompt forbids opening PRs unasked, and a CLAUDE.md rule saying otherwise
+# kept losing that argument.
+on:
+  push:
+    branches: ['ccr-**', 'claude/**']
+
+concurrency:
+  group: open-pr-${{ github.ref }}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open:
+    runs-on: ubuntu-latest
+    outputs:
+      created: ${{ steps.pr.outputs.created }}
+    steps:
+      - id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ -n "$(gh pr list --head "$BRANCH" --state open --json number --jq '.[].number')" ]; then exit 0; fi
+          gh api "repos/$GH_REPO/compare/$BASE...$BRANCH" > compare.json
+          [ "$(jq .ahead_by compare.json)" -gt 0 ] || exit 0
+          # Title and body from the branch's first commit, like `gh pr create --fill-first`.
+          msg=$(jq -r '.commits[0].commit.message' compare.json)
+          gh pr create --head "$BRANCH" --base "$BASE" --title "$(head -n1 <<< "$msg")" --body "$(tail -n +3 <<< "$msg")"
+          echo created=true >> "$GITHUB_OUTPUT"
+
+  # A PR opened with GITHUB_TOKEN does not trigger ci.yml's pull_request run,
+  # so the commit that opened it is built here instead. Later pushes are
+  # ordinary pull_request events and go through ci.yml.
+  build:
+    needs: open
+    if: needs.open.outputs.created == 'true'
+    uses: ./.github/workflows/build.yml

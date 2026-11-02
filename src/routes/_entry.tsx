@@ -14,7 +14,7 @@ export const Route = createFileRoute('/_entry')({
  * it doesn't fight this shell's document-flow invariant the way `_app`'s
  * `max-h-svh` clip would — the sidebar is viewport-`fixed` internally, and
  * the document underneath is still free to grow past the viewport for
- * keyboard avoidance (see CLAUDE.md's "Route shells").
+ * keyboard avoidance (see docs/agents/route-shells.md).
  *
  * Deliberately no mobile hamburger trigger here (contrast `_app.tsx`'s
  * `PagedTopbar`): below `lg` the editor is reached exactly as before, with

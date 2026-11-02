@@ -90,10 +90,6 @@ statement up front rather than discovering them:
   statement. It is dev-only (`import.meta.env.DEV`) and absent from production
   builds, so it cannot be used against a prod build.
 
-`CLAUDE.md`'s "don't proactively drive the dev server" rule does not apply to
-a survey run — the surveys that require a measurement or screenshot pass say
-so explicitly, and that pass is the ask.
-
 ## Recommended model tiers
 
 Every finding is tagged with a **Recommended model** — the cheapest tier

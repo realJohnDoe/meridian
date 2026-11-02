@@ -7,12 +7,6 @@ architectural issues are making the implementation harder than it needs to be
 (e.g. a misplaced file, a missing abstraction, a boundary violation). Fix
 those first, then implement the requested change on top of it.
 
-## Implementation decisions
-
-When an implementation decision isn't covered by this doc or explicitly
-discussed with the user, default to industry standards rather than
-inventing a bespoke approach.
-
 ## Code size
 
 Given two implementations with essentially equivalent behavior, prefer the
@@ -26,105 +20,39 @@ the same principle applied to keeping survey files from growing unchecked.
 
 ## Package manager
 
-This project uses **pnpm**. Always use `pnpm` — never `npm` or `yarn`.
-
-```bash
-# Install dependencies in a new worktree
-pnpm install
-
-# Add a package
-pnpm add <package>
-
-# Build
-pnpm run build
-```
-
-Using `npm install` will create a `package-lock.json` that must not be committed.
+This project uses **pnpm** (`pnpm install`, `pnpm add`, `pnpm run …`). A
+`package-lock.json` from npm must not be committed.
 
 ## Git workflow
 
 Once the first changeset of a session/task has been applied and verified (build/lint passing), commit and push it to a feature branch right away — don't wait for an explicit "commit and push" ask each time. Keep committing and pushing subsequent changesets the same way as the task progresses.
 
-After changing any files, check whether an open PR already covers the current branch; if the changes aren't included in any open PR yet, open a new one.
-
-Use the `tracemap-pr` skill from [realJohnDoe/tracemap](https://github.com/realJohnDoe/tracemap) (`skills/tracemap-pr/SKILL.md`) on every PR to add trace map images to its description; it decides itself when none would help.
+Pushing a `ccr-*` or `claude/*` branch opens its PR automatically
+(`.github/workflows/open-pr.yml`), so don't open one yourself. After the first
+push, find that PR by its head branch (it appears within a minute) and run the
+`tracemap-pr` skill from [realJohnDoe/tracemap](https://github.com/realJohnDoe/tracemap) (`skills/tracemap-pr/SKILL.md`) on it to add trace map images to its description; it decides itself when none would help. Link the PR in your final message.
 
 Label every issue an agent creates `Sonnet` (well-scoped, mechanical) or
 `Opus` (needs design or cross-module reasoning), plus `Human` when it needs
 human judgement or an important decision before work can start.
 
-## Dev server base path
+## Checking UI changes
 
-The app is served under `/meridian/` — not `/`. When using preview tools or navigating programmatically, always use this base path:
+After a change that affects what renders, look at it before calling it done:
+`pnpm run screenshot <path>…` writes phone and desktop shots in light and dark
+to `test-results/screenshots/`; read them, and say in your summary what you
+looked at and what you couldn't check. The app is served under `/meridian/`.
+Before driving the app any other way (Playwright, `preview_*` tools, entry
+URLs, Tutorial-vault slugs), read `docs/agents/browser-verification.md`.
 
-```
-http://localhost:5173/meridian/
-http://localhost:5173/meridian/entry/<vaultId>/<fileSlug>
-```
+## Build and lint
 
-The `pnpm dev` server defaults to port 5173 but may bind to another port if that's taken.
-
-An entry lives at its own route, not a search param on the agenda. The URL
-carries the two halves of its `EntryKey` as separate path segments — the
-Tutorial vault's id is `example`, so its first note is
-`/meridian/entry/example/01-start-here`. Search params: `date` (YYYY-MM-DD,
-pins which occurrence of a series), `id` (the occurrence's stable id, breaking
-ties when two occurrences of the same file land on the same date), and
-`scope` (`single`/`future`/`all`/`add`).
-`/meridian/entry/<fileSlug>` still works as a redirect to the loaded vault.
-New entries are `/meridian/entry/new`, with `title`, `date`, `time`,
-`duration`, `itemType` and `vault` search params — `vault` overrides
-`defaultVaultId` for that entry, and is what the editor's vault chip sets.
-
-## Build verification
-
-Always use `pnpm run build` (which runs `tsc -b`) to verify the full project build — **not** `tsc --noEmit` alone.
-
-`tsc --noEmit` runs in single-file mode and misses unused-import errors and stricter checks that the composite project build (`tsc -b`) enforces. CI runs `pnpm run build`, so failures can show up there even if `--noEmit` is clean.
-
-`worker/` is a separate pnpm workspace package with its own `tsconfig.json` and `vitest.config.ts` — it is **not** covered by the root `tsc -b` project references or the root `vitest` config. Root `pnpm run build` and `pnpm run test` fan out to it explicitly (`pnpm --filter meridian-oauth-worker run typecheck` / `run test`), so both gates cover `worker/` too; don't widen the root `vitest.config.ts` `include` glob or `tsconfig.json` references to reach it instead, since worker tests would then incorrectly inherit the root's `setupFiles` and `@` alias.
-
-## Linting (generated types must exist first)
-
-The type-aware lint rules (`no-unsafe-*`, etc.) resolve types from **gitignored generated files**. On a fresh worktree these don't exist yet, so `pnpm run lint` reports a flood of spurious "type that cannot be resolved" / "error typed value" errors — the code is fine, the types just haven't been generated. **Don't hand-fix these or add `eslint-disable`s.** Generate the types first:
-
-```bash
-pnpm run build   # regenerates src/routeTree.gen.ts (TanStack Router) and worker/worker-configuration.d.ts (wrangler types, via the worker's pretypecheck)
-```
-
-CI does exactly this before linting (`.github/workflows/build.yml`), which is why it stays green. The two known offenders:
-
-- `src/routeTree.gen.ts` — without it, `Route.useSearch()`/`useParams()` resolve to `any` and `src/` lint fails.
-- `worker/worker-configuration.d.ts` — without it, `Request`/`Response`/`HeadersInit`/`Env` resolve to `any` and **all** of `worker/src` lint fails (~150 errors).
-
-### Two gates, not one
-
-`pnpm run lint` is `eslint … && pnpm run lint:deps`. ESLint is per-file: it
-enforces the module boundaries (invariants 1–3, 5) by asking of each import in
-isolation "is this file allowed to import that one". `lint:deps` is
-[dependency-cruiser](https://github.com/sverweij/dependency-cruiser), which
-builds the whole `src/` module graph first and then asks the questions no
-single file can answer — today just one, invariant 4's "is there a cycle".
-`import type` is counted as an edge, so type-only loops fail too. Config and
-reasoning: `.dependency-cruiser.mjs`.
-
-It reads the same `tsconfig.app.json` path aliases as vite and tsc, so it
-needs `src/routeTree.gen.ts` for the same reason the type-aware rules above
-do. Run it alone with `pnpm run lint:deps`; `pnpm exec depcruise src
---output-type dot | dot -Tsvg > graph.svg` draws the graph when you want to
-look at it.
-
-## TypeScript pinned to 6.0.x
-
-`typescript` is intentionally pinned below the TS 7 major in both `package.json` (root) and `worker/package.json`. `typescript-eslint` hard-refuses to run against TS 7: `eslint` exits with `typescript-eslint does not support TS 7.0`. `vite build`/`tsc -b` themselves are fine under TS 7 — only the lint step breaks. Tracked upstream: https://github.com/typescript-eslint/typescript-eslint/issues/10940 (support for TS ≥7.1).
-
-**Re-check with a fact, not a version number.** This paragraph used to say "even at latest, 8.65.0", which stopped being true the moment 8.66 shipped and made the whole rationale look stale. The durable check is the peer range typescript-eslint declares:
-
-```bash
-npm view @typescript-eslint/typescript-estree@latest peerDependencies.typescript
-```
-
-Last checked 2026-10-29: `>=4.8.4 <6.1.0` at both 8.65.0 and 8.72.1 (npm latest), against TypeScript 7.0.2. While that upper bound stays below 7, the pin stands — don't attempt the bump.
+Verify with `pnpm run build` (which runs `tsc -b`), **not** `tsc --noEmit`
+alone: single-file mode misses unused-import errors and stricter checks the
+composite build enforces, and CI runs `pnpm run build`. Run it before
+`pnpm run lint` on a fresh worktree, since lint needs the types it generates.
+Before touching `worker/`, root build/test config, or the `typescript` pin,
+read `docs/agents/toolchain.md`.
 
 ## Domain vocabulary
 
@@ -145,160 +73,26 @@ It is an **index, not an encyclopedia** — each entry is one sentence plus a po
 | `editor/` | CodeMirror editor, entry UI, dialogs, save logic. |
 | `calendar/` | Day/month/agenda views and occurrence rendering. |
 | `settings/` | The settings screens — general preferences, the theme picker, the vault list and each vault's own screen, and the add-vault wizard. Reached by route (`/settings/…`), not as a modal. |
-| `components/` | Shared React components. Two primitive layers below it: `components/ui/` is a faithful mirror of the **shadcn registry** — only files the shadcn CLI wrote go there, never hand-written ones — and `components/primitives/` holds **our own** shared primitives (`IconButton`, `ResponsiveModal`, `SurfaceButton`, …). This split is load-bearing: `vitest.config.ts` excludes `components/ui/**` from coverage as boilerplate, `knip.json` ignores its unused exports/types, and `shadcn diff` compares that directory against upstream. `components/primitives/` is deliberately covered by none of those exemptions — do not add it to them. A first-party primitive used by only one feature dir belongs in that feature dir, not here — see the placement rule above. **Leaf layer:** the feature dirs import `components/`, so nothing here may import a feature module back (`@/calendar`, `@/search`, `@/editor`, …) — that is a cycle, see invariant 4. A component that needs one is a shell composite, not a shared component; it belongs beside whatever mounts it. |
+| `components/` | Shared React components. `components/ui/` is a faithful mirror of the **shadcn registry** — only files the shadcn CLI wrote go there — and is excluded from coverage, knip and checked by `shadcn diff`; `components/primitives/` holds **our own** shared primitives (`IconButton`, `ResponsiveModal`, …) and gets none of those exemptions. A first-party primitive used by only one feature dir belongs in that feature dir. **Leaf layer:** nothing here may import a feature module back (`@/calendar`, `@/search`, `@/editor`, …); a component that needs one is a shell composite and belongs beside whatever mounts it. |
 | `hooks/` | Shared React hooks. |
-| `routes/` | TanStack Router route definitions, plus the `-`-prefixed files (excluded from route generation) that a route composes: the topbars, and the `_app` shell's own `-appSidebar.tsx`/`-searchBar.tsx`. This is the top of the graph — nothing imports `routes/` — so it is where a composite that reaches across several feature modules belongs. |
+| `routes/` | TanStack Router route definitions, plus the `-`-prefixed files (excluded from route generation) that a route composes: the topbars, and the `_app` shell's own `-appSidebar.tsx`/`-searchBar.tsx`. This is the top of the graph — nothing imports `routes/` — so it is where a composite that reaches across several feature modules belongs. A route goes under `_app` (virtualized lists) or the document-flow chain (text inputs) by what it contains: read `docs/agents/route-shells.md` before adding or moving one. |
 
-**Root-level files are intentionally cross-cutting** — they are imported by three or more unrelated layers and have no single owning directory. The deliberate root residents are:
-
-- `types.ts` — pure domain type declarations, plus the four `isX` discriminated-union guards that belong beside their unions (`isSeries`, `isStandaloneOcc`, `isTracked`, `isEditScope`). No runtime registries or logic — the YAML field-parse registry that used to live here is `model/fieldRegistry.ts`, private to `model/` since every consumer lives there.
-- `vaultRef.ts` — the `VaultRef`/`VaultKind`/`GitHubVaultRef` family; a root leaf (not `storage/`) because `components/` is barred from importing `@/storage` at all (invariant 2), and `@/vaultActions` re-exports `VaultRef` for it.
-- `store.ts` + `storeBridge.ts` — Zustand store for durable, cross-cutting state (vault data, sync status, favorites, prefs); `storeBridge` is imported by `storage/`, `editor/`, and `occurrenceActions.ts`/`storeCommit.ts`. View-local ephemeral state does not belong here — see invariant 5 below.
-- `fileIO.ts` — YAML/frontmatter parse+serialize, the path↔slug mapping, and the branded `EntryKey` (`${vaultId}::${fileSlug}`) that composes with it; used by `debug/`, `editor/`, `model/`, `storage/`. `EntryKey` lives here rather than in a new root file precisely because `model/` may import `fileIO.ts` (invariant 1) and this module already owns the identity mapping.
-- `wikilinks.ts` — wikilink parse+resolve; used by `editor/`, `model/`, and root. Resolution is **per vault** — files store a bare `[[slug]]`, so `resolveWikilink` takes the linking file's vaultId and `buildResolveIndex` partitions by it.
-- `occurrenceActions.ts` — user-action orchestration, including its delete-undo toast; used by `editor/` and `calendar/`
-- `storeCommit.ts` + `persistencePort.ts` — persistence-port abstraction (see invariant 3 below); used by `editor/`, `storage/`, and `occurrenceActions.ts`
-- `autoSaveFlushPort.ts` — the open entry editor's pending-autosave flush port; a root leaf for the same reason as `persistencePort.ts` — `routes/__root.tsx` needs to call it at page teardown without statically importing the `@/editor` barrel (and with it, CodeMirror) into every route's entry chunk.
-- `vaultActions.ts` — used by `components/` and `routes/`
-- `entryRoute.ts` — `newEntryRoute`/`entryRoute`/`keyRoute`, the pure TanStack Router Link/navigate descriptor builders for an entry; used by `editor/`, `hooks/useOpenEntry.ts`, and `routes/` (`-searchBar.tsx`, `-appSidebar.tsx`). A root leaf rather than `routes/-entryRoute.ts` (where it used to live) because `routes/` itself imports all three of those to compose its pages — a feature dir importing it back from `routes/` created a real cycle.
-- `format.ts`, `fileOccurrence.ts`, `occView.ts` — view-model helpers; each used by three or more feature dirs (`calendar/`, `components/`, `editor/`, `hooks/`, `routes/`, `storage/`, `search/`). `occView.ts` also owns the display vocabulary: `OccState` (what an occurrence is, derived by its own `occState()`) and the painting layer on top of it — `OccHue`/`OccTone`, the `colorBy` preference, and the `OccPainter` that resolves both plus the card's one chip (bound to the store by `hooks/useOccPainter.ts`).
+**Root-level files are intentionally cross-cutting** — imported by three or more unrelated layers, with no single owning directory. Before adding, moving or splitting one, read the list of deliberate root residents and why each is there in `docs/agents/architecture.md`.
 
 All feature directories already have `index.ts` barrels enforced by the import-boundary lint rules — do not propose adding them.
 
-## Route shells
-
-There are two layout chains under `routes/`, and which one a route belongs to
-is decided by **what the route contains**, not by whether it feels like a
-"destination".
-
-| Shell | Routes | For |
-|---|---|---|
-| `_app` — one screen tall, clips itself | `_app.*` (agenda, day/week/month, unscheduled tasks, notes) | Routes with **virtualized lists**. `useVirtualizer` is element-scoped via `getScrollElement`, so the scroller must be an element, not the document. |
-| Document flow | `_entry.*`, `settings.*`, `auth.*` | Routes with **text inputs and no virtualizer**. The document can grow, so the browser lifts a focused input above the on-screen keyboard natively, on every platform. |
-
-Put a route with text inputs under `_app` and it gets neither: `_app` caps its
-height so the document can never scroll, so there is no native keyboard
-avoidance *and* nothing for the browser to scroll the field into view within —
-it sits behind the keyboard. The failure is silent, mobile-only, and invisible
-to every test in `src/`, since jsdom has no layout engine.
-
-This has been got wrong twice. The entry routes started on the app chain,
-which is why keyboard avoidance was hand-rolled across six surfaces before
-`3de767a` addressed the cause rather than the symptom; `/settings` then
-repeated it (PR #840, fixed in #844).
-
-Nothing enforces *placement* — the filename is the whole declaration
-(`_app.foo.tsx` vs `foo.tsx`), and a route wrongly filed under `_app` would
-pass the app-shell geometry assertions and still fail keyboard avoidance
-uncaught. *Coverage* is enforced, though: `e2e/layout-smoke.spec.ts`'s
-`findUncoveredRoutes()` walks every leaf file in `src/routes/`, extracts its
-`createFileRoute(...)` path, and its own test fails in CI if it isn't listed
-in `APP_ROUTES`, `FLOW_ROUTES`, or the `ROUTE_COVERAGE_EXEMPTIONS` escape
-hatch (documented inline — e.g. `/auth/callback`, which has no
-`[data-flow-screen]`/`[data-topbar]` host for the check to anchor to). So a
-new route can't silently go unlisted; it can still silently go in the wrong
-list. `routes/-appShell.test.ts` separately pins how `_app`'s cap is
-expressed.
-
 ## Architecture invariants
 
-These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
+Enforced by `pnpm run lint` (ESLint per file, then dependency-cruiser over the whole graph):
 
-1. **`model/` is the domain core — no outward dependencies.** It imports only from `types.ts`, `fileIO.ts`, and `wikilinks.ts` (all cross-cutting root residents). It must never import from `store`, `storage`, `editor`, `calendar`, or any other feature.
-
-2. **A module's internals are private to its own subtree; the barrel is its only public surface.** A module is any `src/` directory with its own `index.ts` — `eslint.config.js` derives the list from the filesystem (`findModules`), so a directory becomes a protected module the moment it grows a barrel, with no config edit. Code outside a module — a sibling module, *or* a root-level file — must import it via `@/module` (the barrel), never `@/module/internal-file`; a single `no-restricted-paths` zone per module enforces both directions the same way (root files aren't a privileged exception — "root resident" means cross-cutting, not exempt from the boundary). Widening a module's reach costs an explicit barrel export or a move up the tree, never a deep import. Two permanent exceptions (always allowed as deep imports): `@/components/ui/**` (shadcn registry) and `@/components/primitives/**` (our own shared primitives) — both primitive layers one level inside `components/`. `@/lib/**` is exempt for a different reason: it has no `index.ts`, so it isn't a module at all.
-
+1. **`model/` is the domain core — no outward dependencies.** It imports only from `types.ts`, `fileIO.ts`, and `wikilinks.ts`. It must never import from `store`, `storage`, `editor`, `calendar`, or any other feature.
+2. **A module's internals are private to its own subtree; the barrel is its only public surface.** A module is any `src/` directory with its own `index.ts` (`eslint.config.js` derives the list from the filesystem). Code outside a module — a sibling module *or* a root-level file — imports it via `@/module`, never `@/module/internal-file`; "root resident" means cross-cutting, not exempt. Widening a module's reach costs an explicit barrel export or a move up the tree, never a deep import. Permanent exceptions: `@/components/ui/**` and `@/components/primitives/**`; `@/lib/**` has no `index.ts`, so it isn't a module.
 3. **Core persistence goes through the port.** `storeCommit.ts` and `occurrenceActions.ts` call the `persistencePort` abstraction rather than `@/storage` functions directly. The storage adapter registers the implementation at startup.
-
-4. **No import cycles. There are no accepted ones, and `import type` counts.**
-   Enforced by `pnpm run lint:deps` (dependency-cruiser, config in
-   `.dependency-cruiser.mjs`), which `pnpm run lint` chains and CI therefore
-   runs.
-
-   This is a hard rule and not a stylistic one, for two separate reasons.
-   A *runtime* cycle means some module in the loop necessarily executes
-   against a half-initialised copy of the next, so whether it works at all
-   depends on the order the bundler happens to emit — the failure is silent
-   until it isn't, and it lands at load time, where there is no stack to read.
-   A *type-only* cycle has no such bug and is still forbidden: two modules
-   that name each other's types cannot be read, moved, tested or extracted
-   independently, which is most of what the boundary was for. Treating the two
-   differently would also make the rule one keystroke wide — deleting `type`
-   from an import would turn a tolerated loop into a real one with nothing to
-   catch it. So the checked graph counts type edges (`tsPreCompilationDeps`),
-   and a shared type gets the same fix as shared code: put it where neither
-   consumer has to import the other. Usually that is the module that *produces*
-   values of it — `FilterOccs` sits in `calendar/useCalendarFilter.ts`, which
-   builds the live filter, not in either of the two builders that take one.
-
-   A cycle is a **placement bug**, not something inherent to feature-sliced
-   React. Every one this codebase has had turned out to be a file sitting in
-   the wrong directory, and the two shapes it takes both have a standard fix:
-
-   - **A leaf layer importing a feature back.** `components/` is imported by
-     the features; nothing in it may import `@/calendar`, `@/search`,
-     `@/editor` or any other feature module. When a component genuinely needs
-     one, it is not a shared component — it is a composite that belongs beside
-     whatever mounts it. `SearchBar`/`AppSidebar` were exactly this, and moved
-     to `routes/-searchBar.tsx`/`routes/-appSidebar.tsx`.
-   - **A downstream module calling back upstream.** Return the request as data
-     and let the caller act on it, rather than importing the caller. See
-     `storage/sync.ts`'s `SyncCycleResult`: the sync core reports "these vaults
-     want a push" and `syncScheduler.ts` — which is upstream of it — does the
-     pushing. The type-level form of this is a low layer enumerating its own
-     consumers: `storage/cache/db.ts`'s `meta` row is `value: unknown` rather
-     than a union naming `VaultRef[]` and `PendingMove[]`, because every reader
-     validates what came out of IndexedDB anyway.
-
-   Both are ordinary dependency inversion; reach for them before considering
-   anything more exotic. A cycle is never fixed by adding an exception to
-   `.dependency-cruiser.mjs`.
-
-5. **View-ephemeral state lives with its view.** `store.ts` holds durable vault/sync/prefs state only. `calendar/viewState.ts` owns calendar view ephemera (agenda scroll position, carousel swipe previews, scroll-to-today) in its own Zustand store, reached through the `@/calendar` barrel like any other feature-internal state — not through `store.ts`/`storeBridge`. `zustand` is otherwise restricted to `store.ts`; `calendar/viewState.ts` is the one named exception in `eslint.config.js`.
-
-## Manual browser verification
-
-Don't proactively start the dev server and drive it with `preview_*` tools to verify a change. Only do this when the user explicitly asks for it — they generally test UI changes themselves.
-
-**This does not apply to survey runs.** the `survey-performance`,
-`survey-product-niche`, `survey-health-ui` and `survey-usability` skills each specify a measurement or screenshot
-pass as a required phase — dev server, browser, real numbers — and those
-surveys are the explicit ask. Skipping that phase because of the paragraph
-above is a silent failure: it lands as "partially assessed", which the survey
-conventions permit, so nothing surfaces that the run never looked.
-
-## Preview tools (gotchas — read before using `preview_*`)
-
-These bit us repeatedly; follow them to avoid a long debug loop:
-
-- **The preview server runs from the *session* cwd, not the worktree you're editing.** If your changes live in a different worktree, the default `meridian` launch config will serve the *wrong* code (you'll see stale behavior and your `console.log`s never fire). Add a dedicated launch config that targets the right worktree:
-  ```json
-  {
-    "name": "pr-xyz",
-    "runtimeExecutable": "pnpm",
-    "runtimeArgs": ["-C", "<abs-path-to-worktree>", "exec", "vite", "--host", "--port", "5199", "--strictPort"],
-    "port": 5199,
-    "autoPort": false
-  }
-  ```
-- **Give each config a unique port.** The MCP dedupes/reuses configs by port, so two configs both on `5173` collapse into one and you may get served the wrong one (the returned `name` will reveal the mix-up).
-- **Don't use `pnpm dev -- --port N`.** The extra `--` is forwarded to vite and silently breaks `--port` (vite stays on 5173). Use `pnpm exec vite --port N --strictPort` instead.
-- **Trust `preview_logs`, not the MCP's reported port.** The MCP reports the *configured* port; vite prints the real `Local:` URL in its logs. Check there.
-- **To verify which code is actually being served**, assert on a feature only the target branch has (e.g. for PR 3, that off-cursor wikilinks render as chips, not `.wl` marks).
-- **Don't hard-navigate (`window.location`) straight to an `/entry/<vault>/<slug>` URL** — it races vault loading, so the entry isn't in the store yet and you get "Item not found". Instead load `/meridian/`, wait for `[data-testid="entry-card"]` to appear, then click the card's `button[aria-label="<title>"]` (SPA nav, no reload).
-- **Example-vault slugs:** "Welcome to Meridian" = `01-start-here`; the notes it lists are `everything-is-a-list`, `tasks-and-events`, `recurring-events`, `links-and-backlinks`, `favorites`, `frontmatter-reference`, `share-a-calendar`, `install-as-an-app`, `make-it-yours`. The entries those link on to are `buy-groceries`, `book-dentist`, `plan-the-week`, `lunch-with-sam`, `team-standup`, `morning-run` and `dev-notes`. Source of truth: the `id:` fields in `src/storage/devFixtures/tutorialVault.ts`.
-- **Inspect CM6 state from the page:** `document.querySelector('.cm-content').cmTile.view` gives the `EditorView` (read `view.state`, `dispatch`, etc.).
+4. **No import cycles. There are no accepted ones, and `import type` counts.** A cycle is a placement bug, never fixed by adding an exception to `.dependency-cruiser.mjs`. When `pnpm run lint:deps` reports one, read `docs/agents/architecture.md` for the two shapes it takes and their standard fixes.
+5. **View-ephemeral state lives with its view.** `store.ts` holds durable vault/sync/prefs state only. `calendar/viewState.ts` owns calendar view ephemera (agenda scroll position, carousel swipe previews, scroll-to-today) in its own Zustand store, reached through the `@/calendar` barrel — not through `store.ts`/`storeBridge`. `zustand` is otherwise restricted to `store.ts`.
 
 ## Agent skills
 
-### Issue tracker
-
-GitHub Issues via `gh`. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Default five-label vocabulary. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context; `GLOSSARY.md` serves as the context file. See `docs/agents/domain.md`.
+- **Issue tracker:** GitHub Issues via `gh`. See `docs/agents/issue-tracker.md`.
+- **Triage labels:** default five-label vocabulary. See `docs/agents/triage-labels.md`.
+- **Domain docs:** single-context; `GLOSSARY.md` serves as the context file. See `docs/agents/domain.md`.

@@ -107,8 +107,8 @@ const ROUTE_COVERAGE_EXEMPTIONS: Record<string, string> = {
 }
 
 /**
- * Guards the two lists above against going stale the way CLAUDE.md's "Route
- * shells" section warns they will: "the filename is the whole declaration"
+ * Guards the two lists above against going stale the way
+ * docs/agents/route-shells.md warns they will: "the filename is the whole declaration"
  * and nothing else notices when a new route file lands uncovered. Walks
  * every leaf route file, extracts the path it registers with
  * `createFileRoute(...)`, and confirms some URL in `APP_ROUTES` or
@@ -233,7 +233,7 @@ interface TextEntryField {
 }
 
 /**
- * The structural form of CLAUDE.md's "Route shells" rule: "a route whose own
+ * The structural form of docs/agents/route-shells.md's rule: "a route whose own
  * content contains a text-entry field belongs on the document-flow chain,
  * not under `_app`." This has been got wrong twice — the entry routes
  * (fixed in `3de767a`) and `/settings` (#840, fixed in #844) — both times
@@ -328,7 +328,7 @@ for (const vp of VIEWPORTS) {
         const fields = await page.evaluate(readTextEntryFields)
         expect(fields, `${route} is filed under _app but its own content renders a text-entry field ` +
           `(${fields.map(f => `<${f.tag}${f.type ? ` type=${f.type}` : ''}${f.name ? ` ${f.name}` : ''}>`).join(', ')}) ` +
-          `— move it to the document-flow chain instead (see CLAUDE.md's "Route shells")`).toEqual([])
+          `— move it to the document-flow chain instead (see docs/agents/route-shells.md)`).toEqual([])
 
         if (route !== '/') return
 

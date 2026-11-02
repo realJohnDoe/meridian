@@ -288,7 +288,7 @@ function collectTextElementsInPage(): CollectedElement[] {
    * The element's rect intersected with every clipping ancestor's own rect,
    * walking up to <html> — NOT just `getBoundingClientRect()` clamped to the
    * window. A collapsed `grid-template-rows: 0fr` panel (the quick-nav
-   * disclosure — CLAUDE.md's "Route shells" section) or an Embla carousel's
+   * disclosure) or an Embla carousel's
    * off-screen slide (`MonthStrip.tsx`, the search date picker) both clip a
    * descendant via an ancestor's `overflow: hidden`, but the descendant's own
    * `getBoundingClientRect()` keeps reporting its full, real, on-paper

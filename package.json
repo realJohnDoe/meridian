@@ -14,6 +14,7 @@
     "lint": "eslint src worker/src e2e playwright.config.ts --max-warnings=0 && pnpm run lint:deps",
     "lint:deps": "depcruise src",
     "test:e2e": "playwright test",
+    "screenshot": "node scripts/screenshot.mjs",
     "knip": "knip"
   },
   "dependencies": {
