@@ -1,6 +1,8 @@
 ---
 name: survey-product-niche
 description: Run the product niche fit and positioning survey: how well Meridian serves its target niche and communicates it. Use when asked to run or edit the product-niche survey.
+label: product
+scope: src/onboarding src/storage/devFixtures docs README.md
 ---
 
 Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.

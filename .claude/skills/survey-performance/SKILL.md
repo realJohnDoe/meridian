@@ -1,6 +1,8 @@
 ---
 name: survey-performance
 description: Run the PWA snappiness survey: measured performance findings on the app's hot user flows, each with a baseline number and re-runnable recipe. Use when asked to run or edit the performance survey.
+label: performance
+scope: src
 ---
 
 Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
