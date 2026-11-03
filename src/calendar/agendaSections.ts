@@ -421,8 +421,15 @@ function computeChunkRows(
   const seededAnchorKey = index === ctx.anchorChunk ? ctx.anchorKey : null
   const groupingReusable = prev !== null && prev.index === index && prev.seededAnchorKey === seededAnchorKey
   const changed = groupingReusable ? changedIndices(prev.occs, occs) : null
+  // A `now` tick only reorders days the clock can still move through: today,
+  // and yesterday (a timed event that started there may run past midnight).
+  // Earlier days are entirely past, later ones entirely future. A tick that
+  // crosses midnight changes what "past" means for every day, so it rebuilds
+  // all sections.
+  const tickOnly = changed !== null && prev !== null && prev.nowMs !== ctx.nowMs
+    && fmtISO(new Date(prev.nowMs)) === fmtISO(ctx.now)
   const sectionsReusable = changed !== null && prev !== null
-    && prev.todayMs === ctx.todayMs && prev.nowMs === ctx.nowMs && prev.filterKey === ctx.filterKey
+    && prev.todayMs === ctx.todayMs && (tickOnly || prev.nowMs === ctx.nowMs) && prev.filterKey === ctx.filterKey
 
   let buckets: Map<string, DayBucket>
   let keyByIndex: (string | undefined)[]
@@ -443,7 +450,7 @@ function computeChunkRows(
     // affects bucket-building — only the walk's dividers read it — but it must
     // still gate *this* shortcut, or a week-start-only change would hand back
     // the old row list without ever re-walking it.
-    if (sectionsReusable && prev.ws === ctx.ws && touched.size === 0) {
+    if (sectionsReusable && prev.ws === ctx.ws && touched.size === 0 && !tickOnly) {
       return prev.occs === occs ? prev : { ...prev, occs }
     }
 
@@ -455,6 +462,10 @@ function computeChunkRows(
     for (const k of touched) {
       const b = buckets.get(k)
       if (b) buckets.set(k, { ...b, occs: b.indices.map(i => occs[i]!) })
+    }
+    if (sectionsReusable && tickOnly) {
+      touched.add(ctx.todayKey)
+      touched.add(fmtISO(addDays(ctx.today, -1)))
     }
     dirty = sectionsReusable ? touched : null
   } else {
