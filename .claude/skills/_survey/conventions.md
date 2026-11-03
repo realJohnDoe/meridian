@@ -106,6 +106,9 @@ unranked. The script un-shallows the clone first, per the rule above, and needs
 `gh` for the run dates. A new survey must declare both keys or the ranking
 ignores it.
 
+A weekly scheduled task starts the top-ranked survey; its procedure is
+`docs/agents/weekly-survey.md`.
+
 ## Recommended model tiers
 
 Every finding is tagged with a **Recommended model** — the cheapest tier
