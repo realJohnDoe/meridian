@@ -1,15 +1,11 @@
 # Triage Labels
 
-The skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's issue tracker.
+This repo has no triage state labels. The skills' triage roles map onto the labels in `CLAUDE.md` (one model-tier label: `haiku`/`sonnet`/`opus`/`opus-plan`, plus `decision-required`):
 
-| Label in mattpocock/skills | Label in our tracker | Meaning                                  |
-| -------------------------- | -------------------- | ---------------------------------------- |
-| `needs-triage`             | `needs-triage`       | Maintainer needs to evaluate this issue  |
-| `needs-info`               | `needs-info`         | Waiting on reporter for more information |
-| `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
-| `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
-| `wontfix`                  | `wontfix`            | Will not be actioned                     |
-
-When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
-
-These describe an issue's triage *state*. They are separate from the `Sonnet`/`Opus`/`Human` labels (who should do the work, and whether a human decision is needed first), which are governed by `CLAUDE.md`; an issue carries both.
+| Role in mattpocock/skills | In our tracker                                          |
+| ------------------------- | ------------------------------------------------------- |
+| `needs-triage`            | an issue with no tier label                             |
+| `needs-info`              | `decision-required`                                     |
+| `ready-for-agent`         | a tier label and no `decision-required`                 |
+| `ready-for-human`         | `decision-required`                                     |
+| `wontfix`                 | close as `not planned` (no label)                       |

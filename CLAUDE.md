@@ -49,9 +49,10 @@ After changing any files, check whether an open PR already covers the current br
 
 Use the `tracemap-pr` skill from [realJohnDoe/tracemap](https://github.com/realJohnDoe/tracemap) (`skills/tracemap-pr/SKILL.md`) on every PR to add trace map images to its description; it decides itself when none would help.
 
-Label every issue an agent creates `Sonnet` (well-scoped, mechanical) or
-`Opus` (needs design or cross-module reasoning), plus `Human` when it needs
-human judgement or an important decision before work can start.
+Label every issue an agent creates with exactly one model-tier label —
+`haiku`, `sonnet` (well-scoped, mechanical), `opus` (needs design or
+cross-module reasoning) or `opus-plan` (a plan spanning several PRs) — plus
+`decision-required` when a human must decide before work starts.
 
 ## Dev server base path
 
@@ -297,7 +298,7 @@ GitHub Issues via `gh`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default five-label vocabulary. See `docs/agents/triage-labels.md`.
+Model-tier labels plus `decision-required`. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
