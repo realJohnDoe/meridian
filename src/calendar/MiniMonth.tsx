@@ -146,10 +146,14 @@ function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, i
   const m = month.getMonth()
 
   const allOccs = useExpandWithMultiday(items, roots, startOfMonth(month), endOfMonth(month))
-  const dotsByDay = useMemo(
-    () => dayDotsFor(filterOccs(allOccs), painter.hue),
-    [allOccs, filterOccs, painter],
-  )
+  // Dots are recomputed against the previous result so unchanged days keep
+  // their array identity (see dayDotsFor). Derived during render, keyed on the
+  // inputs, because refs can't be read in render.
+  const [dots, setDots] = useState(() => ({ allOccs, filterOccs, painter, byDay: dayDotsFor(filterOccs(allOccs), painter.hue) }))
+  if (dots.allOccs !== allOccs || dots.filterOccs !== filterOccs || dots.painter !== painter) {
+    setDots({ allOccs, filterOccs, painter, byDay: dayDotsFor(filterOccs(allOccs), painter.hue, dots.byDay) })
+  }
+  const dotsByDay = dots.byDay
 
   const cells = useMemo<MonthCell[]>(() => monthGridCells(y, m, ws, FIXED_WEEKS), [y, m, ws])
   const weekdayNames = weekdayShortNames(ws)

@@ -86,3 +86,16 @@ describe('dayDotsFor, colored by vault', () => {
     expect(dots.get('2026-06-15')).toEqual(['neutral'])
   })
 })
+
+describe('dayDotsFor with prev', () => {
+  it('reuses unchanged days\' arrays and replaces changed ones', () => {
+    const a = occAt('2026-06-15', 9, { id: 'a' })
+    const b = occAt('2026-06-16', 9, { id: 'b' })
+    const first = dayDotsFor([a, b], typeHue)
+    const task = occAt('2026-06-16', 10, { id: 't', metadata: { participants: [], title: '', tags: [], items: [], vaultId: 'v', fileSlug: 'n', done: false, jsTime: new Date('2026-06-16T10:00:00') } })
+    const second = dayDotsFor([a, b, task], typeHue, first)
+    expect(second.get('2026-06-15')).toBe(first.get('2026-06-15'))
+    expect(second.get('2026-06-16')).not.toBe(first.get('2026-06-16'))
+    expect(second.get('2026-06-16')).toEqual(['event', 'task'])
+  })
+})
