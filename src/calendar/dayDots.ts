@@ -14,9 +14,6 @@ const MAX_DOTS_PER_DAY = 4
  * completed task to `'done'`, and a day whose only task got done still had
  * something on it, so a dot keeps the color it had.
  *
- * Pass the previous result as `prev` to keep each unchanged day's array
- * reference-stable, so memoised day cells skip re-rendering.
- *
  * Notes carry no date (`date === ''`), so calendar expansion never produces one
  * for them (see `undatedOccs.ts`) — the guard below is belt-and-braces for a
  * caller that hands over an unfiltered list.
@@ -28,7 +25,6 @@ const MAX_DOTS_PER_DAY = 4
 export function dayDotsFor(
   occs: Occurrence[],
   hueOf: (o: Occurrence) => OccHue,
-  prev?: Map<string, OccHue[]>,
 ): Map<string, OccHue[]> {
   const byDay = new Map<string, Set<OccHue>>()
   for (const occ of occs) {
@@ -43,10 +39,7 @@ export function dayDotsFor(
 
   const result = new Map<string, OccHue[]>()
   for (const [iso, hues] of byDay) {
-    const dots = HUE_ORDER.filter(h => hues.has(h)).slice(0, MAX_DOTS_PER_DAY)
-    const old = prev?.get(iso)
-    const same = old && old.length === dots.length && old.every((h, i) => h === dots[i])
-    result.set(iso, same ? old : dots)
+    result.set(iso, HUE_ORDER.filter(h => hues.has(h)).slice(0, MAX_DOTS_PER_DAY))
   }
   return result
 }

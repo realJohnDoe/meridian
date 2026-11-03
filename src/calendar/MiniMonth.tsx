@@ -35,8 +35,6 @@ const CENTER_PANE = Math.floor(PANE_COUNT / 2)
 // panel's height.
 const FIXED_WEEKS = 6
 
-const EMPTY_DOTS: OccHue[] = []
-
 // This grid used to be a full `Calendar` (react-day-picker) instance per
 // pane — the right tool for DatePickerDialog's actual date-input control
 // (range modes, keyboard roving-tabindex, ARIA grid semantics), badly
@@ -66,7 +64,8 @@ interface DayProps {
   other: boolean
   isToday: boolean
   highlight: boolean
-  dots: OccHue[]
+  /** Space-joined hues — a primitive, so the memo compares by value and a day whose dots didn't change skips re-rendering. */
+  dots: string
   onSelectDay: (iso: string) => void
 }
 
@@ -112,9 +111,9 @@ function MiniMonthDay({ date, other, isToday, highlight, dots, onSelectDay }: Da
       )}
     >
       {date.getDate()}
-      {dots.length > 0 && (
+      {dots && (
         <div className="flex gap-0.5" aria-hidden>
-          {dots.map(hue => (
+          {(dots.split(' ') as OccHue[]).map(hue => (
             <span key={hue} data-dot={hue} className={cn('size-1.5 rounded-full', HUE_SOLID[hue])} />
           ))}
         </div>
@@ -146,14 +145,10 @@ function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, i
   const m = month.getMonth()
 
   const allOccs = useExpandWithMultiday(items, roots, startOfMonth(month), endOfMonth(month))
-  // Dots are recomputed against the previous result so unchanged days keep
-  // their array identity (see dayDotsFor). Derived during render, keyed on the
-  // inputs, because refs can't be read in render.
-  const [dots, setDots] = useState(() => ({ allOccs, filterOccs, painter, byDay: dayDotsFor(filterOccs(allOccs), painter.hue) }))
-  if (dots.allOccs !== allOccs || dots.filterOccs !== filterOccs || dots.painter !== painter) {
-    setDots({ allOccs, filterOccs, painter, byDay: dayDotsFor(filterOccs(allOccs), painter.hue, dots.byDay) })
-  }
-  const dotsByDay = dots.byDay
+  const dotsByDay = useMemo(
+    () => dayDotsFor(filterOccs(allOccs), painter.hue),
+    [allOccs, filterOccs, painter],
+  )
 
   const cells = useMemo<MonthCell[]>(() => monthGridCells(y, m, ws, FIXED_WEEKS), [y, m, ws])
   const weekdayNames = weekdayShortNames(ws)
@@ -204,7 +199,7 @@ function MiniMonthPane({ monthKey, highlightDates, onSelectDay, onMonthChange, i
             other={other}
             isToday={sameDay(date, today)}
             highlight={highlightKeys.has(fmtISO(date))}
-            dots={dotsByDay.get(fmtISO(date)) ?? EMPTY_DOTS}
+            dots={dotsByDay.get(fmtISO(date))?.join(' ') ?? ''}
             onSelectDay={onSelectDay}
           />
         ))}
