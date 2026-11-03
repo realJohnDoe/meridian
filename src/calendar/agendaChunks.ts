@@ -22,7 +22,9 @@ export const CHUNK_DAYS = 28
 
 /**
  * The ceiling on how far forward the agenda's *loaded run* may grow from
- * `agendaAnchor` — not a window expanded up front. First paint seeds only
+ * `agendaAnchor` while its rows don't yet fill the scroller — not a window
+ * expanded up front, and not a limit on scrolling: once the rows overflow the
+ * viewport, AgendaView grows past it without bound. First paint seeds only
  * three chunks (the one containing the anchor, plus one on each side; see
  * `calendar/viewState.ts`'s `agendaLoadedChunks`), and the run then grows
  * incrementally: forward as the user scrolls, backward on the explicit "Load
@@ -43,8 +45,12 @@ export const CHUNK_DAYS = 28
  * even a chunk with nothing scheduled in it adds ~4-5 rows and the guard never
  * fires. Past the last occurrence a sparse tail also keeps the virtualizer's
  * range pinned to the end of `rows`, so the range check never fires either.
- * Remove this and the agenda walks itself into the far future, trimming real
- * content off the back edge as it goes. Stopping instead at the first chunk
+ * Remove this and an agenda too sparse to fill the viewport walks itself into
+ * the far future, trimming real content off the back edge as it goes. A list
+ * that does overflow needs no such bound: growth appends below a fixed
+ * scrollTop, so the virtualizer's range stays put while `rows` lengthens, and
+ * the range check stops it within a chunk or two. Applying the bound there too
+ * is what used to make the agenda silently stop ~90 days out. Stopping instead at the first chunk
  * with no occurrences doesn't work: an indefinite series (no `end`) puts a real
  * occurrence in every future chunk, forever.
  *
@@ -104,7 +110,7 @@ export function agendaChunkRun(range: { first: number; last: number }): number[]
   return out
 }
 
-/** How far forward the loaded run may grow as the user scrolls — see EXPAND_FUTURE_DAYS. */
+/** How far forward the loaded run may grow before it fills the viewport — see EXPAND_FUTURE_DAYS. */
 export function maxLoadableChunk(anchor: Date, ws: 0 | 1 | 6): number {
   return chunkIndexFor(addDays(anchor, EXPAND_FUTURE_DAYS), ws)
 }

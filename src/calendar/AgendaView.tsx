@@ -71,8 +71,8 @@ export default function AgendaView({ onOpen }: Props) {
 
   // The loaded run's current bounds (seeded by useAgendaSections' own call to
   // useAgendaLoadedRun above, so this is never null once rows exist) and how
-  // far forward growth may still take it — see agendaChunks.ts's
-  // maxLoadableChunk. Backward has no ceiling, so "Load earlier" stays
+  // far forward growth may take it before the rows fill the viewport — see
+  // agendaChunks.ts's maxLoadableChunk. Backward has no ceiling, so "Load earlier" stays
   // available for as long as there is a seeded run to extend.
   const loadedChunks = useAgendaLoadedChunks()
   const maxLast = useMemo(() => maxLoadableChunk(anchor, ws), [anchor, ws])
@@ -219,7 +219,13 @@ export default function AgendaView({ onOpen }: Props) {
     const endIndex = items[items.length - 1]!.index
     if (endIndex < rows.length - GROW_FORWARD_ROWS) return
     lastForwardGrowRef.current = rows.length
-    growAgendaLoadedChunksForward(maxLast)
+    // maxLast only bounds growth while the rows don't yet overflow the
+    // scroller — the one case with no other stop (see agendaChunks.ts's
+    // EXPAND_FUTURE_DAYS). Once they do, each chunk appended below a fixed
+    // scrollTop moves rows.length away from endIndex, so the range check above
+    // ends the loop by itself.
+    const el = scRef.current
+    growAgendaLoadedChunksForward(el && el.scrollHeight > el.clientHeight ? Infinity : maxLast)
   }, [rows.length, maxLast, virtualizer])
 
   // A real scroll event is the authoritative moment to record where the
@@ -247,8 +253,8 @@ export default function AgendaView({ onOpen }: Props) {
   // covers forward growth for a loaded run that doesn't fill the viewport in
   // the first place (a sparse vault) — this re-runs whenever `rows` changes,
   // including the rows change growth itself causes, so a still-too-short run
-  // keeps widening until maybeGrowForward's own range check is satisfied or
-  // growAgendaLoadedChunksForward's maxLast bound is reached.
+  // keeps widening until maybeGrowForward's own range check is satisfied or,
+  // while the rows still fit the viewport, maxLast is reached.
   useEffect(() => {
     updateTopDate()
     maybeGrowForward()
