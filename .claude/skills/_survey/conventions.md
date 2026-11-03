@@ -185,6 +185,15 @@ test suite, a measurement recipe, or a repro to verify a landed fix is fully
 scripted and suits the cheapest tier regardless of which tier the fix itself
 needed. Where findings touch the same code, add a one-line **sequencing
 note** saying which order avoids rebasing the same file twice.
+Also record each such note as a native **blocked-by** edge on the later finding's
+sub-issue, so order is queryable and not only prose; the API call is under
+**Blocking** in `docs/agents/issue-tracker.md`. Worked example: #1289's note
+"land #1294 before #1290" is the edge `#1290 blocked_by #1294`. Open findings
+that can start now (`<parent>` = the run's parent issue number):
+
+```bash
+gh api repos/realJohnDoe/meridian/issues/<parent>/sub_issues --jq '.[] | select(.state=="open" and .issue_dependencies_summary.blocked_by==0) | .number'
+```
 
 ## Finding fields
 
