@@ -444,6 +444,35 @@ describe('computeAgendaSections', () => {
     expect(itemIds(findDay(later.sections, '2026-06-15'))).toEqual(['today-task-a', 'today-task-b', 'today-event'])
   })
 
+  it('on a clock tick re-sorts only today, reusing every other day\'s section by reference', () => {
+    const all = baseOccs()
+    const first = compute(null, all, noGroups)
+    const later = compute(first, all, noGroups, TODAY, new Date(2026, 5, 15, 9, 30))
+
+    expect(findDay(later.sections, '2026-06-20')).toBe(findDay(first.sections, '2026-06-20'))
+    expect(findDay(later.sections, '2026-06-10')).toBe(findDay(first.sections, '2026-06-10'))
+    expect(findDay(later.sections, '2026-06-15')).not.toBe(findDay(first.sections, '2026-06-15'))
+  })
+
+  it('re-sorts yesterday on a tick, since an event running past midnight can end in the small hours', () => {
+    const all = [occ('late', '2026-06-14', { time: '23:00', duration: '4h' }), occ('plain', '2026-06-14', { time: '23:30', duration: '5h' })]
+    const first = compute(null, all, noGroups, TODAY, new Date(2026, 5, 15, 2, 0))
+    expect(itemIds(findDay(first.sections, '2026-06-14'))).toEqual(['late', 'plain'])
+    const later = compute(first, all, noGroups, TODAY, new Date(2026, 5, 15, 3, 30))
+    expect(itemIds(findDay(later.sections, '2026-06-14'))).toEqual(['plain', 'late'])
+  })
+
+  it('rebuilds every section when the tick crosses midnight', () => {
+    const all = [occ('whole', '2026-06-15'), occ('next', '2026-06-16')]
+    const evening = new Date(2026, 5, 15, 23, 59)
+    const first = compute(null, all, noGroups, TODAY, evening)
+    const tomorrow = new Date(2026, 5, 16)
+    const later = compute(first, all, noGroups, tomorrow, new Date(2026, 5, 16, 0, 0))
+
+    expect(findDay(later.sections, '2026-06-16')).not.toBe(findDay(first.sections, '2026-06-16'))
+    expect(findDay(later.sections, '2026-06-16')?.isToday).toBe(true)
+  })
+
   it('applies the calendar filter per day and drops days it empties', () => {
     const all = [
       occ('mine', '2026-06-20', { time: '09:00', participants: ['alice'] }),
