@@ -1,6 +1,8 @@
 ---
 name: survey-security
 description: Run the security survey: ways an attacker or malicious input can compromise the OAuth worker, the iCal proxy, stored GitHub tokens, rendered content, shared vaults or the dependency tree. Use when asked to run or edit the security survey.
+label: security
+scope: worker src/storage src/editor src/routes/auth.callback.tsx src/settings .github/workflows package.json pnpm-lock.yaml vite.config.ts
 ---
 
 Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
