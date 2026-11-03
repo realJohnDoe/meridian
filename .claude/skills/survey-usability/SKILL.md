@@ -30,7 +30,9 @@ platform conventions, mobile and keyboard ergonomics, learnability.
 belongs to one of them, hand it over in one line rather than reporting it here:
 
 - `health-ui.md` — anything judged by *reading code*: whether a state is
-  implemented, a11y markup, touch-target sizes, contrast (already a CI floor in
+  implemented, a11y markup (axe violations from the screen-reader phase go
+  there as markup findings; this survey keeps what a screen-reader user can't
+  *do*), touch-target sizes, contrast (already a CI floor in
   `e2e/contrast-sweep.spec.ts`), styling-system consistency.
 - `product-niche.md` — who the product is *for*. This survey takes the target
   user as given and asks whether they can succeed.
@@ -93,6 +95,28 @@ A defect two surveys both find is one issue: search open issues first, per
   users could settle it, add it to the parent issue as a question for
   `product-niche.md`'s bet list rather than scoring it.
 
+## Screen-reader phase (required)
+
+Judge the *experience* of a screen-reader user, on the same app instance as
+the walkthroughs. Per core flow — tasks 1, 2, 3, 6, 7, 8 and 9 below — at
+390×844, in the Tutorial vault:
+
+1. `pnpm add axe-core@4.12.1` in a scratchpad dir (never the repo; the e2e
+   contrast sweep deliberately doesn't use axe).
+2. In the keep-alive driver, at each step of the flow, run
+   `await page.locator('body').ariaSnapshot()`, then
+   `await page.addScriptTag({ path: '<scratch>/node_modules/axe-core/axe.min.js' })`
+   and `page.evaluate(() => axe.run(document, { resultTypes: ['violations'] }))`.
+   (Verified 2026-11-03 on the agenda: `aria-required-attr`, `button-name`
+   and `region` fire.)
+3. Read the snapshot as a screen-reader user would: can they reach each
+   control by role and name, is the result of an action announced (a toast, a
+   moved focus, a changed heading), does the flow finish without sight?
+
+Report a flow as completable or not from the snapshot, citing its steps. An
+axe violation is a *markup* finding: hand it to `health-ui.md` in one line.
+A flow the tree makes impossible or unannounced is reported here.
+
 ## Tasks to walk
 
 Seed list, not the search space — add any job the app's own UI suggests is
@@ -110,7 +134,7 @@ core, and say which you added:
 10. Change the theme and one other preference.
 11. Start adding a vault (up to the environment's limit).
 
-Budget: every task at mobile; tasks 1, 2 and 5 also at desktop; the heuristic
+Budget: every task at mobile (the screen-reader phase is mobile only); tasks 1, 2 and 5 also at desktop; the heuristic
 sweep once per distinct screen.
 
 ## Output structure
