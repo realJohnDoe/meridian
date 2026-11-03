@@ -9,7 +9,8 @@ import type { AgendaRow } from './agendaSections'
 // HEADER_H:    the overdue toggle row.
 // MONTH_H:     the big per-month divider ("August 2026").
 // WEEK_H:      the smaller per-week divider ("Week 32, Aug 3 – 9").
-// ROW_H_META:  OccurrenceCard with one line of meta chips (67, measured) + AgendaRow
+// ROW_H_META:  OccurrenceCard with its meta row, which is clipped to exactly one
+//              chip line so this holds however many chips a card has (67, measured) + AgendaRow
 //              mb-1.5 (6) = 73px. A chip is 21px, not text-2xs's 10px: it
 //              inherits body's 1.5 line-height (15) + py-0.5 (4) + border (2).
 //              Being 5px short here made nearly every mounted row re-measure,

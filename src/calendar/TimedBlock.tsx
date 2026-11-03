@@ -52,8 +52,8 @@ export function TimedBlock({ o, dh, colIndex, totalCols, hour12, onOpen, compact
 
   const { left, width } = blockGeometry(colIndex, totalCols)
 
-  // Same formatting the agenda OccurrenceCard uses: locale-aware start time and
-  // a "until HH:MM (1 hour)" duration chip, instead of the old `10:00 · 1h` line.
+  // Locale-aware start time and a "until HH:MM (1 hour)" duration chip, instead
+  // of the old `10:00 · 1h` line.
   const timeLabel = fmtT(o.time, hour12)
   const durationLabel = o.metadata.duration
     ? (o.time

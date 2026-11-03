@@ -6,7 +6,7 @@ import KindIcon from './KindIcon'
 import { fmtT, parseDateString, multidayDisplayTitle } from '@/model'
 import { fmtShort } from '@/format'
 import { useStore } from '@/store'
-import { formatDurationChip, fmtDuration } from '@/format'
+import { formatDurationChip, fmtDuration, durationToEndDateTime, fmtEndTime } from '@/format'
 import { useOccPainter } from '@/hooks'
 import { Checkbox } from './ui/checkbox'
 import { Badge } from './primitives/badge'
@@ -152,6 +152,11 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
         ? formatDurationChip(rawDuration, { date: occ.date, time: occ.time }, hour12)
         : fmtDuration(rawDuration))
     : null
+  // A same-day timed duration reads as one "9:00 – 9:30" chip rather than a
+  // time chip plus an "until 9:30 (30 minutes)" chip — the pair was the most
+  // common reason the meta row overflowed its single line.
+  const end       = occ.time && rawDuration ? durationToEndDateTime(occ.date, occ.time, rawDuration) : null
+  const timeRange = t && end?.date === occ.date ? `${t} – ${fmtEndTime(end.time, hour12)}` : null
 
   const dateBadge = (() => {
     const d = parseDateString(occ.date)
@@ -209,12 +214,20 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
           </div>
         </div>
 
-        {/* Meta row */}
+        {/* Meta row — exactly one chip line tall (h-5.25 = a 21px chip), so a
+            card's height never depends on how its chips wrap: chips that don't
+            fit wrap onto a second line that is clipped away whole. Virtualized
+            lists estimate row heights before mounting (agendaRowHeights.ts);
+            a wrapped line made the row 27px taller than that estimate, and the
+            virtualizer's scroll correction for it was a visible jump. Chips
+            are in priority order, so what gets dropped is the trailing
+            backlinks and the painter's chip. */}
         {showMeta && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 h-5.25 overflow-hidden">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
-            {showTime !== 'none' && t && <Badge variant="tag">{t}</Badge>}
-            {showTime !== 'none' && durationLabel && <Badge variant="tag">{durationLabel}</Badge>}
+            {showTime !== 'none' && timeRange && <Badge variant="tag">{timeRange}</Badge>}
+            {showTime !== 'none' && !timeRange && t && <Badge variant="tag">{t}</Badge>}
+            {showTime !== 'none' && !timeRange && durationLabel && <Badge variant="tag">{durationLabel}</Badge>}
             {showTagsParticipants && listedOn.map(label => (
               <TagChip key={label} label={label} isTopic />
             ))}
