@@ -1,0 +1,85 @@
+name: Dependency audit
+
+# Reports, never blocks. The audit used to live in build.yml, where an advisory
+# published over a weekend turned every PR red — including the fix for it.
+#
+# Caveat: GitHub disables scheduled workflows after 60 days without repository
+# activity. During a long pause this relies on Dependabot merges keeping the
+# repo active; if it goes quiet, re-enable the workflow in the Actions tab.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # `pnpm audit` takes no --filter, so run it inside each workspace.
+      # It exits non-zero when it finds something; the report step reads the JSON.
+      - run: pnpm audit --audit-level=moderate --json > "$RUNNER_TEMP/audit-root.json" || true
+      - run: pnpm audit --audit-level=moderate --json > "$RUNNER_TEMP/audit-worker.json" || true
+        working-directory: worker
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const TITLE = 'Dependency audit: open advisories';
+            const read = (f) => {
+              try { return JSON.parse(fs.readFileSync(f, 'utf8')).advisories ?? {}; }
+              catch { return {}; }
+            };
+            const rows = [];
+            for (const [pkg, file] of [['root', 'audit-root.json'], ['worker', 'audit-worker.json']]) {
+              for (const a of Object.values(read(`${process.env.RUNNER_TEMP}/${file}`))) {
+                rows.push({ pkg, ...a });
+              }
+            }
+            const { owner, repo } = context.repo;
+            const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
+            const dependabot = prs.filter((p) => p.user?.login === 'dependabot[bot]');
+            const fix = (name) => {
+              const pr = dependabot.find((p) => p.title.includes(`\`${name}\``) || new RegExp(`\\b${name}\\b`).test(p.title));
+              return pr ? `#${pr.number}` : 'no';
+            };
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', labels: 'security', per_page: 100,
+            });
+            const existing = issues.find((i) => i.title === TITLE && !i.pull_request);
+
+            if (rows.length === 0) {
+              if (existing) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body: 'Audit is clean again — closing.' });
+                await github.rest.issues.update({ owner, repo, issue_number: existing.number, state: 'closed', state_reason: 'completed' });
+              }
+              return;
+            }
+            const body = [
+              'Found by the weekly `Dependency audit` workflow (moderate and above). Not a PR blocker.',
+              '',
+              '| Package | Workspace | Severity | Advisory | Dependabot PR |',
+              '|---|---|---|---|---|',
+              ...rows.map((r) => `| \`${r.module_name}\` | ${r.pkg} | ${r.severity} | [${r.title}](${r.url}) | ${fix(r.module_name)} |`),
+              '',
+              `_Updated ${new Date().toISOString().slice(0, 10)}._`,
+            ].join('\n');
+            if (existing) {
+              await github.rest.issues.update({ owner, repo, issue_number: existing.number, body });
+            } else {
+              await github.rest.issues.create({ owner, repo, title: TITLE, body, labels: ['security', 'sonnet'] });
+            }

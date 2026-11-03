@@ -115,6 +115,10 @@ do. Run it alone with `pnpm run lint:deps`; `pnpm exec depcruise src
 --output-type dot | dot -Tsvg > graph.svg` draws the graph when you want to
 look at it.
 
+## Dependency audit is not a CI gate
+
+`pnpm audit` does not run in `build.yml`, so a freshly published advisory never turns PRs red. `.github/workflows/audit.yml` runs it weekly for the root and `worker/` and keeps one `security`-labelled tracking issue up to date, closing it when clean.
+
 ## TypeScript pinned to 6.0.x
 
 `typescript` is intentionally pinned below the TS 7 major in both `package.json` (root) and `worker/package.json`. `typescript-eslint` hard-refuses to run against TS 7: `eslint` exits with `typescript-eslint does not support TS 7.0`. `vite build`/`tsc -b` themselves are fine under TS 7 — only the lint step breaks. Tracked upstream: https://github.com/typescript-eslint/typescript-eslint/issues/10940 (support for TS ≥7.1).
