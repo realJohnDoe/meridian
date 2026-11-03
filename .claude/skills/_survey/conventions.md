@@ -1,7 +1,8 @@
 # Survey conventions
 
 Shared process, scoring, and reporting rules used by every survey skill (`survey-health`, `survey-performance`, `survey-health-ui`,
-`survey-data-integrity`, `survey-security`, `survey-product-niche`, `survey-usability`; each
+`survey-data-integrity`, `survey-security`, `survey-product-niche`, `survey-usability`,
+`survey-retro`; each
 `../survey-*/SKILL.md`). This directory has no `SKILL.md` of its own, so it is
 not invocable — the surveys read it. Each survey states only what's
 specific to it — its categories, its findings cap, its target
@@ -100,11 +101,12 @@ so explicitly, and that pass is the ask.
 **days since its last run × merged PRs touching its scope since then** and shows
 both inputs. Each `survey-*/SKILL.md` declares what it reads in its frontmatter:
 `label` (the survey-type label whose parent issues are the past runs) and `scope`
-(git pathspecs; `survey-health` also has `scope-alt` for the test-code corpus).
+(git pathspecs; `survey-health` also has `scope-alt` for the test-code corpus;
+`survey-retro`'s is `sessions`, which counts agent-session PRs opened since its last run).
 The health survey alternates corpus, so the corpus its latest run used is listed
 unranked. The script un-shallows the clone first, per the rule above, and needs
 `gh` for the run dates. A new survey must declare both keys or the ranking
-ignores it.
+fails.
 
 ## Recommended model tiers
 
@@ -277,7 +279,7 @@ files"); this section states only what a survey run does.
 - **One parent issue per run**, titled with the survey and its scope
   (`Codebase health survey — test code — 2026-09-12` is the worked example,
   #1065), labelled with the survey-type label (`health`, `ui`, `performance`,
-  `product`, `data-integrity`, `security`, `ux`). Its body carries the coverage statement, the
+  `product`, `data-integrity`, `security`, `ux`, `retro`). Its body carries the coverage statement, the
   category verdicts and the summary table — with the table's rows linking to
   each finding's sub-issue rather than restating it. This **replaces** the
   report file the old convention wrote to `plans/reports/`: there is no
