@@ -46,6 +46,8 @@ for (const dir of readdirSync(".claude/skills").filter((d) =>
   d.startsWith("survey-"),
 )) {
   const f = fm(dir);
+  if (!f.label || !f.scope)
+    throw new Error(`${dir}: frontmatter needs both label and scope`);
   const all = runs(f.label);
   const isTests = (r) => /test code/i.test(r.title);
   const corpora = f["scope-alt"]
@@ -71,17 +73,25 @@ for (const dir of readdirSync(".claude/skills").filter((d) =>
       });
       continue;
     }
-    const prs = sh("git", [
-      "log",
-      "--first-parent",
-      "-m",
-      `--since=${last}`,
-      "--format=%H",
-      "--",
-      ...words(scope),
-    ])
-      .split("\n")
-      .filter(Boolean).length;
+    // `scope: sessions` (survey-retro) counts session PRs opened since, not paths.
+    const prs =
+      scope === "sessions"
+        ? Number(
+            sh("node", ["scripts/retro-candidates.mjs", "--since", last]).split(
+              " ",
+            )[0],
+          )
+        : sh("git", [
+            "log",
+            "--first-parent",
+            "-m",
+            `--since=${last}`,
+            "--format=%H",
+            "--",
+            ...words(scope),
+          ])
+            .split("\n")
+            .filter(Boolean).length;
     const days = Math.round((today - new Date(last)) / 864e5);
     rows.push({ name, last, days, prs, score: days * prs, corpus, dir });
   }
