@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  checks:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -69,3 +69,14 @@ jobs:
       # series. `--only-shell`: headless runs only use the headless shell.
       - run: pnpm exec playwright install --with-deps --only-shell chromium
       - run: pnpm run test:e2e
+
+  # The ruleset on main requires the `build / build` check (caller job
+  # `build` in ci.yml / this job). Keeping that name on a gate that needs
+  # both jobs makes e2e required too, without editing the ruleset, and
+  # keeps checks and e2e running in parallel.
+  build:
+    needs: [checks, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.checks.result }}" = success && test "${{ needs.e2e.result }}" = success
