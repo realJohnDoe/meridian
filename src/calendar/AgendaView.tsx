@@ -298,16 +298,21 @@ export default function AgendaView({ onOpen }: Props) {
   // indistinguishable from this scrollToIndex baseline.
   useLayoutEffect(() => {
     if (!scrollTarget || goToRowIndex < 0 || !scRef.current) return
-    virtualizer.scrollToIndex(goToRowIndex, { align: 'start' })
+    // A target equal to the anchor lands on goToRowIndex (which may prefer the
+    // overdue block); one inside the loaded run keeps the old anchor
+    // (requestScrollToDate), so find its first row by date instead.
+    const targetIndex = scrollTarget === anchorKey ? goToRowIndex : rows.findIndex(r => r.dateKey >= scrollTarget)
+    if (targetIndex < 0) return
+    virtualizer.scrollToIndex(targetIndex, { align: 'start' })
     lastTopRef.current = scrollTarget
     // Record the landing spot directly rather than reading it back: the
     // scroll event this just triggered hasn't been dispatched yet, so
     // captureAnchor would still see the pre-scroll offset. This is also what
     // seeds the anchor on a cold start, before the user has scrolled at all —
     // which is exactly the case the startup drift showed up in.
-    anchorAt(goToRowIndex, scrollTarget)
+    anchorAt(targetIndex, scrollTarget)
     markAgendaScrolled(scrollTarget)
-  }, [scrollTarget, goToRowIndex, virtualizer, anchorAt])
+  }, [scrollTarget, anchorKey, rows, goToRowIndex, virtualizer, anchorAt])
 
   // Only while the scroller sits at its very top does "Load earlier" belong
   // on screen — otherwise, sitting above the scroll container (see

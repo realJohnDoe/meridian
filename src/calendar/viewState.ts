@@ -2,7 +2,8 @@ import { createStore } from 'zustand/vanilla'
 import { useStore as useZustandStore } from 'zustand/react'
 import { startOfToday, addDays, differenceInCalendarDays } from 'date-fns'
 import type { VirtualItem } from '@tanstack/react-virtual'
-import { fmtISO } from '@/model'
+import { fmtISO, parseDateString, weekStartsOn } from '@/model'
+import { useStore } from '@/store'
 import { resetAll as resetExpansionCaches } from './expansionCaches'
 import { weekStartFor } from './weekRange'
 import { chunkIndexFor } from './agendaChunks'
@@ -380,11 +381,26 @@ export function setQuickNavBrowsePreview(key: string | null): void {
  * that may fall outside the default window (e.g. arriving from a Month/Day
  * view that had paged far from today; see Sidebar's Agenda nav item).
  *
- * Clears `agendaLoadedChunks` back to null along with the anchor: the loaded
- * run is centered on the *old* anchor, and a jump needs it reseeded around
- * the new one rather than widened to cover both — see `useAgendaLoadedRun`.
+ * When the target's chunk lies outside the loaded run, clears
+ * `agendaLoadedChunks` back to null along with the anchor: the run is centered
+ * on the *old* anchor, and a jump needs it reseeded around the new one rather
+ * than widened to cover both — see `useAgendaLoadedRun`. When the target is
+ * already inside the run its row exists, so only the scroll target is set:
+ * leaving the anchor and run alone keeps the chunk and sections caches valid
+ * (a reseed would re-expand and re-section with no data change). Consequence:
+ * the anchor's forced empty-day section isn't moved to such a target, matching
+ * what scrolling there by hand shows.
  */
 export function requestScrollToDate(dateKey: string): void {
+  const { agendaLoadedChunks: run } = calendarView.getState()
+  if (run) {
+    const date = parseDateString(dateKey)
+    const chunk = date && chunkIndexFor(date, weekStartsOn(useStore.getState().localePrefs))
+    if (chunk !== null && chunk >= run.first && chunk <= run.last) {
+      calendarView.setState({ agendaScrollTarget: dateKey })
+      return
+    }
+  }
   calendarView.setState({ agendaAnchor: dateKey, agendaScrollTarget: dateKey, agendaLoadedChunks: null })
 }
 

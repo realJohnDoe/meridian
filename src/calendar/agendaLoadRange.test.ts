@@ -162,11 +162,23 @@ describe('reseeding on reset/jump', () => {
     expect(calendarView.getState().agendaLoadedChunks).toBeNull()
   })
 
-  it('requestScrollToDate clears the loaded run back to null, since it is centered on the old anchor', () => {
+  it('requestScrollToDate clears the loaded run back to null when the target lies outside it', () => {
     calendarView.setState({ agendaLoadedChunks: { first: 0, last: 2 } })
 
     requestScrollToDate('2026-12-25')
 
     expect(calendarView.getState().agendaLoadedChunks).toBeNull()
+  })
+
+  it('requestScrollToDate keeps the run and anchor when the target is inside it', () => {
+    const anchor = calendarView.getState().agendaAnchor
+    const run = { first: 0, last: 1_000_000 }
+    calendarView.setState({ agendaLoadedChunks: run })
+
+    requestScrollToDate('2026-12-25')
+
+    expect(calendarView.getState().agendaLoadedChunks).toBe(run)
+    expect(calendarView.getState().agendaAnchor).toBe(anchor)
+    expect(calendarView.getState().agendaScrollTarget).toBe('2026-12-25')
   })
 })

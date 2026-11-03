@@ -703,10 +703,9 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     // hold the old position against an explicit request.
     expect(calendarView.getState().agendaScrollTarget).toBeNull()
     expect(calendarView.getState().agendaTopDate).toBe(fmtISO(today))
-    // The loaded run re-seeds around the new anchor rather than keeping the
-    // wide run this file's beforeEach primed it with (requestScrollToDate
-    // clears agendaLoadedChunks back to null; see viewState.ts).
-    expect(calendarView.getState().agendaLoadedChunks).not.toEqual(loadedBefore)
+    // Today's chunk is inside the wide run this file's beforeEach primed, so
+    // the run is kept rather than reseeded (see viewState.ts).
+    expect(calendarView.getState().agendaLoadedChunks).toEqual(loadedBefore)
   })
 
   // Regression test for a real bug, not a hypothetical one: a version of the
