@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { hasSameStructure, computeExpansionCache } from '@/model/expansionCache'
-import type { StoreSeries, StoreOcc, Roots } from '@/types'
+import type { StoreItem, StoreSeries, StoreOcc, Roots } from '@/types'
 import { keyOf, TEST_VAULT } from './helpers'
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -225,10 +225,9 @@ describe('computeExpansionCache', () => {
   })
 
   it('overlays a changed file title onto every one of its occurrences when they land at several positions in allOccs', () => {
-    // Regression test for the reverse index used by the overlay fast path:
     // note-a has occurrences interleaved with note-b's throughout allOccs, so
-    // a naive single-index (id/entryKey -> one position) would miss all but
-    // the last one.
+    // an overlay that stopped at the first (or tracked only the last) position
+    // per file would miss the rest.
     const a1 = occ({ id: 'a1', entryKey: keyOf('note-a.md'), date: '2026-05-26' })
     const b1 = occ({ id: 'b1', entryKey: keyOf('note-b.md'), date: '2026-05-27' })
     const a2 = occ({ id: 'a2', entryKey: keyOf('note-a.md'), date: '2026-05-28' })
@@ -248,5 +247,56 @@ describe('computeExpansionCache', () => {
 
     expect(second.allOccs.filter(o => o.entryKey === keyOf('note-a.md')).map(o => o.metadata.title)).toEqual(['New Title', 'New Title', 'New Title'])
     expect(second.allOccs.filter(o => o.entryKey === keyOf('note-b.md')).every(o => o.metadata.title === 'Note B')).toBe(true)
+  })
+
+  describe('structural edits re-expand only the changed entries', () => {
+    // Many entries sharing all-day dates, so most jsTimes tie and the merge has
+    // to reproduce the full path's tie order (series, then standalones, then
+    // multiday extras, each in items order) — not just its jsTime order.
+    const key = (n: number) => keyOf(`note-${n}.md`)
+    function vault(): StoreItem[] {
+      const items: StoreItem[] = []
+      for (let n = 0; n < 12; n++) {
+        items.push(occ({ id: `${n}|occ`, entryKey: key(n), date: `2026-05-${26 + (n % 4)}` }))
+        if (n % 3 === 0) items.push(series({ id: `${n}|series`, entryKey: key(n), date: '2026-05-25', repeat: { type: 'schedule', freq: 'weekly', byweekday: ['mo', 'we'] } }))
+      }
+      items.push(occ({ id: '12|occ', entryKey: key(12), date: '2026-05-26', metadata: { participants: [], duration: '3d' } }))
+      const ac = series({ id: '13|series', entryKey: key(13), date: '2026-05-26', repeat: { type: 'after_completion', interval: '2 days' }, metadata: { participants: [], done: false } })
+      items.push(ac, occ({ id: '13|inst', entryKey: key(13), date: '2026-05-26', ownerId: ac.id, metadata: { participants: [], done: false } }))
+      return items
+    }
+    const roots = rootsOf(Array.from({ length: 15 }, (_, n) => [`note-${n}.md`, { title: `Note ${n}`, tags: [], items: [] }]))
+    const replace = (items: StoreItem[], id: string, patch: Partial<StoreOcc> | Partial<StoreSeries>) =>
+      items.map(i => i.id === id ? { ...i, ...patch } : i)
+
+    const edits: [string, (items: StoreItem[]) => StoreItem[]][] = [
+      ['add an entry', items => [...items, occ({ id: '14|occ', entryKey: key(14), date: '2026-05-27' })]],
+      ['remove an entry', items => items.filter(i => i.entryKey !== key(3))],
+      ['change a date', items => replace(items, '5|occ', { date: '2026-05-29' })],
+      ['change a repeat rule', items => replace(items, '6|series', { repeat: { type: 'schedule', freq: 'daily' } })],
+      ['make an event multiday', items => replace(items, '7|occ', { metadata: { participants: [], duration: '4d' } })],
+      ['move a multiday event', items => replace(items, '12|occ', { date: '2026-05-28' })],
+      ['complete an after-completion series', items => replace(items, '13|inst', { metadata: { participants: [], done: true } })],
+    ]
+
+    it.each(edits)('%s: matches a full recompute and keeps unchanged entries by reference', (_, edit) => {
+      const before = vault()
+      const prev = computeExpansionCache(null, before, roots, from, to)
+      const after = edit(before)
+      const changed = new Set(after.filter(i => !before.includes(i)).concat(before.filter(i => !after.includes(i))).map(i => i.entryKey))
+
+      const incremental = computeExpansionCache(prev, after, roots, from, to)
+      expect(incremental).toEqual(computeExpansionCache(null, after, roots, from, to))
+      const prevOccs = new Set(prev.allOccs)
+      for (const o of incremental.allOccs) expect(prevOccs.has(o)).toBe(!changed.has(o.entryKey))
+    })
+
+    it('still matches a full recompute when unchanged entries were reordered', () => {
+      const before = vault()
+      const prev = computeExpansionCache(null, before, roots, from, to)
+      const moved = (i: StoreItem) => i.entryKey === key(0)
+      const after = [...before.filter(i => !moved(i)), ...before.filter(moved), occ({ id: '14|occ', entryKey: key(14), date: '2026-05-27' })]
+      expect(computeExpansionCache(prev, after, roots, from, to)).toEqual(computeExpansionCache(null, after, roots, from, to))
+    })
   })
 })
