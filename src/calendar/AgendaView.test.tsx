@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import AgendaView from './AgendaView'
 import { setupStore, seedStore, makeOcc, makeSeries, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
-import { fmtISO } from '@/model'
+import { fmtISO, weekStartsOn } from '@/model'
 import { addDays } from '@/format'
 import { useStore } from '@/store'
 import { calendarView, resetCalendarOnVaultChange, requestScrollToToday, requestScrollToDate } from './viewState'
-import { chunkIndexFor } from './agendaChunks'
+import { chunkIndexFor, maxLoadableChunk } from './agendaChunks'
 import type { Occurrence } from '@/types'
 
 setupStore()
@@ -926,6 +926,21 @@ describe('AgendaView — incremental loading', () => {
     // computeAgendaScrollRestore.ts's own note on this).
     await settle()
     expect(scrollContainer().scrollTop).toBe(settledOffset)
+  })
+
+  // The forward ceiling (maxLoadableChunk) only exists to stop growth that no
+  // scroll drives — a run too short to fill the viewport. Applied to scrolling
+  // too, it made the agenda silently stop extending ~90 days out.
+  it('keeps growing forward past maxLoadableChunk while the user keeps scrolling', async () => {
+    calendarView.setState({ agendaLoadedChunks: null })
+    seedStore([todayTask(), ...upcoming()], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await flush()
+
+    for (let i = 0; i < 30; i++) await scrollDownBy(2000)
+
+    const ws = weekStartsOn(useStore.getState().localePrefs)
+    expect(calendarView.getState().agendaLoadedChunks!.last).toBeGreaterThan(maxLoadableChunk(today, ws))
   })
 
   it('"Load earlier" widens the loaded run backward and holds the visible day, needing no scroll-compensation code of its own', async () => {
