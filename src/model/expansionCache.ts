@@ -2,6 +2,7 @@ import type { StoreItem, StoreOcc, StoreSeries, Roots, Occurrence, FileMetadata 
 import { isSeries } from '@/types'
 import { expandWithMultiday } from './expansion'
 import { buildItemIndex, type ItemIndex } from './itemIndex'
+import { parseDateString, parseDateTime } from './dateUtils'
 
 // One-slot memo for buildItemIndex(items), keyed by `items` reference.
 //
@@ -35,34 +36,6 @@ export interface ExpansionCache {
   fromMs: number
   toMs: number
   allOccs: Occurrence[]
-  /**
-   * Reverse indices from occurrence identity to positions in `allOccs`, built
-   * once per full expansion and carried forward unchanged across overlay
-   * passes (positions stay stable — see `hasSameStructure`). These are what
-   * let the metadata-overlay fast path in `computeExpansionCache` touch only
-   * the affected occurrences instead of walking all of them.
-   */
-  indexById: Map<string, number[]>
-  indexByEntryKey: Map<string, number[]>
-  indexByOwnerId: Map<string, number[]>
-}
-
-function buildReverseIndex(allOccs: Occurrence[]): Pick<ExpansionCache, 'indexById' | 'indexByEntryKey' | 'indexByOwnerId'> {
-  const indexById = new Map<string, number[]>()
-  const indexByEntryKey = new Map<string, number[]>()
-  const indexByOwnerId = new Map<string, number[]>()
-  const push = (map: Map<string, number[]>, key: string, i: number) => {
-    const existing = map.get(key)
-    if (existing) existing.push(i)
-    else map.set(key, [i])
-  }
-  for (let i = 0; i < allOccs.length; i++) {
-    const occ = allOccs[i]!
-    push(indexById, occ.id, i)
-    push(indexByEntryKey, occ.entryKey, i)
-    if (occ.ownerId) push(indexByOwnerId, occ.ownerId, i)
-  }
-  return { indexById, indexByEntryKey, indexByOwnerId }
 }
 
 /**
@@ -123,7 +96,9 @@ export function hasSameStructure(a: StoreItem[], b: StoreItem[]): boolean {
  * Computes the expansion result for the given inputs, reusing `prev` when the
  * scheduling structure is unchanged instead of re-running expandWithMultiday.
  * When only non-structural metadata (done, priority, participants) changed,
- * the new values are overlaid directly onto the cached occurrences.
+ * the new values are overlaid directly onto the cached occurrences. When the
+ * structure changed, only the changed entries are re-expanded (see
+ * `reexpandChangedEntries`).
  */
 export function computeExpansionCache(
   prev: ExpansionCache | null,
@@ -188,29 +163,22 @@ export function computeExpansionCache(
       }
     }
 
-    // Only the occurrences actually touched by a changed item/file/series need
-    // to move — everything else stays the same reference. The reverse indices
-    // (built once per full expansion, see buildReverseIndex) resolve exactly
-    // which positions those are without walking prev.allOccs.
-    const affectedIndices = new Set<number>()
-    for (const id of changedById.keys()) {
-      for (const i of prev.indexById.get(id) ?? []) affectedIndices.add(i)
-    }
-    for (const entryKey of changedFileMeta.keys()) {
-      for (const i of prev.indexByEntryKey.get(entryKey) ?? []) affectedIndices.add(i)
-    }
-    for (const ownerId of changedSeriesById.keys()) {
-      for (const i of prev.indexByOwnerId.get(ownerId) ?? []) affectedIndices.add(i)
-    }
-
-    const allOccs = prev.allOccs.slice()
-    for (const i of affectedIndices) {
-      const occ = allOccs[i]!
+    // Only the occurrences actually touched by a changed item/file/series
+    // move — everything else stays the same reference. Gated on entryKey
+    // first: an entry's occurrences share one entryKey string, so that lookup
+    // hashes once per entry, where a per-occurrence id would hash every
+    // occurrence. Item ids embed their entryKey (parseToStoreItems), so no
+    // change reaches outside its own entry.
+    const changedKeys = new Set<string>(changedFileMeta.keys())
+    for (const item of [...changedById.values(), ...changedSeriesById.values()]) changedKeys.add(item.entryKey)
+    const allOccs = prev.allOccs.map(occ => {
+      if (!changedKeys.has(occ.entryKey)) return occ
       const changedItem = changedById.get(occ.id)
       const changedFile = changedFileMeta.get(occ.entryKey)
       const changedSeries = occ.ownerId ? changedSeriesById.get(occ.ownerId) : undefined
+      if (!changedItem && !changedFile && !changedSeries) return occ
       const override = changedSeries ? overrideById.get(occ.id) : undefined
-      allOccs[i] = {
+      return {
         ...occ,
         metadata: {
           ...occ.metadata,
@@ -227,13 +195,82 @@ export function computeExpansionCache(
           } : null),
         },
       }
-    }
-    // Positions are unchanged (hasSameStructure guarantees alignment) and the
-    // occurrences' id/entryKey/ownerId never change here — only metadata does
-    // — so the reverse indices themselves stay valid and carry forward as-is.
-    return { items, roots, fromMs, toMs, allOccs, indexById: prev.indexById, indexByEntryKey: prev.indexByEntryKey, indexByOwnerId: prev.indexByOwnerId }
+    })
+    return { items, roots, fromMs, toMs, allOccs }
   }
 
-  const allOccs = expandWithMultiday(items, roots, from, to, itemIndexFor(items))
-  return { items, roots, fromMs, toMs, allOccs, ...buildReverseIndex(allOccs) }
+  const sameWindow = prev && prev.fromMs === fromMs && prev.toMs === toMs
+  const allOccs = (sameWindow ? reexpandChangedEntries(prev, items, roots, from, to) : null)
+    ?? expandWithMultiday(items, roots, from, to, itemIndexFor(items))
+  return { items, roots, fromMs, toMs, allOccs }
+}
+
+/**
+ * The structural path: re-expands only the entries whose items or root
+ * changed, keeps every other entry's occurrences by reference (so row memos
+ * hold), and merges the two sorted lists into exactly the order a full
+ * `expandWithMultiday` over `items` would produce. Returns `null` — "do the
+ * full expansion" — when too much changed for this to be worth it.
+ *
+ * Keyed by entryKey, not occurrence id: a multiday standalone emits one
+ * occurrence per covered day under one id. Entry granularity is also what
+ * keeps a series and its overrides together — `parseToStoreItems` puts both
+ * in the same file and derives every item id from its entryKey, so no
+ * occurrence of one entry can depend on, or dedupe against, another's items.
+ */
+function reexpandChangedEntries(prev: ExpansionCache, items: StoreItem[], roots: Roots, from: Date, to: Date): Occurrence[] | null {
+  const prevItems = new Set(prev.items)
+  const nextItems = new Set(items)
+  const changed = new Set<string>()
+  for (const item of items) if (!prevItems.has(item)) changed.add(item.entryKey)
+  for (const item of prev.items) if (!nextItems.has(item)) changed.add(item.entryKey)
+  if (roots !== prev.roots) {
+    for (const [key, meta] of roots) if (prev.roots.get(key) !== meta) changed.add(key)
+    for (const key of prev.roots.keys()) if (!roots.has(key)) changed.add(key)
+  }
+  const changedItems = items.filter(item => changed.has(item.entryKey))
+  // A vault load or reload touches most entries; the merge only pays off for a few.
+  if (changedItems.length > items.length / 4) return null
+
+  // Unchanged entries' items must keep their relative order in `items`
+  // (deriveViews walks the entries Map in insertion order), or `kept` is no
+  // longer sorted under the new tie-break ranks and a merge would be silently wrong.
+  const keptItems = prev.items.filter(item => !changed.has(item.entryKey))
+  let k = 0
+  for (const item of items) if (!changed.has(item.entryKey) && item !== keptItems[k++]) return null
+
+  const fresh = expandWithMultiday(changedItems, roots, from, to)
+  const kept = prev.allOccs.filter(occ => !changed.has(occ.entryKey))
+
+  // Tie-break between equal jsTimes the way the full path's stable sort does:
+  // by emission order — every series' occurrences (in items order), then
+  // every standalone's start, then multiday standalones' extra covered days.
+  const { series, standalones } = itemIndexFor(items)
+  const rankById = new Map<string, number>()
+  series.forEach((item, i) => rankById.set(item.id, i))
+  standalones.forEach((item, i) => rankById.set(item.id, series.length + i))
+  const rank = (occ: Occurrence): number => {
+    const r = rankById.get(occ.ownerId ?? occ.id) ?? -1
+    const start = parseDateTime(occ.date, occ.time) ?? parseDateString(occ.date)
+    return !occ.ownerId && occ.metadata.jsTime!.getTime() !== start?.getTime() ? r + standalones.length : r
+  }
+  const before = (a: Occurrence, b: Occurrence) =>
+    ((a.metadata.jsTime!.getTime() - b.metadata.jsTime!.getTime()) || rank(a) - rank(b)) < 0
+
+  // Binary-search each fresh occurrence's slot in `kept`, so ranks are only
+  // computed for the handful of comparisons that land on a tie.
+  const merged: Occurrence[] = []
+  let next = 0
+  for (const occ of fresh) {
+    let lo = next, hi = kept.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (before(kept[mid]!, occ)) lo = mid + 1
+      else hi = mid
+    }
+    while (next < lo) merged.push(kept[next++]!)
+    merged.push(occ)
+  }
+  while (next < kept.length) merged.push(kept[next++]!)
+  return merged
 }
