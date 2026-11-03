@@ -199,13 +199,7 @@ Examples (not exhaustive):
 
 ### 4. Security (UI-facing)
 
-**Scope:** ways malicious or malformed input could compromise the rendered UI or its users. State the threat model first: what user- or file-supplied content is rendered, and how.
-
-Examples (not exhaustive):
-
-- `dangerouslySetInnerHTML` or manual DOM injection of user/file-derived content without sanitization
-- User-controlled URLs in `href`/`src` (`javascript:` schemes), unsafe `target="_blank"` without `rel`
-- Untrusted content (markdown, frontmatter, wikilinks, file names) flowing into rendering without escaping
+Owned by [the security survey](../survey-security/SKILL.md) (its `xss` category) — not scanned here. Its verdict line points at that survey's latest run instead; file anything you trip over there.
 
 ### 5. Code Health & DRY (components and hooks)
 
