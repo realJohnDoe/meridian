@@ -214,16 +214,16 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
           </div>
         </div>
 
-        {/* Meta row — exactly one chip line tall (h-5.25 = a 21px chip), so a
-            card's height never depends on how its chips wrap: chips that don't
-            fit wrap onto a second line that is clipped away whole. Virtualized
-            lists estimate row heights before mounting (agendaRowHeights.ts);
-            a wrapped line made the row 27px taller than that estimate, and the
-            virtualizer's scroll correction for it was a visible jump. Chips
-            are in priority order, so what gets dropped is the trailing
-            backlinks and the painter's chip. */}
+        {/* Meta row — a single non-wrapping chip line, so a card's height
+            never depends on how many chips it has. Virtualized lists estimate
+            row heights before mounting (agendaRowHeights.ts); a wrapped line
+            made the row 27px taller than that estimate, and the virtualizer's
+            scroll correction for it was a visible jump. Chips that don't fit
+            run off the right edge under a fade, which also signals there is
+            more; chips are in priority order, so the trailing backlinks and
+            the painter's chip are what get cut. */}
         {showMeta && (
-          <div className="flex flex-wrap gap-1.5 h-5.25 overflow-hidden">
+          <div className="flex gap-1.5 overflow-hidden [mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)]">
             {showDate && dateBadge && <Badge variant="tag">{dateBadge}</Badge>}
             {showTime !== 'none' && timeRange && <Badge variant="tag">{timeRange}</Badge>}
             {showTime !== 'none' && !timeRange && t && <Badge variant="tag">{t}</Badge>}
