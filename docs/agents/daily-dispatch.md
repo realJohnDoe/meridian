@@ -1,0 +1,46 @@
+# Daily dispatch
+
+Run by the daily scheduled task ("Daily dispatcher"); the task's prompt only
+says to follow this file. Goal: open findings move forward without anyone
+starting sessions by hand, and the maintainer's part comes down to one weekly
+digest.
+
+1. `node scripts/factory-dispatch.mjs` is the **dry run**: it prints the plan as
+   JSON and writes nothing. Read it before applying.
+2. `node scripts/factory-dispatch.mjs --apply` claims what the plan starts
+   (assigns each dispatched issue and leaves a `factory-dispatch` marker comment;
+   leaves a `factory-followup` marker comment on each followed-up PR) and
+   writes the digest if it's due. It prints the same plan.
+3. For each entry in `sessions`, call `create_session` with the entry's
+   `prompt` and `title`, `source_url` `https://github.com/realJohnDoe/meridian`,
+   and `model` set to the current model of the family `tier` names. For a
+   `followup` entry also pass `source_revision` and `outcome_branch` set to
+   `branch`, so it works on the PR's own branch.
+4. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is
+   the follow-up.
+5. If `sessions` is empty and `digest.write` is false, stop. Post nothing.
+
+## What the script decides
+
+- **Dispatch**: open issues that have a `haiku`/`sonnet`/`opus` label, no
+  `opus-plan` or `decision-required`, no assignee, no open native blocker, no
+  sub-issues, and no open PR that closes them. Oldest first.
+- **Follow-up**: open, non-draft PRs that close a tier-labelled issue, once CI
+  has finished. A PR gets one narrow session if it has a failing check or
+  review feedback newer than its head commit that isn't an agent's (no Claude
+  Code footer). It waits while a follow-up is newer than the head commit.
+  Green, quiet PRs cost nothing.
+- **Caps**: at most `--max-sessions` (4) sessions per run, follow-ups first;
+  at most `--max-followups` (2) follow-ups per PR. After that the PR goes in
+  the digest instead.
+- **Digest**: one issue titled `Factory digest`, listing what is waiting on the
+  maintainer, each line saying what to do: **Decide** (open
+  `decision-required` issues), **Review** (green, quiet `opus`/`opus-plan`
+  PRs), **Unstick** (PRs at their follow-up cap, a follow-up with no push
+  after 2 days, a dispatched issue with no PR after 2 days). The body is
+  rewritten, and a comment posted, only when its contents changed **and** the
+  last write was 7 or more days ago. A quiet week sends nothing. Nothing is
+  merged or decided on silence.
+
+To re-dispatch a stuck issue, unassign it. To stop a PR from getting
+follow-ups, mark it draft.
