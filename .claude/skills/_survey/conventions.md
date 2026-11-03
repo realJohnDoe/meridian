@@ -280,6 +280,10 @@ files"); this section states only what a survey run does.
   issue. Then read the most recent *closed* parent's "deliberately not filed"
   section: a judgement made there (e.g. #1065 keeping `ci.yml`'s duplicate
   worker job) is invisible to an open-issue search and gets re-derived otherwise.
+- A fix that adds a cache, memo or incremental-update path ships a test that its
+  output deep-equals a full recompute (precedent: #1300's expansion-cache test).
+  The PR template (`.github/pull_request_template.md`) makes the fixer state the
+  finding's acceptance check, re-run, before it closes.
 - A finding closes when a PR saying `Fixes #N` merges. Do not edit a file to
   close one. Dropping one as invalid or won't-fix is a close with `not planned`
   plus a comment saying why; deferring one is an open issue with a `deferred`

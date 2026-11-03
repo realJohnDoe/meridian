@@ -132,6 +132,8 @@ Reserve plan mode + multi-PR for an architecture change **or** a product
 decision (e.g. "cap the list" vs "restructure the virtualizer"). Example hazard
 note: "Sonnet 5 if the cache key is specified in the task; else Opus 5."
 
+A `Fix` that adds a cache, memo or incremental path must name the recompute-equivalence test ([conventions](../_survey/conventions.md#reporting)).
+
 Rank and report findings per the [shared convention](../_survey/conventions.md#ranking-findings). Here, "confirming" a fix means re-running the measurement recipe.
 
 Per [Don't pad the findings list](../_survey/conventions.md#dont-pad-the-findings-list) and
