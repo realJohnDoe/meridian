@@ -3,6 +3,7 @@ import { isSeries } from '@/types'
 import { expandWithMultiday } from './expansion'
 import { buildItemIndex, type ItemIndex } from './itemIndex'
 import { parseDateString, parseDateTime } from './dateUtils'
+import { parseDurationDays } from './duration'
 
 // One-slot memo for buildItemIndex(items), keyed by `items` reference.
 //
@@ -210,7 +211,7 @@ export function computeExpansionCache(
  * changed, keeps every other entry's occurrences by reference (so row memos
  * hold), and merges the two sorted lists into exactly the order a full
  * `expandWithMultiday` over `items` would produce. Returns `null` — "do the
- * full expansion" — when too much changed for this to be worth it.
+ * full expansion" — only when it cannot reproduce that order (see below).
  *
  * Keyed by entryKey, not occurrence id: a multiday standalone emits one
  * occurrence per covered day under one id. Entry granularity is also what
@@ -229,8 +230,6 @@ function reexpandChangedEntries(prev: ExpansionCache, items: StoreItem[], roots:
     for (const key of prev.roots.keys()) if (!roots.has(key)) changed.add(key)
   }
   const changedItems = items.filter(item => changed.has(item.entryKey))
-  // A vault load or reload touches most entries; the merge only pays off for a few.
-  if (changedItems.length > items.length / 4) return null
 
   // Unchanged entries' items must keep their relative order in `items`
   // (deriveViews walks the entries Map in insertion order), or `kept` is no
@@ -247,18 +246,26 @@ function reexpandChangedEntries(prev: ExpansionCache, items: StoreItem[], roots:
   // every standalone's start, then multiday standalones' extra covered days.
   const { series, standalones } = itemIndexFor(items)
   const rankById = new Map<string, number>()
+  // Start time of each multiday standalone: its occurrences at any other time
+  // are the extra covered days, which rank after every standalone start.
+  const multidayStartById = new Map<string, number | undefined>()
   series.forEach((item, i) => rankById.set(item.id, i))
-  standalones.forEach((item, i) => rankById.set(item.id, series.length + i))
+  standalones.forEach((item, i) => {
+    rankById.set(item.id, series.length + i)
+    if ((parseDurationDays(item.metadata.duration) ?? 0) >= 2) {
+      multidayStartById.set(item.id, (parseDateTime(item.date, item.time) ?? parseDateString(item.date))?.getTime())
+    }
+  })
   const rank = (occ: Occurrence): number => {
     const r = rankById.get(occ.ownerId ?? occ.id) ?? -1
-    const start = parseDateTime(occ.date, occ.time) ?? parseDateString(occ.date)
-    return !occ.ownerId && occ.metadata.jsTime!.getTime() !== start?.getTime() ? r + standalones.length : r
+    const isExtraDay = multidayStartById.has(occ.id) && occ.metadata.jsTime!.getTime() !== multidayStartById.get(occ.id)
+    return isExtraDay ? r + standalones.length : r
   }
   const before = (a: Occurrence, b: Occurrence) =>
     ((a.metadata.jsTime!.getTime() - b.metadata.jsTime!.getTime()) || rank(a) - rank(b)) < 0
 
-  // Binary-search each fresh occurrence's slot in `kept`, so ranks are only
-  // computed for the handful of comparisons that land on a tie.
+  // Binary-search each fresh occurrence's slot in `kept`, resuming from the
+  // previous slot since both lists are sorted.
   const merged: Occurrence[] = []
   let next = 0
   for (const occ of fresh) {
