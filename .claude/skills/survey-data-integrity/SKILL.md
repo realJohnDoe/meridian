@@ -1,6 +1,8 @@
 ---
 name: survey-data-integrity
 description: Run the data integrity survey: ways the app can lose, corrupt or silently mangle the user's Markdown content. Use when asked to run or edit the data-integrity survey.
+label: data-integrity
+scope: src/model src/storage src/editor
 ---
 
 Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.

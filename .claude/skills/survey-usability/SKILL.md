@@ -1,6 +1,8 @@
 ---
 name: survey-usability
 description: Run the code-blind usability survey: evaluate task flows, navigation and microcopy by using the app. Use when asked to run or edit the usability survey.
+label: ux
+scope: src
 ---
 
 Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.

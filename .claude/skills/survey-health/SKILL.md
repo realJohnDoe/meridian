@@ -1,6 +1,9 @@
 ---
 name: survey-health
 description: Run the codebase health survey: code-health findings across architecture, duplication, testing, tooling and more, ranked and filed as sub-issues. Use when asked to run, repeat or edit the health survey.
+label: health
+scope: src ":!src/**/*.test.*" ":!src/test-utils"
+scope-alt: "src/**/*.test.*" src/test-utils e2e
 ---
 
 Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.

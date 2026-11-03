@@ -94,6 +94,18 @@ statement up front rather than discovering them:
 a survey run — the surveys that require a measurement or screenshot pass say
 so explicitly, and that pass is the ask.
 
+## Choosing the next survey
+
+`node scripts/survey-next.mjs` prints the answer. It ranks each survey by
+**days since its last run × merged PRs touching its scope since then** and shows
+both inputs. Each `survey-*/SKILL.md` declares what it reads in its frontmatter:
+`label` (the survey-type label whose parent issues are the past runs) and `scope`
+(git pathspecs; `survey-health` also has `scope-alt` for the test-code corpus).
+The health survey alternates corpus, so the corpus its latest run used is listed
+unranked. The script un-shallows the clone first, per the rule above, and needs
+`gh` for the run dates. A new survey must declare both keys or the ranking
+ignores it.
+
 ## Recommended model tiers
 
 Every finding is tagged with a **Recommended model** — the cheapest tier

@@ -1,6 +1,8 @@
 ---
 name: survey-health-ui
 description: Run the UI-layer health survey: code-health findings in components, hooks, styling, a11y markup and view state. Use when asked to run or edit the UI health survey.
+label: ui
+scope: src/components src/hooks src/calendar src/editor src/routes src/settings src/search src/onboarding
 ---
 
 Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
