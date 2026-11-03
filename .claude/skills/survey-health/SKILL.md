@@ -228,15 +228,7 @@ Examples (not exhaustive):
 
 ### 4. Security
 
-**Scope:** any way an attacker or malicious input could compromise the app, its data, or its users — evaluated against this app's actual threat model (state what that model is: what's client-side, what's persisted where, what external input is parsed).
-
-Examples (not exhaustive):
-
-- XSS vectors: `dangerouslySetInnerHTML`, unescaped user input rendered as HTML, user-controlled URLs in `href`/`src` (`javascript:` schemes)
-- Sensitive values hardcoded or exposed to the client bundle; tokens/credentials persisted in insecure storage
-- Security-relevant logic only enforced client-side
-- Untrusted-input parsing without sanitization (markdown/HTML rendering, file names, path traversal in user-supplied paths)
-- Anything else in scope — injection, missing origin checks on `postMessage`, known-vulnerable dependency versions, etc.
+Owned by [the security survey](../survey-security/SKILL.md) — not scanned here. Its verdict line points at that survey's latest run instead; file anything you trip over there.
 
 ### 5. Testing & Error Handling
 
