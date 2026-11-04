@@ -11,11 +11,13 @@ digest.
    (assigns each dispatched issue and leaves a `factory-dispatch` marker comment;
    leaves a `factory-followup` marker comment on each followed-up PR) and
    writes the digest if it's due. It prints the same plan.
-3. For each entry in `sessions`, call `create_session` with the entry's
-   `prompt` and `title`, `source_url` `https://github.com/realJohnDoe/meridian`,
-   and `model` set to the current model of the family `tier` names. For a
-   `followup` entry also pass `source_revision` and `outcome_branch` set to
-   `branch`, so it works on the PR's own branch.
+3. For each entry in `sessions`, start one background subagent with the
+   `Agent` tool: the entry's `prompt`, `description` from its `title`,
+   `model` set to its `tier`, and `isolation: "worktree"`, so each works in its
+   own checkout with its own context. A `followup` entry's prompt names the
+   PR branch to work on. Start them all, then wait for every one to finish
+   before ending the run. (Scheduled runs have no `create_session`; subagents
+   are how one run fans out.)
 4. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is
    the follow-up.
 5. If `sessions` is empty and `digest.write` is false, stop. Post nothing.

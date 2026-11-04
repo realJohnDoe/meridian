@@ -152,6 +152,7 @@ const dispatches = issues
     title: `#${i.number} ${i.title}`,
     prompt: [
       `Implement #${i.number} (${i.html_url}) in ${REPO}, following CLAUDE.md.`,
+      `Work on a new branch \`claude/issue-${i.number}\` from \`origin/main\` and push it.`,
       `Open a PR whose description fills in .github/pull_request_template.md: \`Fixes #${i.number}\`, the acceptance check re-run with before → after, and the build & lint result.`,
       `Do not subscribe to PR activity: the daily dispatcher follows up on red CI and review comments.`,
     ].join("\n"),
