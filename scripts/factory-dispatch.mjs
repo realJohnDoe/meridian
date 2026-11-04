@@ -69,10 +69,17 @@ for (const pr of prs.filter((p) => !p.draft)) {
   const runs = api(
     `repos/${REPO}/commits/${pr.head.sha}/check-runs?per_page=100`,
   ).check_runs;
-  if (runs.length === 0 || runs.some((r) => r.status !== "completed")) continue;
-  const failing = runs.filter((r) =>
-    ["failure", "timed_out", "startup_failure"].includes(r.conclusion),
-  );
+  // GitHub runs no CI on a conflicting PR, so this check must not wait for CI.
+  // `mergeable` is computed lazily: null means look again next run, not conflict.
+  const conflict = api(`repos/${REPO}/pulls/${pr.number}`).mergeable === false;
+  const finished =
+    runs.length > 0 && runs.every((r) => r.status === "completed");
+  if (!finished && !conflict) continue;
+  const failing = finished
+    ? runs.filter((r) =>
+        ["failure", "timed_out", "startup_failure"].includes(r.conclusion),
+      )
+    : [];
   const comments = all(
     `repos/${REPO}/issues/${pr.number}/comments?per_page=100`,
   );
@@ -88,7 +95,7 @@ for (const pr of prs.filter((p) => !p.draft)) {
       c.user.type !== "Bot" &&
       !AGENT.test(c.body ?? ""),
   );
-  if (failing.length === 0 && feedback.length === 0) {
+  if (failing.length === 0 && feedback.length === 0 && !conflict) {
     if (
       ["opus", "opus-plan"].some((t) =>
         names(pr).concat(names(issue)).includes(t),
@@ -108,7 +115,7 @@ for (const pr of prs.filter((p) => !p.draft)) {
       pr: pr.number,
       title: pr.title,
       url: pr.html_url,
-      why: `${failing.length ? "CI red" : "unanswered review"} after ${marks.length} follow-up(s)`,
+      why: `${conflict ? "conflicts with main" : failing.length ? "CI red" : "unanswered review"} after ${marks.length} follow-up(s)`,
     });
     continue;
   }
@@ -122,6 +129,11 @@ for (const pr of prs.filter((p) => !p.draft)) {
     title: `Follow up #${pr.number}`,
     prompt: [
       `PR #${pr.number} (${pr.html_url}, branch \`${pr.head.ref}\`) for #${issue.number} needs a narrow fix. Work on that branch and push to it; do not open a new PR.`,
+      ...(conflict
+        ? [
+            `- Merge conflict with main: merge or rebase \`main\` into the branch, resolve the conflicts and push. This is a conflict resolution, not a CI fix; CI runs once it pushes.`,
+          ]
+        : []),
       ...failing.map((r) => `- CI failing: ${r.name}: ${r.html_url}`),
       ...feedback.map((c) => `- Unanswered review feedback: ${c.html_url}`),
       `Fix only that. For CI, reproduce the failure first and show the same check passing. Run \`pnpm run build\` and \`pnpm run lint\` before pushing. Reply to each review comment you address. The PR description must still meet .github/pull_request_template.md.`,
