@@ -14,7 +14,8 @@
     "lint": "eslint src worker/src e2e playwright.config.ts --max-warnings=0 && pnpm run lint:deps",
     "lint:deps": "depcruise src",
     "test:e2e": "playwright test",
-    "knip": "knip"
+    "knip": "knip",
+    "check": "pnpm run build && pnpm run lint && pnpm run test:coverage && pnpm run knip"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

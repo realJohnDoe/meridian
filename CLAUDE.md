@@ -43,7 +43,7 @@ Using `npm install` will create a `package-lock.json` that must not be committed
 
 ## Git workflow
 
-Once the first changeset of a session/task has been applied and verified (build/lint passing), commit and push it to a feature branch right away — don't wait for an explicit "commit and push" ask each time. Keep committing and pushing subsequent changesets the same way as the task progresses.
+Once the first changeset of a session/task has been applied and verified (`pnpm run check` passing, re-run after the last edit), commit and push it to a feature branch right away — don't wait for an explicit "commit and push" ask each time. Keep committing and pushing subsequent changesets the same way as the task progresses.
 
 After changing any files, check whether an open PR already covers the current branch; if the changes aren't included in any open PR yet, open a new one.
 
@@ -78,6 +78,8 @@ New entries are `/meridian/entry/new`, with `title`, `date`, `time`,
 `defaultVaultId` for that entry, and is what the editor's vault chip sets.
 
 ## Build verification
+
+`pnpm run check` runs every step of CI's build job (build, lint, `test:coverage` incl. the coverage-floor ratchet, knip; e2e excluded). It takes ~4 minutes, longer than the Bash tool's 2-minute default timeout, so run it with `run_in_background` and redirect output to a file.
 
 Always use `pnpm run build` (which runs `tsc -b`) to verify the full project build — **not** `tsc --noEmit` alone.
 
