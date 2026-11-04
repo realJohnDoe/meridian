@@ -105,7 +105,7 @@ for (const pr of prs.filter((p) => !p.draft)) {
     const labels = names(pr).concat(issue ? names(issue) : []);
     if (["opus", "opus-plan"].some((t) => labels.includes(t)))
       review.push({ pr: pr.number, title: pr.title, url: pr.html_url });
-    else if (!pr.auto_merge) automerge.push({ pr: pr.number, title: pr.title });
+    else if (!pr.auto_merge) automerge.push({ pr: pr.number, sha: pr.head.sha, title: pr.title });
     continue;
   }
   const marks = comments.filter((c) => c.body.includes(FOLLOWUP));
@@ -234,13 +234,20 @@ const digest = {
 // --- Apply ------------------------------------------------------------------
 if (APPLY) {
   const me = api("user").login;
-  // Branch protection still holds the merge until `build / build` is green.
+  // Every `automerge` PR already has finished, green CI, so merge it now,
+  // pinned to the head commit that was checked. (GitHub refuses to *enable*
+  // auto-merge on a PR that is already mergeable.) A refused merge is
+  // logged and retried on the next run, not fatal.
   for (const m of automerge)
-    post(
-      `repos/${REPO}/pulls/${m.pr}/ccr/auto_merge`,
-      { merge_method: "merge" },
-      "PUT",
-    );
+    try {
+      post(
+        `repos/${REPO}/pulls/${m.pr}/merge`,
+        { sha: m.sha, merge_method: "merge" },
+        "PUT",
+      );
+    } catch (e) {
+      console.error(`merge #${m.pr} refused: ${e.stderr ?? e.message}`);
+    }
   for (const s of sessions) {
     if (s.kind === "dispatch") {
       post(`repos/${REPO}/issues/${s.issue}/assignees`, { assignees: [me] });
