@@ -58,12 +58,18 @@ const linked = new Set(prs.flatMap(linkedIssues));
 const followups = [];
 const review = [];
 const unstick = [];
+const automerge = [];
+// A survey run's process-learnings PR touches only survey skill files.
+const isLearnings = (pr) =>
+  all(`repos/${REPO}/pulls/${pr.number}/files?per_page=100`).every((f) =>
+    /^\.claude\/skills\/survey-[^/]+\/SKILL\.md$/.test(f.filename),
+  );
 for (const pr of prs.filter((p) => !p.draft)) {
   const issue = linkedIssues(pr)
     .map((n) => byNumber.get(n))
     .find((i) => i && tierOf(names(i)));
-  if (!issue) continue;
-  const tier = tierOf(names(issue));
+  if (!issue && !isLearnings(pr)) continue;
+  const tier = issue ? tierOf(names(issue)) : "sonnet";
   const head = api(`repos/${REPO}/commits/${pr.head.sha}`);
   const headDate = head.commit.committer.date;
   const runs = api(
@@ -89,12 +95,10 @@ for (const pr of prs.filter((p) => !p.draft)) {
       !AGENT.test(c.body ?? ""),
   );
   if (failing.length === 0 && feedback.length === 0) {
-    if (
-      ["opus", "opus-plan"].some((t) =>
-        names(pr).concat(names(issue)).includes(t),
-      )
-    )
+    const labels = names(pr).concat(issue ? names(issue) : []);
+    if (["opus", "opus-plan"].some((t) => labels.includes(t)))
       review.push({ pr: pr.number, title: pr.title, url: pr.html_url });
+    else if (!pr.auto_merge) automerge.push({ pr: pr.number, title: pr.title });
     continue;
   }
   const marks = comments.filter((c) => c.body.includes(FOLLOWUP));
@@ -116,12 +120,12 @@ for (const pr of prs.filter((p) => !p.draft)) {
   followups.push({
     kind: "followup",
     pr: pr.number,
-    issue: issue.number,
+    issue: issue?.number,
     tier,
     branch: pr.head.ref,
     title: `Follow up #${pr.number}`,
     prompt: [
-      `PR #${pr.number} (${pr.html_url}, branch \`${pr.head.ref}\`) for #${issue.number} needs a narrow fix. Work on that branch and push to it; do not open a new PR.`,
+      `PR #${pr.number} (${pr.html_url}, branch \`${pr.head.ref}\`) ${issue ? `for #${issue.number} ` : ""}needs a narrow fix. Work on that branch and push to it; do not open a new PR.`,
       ...failing.map((r) => `- CI failing: ${r.name}: ${r.html_url}`),
       ...feedback.map((c) => `- Unanswered review feedback: ${c.html_url}`),
       `Fix only that. For CI, reproduce the failure first and show the same check passing. Run \`pnpm run build\` and \`pnpm run lint\` before pushing. Reply to each review comment you address. The PR description must still meet .github/pull_request_template.md.`,
@@ -217,6 +221,13 @@ const digest = {
 // --- Apply ------------------------------------------------------------------
 if (APPLY) {
   const me = api("user").login;
+  // Branch protection still holds the merge until `build / build` is green.
+  for (const m of automerge)
+    post(
+      `repos/${REPO}/pulls/${m.pr}/ccr/auto_merge`,
+      { merge_method: "merge" },
+      "PUT",
+    );
   for (const s of sessions) {
     if (s.kind === "dispatch") {
       post(`repos/${REPO}/issues/${s.issue}/assignees`, { assignees: [me] });
@@ -253,6 +264,7 @@ console.log(
     {
       applied: APPLY,
       sessions,
+      automerge,
       deferred: [...followups, ...dispatches]
         .slice(MAX_SESSIONS)
         .map((s) => s.title),
