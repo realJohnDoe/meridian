@@ -30,7 +30,10 @@ new endpoint, a new storage location or a new renderer changes it.
   `postMessage`); the author of a vault file the user opens — a shared repo, a
   hand-edited file, an `.ics` feed (stored XSS, link injection); any non-browser
   client hitting the Worker directly (SSRF, open proxy, abuse of the OAuth
-  client secret); a compromised or typo-squatted npm package.
+  client secret); a compromised or typo-squatted npm package; any *other* page
+  on `realjohndoe.github.io` — same origin, so it shares IndexedDB, CSP `'self'`
+  and the Worker's CORS allowlist (#1343). This sandbox cannot reach that host
+  or the Pages API, so which sibling sites exist stays unverified.
 - **Assets:** the GitHub access and refresh tokens; the user's vault contents
   (including private repos); the Worker's GitHub App client secret; the Worker
   itself as a network vantage point.
