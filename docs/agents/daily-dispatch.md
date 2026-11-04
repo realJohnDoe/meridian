@@ -11,11 +11,13 @@ digest.
    (assigns each dispatched issue and leaves a `factory-dispatch` marker comment;
    leaves a `factory-followup` marker comment on each followed-up PR) and
    enables auto-merge on the `automerge` PRs and writes the digest if it's due. It prints the same plan.
-3. For each entry in `sessions`, call `create_session` with the entry's
-   `prompt` and `title`, `source_url` `https://github.com/realJohnDoe/meridian`,
-   and `model` set to the current model of the family `tier` names. For a
-   `followup` entry also pass `source_revision` and `outcome_branch` set to
-   `branch`, so it works on the PR's own branch.
+3. For each entry in `sessions`, start one background subagent with the
+   `Agent` tool: the entry's `prompt`, `description` from its `title`,
+   `model` set to its `tier`, and `isolation: "worktree"`, so each works in its
+   own checkout with its own context. A `followup` entry's prompt names the
+   PR branch to work on. Start them all, then wait for every one to finish
+   before ending the run. (Scheduled runs have no `create_session`; subagents
+   are how one run fans out.)
 4. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is
    the follow-up.
 5. If `sessions` and `automerge` are empty and `digest.write` is false, stop. Post nothing.
@@ -26,7 +28,10 @@ digest.
   `opus-plan` or `decision-required`, no assignee, no open native blocker, no
   sub-issues, and no open PR that closes them. Oldest first.
 - **Follow-up**: open, non-draft PRs that close a tier-labelled issue, once CI
-  has finished. A PR gets one narrow session if it has a failing check or
+  has finished. A PR gets one narrow session if it conflicts with `main`
+  (checked without waiting for CI, since GitHub runs none on a conflicting PR;
+  the session merges `main` in and pushes; an "unknown" mergeability is
+  skipped until the next run), has a failing check or
   review feedback newer than its head commit that isn't an agent's (no Claude
   Code footer). It waits while a follow-up is newer than the head commit.
   Green, quiet PRs cost nothing.
@@ -41,7 +46,7 @@ digest.
 - **Digest**: one issue titled `Factory digest`, listing what is waiting on the
   maintainer, each line saying what to do: **Decide** (open
   `decision-required` issues), **Review** (green, quiet `opus`/`opus-plan`
-  PRs), **Unstick** (PRs at their follow-up cap, a follow-up with no push
+  PRs), **Unstick** (PRs at their follow-up cap, conflicts included, a follow-up with no push
   after 2 days, a dispatched issue with no PR after 2 days). The body is
   rewritten, and a comment posted, only when its contents changed **and** the
   last write was 7 or more days ago. A quiet week sends nothing. Nothing is
