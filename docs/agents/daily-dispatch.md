@@ -28,7 +28,10 @@ digest.
   `opus-plan` or `decision-required`, no assignee, no open native blocker, no
   sub-issues, and no open PR that closes them. Oldest first.
 - **Follow-up**: open, non-draft PRs that close a tier-labelled issue, once CI
-  has finished. A PR gets one narrow session if it has a failing check or
+  has finished. A PR gets one narrow session if it conflicts with `main`
+  (checked without waiting for CI, since GitHub runs none on a conflicting PR;
+  the session merges `main` in and pushes; an "unknown" mergeability is
+  skipped until the next run), has a failing check or
   review feedback newer than its head commit that isn't an agent's (no Claude
   Code footer). It waits while a follow-up is newer than the head commit.
   Green, quiet PRs cost nothing.
@@ -38,7 +41,7 @@ digest.
 - **Digest**: one issue titled `Factory digest`, listing what is waiting on the
   maintainer, each line saying what to do: **Decide** (open
   `decision-required` issues), **Review** (green, quiet `opus`/`opus-plan`
-  PRs), **Unstick** (PRs at their follow-up cap, a follow-up with no push
+  PRs), **Unstick** (PRs at their follow-up cap, conflicts included, a follow-up with no push
   after 2 days, a dispatched issue with no PR after 2 days). The body is
   rewritten, and a comment posted, only when its contents changed **and** the
   last write was 7 or more days ago. A quiet week sends nothing. Nothing is
