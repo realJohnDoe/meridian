@@ -10,7 +10,7 @@ digest.
 2. `node scripts/factory-dispatch.mjs --apply` claims what the plan starts
    (assigns each dispatched issue and leaves a `factory-dispatch` marker comment;
    leaves a `factory-followup` marker comment on each followed-up PR) and
-   writes the digest if it's due. It prints the same plan.
+   enables auto-merge on the `automerge` PRs and writes the digest if it's due. It prints the same plan.
 3. For each entry in `sessions`, start one background subagent with the
    `Agent` tool: the entry's `prompt`, `description` from its `title`,
    `model` set to its `tier`, and `isolation: "worktree"`, so each works in its
@@ -20,7 +20,7 @@ digest.
    are how one run fans out.)
 4. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is
    the follow-up.
-5. If `sessions` is empty and `digest.write` is false, stop. Post nothing.
+5. If `sessions` and `automerge` are empty and `digest.write` is false, stop. Post nothing.
 
 ## What the script decides
 
@@ -35,6 +35,11 @@ digest.
   review feedback newer than its head commit that isn't an agent's (no Claude
   Code footer). It waits while a follow-up is newer than the head commit.
   Green, quiet PRs cost nothing.
+- **Auto-merge**: a green, quiet PR goes on auto-merge (`automerge` in the
+  plan; the `main` ruleset's required `build / build` still gates it) if it
+  closes a `haiku`/`sonnet` issue or is a survey run's process-learnings PR
+  (touches only `.claude/skills/survey-*/SKILL.md`). `opus`/`opus-plan` PRs
+  never auto-merge; they go in the digest's Review list.
 - **Caps**: at most `--max-sessions` (4) sessions per run, follow-ups first;
   at most `--max-followups` (2) follow-ups per PR. After that the PR goes in
   the digest instead.
@@ -45,7 +50,7 @@ digest.
   after 2 days, a dispatched issue with no PR after 2 days). The body is
   rewritten, and a comment posted, only when its contents changed **and** the
   last write was 7 or more days ago. A quiet week sends nothing. Nothing is
-  merged or decided on silence.
+  decided on silence.
 
 To re-dispatch a stuck issue, unassign it. To stop a PR from getting
 follow-ups, mark it draft.
