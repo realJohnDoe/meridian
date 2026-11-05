@@ -108,7 +108,8 @@ for (const pr of prs.filter((p) => !p.draft)) {
   );
   if (failing.length === 0 && feedback.length === 0 && !conflict) {
     const labels = names(pr).concat(issue ? names(issue) : []);
-    // dependabot-automerge.yml queues all but majors; a major waits for a human.
+    // dependabot-automerge.yml queues all but majors, and drops a PR anyone else
+    // pushed to; those wait for a human.
     if (
       bot
         ? !pr.auto_merge

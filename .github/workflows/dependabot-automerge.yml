@@ -19,3 +19,19 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # A push by anyone but Dependabot (a factory follow-up, a merge of main) is
+  # code nobody reviewed: drop auto-merge so the PR waits in the digest's
+  # Review list, like an opus PR.
+  hold-for-review:
+    if: >-
+      github.event.action == 'synchronize' &&
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.actor != 'dependabot[bot]' &&
+      github.event.pull_request.auto_merge
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh pr merge --disable-auto "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
