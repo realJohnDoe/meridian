@@ -4,6 +4,8 @@ Run twice a week by the scheduled task "Start top-ranked survey"; the task's
 prompt only says to follow this file. Goal: survey cadence without anyone
 remembering, and no new findings while the backlog is already full.
 
+0. `node scripts/factory-pause.mjs`: if `state` is not `normal`, **stop. Post
+   nothing, open nothing.** (Resume is the dispatcher's job; this task waits.)
 1. **Count the open backlog**: open issues with a model-tier label, not counting
    parent issues (ones with sub-issues):
 

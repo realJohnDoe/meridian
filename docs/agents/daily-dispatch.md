@@ -5,6 +5,9 @@ says to follow this file. Goal: open findings move forward without anyone
 starting sessions by hand, and the maintainer's part comes down to one weekly
 digest.
 
+0. Run `node scripts/factory-pause.mjs` first and act on its `state` as
+   `docs/agents/factory-pause.md` says. Anything but `normal` ends this
+   procedure.
 1. `node scripts/factory-dispatch.mjs` is the **dry run**: it prints the plan as
    JSON and writes nothing. Read it before applying.
 2. `node scripts/factory-dispatch.mjs --apply` claims what the plan starts

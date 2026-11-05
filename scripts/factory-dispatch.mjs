@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The daily dispatcher's plan: which findings to start, which PRs need a follow-up
 // session, and the weekly digest. See docs/agents/daily-dispatch.md.
-// Usage: node scripts/factory-dispatch.mjs [--apply] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD]
+// Usage: node scripts/factory-dispatch.mjs [--apply] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--followups-only]
 // Without --apply it is a dry run: it prints the plan and writes nothing.
 import { execFileSync } from "node:child_process";
 
@@ -11,6 +11,7 @@ const arg = (name, dflt) => {
   return i > 0 ? process.argv[i + 1] : dflt;
 };
 const APPLY = process.argv.includes("--apply");
+const FOLLOWUPS_ONLY = process.argv.includes("--followups-only"); // drain: merge and follow up, start nothing new
 const MAX_SESSIONS = Number(arg("--max-sessions", 4));
 const MAX_FOLLOWUPS = Number(arg("--max-followups", 2));
 const STALE_DAYS = 2; // a claim or follow-up with nothing to show after this is stuck
@@ -149,6 +150,7 @@ for (const pr of prs.filter((p) => !p.draft)) {
 // --- Dispatch ---------------------------------------------------------------
 const dispatches = issues
   .filter((i) => {
+    if (FOLLOWUPS_ONLY) return false;
     const l = names(i);
     return (
       tierOf(l) &&
