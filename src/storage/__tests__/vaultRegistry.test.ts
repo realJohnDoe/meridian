@@ -119,6 +119,8 @@ vi.mock('@/storage/cache/credentials', () => ({
   handleSave: vi.fn(async (id: string, h: unknown) => { metaStore.set(`handle:${id}`, h) }),
   handleLoad: vi.fn(async (id: string) => metaStore.get(`handle:${id}`) ?? null),
   handleClear: vi.fn(async (id: string) => { metaStore.delete(`handle:${id}`) }),
+  tokenLoad: vi.fn(async (id: string) => (metaStore.get(`token:${id}`) as string | undefined) ?? null),
+  refreshTokenLoad: vi.fn(async (id: string) => (metaStore.get(`refreshToken:${id}`) as string | undefined) ?? null),
   tokenSave: vi.fn(async (id: string, t: string) => { metaStore.set(`token:${id}`, t) }),
   tokenClear: vi.fn(async (id: string) => { metaStore.delete(`token:${id}`) }),
   refreshTokenSave: vi.fn(async (id: string, t: string) => { metaStore.set(`refreshToken:${id}`, t) }),
@@ -208,6 +210,7 @@ vi.mock('@/storage/exampleBackend', () => ({
 
 vi.mock('@/storage/githubOAuth', () => ({
   ensureFreshAccessToken: vi.fn(),
+  revokeGitHubToken: vi.fn(async () => {}),
 }))
 
 /** Flatten `layers` into the derived `items`/`roots`, exactly as the store's `deriveViews` does. */
@@ -263,7 +266,7 @@ import {
   addLocalVault, addGitHubVaultOAuth, onVaultChanged, newVaultId,
 } from '@/storage/vaultRegistry'
 import { getBackend, getMountedVaultIds, unmountAllBackends } from '@/storage/backends'
-import { ensureFreshAccessToken } from '@/storage/githubOAuth'
+import { ensureFreshAccessToken, revokeGitHubToken } from '@/storage/githubOAuth'
 import { vaultRefsLoad, vaultRefsSave } from '@/storage/cache/registry'
 import { diskPickDirectory } from '@/storage/fs'
 
@@ -796,6 +799,39 @@ describe('setDefaultVault', () => {
 // ── removeVault ──────────────────────────────────────────────────────────
 
 describe('removeVault', () => {
+  const GH_2: VaultRef = { ...GITHUB_REF, id: 'gh-2' }
+
+  it('revokes the GitHub token of a removed vault', async () => {
+    vi.mocked(revokeGitHubToken).mockClear()
+    metaStore.set('vaults', [GITHUB_REF])
+    metaStore.set(`token:${GITHUB_REF.id}`, 'gho_a')
+    metaStore.set(`refreshToken:${GITHUB_REF.id}`, 'ghr_a')
+    await removeVault(GITHUB_REF.id)
+    expect(revokeGitHubToken).toHaveBeenCalledWith('gho_a')
+    expect(metaStore.get(`token:${GITHUB_REF.id}`)).toBeUndefined()
+  })
+
+  it('does not revoke when another vault shares the token', async () => {
+    vi.mocked(revokeGitHubToken).mockClear()
+    metaStore.set('vaults', [GITHUB_REF, GH_2])
+    for (const id of [GITHUB_REF.id, GH_2.id]) {
+      metaStore.set(`token:${id}`, 'gho_shared')
+      metaStore.set(`refreshToken:${id}`, 'ghr_shared')
+    }
+    await removeVault(GITHUB_REF.id)
+    expect(revokeGitHubToken).not.toHaveBeenCalled()
+    expect(metaStore.get(`token:${GITHUB_REF.id}`)).toBeUndefined()
+    expect(metaStore.get(`token:${GH_2.id}`)).toBe('gho_shared')
+  })
+
+  it('still removes the vault when the revoke fails', async () => {
+    vi.mocked(revokeGitHubToken).mockRejectedValueOnce(new Error('offline'))
+    metaStore.set('vaults', [GITHUB_REF])
+    metaStore.set(`token:${GITHUB_REF.id}`, 'gho_a')
+    await removeVault(GITHUB_REF.id)
+    expect((metaStore.get('vaults') as VaultRef[])).toEqual([])
+  })
+
   it('unmounts, drops the layer and sync row, and clears the credential', async () => {
     metaStore.set('vaults', [LOCAL_REF])
     metaStore.set(`handle:${LOCAL_REF.id}`, {})
