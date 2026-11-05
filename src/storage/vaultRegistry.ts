@@ -2,7 +2,7 @@ import { cacheInit } from '@/storage/cache/db'
 import { cacheLoadAll, applyRemoteBatch, cacheDeleteAll } from '@/storage/cache/files'
 import {
   handleSave, handleLoad, handleClear,
-  tokenClear, refreshTokenClear, tokenExpiryClear,
+  tokenLoad, refreshTokenLoad, tokenClear, refreshTokenClear, tokenExpiryClear,
   credentialsSave,
 } from '@/storage/cache/credentials'
 import {
@@ -16,7 +16,7 @@ import { SEEN_SKIPPED_PREFIX } from './icalBackend'
 import { clearVaultKey } from '@/lib/vaultStorage'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
-import { ensureFreshAccessToken } from './githubOAuth'
+import { ensureFreshAccessToken, revokeGitHubToken } from './githubOAuth'
 import type { OAuthTokens } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import { isWritableVault } from '@/vaultRef'
@@ -726,6 +726,26 @@ export async function addIcalVault(feedUrl: string, name: string): Promise<void>
 }
 
 /**
+ * Revokes vault `id`'s GitHub grant, unless another GitHub vault holds the same
+ * access or refresh token (`findReusableGitHubSession` copies one sign-in into
+ * further vaults) — revoking it would sign those out too. Never throws.
+ */
+async function revokeUnlessShared(id: string, refs: VaultRef[]): Promise<void> {
+  try {
+    const [token, refresh] = await Promise.all([tokenLoad(id), refreshTokenLoad(id)])
+    if (!token) return
+    for (const other of refs) {
+      if (other.kind !== 'github' || other.id === id) continue
+      const [t, r] = await Promise.all([tokenLoad(other.id), refreshTokenLoad(other.id)])
+      if (t === token || (refresh && r === refresh)) return
+    }
+    await revokeGitHubToken(token)
+  } catch (e) {
+    console.warn('[vault] could not revoke GitHub token:', e)
+  }
+}
+
+/**
  * Unregister a vault: unmount its backend, drop its layer and its sync state,
  * clear its credential, and delete its cache rows.
  *
@@ -756,6 +776,7 @@ export async function removeVault(id: string): Promise<void> {
 
     if (ref.kind === 'local') await handleClear(id)
     if (ref.kind === 'github') {
+      await revokeUnlessShared(id, existing)
       await tokenClear(id)
       await refreshTokenClear(id)
       await tokenExpiryClear(id)
