@@ -50,9 +50,11 @@ digest.
   maintainer, each line saying what to do: **Decide** (open
   `decision-required` issues), **Review** (green, quiet `opus`/`opus-plan`
   PRs), **Unstick** (PRs at their follow-up cap, conflicts included, a follow-up with no push
-  after 2 days, a dispatched issue with no PR after 2 days). The body is
-  rewritten, and a comment posted, only when its contents changed **and** the
-  last write was 7 or more days ago. A quiet week sends nothing. Nothing is
+  after 2 days, a dispatched issue with no PR after 2 days). Below that,
+  **Merged since** lists every PR merged since the last digest, with the issue
+  it closed and that issue's labels. The body is rewritten, and a comment
+  posted, only when something merged or what waits changed, **and** the last
+  write was 7 or more days ago. A quiet week sends nothing. Nothing is
   decided on silence.
 
 To re-dispatch a stuck issue, unassign it. To stop a PR from getting
