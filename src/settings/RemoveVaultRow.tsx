@@ -38,7 +38,7 @@ export function RemoveVaultRow({ vault }: { vault: VaultRef }) {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-destructive hover:bg-destructive-subtle hover:text-destructive"
+            className="gap-1.5 text-destructive hover:bg-transparent hover-layer hover:text-destructive"
             onClick={handleRemoveClick}
           >
             <Trash2 className="size-3.5 stroke-[1.7]" />
@@ -68,7 +68,7 @@ export function RemoveVaultRow({ vault }: { vault: VaultRef }) {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive-hover"
+              className="gap-1.5 bg-destructive text-destructive-foreground hover:bg-destructive hover-layer"
               onClick={() => { setConfirmOpen(false); void removeVault(vault.id) }}
             >
               <Trash2 size={13} />

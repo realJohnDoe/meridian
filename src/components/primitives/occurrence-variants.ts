@@ -30,7 +30,7 @@ export const HUE_SOLID: Record<OccHue, string> = {
  * foreground (each theme picks whichever of its two ink colors contrasts best
  * against that specific swatch — see index.css) is deliberate: a light tint
  * behind colored text can't clear AA on light themes, no matter the text
- * color. hover:bg-{color}-hover (matching the buttonVariants hover convention) and an
+ * color. hover:bg-{color} plus `hover-layer` (index.css; the shared hover wash) and an
  * explicit hover:text so neither gets silently overridden by SurfaceButton's own
  * ghost-variant hover styles. Identical across all item-display contexts — one edit
  * here changes every view.
@@ -40,13 +40,13 @@ export const HUE_SOLID: Record<OccHue, string> = {
  * wherever that one does.
  */
 const TINT_CLASSES = {
-  event:        'bg-event text-event-foreground hover:bg-event-hover hover:text-event-foreground',
-  task:         'bg-task text-task-foreground hover:bg-task-hover hover:text-task-foreground',
-  'priority-1': 'bg-priority-1 text-priority-1-foreground hover:bg-priority-1-hover hover:text-priority-1-foreground',
-  'priority-2': 'bg-priority-2 text-priority-2-foreground hover:bg-priority-2-hover hover:text-priority-2-foreground',
-  'priority-3': 'bg-priority-3 text-priority-3-foreground hover:bg-priority-3-hover hover:text-priority-3-foreground',
-  note:         'bg-note text-note-foreground hover:bg-note-hover hover:text-note-foreground',
-  neutral:      'bg-muted-foreground text-background hover:bg-muted-foreground-hover hover:text-background',
+  event:        'bg-event text-event-foreground hover:bg-event hover-layer hover:text-event-foreground',
+  task:         'bg-task text-task-foreground hover:bg-task hover-layer hover:text-task-foreground',
+  'priority-1': 'bg-priority-1 text-priority-1-foreground hover:bg-priority-1 hover-layer hover:text-priority-1-foreground',
+  'priority-2': 'bg-priority-2 text-priority-2-foreground hover:bg-priority-2 hover-layer hover:text-priority-2-foreground',
+  'priority-3': 'bg-priority-3 text-priority-3-foreground hover:bg-priority-3 hover-layer hover:text-priority-3-foreground',
+  note:         'bg-note text-note-foreground hover:bg-note hover-layer hover:text-note-foreground',
+  neutral:      'bg-muted-foreground text-background hover:bg-muted-foreground hover-layer hover:text-background',
 } satisfies Record<OccHue, string>
 
 /**
