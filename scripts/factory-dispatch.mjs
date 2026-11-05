@@ -73,7 +73,8 @@ for (const pr of prs.filter((p) => !p.draft)) {
     .find((i) => i && tierOf(names(i)));
   const bot = isDependabot(pr);
   if (!issue && !bot && !isLearnings(pr)) continue;
-  const tier = issue ? tierOf(names(issue)) : "sonnet";
+  // A red bump is undiagnosed and often rooted in a dependency's own change.
+  const tier = issue ? tierOf(names(issue)) : bot ? "opus" : "sonnet";
   const head = api(`repos/${REPO}/commits/${pr.head.sha}`);
   const headDate = head.commit.committer.date;
   const runs = api(

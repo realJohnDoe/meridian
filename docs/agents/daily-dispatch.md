@@ -31,7 +31,7 @@ digest.
   `opus-plan` or `decision-required`, no assignee, no open native blocker, no
   sub-issues, and no open PR that closes them. Oldest first.
 - **Follow-up**: open, non-draft PRs that close a tier-labelled issue, survey
-  learnings PRs and Dependabot PRs (as `sonnet`), once CI
+  learnings PRs and Dependabot PRs (as `opus`), once CI
   has finished. A PR gets one narrow session if it conflicts with `main`
   (checked without waiting for CI, since GitHub runs none on a conflicting PR;
   the session merges `main` in and pushes; an "unknown" mergeability is
