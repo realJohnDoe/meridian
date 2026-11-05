@@ -5,14 +5,14 @@ says to follow this file. Goal: open findings move forward without anyone
 starting sessions by hand, and the maintainer's part comes down to one weekly
 digest.
 
-0. Run `node scripts/factory-pause.mjs` first and act on its `state` as
-   `docs/agents/factory-pause.md` says. Anything but `normal` ends this
+0. Run `node scripts/farm-pause.mjs` first and act on its `state` as
+   `docs/agents/farm-pause.md` says. Anything but `normal` ends this
    procedure.
-1. `node scripts/factory-dispatch.mjs` is the **dry run**: it prints the plan as
+1. `node scripts/farm-dispatch.mjs` is the **dry run**: it prints the plan as
    JSON and writes nothing. Read it before applying.
-2. `node scripts/factory-dispatch.mjs --apply` claims what the plan starts
-   (assigns each dispatched issue and leaves a `factory-dispatch` marker comment;
-   leaves a `factory-followup` marker comment on each followed-up PR) and
+2. `node scripts/farm-dispatch.mjs --apply` claims what the plan starts
+   (assigns each dispatched issue and leaves a `farm-dispatch` marker comment;
+   leaves a `farm-followup` marker comment on each followed-up PR) and
    merges the `automerge` PRs and writes the digest if it's due. It prints the same plan.
 3. For each entry in `sessions`, start one background subagent with the
    `Agent` tool: the entry's `prompt`, `description` from its `title`,
@@ -50,7 +50,7 @@ digest.
 - **Caps**: at most `--max-sessions` (4) sessions per run, follow-ups first;
   at most `--max-followups` (2) follow-ups per PR. After that the PR goes in
   the digest instead.
-- **Digest**: one issue titled `Factory digest`, listing what is waiting on the
+- **Digest**: one issue titled `Farm digest`, listing what is waiting on the
   maintainer, each line saying what to do: **Decide** (open
   `decision-required` issues), **Review** (green, quiet `opus`/`opus-plan`
   PRs), **Unstick** (PRs at their follow-up cap, conflicts included, a follow-up with no push
