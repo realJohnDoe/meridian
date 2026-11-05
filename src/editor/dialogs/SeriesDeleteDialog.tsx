@@ -7,6 +7,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { buttonVariants } from '@/components/ui/button'
 import type { SeriesSheetConfig } from '@/editor/save'
 import DeleteDialogFooter from './DeleteDialogFooter'
 
@@ -33,7 +34,7 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
           {config?.options.map(opt => (
             <div key={opt.label} className="flex flex-col gap-1">
               <AlertDialogAction
-                className="w-full border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20"
+                className={buttonVariants({ variant: 'outline', className: 'w-full text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive' })}
                 onClick={() => { opt.onClick(); onClose() }}
               >
                 {opt.label}

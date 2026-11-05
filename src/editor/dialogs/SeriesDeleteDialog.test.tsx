@@ -13,8 +13,8 @@ const OPTION_CLICK = vi.fn()
 const CONFIG: SeriesSheetConfig = {
   title: 'Delete "Standup"',
   options: [
-    { label: 'This occurrence', warning: 'The series ends here.', onClick: OPTION_CLICK },
-    { label: 'All occurrences', onClick: vi.fn() },
+    { label: 'Delete this occurrence', warning: 'The series ends here.', onClick: OPTION_CLICK },
+    { label: 'Delete all occurrences', onClick: vi.fn() },
   ],
 }
 
@@ -24,7 +24,7 @@ describe('SeriesDeleteDialog', () => {
     const onClose = vi.fn()
     render(<SeriesDeleteDialog config={CONFIG} onClose={onClose} />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'This occurrence' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete this occurrence' }))
 
     expect(OPTION_CLICK).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalled()
