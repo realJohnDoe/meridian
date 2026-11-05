@@ -153,7 +153,7 @@ export function VaultSettings({ vault }: Props) {
                   !vault.color ? 'border-primary' : 'border-transparent',
                 )}
               >
-                <span className="size-4.5 rounded-full border-2 border-dashed border-muted-foreground/50" />
+                <span className="size-4.5 rounded-full border-2 border-dashed border-muted-foreground" />
               </button>
               {VAULT_COLORS.map(({ value, label }) => (
                 <button

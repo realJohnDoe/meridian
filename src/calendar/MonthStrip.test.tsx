@@ -30,7 +30,7 @@ describe('MonthStrip', () => {
     vi.setSystemTime(new Date(2026, 8, 10)) // September 2026 — not the active August chip
     try {
       renderStrip()
-      expect(screen.getByRole('button', { name: 'August 2026' })).toHaveClass('bg-tint-selected', 'ring-2', 'ring-primary')
+      expect(screen.getByRole('button', { name: 'August 2026' })).toHaveClass('bg-state-selected', 'ring-2', 'ring-primary')
       expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('bg-primary')
     } finally {
       vi.useRealTimers()
@@ -43,7 +43,7 @@ describe('MonthStrip', () => {
     try {
       renderStrip()
       expect(screen.getByRole('button', { name: 'September 2026' })).toHaveClass('bg-primary')
-      expect(screen.getByRole('button', { name: 'September 2026' })).not.toHaveClass('bg-tint-selected')
+      expect(screen.getByRole('button', { name: 'September 2026' })).not.toHaveClass('bg-state-selected')
     } finally {
       vi.useRealTimers()
     }
@@ -55,7 +55,7 @@ describe('MonthStrip', () => {
     try {
       renderStrip()
       expect(screen.getByRole('button', { name: 'August 2026' })).toHaveClass('bg-primary')
-      expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('bg-tint-selected')
+      expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('bg-state-selected')
       expect(screen.getByRole('button', { name: 'August 2026' })).not.toHaveClass('ring-primary')
     } finally {
       vi.useRealTimers()

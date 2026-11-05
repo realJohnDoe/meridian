@@ -342,7 +342,7 @@ function LiveWeekDayColumns({ days, clockValue, today, now, onCreate, onOpen, ho
     // "columns" are overlapping events within one day; here they're the days
     // themselves). That's also why HourCells and NowLine are repeated seven
     // times here and rendered once there.
-    <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border/60" style={{ left: GUTTER, right: COL_RIGHT_PAD }}>
+    <div className="absolute inset-y-0 flex gap-0.5 divide-x divide-border" style={{ left: GUTTER, right: COL_RIGHT_PAD }}>
       {days.map(d => {
         const dKey = fmtISO(d)
         const isToday = sameDay(d, today)
@@ -465,7 +465,7 @@ export default function WeekPane(props: Props) {
                 key={fmtISO(d)}
                 type="button"
                 onClick={() => onDayClick(d)}
-                className="flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1.5 hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1.5 hover:bg-muted-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 aria-label={fmtShort(d)}
               >
                 <span className="text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground">

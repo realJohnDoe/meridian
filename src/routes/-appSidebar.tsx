@@ -106,7 +106,7 @@ export default function AppSidebar() {
               toggle reads as scoped to all four views, not to the Day row it
               happens to sit beneath. */}
           <SidebarGroup className="p-0 pt-3">
-            <div className="mx-2 rounded-lg border border-sidebar-border bg-sidebar-accent/40 overflow-hidden">
+            <div className="mx-2 rounded-lg border border-sidebar-border bg-muted-subtle overflow-hidden">
               <SidebarGroupLabel className="h-auto px-3 pt-2 pb-1 text-2xs font-semibold uppercase tracking-wider">Calendar</SidebarGroupLabel>
               <SidebarMenu>
                 {navItems.map(({ Icon, label, active, onClick }) => (
@@ -133,7 +133,7 @@ export default function AppSidebar() {
                   <Checkbox
                     checked={showTasks}
                     onCheckedChange={() => toggleShowTasks()}
-                    visualClassName="size-4.5 group-data-[state=checked]:bg-sidebar-foreground/70 group-data-[state=checked]:border-sidebar-foreground/70"
+                    visualClassName="size-4.5 group-data-[state=checked]:bg-sidebar-foreground group-data-[state=checked]:border-sidebar-foreground"
                   />
                   <span className="text-sm">Show tasks on calendar</span>
                 </label>
@@ -180,7 +180,7 @@ export default function AppSidebar() {
                         className="group/menu-item relative"
                       >
                         {editingFavorites ? (
-                          <div className="flex items-center gap-1 px-5 py-3 text-sm font-medium text-sidebar-foreground/60">
+                          <div className="flex items-center gap-1 px-5 py-3 text-sm font-medium text-muted-foreground">
                             <span className="flex-1 truncate">{title}</span>
                             <IconButton hit="pad" label="Move up" title="Move up" disabled={at === 0} onClick={() => reorderFavorites(at, at - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronUp size={13} /></IconButton>
                             <IconButton hit="pad" label="Move down" title="Move down" disabled={at === favorites.length - 1} onClick={() => reorderFavorites(at, at + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronDown size={13} /></IconButton>

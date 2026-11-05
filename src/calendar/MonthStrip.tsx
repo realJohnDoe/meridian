@@ -163,7 +163,7 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
                 isToday
                   ? 'bg-primary text-primary-foreground'
                   : m.key === activeKey
-                    ? 'bg-tint-selected text-foreground ring-2 ring-inset ring-primary'
+                    ? 'bg-state-selected text-foreground ring-2 ring-inset ring-primary'
                     : 'text-foreground hover:bg-muted',
               )}
             >

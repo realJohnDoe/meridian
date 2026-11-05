@@ -184,7 +184,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   className={cn(
                     badgeVariants({ variant: 'chip' }),
                     'cursor-pointer',
-                    serialiseInterval(Math.max(1, n), unit) === p.value && 'bg-tint-selected text-primary border-primary',
+                    serialiseInterval(Math.max(1, n), unit) === p.value && 'bg-state-selected text-primary border-primary',
                   )}
                   onClick={() => {
                     const parsed = parseDuration(p.value)

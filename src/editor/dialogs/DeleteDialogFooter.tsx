@@ -35,7 +35,7 @@ export default function DeleteDialogFooter(props: Props) {
       )}
       {onDelete && (
         <AlertDialogAction
-          className="bg-destructive text-destructive-foreground hover:bg-destructive/90 gap-1.5"
+          className="bg-destructive text-destructive-foreground hover:bg-destructive-hover gap-1.5"
           onClick={onDelete}
         >
           <Trash2 size={13} />

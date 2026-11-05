@@ -24,7 +24,7 @@ const baseCls = cn(
 // aliases --warning to --priority-3), so this reads with the same verified
 // contrast rather than the plain text-warning label/count this replaced,
 // which was unreadably faint on light themes.
-const chipCls = 'bg-warning/30 text-chip-tint-foreground'
+const chipCls = 'bg-warning-tint text-chip-tint-foreground'
 
 /**
  * The agenda's one remaining full-width header row: the "Overdue" collapse

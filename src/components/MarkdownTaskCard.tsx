@@ -42,7 +42,7 @@ export default function MarkdownTaskCard({
 
   return (
     <DimmableCard dimmed={done} className="flex items-stretch gap-2.5 pl-2 pr-2.5 py-2">
-      <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground/20" />
+      <span className="w-1 self-stretch rounded-full shrink-0 min-h-5 bg-muted-foreground-tint" />
       <div className={cn('relative z-20 flex flex-1 min-w-0 items-center gap-1.5 py-0.5', done && 'opacity-60')}>
         <Checkbox
           checked={done}

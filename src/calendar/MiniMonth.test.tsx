@@ -79,7 +79,7 @@ describe('MiniMonth', () => {
     vi.setSystemTime(new Date(2026, 7, 10)) // not the highlighted day, so it can't also read as today
     try {
       const { container } = renderMini([], { highlightDates: [new Date(2026, 7, 15)] })
-      expect(dayButton(container, new Date(2026, 7, 15))).toHaveClass('bg-tint-selected', 'ring-2', 'ring-primary')
+      expect(dayButton(container, new Date(2026, 7, 15))).toHaveClass('bg-state-selected', 'ring-2', 'ring-primary')
       // The tint, not today's solid fill — the two must stay distinguishable.
       expect(dayButton(container, new Date(2026, 7, 15))).not.toHaveClass('bg-primary')
       expect(dayButton(container, new Date(2026, 7, 16))).not.toHaveClass('ring-primary')
@@ -94,7 +94,7 @@ describe('MiniMonth', () => {
     try {
       const { container } = renderMini([], { highlightDates: [new Date(2026, 7, 15)] })
       expect(dayButton(container, new Date(2026, 7, 15))).toHaveClass('bg-primary')
-      expect(dayButton(container, new Date(2026, 7, 15))).not.toHaveClass('bg-tint-selected')
+      expect(dayButton(container, new Date(2026, 7, 15))).not.toHaveClass('bg-state-selected')
       expect(dayButton(container, new Date(2026, 7, 15))).not.toHaveClass('ring-primary')
     } finally {
       vi.useRealTimers()
