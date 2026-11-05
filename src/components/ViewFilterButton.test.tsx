@@ -27,7 +27,7 @@ function openPopover() {
 
 /** The row `<div>` that holds one vault's chevron, checkbox and name — the
  *  nearest `div` ancestor of its name text, and nothing from sibling rows or
- *  the (sibling, not ancestor) CollapsibleContent below it. */
+ *  the (sibling, not ancestor) CollapsibleBody below it. */
 function vaultRow(name: string): HTMLElement {
   const row = screen.getByText(name).closest('div')
   if (!row) throw new Error(`no row div found for ${name}`)

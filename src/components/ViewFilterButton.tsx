@@ -4,7 +4,8 @@ import { useStore, NO_PARTICIPANT } from '@/store'
 import { Button } from './primitives/button'
 import { Checkbox } from './ui/checkbox'
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover'
-import { Collapsible, CollapsibleContent } from './ui/collapsible'
+import { Collapsible } from './ui/collapsible'
+import { CollapsibleBody } from './primitives/collapsible-body'
 import { IconButton } from './primitives/icon-button'
 import { VaultIcon } from './vaultIcon'
 import { cn } from '@/lib/cn'
@@ -278,7 +279,7 @@ export default function ViewFilterButton() {
                     *icon*, so participant name text lands under the vault name
                     text above it — clearer nesting for a shallow tree than
                     matching the chevron's indent would give. */}
-                <CollapsibleContent className="pl-13">
+                <CollapsibleBody className="pl-13">
                   {group.hasUnassigned && (
                     <PersonRow
                       label="No participants"
@@ -295,7 +296,7 @@ export default function ViewFilterButton() {
                       onToggle={() => toggleParticipantHidden(group.vault.id, p)}
                     />
                   ))}
-                </CollapsibleContent>
+                </CollapsibleBody>
               </Collapsible>
             )
           })}

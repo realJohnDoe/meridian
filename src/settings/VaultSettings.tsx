@@ -4,7 +4,8 @@ import { Link } from '@tanstack/react-router'
 import { Trash2, AlertCircle, Download, RefreshCw, ArchiveRestore, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
 import { IconButton } from '@/components/primitives/icon-button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { CollapsibleBody } from '@/components/primitives/collapsible-body'
 import { Input } from '@/components/ui/input'
 import { useStore } from '@/store'
 import {
@@ -338,9 +339,9 @@ export function VaultSettings({ vault }: Props) {
                     {archivedOpen ? 'Hide archived entries' : `Show ${archived.length} archived entries`}
                   </button>
                 </CollapsibleTrigger>
-                <CollapsibleContent className="overflow-hidden pt-1.5 data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up motion-reduce:animate-none">
+                <CollapsibleBody className="pt-1.5">
                   <ArchivedRows archived={archived} />
-                </CollapsibleContent>
+                </CollapsibleBody>
               </Collapsible>
             ) : (
               <ArchivedRows archived={archived} />

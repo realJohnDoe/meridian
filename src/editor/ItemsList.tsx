@@ -11,7 +11,8 @@ import { isDimmed, priorityRank, occSortKey, compareSortKeys } from '@/calendar'
 import type { SortKey } from '@/calendar'
 import { occKind } from '@/occView'
 import { IconButton } from '@/components/primitives/icon-button'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { CollapsibleBody } from '@/components/primitives/collapsible-body'
 import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
 import { FloatingComboboxList } from './FloatingComboboxList'
 import { reopenOcc } from '@/occurrenceActions'
@@ -416,9 +417,9 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
               <ChevronDown size={12} className="transition-transform duration-200" />
               Done · {doneRows.length}
             </CollapsibleTrigger>
-            <CollapsibleContent className="flex flex-col gap-1.5 mt-1.5">
+            <CollapsibleBody className="flex flex-col gap-1.5 pt-1.5">
               {doneRows.map(row => renderRow(row))}
-            </CollapsibleContent>
+            </CollapsibleBody>
           </Collapsible>
         )}
       </div>
