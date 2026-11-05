@@ -1,7 +1,9 @@
 version: 2
 updates:
   - package-ecosystem: npm
-    directories: ['/', '/worker'] # root package and the worker workspace package
+    # `/` alone: worker/ is a pnpm workspace member sharing the root lockfile, so
+    # the root update already bumps it. Listing `/worker` too opened duplicate PRs.
+    directory: /
     schedule:
       interval: weekly
     # Matches pnpm-workspace.yaml `minimumReleaseAge: 1440` (24 h).

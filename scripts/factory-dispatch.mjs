@@ -55,7 +55,8 @@ const linkedIssues = (pr) =>
 const linked = new Set(prs.flatMap(linkedIssues));
 
 // --- PR follow-up -----------------------------------------------------------
-// Only PRs that close a tier-labelled issue are ours to follow up.
+// Ours to follow up: PRs that close a tier-labelled issue, survey learnings PRs
+// and Dependabot PRs.
 const followups = [];
 const review = [];
 const unstick = [];
@@ -65,12 +66,15 @@ const isLearnings = (pr) =>
   all(`repos/${REPO}/pulls/${pr.number}/files?per_page=100`).every((f) =>
     /^\.claude\/skills\/survey-[^/]+\/SKILL\.md$/.test(f.filename),
   );
+const isDependabot = (pr) => pr.user.login === "dependabot[bot]";
 for (const pr of prs.filter((p) => !p.draft)) {
   const issue = linkedIssues(pr)
     .map((n) => byNumber.get(n))
     .find((i) => i && tierOf(names(i)));
-  if (!issue && !isLearnings(pr)) continue;
-  const tier = issue ? tierOf(names(issue)) : "sonnet";
+  const bot = isDependabot(pr);
+  if (!issue && !bot && !isLearnings(pr)) continue;
+  // A red bump is undiagnosed and often rooted in a dependency's own change.
+  const tier = issue ? tierOf(names(issue)) : bot ? "opus" : "sonnet";
   const head = api(`repos/${REPO}/commits/${pr.head.sha}`);
   const headDate = head.commit.committer.date;
   const runs = api(
@@ -104,7 +108,12 @@ for (const pr of prs.filter((p) => !p.draft)) {
   );
   if (failing.length === 0 && feedback.length === 0 && !conflict) {
     const labels = names(pr).concat(issue ? names(issue) : []);
-    if (["opus", "opus-plan"].some((t) => labels.includes(t)))
+    // dependabot-automerge.yml queues all but majors; a major waits for a human.
+    if (
+      bot
+        ? !pr.auto_merge
+        : ["opus", "opus-plan"].some((t) => labels.includes(t))
+    )
       review.push({ pr: pr.number, title: pr.title, url: pr.html_url });
     else if (!pr.auto_merge)
       automerge.push({ pr: pr.number, sha: pr.head.sha, title: pr.title });
@@ -142,7 +151,10 @@ for (const pr of prs.filter((p) => !p.draft)) {
         : []),
       ...failing.map((r) => `- CI failing: ${r.name}: ${r.html_url}`),
       ...feedback.map((c) => `- Unanswered review feedback: ${c.html_url}`),
-      `Fix only that. For CI, reproduce the failure first and show the same check passing. Run \`pnpm run build\` and \`pnpm run lint\` before pushing. Reply to each review comment you address. The PR description must still meet .github/pull_request_template.md.`,
+      `Fix only that. For CI, reproduce the failure first and show the same check passing. Run \`pnpm run build\` and \`pnpm run lint\` before pushing. Reply to each review comment you address.`,
+      bot
+        ? `This is a Dependabot bump: adapt the code or config to the new versions rather than reverting a bump, and leave the PR description as Dependabot wrote it. If a bump can't be adopted narrowly, say why in a PR comment instead of pushing.`
+        : `The PR description must still meet .github/pull_request_template.md.`,
       `Do not subscribe to PR activity: the daily dispatcher checks this PR again tomorrow.`,
     ].join("\n"),
   });
