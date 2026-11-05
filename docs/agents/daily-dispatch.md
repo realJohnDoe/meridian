@@ -30,7 +30,8 @@ digest.
 - **Dispatch**: open issues that have a `haiku`/`sonnet`/`opus` label, no
   `opus-plan` or `decision-required`, no assignee, no open native blocker, no
   sub-issues, and no open PR that closes them. Oldest first.
-- **Follow-up**: open, non-draft PRs that close a tier-labelled issue, once CI
+- **Follow-up**: open, non-draft PRs that close a tier-labelled issue, survey
+  learnings PRs and Dependabot PRs (as `sonnet`), once CI
   has finished. A PR gets one narrow session if it conflicts with `main`
   (checked without waiting for CI, since GitHub runs none on a conflicting PR;
   the session merges `main` in and pushes; an "unknown" mergeability is
@@ -43,6 +44,9 @@ digest.
   closes a `haiku`/`sonnet` issue or is a survey run's process-learnings PR
   (touches only `.claude/skills/survey-*/SKILL.md`). `opus`/`opus-plan` PRs
   are never merged by the script; they go in the digest's Review list.
+  Dependabot PRs aren't merged by the script either:
+  `dependabot-automerge.yml` queues non-majors, and a green major goes in the
+  Review list.
 - **Caps**: at most `--max-sessions` (4) sessions per run, follow-ups first;
   at most `--max-followups` (2) follow-ups per PR. After that the PR goes in
   the digest instead.
