@@ -205,12 +205,16 @@ const line = (x, ask) =>
   `- [ ] **${ask}** [#${x.pr ?? x.issue}](${x.url}) ${x.title}${x.why ? ` (${x.why})` : ""}`;
 const section = (h, xs, ask) =>
   xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, ask)), ""] : [];
+// Part of `waiting`, so the change check below compares it too.
+const NOTE =
+  "_Answer each item on its own issue or PR, and remove `decision-required` once decided. Comments on this digest aren't read._\n\n";
 const waiting =
-  [
+  NOTE +
+  ([
     ...section("Decide", decide, "Decide:"),
     ...section("Review", review, "Review:"),
     ...section("Unstick", unstick, "Unstick:"),
-  ].join("\n") || "Nothing is waiting on the maintainer.\n";
+  ].join("\n") || "Nothing is waiting on the maintainer.\n");
 const digestIssue = issues.find((i) => i.title === DIGEST_TITLE);
 const prev = digestIssue?.body?.match(/<!-- digest-date: (\S+) -->/)?.[1];
 // What merged since the last digest (inclusive, so a PR merged on that day
