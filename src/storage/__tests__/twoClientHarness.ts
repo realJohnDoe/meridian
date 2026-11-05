@@ -35,7 +35,6 @@ import { mountBackend } from '@/storage/backends'
 import { syncStateFor, dropSyncState, dropAllSyncState } from '@/storage/syncState'
 import { unmountAllBackends } from '@/storage/backends'
 import { cacheInit } from '@/storage/cache/db'
-import type { MeridianDB } from '@/storage/cache/db'
 import { syncToBackend } from '@/storage/syncScheduler'
 import { clearSyncJournal } from '@/storage/syncJournal'
 import { useStore } from '@/store'
@@ -714,41 +713,6 @@ export async function skipAhead(ms: number, vaultIds: readonly string[]): Promis
  * caller here — nothing reads `fetch`'s mock state — and is dropped the
  * instant the next `resetWorld` overwrites the stub.
  */
-/**
- * Drop the finished transactions `fake-indexeddb` never lets go of — the
- * other half of #1023, and the reason a long soak still slowed to a crawl
- * after that issue's own fix landed.
- *
- * Its `Database` holds every transaction ever opened against a connection in
- * one array (`transactions.push(tx)` in `FDBDatabase`, with no removal
- * anywhere in the library), and `processTransactions` re-`filter`s that whole
- * array on every transaction creation and every complete/abort. Across a soak
- * that is two compounding problems and not one: an unbounded **retention** —
- * each finished transaction keeps its scope and request objects alive — and an
- * O(n) **scan per transaction event** over an array that grows by two per
- * `resetWorld`, which makes the harness quadratic in the number of runs.
- *
- * Measured over 1,200 `resetWorld()` calls: 69MB climbing to 91MB without
- * this, flat at 65MB with it; the fixed-sequence probe in
- * `twoClientHarnessLeak.test.ts` goes from 2,400 runs costing 4.2x the
- * per-run cost of the first 400 to holding roughly steady. That per-run climb
- * is what `#1023` read as "ordinary GC behavior at a growing live heap" — it
- * is neither ordinary nor GC's doing, it is this.
- *
- * Only records already marked `finished` go, so a transaction still running
- * or waiting is left for the library's own scheduler. Nothing else releases
- * these: `cacheInit()`'s database is deliberately a process singleton (it is
- * only ever `.clear()`ed, never rebuilt), and production runs against a real
- * IndexedDB where the question doesn't arise.
- */
-function pruneFinishedTransactions(db: MeridianDB): void {
-  const raw = (db.backendDB() as unknown as {
-    _rawDatabase?: { transactions: { _state?: string }[] }
-  })._rawDatabase
-  if (!raw) return
-  raw.transactions = raw.transactions.filter(t => t._state !== 'finished')
-}
-
 export async function resetWorld(): Promise<FakeGitHub> {
   // The run boundary itself (#1052). Anything still in flight here is work the
   // *previous* run never drained, which `quiesce` should have made impossible —
@@ -771,7 +735,6 @@ export async function resetWorld(): Promise<FakeGitHub> {
   const db = await cacheInit()
   await db.files.clear()
   await db.meta.clear()
-  pruneFinishedTransactions(db)
   return remote
 }
 

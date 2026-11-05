@@ -9,7 +9,6 @@ export { storedDefaultLists, defaultParticipants, saveDefaultParticipants, saveD
 export { default as RepeatDialog } from './dialogs/RepeatDialog'
 export type { EntryState } from './state'
 export { useEntryEditor } from './useEntryEditor'
-export type { DialogHandlers, NewEntrySeed } from './useEntryEditor'
+export type { DialogHandlers } from './useEntryEditor'
 export { applyScope, entryFromOccurrence, archiveEntry } from './save'
 export { usePendingLinks } from './usePendingLinks'
-export type { PendingLinks } from './usePendingLinks'
