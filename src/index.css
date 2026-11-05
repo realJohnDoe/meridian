@@ -68,6 +68,9 @@
   --color-priority-1:     var(--priority-1);
   --color-priority-2:     var(--priority-2);
   --color-priority-3:     var(--priority-3);
+  --color-tint-subtle:    var(--tint-subtle);
+  --color-tint-hover:     var(--tint-hover);
+  --color-tint-selected:  var(--tint-selected);
   /* On-accent text for solid domain-color chips — each theme picks whichever
      of its two ink colors (--ink-light/--ink-dark) contrasts best against
      that specific swatch, so swatches can stay at their vivid brand hue
@@ -234,6 +237,14 @@
   --done-overlay: color-mix(in oklab, var(--background), transparent 30%);
 
   --radius: 0.625rem;
+
+  /* Primary state tints — the one scale for resting/hover/selected washes of
+     primary, instead of a per-component bg-primary/N. Translucent on purpose
+     (they sit over cards, dialogs and grid cells alike); a theme that needs
+     stronger ones overrides these three. */
+  --tint-subtle:   color-mix(in oklab, var(--primary), transparent 95%);
+  --tint-hover:    color-mix(in oklab, var(--primary), transparent 90%);
+  --tint-selected: color-mix(in oklab, var(--primary), transparent 85%);
 
   /* Search bar surface — subtle primary tint over accent */
   --search-bar-bg: color-mix(in oklab, var(--primary), var(--accent) 92%);

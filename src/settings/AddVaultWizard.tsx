@@ -99,7 +99,7 @@ export default function AddVaultWizard() {
               className={cn(
                 'flex items-start gap-3 rounded-xl border p-4 text-left transition-colors',
                 source === id
-                  ? 'border-primary bg-primary/8'
+                  ? 'border-primary bg-tint-selected'
                   : 'border-border hover:bg-accent',
               )}
             >
