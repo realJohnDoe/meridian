@@ -64,7 +64,6 @@
   --color-event:          var(--primary);
   --color-task:           var(--task);
   --color-note:           var(--note);
-  --color-brand-cyan:     var(--brand-cyan);
   --color-priority-1:     var(--priority-1);
   --color-priority-2:     var(--priority-2);
   --color-priority-3:     var(--priority-3);
@@ -116,7 +115,6 @@
      --background in every theme). See each theme block for its pick. */
   --color-chip-tint-foreground: var(--chip-tint-foreground);
   /* Surface for past/done */
-  --color-surface-raised: var(--surface-raised);
 
   --height-control: var(--control-h);
   /* Topbar height token — used for h-topbar, and top-[var(--th)] in positioned children */
@@ -166,9 +164,7 @@
   --background: oklch(0.18 0.05 252);   /* app column, topbar, agenda stream */
   --card:       oklch(0.24 0.05 252);   /* cards, panels, filter overlay */
   --popover:    oklch(0.24 0.05 252);   /* dialogs, dropdowns, wikilink popup */
-  --secondary:  oklch(0.28 0.06 252);   /* chips, type-selector bg */
   --muted:      oklch(0.28 0.06 252);   /* dim surfaces */
-  --accent:     oklch(0.28 0.06 252);   /* hover / selected row surfaces */
 
   /* Text — 3-tier emphasis */
   --foreground:           oklch(0.96 0.02 270);   /* primary text */
@@ -207,7 +203,6 @@
      --primary/--primary-foreground directly (see the @theme inline block). */
   --task:         oklch(0.84 0.17 145);   /* green */
   --note:         oklch(0.75 0.17 215);   /* sky blue */
-  --brand-cyan:   oklch(0.77 0.14 208);   /* sky blue — gradient accent */
   --priority-1:   oklch(0.72 0.19 22);    /* red */
   --priority-2:   oklch(0.76 0.17 48);    /* orange */
   --priority-3:   oklch(0.88 0.18 82);    /* yellow */
@@ -230,15 +225,12 @@
   --sidebar-foreground:         oklch(0.86 0.07 272);
   --sidebar-primary:            oklch(0.71 0.20 278);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent:             oklch(0.28 0.06 252);
-  --sidebar-accent-foreground:  oklch(0.96 0.02 270);
   --sidebar-border: color-mix(in oklab, oklch(0.69 0.03 250), transparent 85%);
   --sidebar-ring:               oklch(0.71 0.20 278);
 
   /* ── Derived — not authored per-theme ── */
   --primary-dark:    oklch(0.63 0.20 278);   /* darker shades for gradients (brand button, search bar) */
   --brand-cyan-dark: oklch(0.68 0.14 208);
-  --surface-raised:  oklch(0.33 0.05 252);   /* elevated surface, one step up from --card */
 }
 
 /* :root-only. Two kinds of token live here rather than in the grouped
@@ -274,6 +266,7 @@
      needs real opacity/blur to actually show, same reasoning as --shadow-float
      above just toned down for a resting (non-floating) element. */
   --shadow-card: 0 1px 3px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
+  --shadow-inset: inset 0 1px 3px rgba(0,0,0,.35);
 
   /* event-border used in EntryBody wikilink underline. var(--primary), not
      var(--event) — event no longer exists as its own custom property, see
@@ -327,6 +320,14 @@
   --warning:     var(--priority-3);
   --warning-foreground: var(--ink-dark);
   --ring:        var(--primary);
+  /* shadcn's secondary/accent and the sidebar's accent were byte-identical
+     copies of --muted (and the sidebar's accent-foreground of
+     --accent-foreground) in every theme — aliased once here for the same
+     reason as --ring above. */
+  --secondary:                 var(--muted);
+  --accent:                    var(--muted);
+  --sidebar-accent:            var(--muted);
+  --sidebar-accent-foreground: var(--accent-foreground);
 }
 
 /* Light-theme card/float shadows — plain Tailwind shadow-sm reads fine on a
@@ -340,6 +341,7 @@
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
   --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+  --shadow-inset:       inset 0 1px 2px rgba(0,0,0,.10);
 }
 
 /* ── MERIDIAN LIGHT THEME ───────────────────────────────────────── */
@@ -363,9 +365,7 @@
   --background: oklch(0.945 0.010 252);
   --card:       oklch(0.98  0.006 252);
   --popover:    oklch(0.98  0.006 252);
-  --secondary:  oklch(0.995 0.003 252);
   --muted:      oklch(0.995 0.003 252);
-  --accent:     oklch(0.995 0.003 252);
 
   /* Text — 3-tier emphasis, dark ink. Ordering by lightness is the inverse
      of .meridian's: here the *lightest* tier is the least emphatic. */
@@ -396,7 +396,6 @@
      (see the @theme inline block). */
   --task:         oklch(0.53 0.15 145);   /* green */
   --note:         oklch(0.53 0.13 215);   /* sky blue */
-  --brand-cyan:   oklch(0.53 0.12 208);   /* sky blue — gradient accent */
   --priority-1:   oklch(0.53 0.20 22);    /* red */
   --priority-2:   oklch(0.70 0.17 55);    /* orange */
   --priority-3:   oklch(0.80 0.16 82);    /* yellow */
@@ -422,8 +421,6 @@
   --sidebar-foreground:         oklch(0.46  0.055 272);
   --sidebar-primary:            oklch(0.52  0.20  278);
   --sidebar-primary-foreground: oklch(0.99  0.004 252);
-  --sidebar-accent:             oklch(0.995 0.003 252);
-  --sidebar-accent-foreground:  oklch(0.36  0.045 270);
   --sidebar-border: color-mix(in oklab, oklch(0.525 0.038 250), transparent 75%);
   --sidebar-ring:               oklch(0.52 0.20 278);
 
@@ -433,23 +430,20 @@
   /* Absolute derived tokens */
   --primary-dark:    oklch(0.45 0.19 278);
   --brand-cyan-dark: oklch(0.46 0.11 208);
-  --surface-raised:  oklch(0.995 0.003 252);
 }
 
 /* ── TOKYO NIGHT THEME ──────────────────────────────────────────── */
 /* Class-scoped override (set by next-themes). Only the authored per-theme
    tokens are restated; the color-mix derived tokens above re-derive from these.
-   The three absolute derived tokens (--primary-dark, --brand-cyan-dark,
-   --surface-raised) are not color-mix based, so they are restated here too. */
+   The two absolute derived tokens (--primary-dark, --brand-cyan-dark) are
+   not color-mix based, so they are restated here too. */
 .tokyo-night {
   /* Surfaces — Tokyo Night elevation ramp */
   --backdrop:   #13141e;
   --background: #1a1b2e;
   --card:       #1f2040;
   --popover:    #1f2040;
-  --secondary:  #292b47;
   --muted:      #292b47;
-  --accent:     #292b47;
 
   /* Text */
   --foreground:           #c0caf5;
@@ -479,7 +473,6 @@
      --primary/--primary-foreground directly (see the @theme inline block). */
   --task:         #9ece6a;   /* green */
   --note:         #7dcfff;   /* cyan */
-  --brand-cyan:   #7dcfff;   /* cyan */
   --priority-1:   #f7768e;   /* red */
   --priority-2:   #ff9e64;   /* orange */
   --priority-3:   #e0af68;   /* yellow */
@@ -500,15 +493,12 @@
   --sidebar-foreground:         #a9b1d6;
   --sidebar-primary:            #bb9af7;
   --sidebar-primary-foreground: #1a1b2e;
-  --sidebar-accent:             #292b47;
-  --sidebar-accent-foreground:  #c0caf5;
   --sidebar-border: color-mix(in oklab, #565f89, transparent 70%);
   --sidebar-ring:               #bb9af7;
 
   /* Absolute derived tokens */
   --primary-dark:    #9d7de0;
   --brand-cyan-dark: #5bb8e8;
-  --surface-raised:  #3b3f5c;
 }
 
 /* ── ROSÉ PINE DAWN THEME ───────────────────────────────────────── */
@@ -518,9 +508,7 @@
   --background: #f2e9e1;
   --card:       #faf4ed;
   --popover:    #faf4ed;
-  --secondary:  #fffaf3;
   --muted:      #fffaf3;
-  --accent:     #fffaf3;
 
   /* Text */
   --foreground:           #575279;
@@ -557,7 +545,6 @@
      same light-ink call as task below. */
   --task:         #6a8c3a;   /* olive green */
   --note:         #286983;   /* pine */
-  --brand-cyan:   #56949f;   /* foam */
   --priority-1:   #b02840;   /* red */
   --priority-2:   #c4621a;   /* orange */
   --priority-3:   #c4a800;   /* yellow */
@@ -582,15 +569,12 @@
   --sidebar-foreground:         #605c79;
   --sidebar-primary:            #907aa9;
   --sidebar-primary-foreground: #fffaf3;
-  --sidebar-accent:             #fffaf3;
-  --sidebar-accent-foreground:  #575279;
   --sidebar-border: color-mix(in oklab, #9893a5, transparent 75%);
   --sidebar-ring:               #907aa9;
 
   /* Absolute derived tokens */
   --primary-dark:    #7a6496;
   --brand-cyan-dark: #3d7a86;
-  --surface-raised:  #fffaf3;
 
   --chip-border: color-mix(in oklab, #9893a5, transparent 68%);
 }
@@ -600,8 +584,8 @@
    accent hues are calibrated in CIE L*a*b* to read equally well on base03
    (dark) and base3 (light), so both variants use the exact same primary/
    domain-color/ink-pick values — down to which of the domain foregrounds'
-   *-foreground picks wins. Only the surface/text/on-accent-ink and
-   --surface-raised tokens (each theme's own block, below) actually differ,
+   *-foreground picks wins. Only the surface/text/on-accent-ink
+   tokens (each theme's own block, below) actually differ,
    since those depend on the surface itself rather than the accent hues. */
 .solarized-light, .solarized-dark {
   /* Brand — violet */
@@ -613,7 +597,6 @@
      inline block); --primary above is this same violet. */
   --task:         #859900;   /* green */
   --note:         #2aa198;   /* cyan */
-  --brand-cyan:   #2aa198;
   --priority-1:   #dc322f;   /* red */
   --priority-2:   #cb4b16;   /* orange */
   --priority-3:   #b58900;   /* yellow */
@@ -640,9 +623,7 @@
   --background: #eee8d5;
   --card:       #fdf6e3;
   --popover:    #fdf6e3;
-  --secondary:  #f5f0e4;
   --muted:      #f5f0e4;
-  --accent:     #f5f0e4;
 
   /* Text — Solarized's own base01/base00/base0/base1 read fine as syntax-
      highlighting accents but fall short as UI body text: --foreground was
@@ -680,12 +661,9 @@
   --sidebar-foreground:         #4c6169;
   --sidebar-primary:            #6c71c4;
   --sidebar-primary-foreground: #fdf6e3;
-  --sidebar-accent:             #f5f0e4;
-  --sidebar-accent-foreground:  #445960;
   --sidebar-border: color-mix(in oklab, #839496, transparent 75%);
   --sidebar-ring:               #6c71c4;
 
-  --surface-raised:  #f5f0e4;
 
   --chip-border: color-mix(in oklab, #839496, transparent 68%);
 }
@@ -697,9 +675,7 @@
   --background: #002b36;
   --card:       #073642;
   --popover:    #073642;
-  --secondary:  #0d4552;
   --muted:      #0d4552;
-  --accent:     #0d4552;
 
   /* Text — base1 (content) down to base01 (comments). Solarized's own
      values read fine as syntax-highlighting accents but fall short as UI
@@ -739,15 +715,12 @@
   --sidebar-foreground:         #aabcbe;
   --sidebar-primary:            #6c71c4;
   --sidebar-primary-foreground: #fdf6e3;
-  --sidebar-accent:             #0d4552;
-  --sidebar-accent-foreground:  #b8c7c7;
   --sidebar-border: color-mix(in oklab, #586e75, transparent 70%);
   --sidebar-ring:               #6c71c4;
 
   /* Elevated surface for past/done bars — this theme's own ramp, so unlike
      --primary-dark/--brand-cyan-dark (shared above) it isn't shared with
      .solarized-light. */
-  --surface-raised:  #11505f;
 }
 
 /* ── DRACULA THEME ──────────────────────────────────────────────── */
@@ -757,9 +730,7 @@
   --background: #1e1f29;
   --card:       #282a36;
   --popover:    #282a36;
-  --secondary:  #373a4a;
   --muted:      #373a4a;
-  --accent:     #373a4a;
 
   /* Text */
   --foreground:           #f8f8f2;
@@ -793,7 +764,6 @@
      --primary/--primary-foreground directly (see the @theme inline block). */
   --task:         #50fa7b;   /* green */
   --note:         #8be9fd;   /* cyan */
-  --brand-cyan:   #8be9fd;   /* cyan */
   --priority-1:   #ff5555;   /* red */
   --priority-2:   #ffb86c;   /* orange */
   --priority-3:   #f1fa8c;   /* yellow */
@@ -814,15 +784,12 @@
   --sidebar-foreground:         #cdd6f4;
   --sidebar-primary:            #bd93f9;
   --sidebar-primary-foreground: #282a36;
-  --sidebar-accent:             #373a4a;
-  --sidebar-accent-foreground:  #f8f8f2;
   --sidebar-border: color-mix(in oklab, #6272a4, transparent 70%);
   --sidebar-ring:               #bd93f9;
 
   /* Absolute derived tokens */
   --primary-dark:    #a07de0;
   --brand-cyan-dark: #6dcfe8;
-  --surface-raised:  #44475a;
 }
 
 /* ── CATPPUCCIN LATTE THEME ─────────────────────────────────────── */
@@ -834,9 +801,7 @@
   --background: #e6e9ef;   /* mantle — app column */
   --card:       #eff1f5;   /* base — cards, panels, filter overlay */
   --popover:    #eff1f5;
-  --secondary:  #f5f6f9;   /* chips, type-selector bg */
   --muted:      #f5f6f9;
-  --accent:     #f5f6f9;   /* hover / selected row surfaces */
 
   /* Text — dark ink on light surfaces */
   --foreground:           #4c4f69;   /* text */
@@ -872,7 +837,6 @@
      mauve. */
   --task:         #40a02b;   /* green */
   --note:         #179299;   /* teal */
-  --brand-cyan:   #179299;
   --priority-1:   #d20f39;   /* red */
   --priority-2:   #fe640b;   /* peach — Catppuccin's official swatch, undarkened;
                                  vs light ink this is only ~2.6:1, well under
@@ -900,8 +864,6 @@
   --sidebar-foreground:         #5a5d75;
   --sidebar-primary:            #8839ef;
   --sidebar-primary-foreground: #eff1f5;
-  --sidebar-accent:             #f5f6f9;
-  --sidebar-accent-foreground:  #4c4f69;
   --sidebar-border: color-mix(in oklab, #9ca0b0, transparent 75%);
   --sidebar-ring:               #8839ef;
 
@@ -911,7 +873,6 @@
   /* Absolute derived tokens */
   --primary-dark:    #7526d3;
   --brand-cyan-dark: #0f7378;
-  --surface-raised:  #f5f6f9;
 }
 
 /* ── CATPPUCCIN MOCHA THEME ─────────────────────────────────────── */
@@ -923,9 +884,7 @@
   --background: #181825;   /* mantle */
   --card:       #1e1e2e;   /* base */
   --popover:    #1e1e2e;
-  --secondary:  #313244;   /* surface0 */
   --muted:      #313244;
-  --accent:     #313244;
 
   /* Text */
   --foreground:           #cdd6f4;   /* text */
@@ -957,7 +916,6 @@
      inline block); --primary above is this same mauve. */
   --task:         #a6e3a1;   /* green */
   --note:         #94e2d5;   /* teal */
-  --brand-cyan:   #94e2d5;
   --priority-1:   #f38ba8;   /* red */
   --priority-2:   #fab387;   /* peach */
   --priority-3:   #f9e2af;   /* yellow */
@@ -979,15 +937,12 @@
   --sidebar-foreground:         #bac2de;
   --sidebar-primary:            #cba6f7;
   --sidebar-primary-foreground: #11111b;
-  --sidebar-accent:             #313244;
-  --sidebar-accent-foreground:  #cdd6f4;
   --sidebar-border: color-mix(in oklab, #6c7086, transparent 70%);
   --sidebar-ring:               #cba6f7;
 
   /* Absolute derived tokens */
   --primary-dark:    #a97ee0;
   --brand-cyan-dark: #5cc9b8;
-  --surface-raised:  #45475a;   /* surface1 */
 }
 
 /* Element resets in @layer base so Tailwind utilities can override them */

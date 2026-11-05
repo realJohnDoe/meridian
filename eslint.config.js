@@ -72,15 +72,22 @@ const tsRecommendedTypeCheckedRules = {
   ...tseslint.plugin.configs['flat/recommended-type-checked'][2].rules,
 }
 
-// No color arithmetic at the call site (`bg-primary/30`, `hover:bg-note/90`):
-// every translucent or hover shade is a named token in index.css's @theme
-// block, defined once and derived from its theme color. `\u002F` is a `/` —
-// esquery's regex literal can't contain one.
-const COLOR_OPACITY = '/\\b(bg|text|border|ring|decoration|divide|outline|fill|stroke|from|via|to|shadow)-[a-z0-9-]+\\u002F\\d+\\b/'
-const NO_COLOR_ARITHMETIC = ['Literal[value', 'TemplateElement[value.raw'].map(node => ({
-  selector: `${node}=${COLOR_OPACITY}]`,
-  message: 'Use a named color token from index.css (e.g. bg-primary-tint) instead of an opacity modifier.',
-}))
+// No color arithmetic or literal colors at the call site: every translucent
+// shade (`bg-primary/30`) and every color or shadow value (`bg-[#123]`,
+// `shadow-[0_8px_32px_rgba(0,0,0,.4)]`, `[box-shadow:…rgb(…)]`) is a named
+// token in index.css, defined once per theme. `/` is a `/` — esquery's
+// regex literal can't contain one.
+const COLOR_UTILITY = '(bg|text|border|ring|decoration|divide|outline|fill|stroke|from|via|to|shadow)'
+const COLOR_LITERAL = '(#[0-9a-fA-F]{3,8}|rgba?\\(|hsla?\\(|oklch\\(|oklab\\(|color-mix\\()'
+const COLOR_PATTERNS = [
+  `\\b${COLOR_UTILITY}-[a-z0-9-]+\\u002F\\d+\\b`,
+  `\\b${COLOR_UTILITY}-\\[[^\\]]*${COLOR_LITERAL}`,
+  `\\[(box-shadow|color|background|background-color|border-color):[^\\]]*${COLOR_LITERAL}`,
+]
+const NO_COLOR_ARITHMETIC = COLOR_PATTERNS.flatMap(re => ['Literal[value', 'TemplateElement[value.raw'].map(node => ({
+  selector: `${node}=/${re}/]`,
+  message: 'Use a named color or shadow token from index.css (e.g. bg-primary-tint, shadow-(--shadow-card)) instead of an opacity modifier or a literal color.',
+})))
 
 export default [
   // Auto-generated files — skip entirely
