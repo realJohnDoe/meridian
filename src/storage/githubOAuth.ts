@@ -198,6 +198,24 @@ async function exchangeForTokens(body: Record<string, string>): Promise<OAuthTok
 }
 
 /**
+ * Asks GitHub (via the Worker) to revoke an access token's authorization.
+ * Best-effort: a failure is logged and swallowed, since it must never block
+ * removing a vault.
+ */
+export async function revokeGitHubToken(accessToken: string): Promise<void> {
+  try {
+    const res = await fetch(`${WORKER_ORIGIN}/oauth/revoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ access_token: accessToken }).toString(),
+    })
+    if (!res.ok) console.warn(`[oauth] token revoke answered ${res.status}`)
+  } catch (e) {
+    console.warn('[oauth] token revoke failed:', e)
+  }
+}
+
+/**
  * Consumes the `code`/`state` GitHub redirected back with, validating against
  * the verifier/state stashed in sessionStorage before the redirect, then
  * exchanges the code for tokens via the Worker.

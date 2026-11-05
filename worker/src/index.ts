@@ -1,4 +1,5 @@
 import { handleOAuthToken } from './oauthToken'
+import { handleOAuthRevoke } from './oauthRevoke'
 import type { Env } from './env'
 import { handleIcalFetch } from './icalFetch'
 import { corsHeadersFor } from './cors'
@@ -24,6 +25,10 @@ export default {
 
     if (url.pathname === '/oauth/token' && request.method === 'POST') {
       return withCors(await handleOAuthToken(request, env), origin)
+    }
+
+    if (url.pathname === '/oauth/revoke' && request.method === 'POST') {
+      return withCors(await handleOAuthRevoke(request, env), origin)
     }
 
     if (url.pathname === '/ical' && request.method === 'GET') {

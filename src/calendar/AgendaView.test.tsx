@@ -637,6 +637,30 @@ describe('AgendaView — holding the visible day across row-list changes', () =>
     expect(calendarView.getState().agendaTopDate).toBe(fmtISO(today))
   })
 
+  // Same shape as the check-off case, but the trigger is the clock: the top
+  // event ends, the minute tick re-sorts it below the day's other items, and the
+  // viewport must keep resting on the day's top instead of following it down.
+  it('keeps the day pinned to the top when its topmost event ends', async () => {
+    const at = (h: number) => new Date(2026, 8, 16, h)
+    const ev = (id: string, h: number) => makeOcc({
+      id, date: fmtISO(today), time: `${h}:00`, entryKey: testKey('note.md'),
+      metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: id, jsTime: at(h), duration: '1h' },
+    })
+    seedStore([ev('ending', 12), ev('later', 15), ...upcoming()], makeRoots('note.md'))
+    render(<AgendaView onOpen={vi.fn()} />)
+    await settle()
+
+    expect(calendarView.getState().agendaTopDate).toBe(fmtISO(today))
+    const offsetBefore = scrollContainer().scrollTop
+
+    // 12:00–13:00 event is over; useNow's 60s interval rebuilds the rows.
+    await act(async () => { vi.setSystemTime(at(14)); vi.advanceTimersByTime(60_000); await Promise.resolve() })
+    await settle()
+
+    expect(scrollContainer().scrollTop).toBe(offsetBefore)
+    expect(calendarView.getState().agendaTopDate).toBe(fmtISO(today))
+  })
+
   // The guard the isScrolling flag was standing in for, now stated directly:
   // while a finger is actually down, re-pinning would drag content out from
   // under the gesture. Programmatic settling (the startup case above) is no

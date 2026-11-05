@@ -106,7 +106,8 @@ for (const pr of prs.filter((p) => !p.draft)) {
     const labels = names(pr).concat(issue ? names(issue) : []);
     if (["opus", "opus-plan"].some((t) => labels.includes(t)))
       review.push({ pr: pr.number, title: pr.title, url: pr.html_url });
-    else if (!pr.auto_merge) automerge.push({ pr: pr.number, sha: pr.head.sha, title: pr.title });
+    else if (!pr.auto_merge)
+      automerge.push({ pr: pr.number, sha: pr.head.sha, title: pr.title });
     continue;
   }
   const marks = comments.filter((c) => c.body.includes(FOLLOWUP));
@@ -204,20 +205,52 @@ const line = (x, ask) =>
   `- [ ] **${ask}** [#${x.pr ?? x.issue}](${x.url}) ${x.title}${x.why ? ` (${x.why})` : ""}`;
 const section = (h, xs, ask) =>
   xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, ask)), ""] : [];
-const items = [
-  ...section("Decide", decide, "Decide:"),
-  ...section("Review", review, "Review:"),
-  ...section("Unstick", unstick, "Unstick:"),
-].join("\n");
-const content = items || "Nothing is waiting on the maintainer.\n";
+// Part of `waiting`, so the change check below compares it too.
+const NOTE =
+  "_Answer each item on its own issue or PR, and remove `decision-required` once decided. Comments on this digest aren't read._\n\n";
+const waiting =
+  NOTE +
+  ([
+    ...section("Decide", decide, "Decide:"),
+    ...section("Review", review, "Review:"),
+    ...section("Unstick", unstick, "Unstick:"),
+  ].join("\n") || "Nothing is waiting on the maintainer.\n");
 const digestIssue = issues.find((i) => i.title === DIGEST_TITLE);
 const prev = digestIssue?.body?.match(/<!-- digest-date: (\S+) -->/)?.[1];
+// What merged since the last digest (inclusive, so a PR merged on that day
+// after the write isn't missed), each with the issue it closed and its labels.
+const since =
+  prev ?? new Date(TODAY - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
+const merged = api(
+  "search/issues",
+  "-X",
+  "GET",
+  "-f",
+  `q=repo:${REPO} is:pr is:merged merged:>=${since}`,
+  "-f",
+  "per_page=100",
+)
+  .items.sort((a, b) => a.number - b.number)
+  .map((pr) => {
+    const closes = linkedIssues(pr).map(
+      (n) => `#${n} · ${names(api(`repos/${REPO}/issues/${n}`)).join(", ")}`,
+    );
+    return `- [#${pr.number}](${pr.html_url}) ${pr.title}${closes.length ? ` (closes ${closes.join("; ")})` : ""}`;
+  });
+const content =
+  waiting +
+  (merged.length
+    ? `\n## Merged since ${since} (${merged.length})\n\n${merged.join("\n")}\n`
+    : "");
 const strip = (b) =>
   (b ?? "")
     .replace(/^<!-- digest-date:.*\n\n?/, "")
     .replace(FOOTER, "")
+    .replace(/\n*## Merged since[\s\S]*$/, "")
     .trim();
-const changed = strip(digestIssue?.body) !== content.trim();
+// Anything merged is news; otherwise only a change in what waits on you is.
+const changed =
+  merged.length > 0 || strip(digestIssue?.body) !== waiting.trim();
 const due = !prev || days(prev) >= DIGEST_DAYS;
 const today = TODAY.toISOString().slice(0, 10);
 const body = `<!-- digest-date: ${today} -->\n\n${content.trim()}${FOOTER}`;
@@ -230,6 +263,7 @@ const digest = {
     decide: decide.length,
     review: review.length,
     unstick: unstick.length,
+    merged: merged.length,
   },
 };
 
@@ -274,9 +308,9 @@ if (APPLY) {
       ).number;
     }
     // A body edit notifies nobody; the comment is the weekly ping.
-    const { decide: d, review: r, unstick: u } = digest.counts;
+    const { decide: d, review: r, unstick: u, merged: m } = digest.counts;
     post(`repos/${REPO}/issues/${digest.issue}/comments`, {
-      body: `Digest for ${today}: ${d} to decide, ${r} to review, ${u} to unstick.${FOOTER}`,
+      body: `Digest for ${today}: ${d} to decide, ${r} to review, ${u} to unstick, ${m} merged.${FOOTER}`,
     });
   }
 }
