@@ -142,7 +142,8 @@ function isBlockedIpv4(a: number, b: number): boolean {
 }
 
 function isBlockedHost(hostname: string): boolean {
-  const host = hostname.toLowerCase()
+  // A trailing root dot ("localhost.") names the same host; strip it first.
+  const host = hostname.toLowerCase().replace(/\.$/, '')
 
   if (host.startsWith('[') && host.endsWith(']')) {
     const groups = ipv6Groups(host.slice(1, -1))
@@ -154,6 +155,13 @@ function isBlockedHost(hostname: string): boolean {
     // v4 address in the last two groups — judge them by that address.
     const v4Embedded = groups.slice(0, 5).every(g => g === 0) && (g5 === 0xffff || g5 === 0)
     if (v4Embedded && isBlockedIpv4(g6 >> 8, g6 & 0xff)) return true
+    // The same v4 address under other well-known prefixes: ::ffff:0:a.b.c.d
+    // (SIIT), 64:ff9b::/96 (NAT64) and 2002::/16 (6to4, v4 in groups 1-2).
+    const siit = groups.slice(0, 4).every(g => g === 0) && groups[4] === 0xffff && g5 === 0
+    const nat64 = g0 === 0x64 && groups[1] === 0xff9b && groups.slice(2, 6).every(g => g === 0)
+    if ((siit || nat64) && isBlockedIpv4(g6 >> 8, g6 & 0xff)) return true
+    const g1 = groups[1] ?? 0
+    if (g0 === 0x2002 && isBlockedIpv4(g1 >> 8, g1 & 0xff)) return true
     if ((g0 & 0xfe00) === 0xfc00) return true  // fc00::/7 unique local
     if ((g0 & 0xffc0) === 0xfe80) return true  // fe80::/10 link-local
     if ((g0 & 0xff00) === 0xff00) return true  // ff00::/8 multicast
