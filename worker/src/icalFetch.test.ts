@@ -138,6 +138,27 @@ describe('validateFeedUrl', () => {
       expect(validateFeedUrl(url), url).toHaveProperty('error')
     }
   })
+
+  it.each([
+    'https://localhost./x.ics',
+    'https://metadata.google.internal./x.ics',
+    'https://printer.local./x.ics',
+    'https://127.0.0.1./x.ics',
+    'https://[::ffff:0:7f00:1]/x.ics',
+    'https://[64:ff9b::7f00:1]/x.ics',
+    'https://[64:ff9b::a9fe:a9fe]/x.ics',
+    'https://[2002:7f00:1::]/x.ics',
+    'https://[2002:a9fe:a9fe::]/x.ics',
+    'webcal://localhost./x.ics',
+  ])('rejects bypass spelling %s', url => {
+    expect(validateFeedUrl(url)).toEqual({ error: 'Calendar URL must point at a public host' })
+  })
+
+  it('allows public hosts under the newly checked prefixes', () => {
+    for (const url of ['https://cal.example./x.ics', 'https://[64:ff9b::5db8:d822]/x.ics', 'https://[2002:5db8:d822::]/x.ics']) {
+      expect(validateFeedUrl(url), url).not.toHaveProperty('error')
+    }
+  })
 })
 
 describe('handleIcalFetch', () => {
