@@ -1,17 +1,18 @@
 import { useState } from 'react'
-import { Trash2, TriangleAlert } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
 import { buttonVariants } from '@/components/ui/button'
+import { Notice } from '@/components/primitives/notice'
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ConfirmDialogContent } from '@/components/primitives/confirm-dialog-content'
 import { removeVault, cacheDirtyCount } from '@/vaultActions'
 import type { VaultRef } from '@/vaultActions'
 import { SettingsRow } from './SettingsSection'
@@ -48,7 +49,7 @@ export function RemoveVaultRow({ vault }: { vault: VaultRef }) {
         }
       />
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+        <ConfirmDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove vault</AlertDialogTitle>
             <AlertDialogDescription>
@@ -59,12 +60,9 @@ export function RemoveVaultRow({ vault }: { vault: VaultRef }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           {dirtyCount > 0 && (
-            <div className="flex items-start gap-2 rounded-lg bg-warning px-3 py-2 text-xs text-warning-foreground">
-              <TriangleAlert size={14} className="mt-0.5 shrink-0" />
-              <span>
-                {dirtyCount} unsynced {dirtyCount === 1 ? 'change has' : 'changes have'} not been backed up and will be lost.
-              </span>
-            </div>
+            <Notice tone="warning">
+              {dirtyCount} unsynced {dirtyCount === 1 ? 'change has' : 'changes have'} not been backed up and will be lost.
+            </Notice>
           )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -76,7 +74,7 @@ export function RemoveVaultRow({ vault }: { vault: VaultRef }) {
               Remove
             </AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogContent>
+        </ConfirmDialogContent>
       </AlertDialog>
     </>
   )

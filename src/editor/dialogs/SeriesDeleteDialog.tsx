@@ -1,13 +1,13 @@
-import { TriangleAlert } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogContent,
   AlertDialogDescription,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ConfirmDialogContent } from '@/components/primitives/confirm-dialog-content'
 import { buttonVariants } from '@/components/ui/button'
+import { Notice } from '@/components/primitives/notice'
 import type { SeriesSheetConfig } from '@/editor/save'
 import DeleteDialogFooter from './DeleteDialogFooter'
 
@@ -24,7 +24,7 @@ interface Props {
 export default function SeriesDeleteDialog({ config, onClose }: Props) {
   return (
     <AlertDialog open={!!config} onOpenChange={(o) => !o && onClose()}>
-      <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+      <ConfirmDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{config?.title ?? 'Delete recurring event'}</AlertDialogTitle>
           <AlertDialogDescription className="sr-only">Choose what to delete.</AlertDialogDescription>
@@ -40,10 +40,7 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
                 {opt.label}
               </AlertDialogAction>
               {opt.warning && (
-                <p className="flex items-start gap-1.5 px-1 text-xs text-muted-foreground">
-                  <TriangleAlert size={12} className="shrink-0 mt-0.5 text-warning-foreground" />
-                  <span>{opt.warning}</span>
-                </p>
+                <Notice tone="warning">{opt.warning}</Notice>
               )}
             </div>
           ))}
@@ -54,7 +51,7 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
           onArchive={config?.onArchive ? () => { config.onArchive?.(); onClose() } : undefined}
           archiveLabel="Archive whole file instead"
         />
-      </AlertDialogContent>
+      </ConfirmDialogContent>
     </AlertDialog>
   )
 }

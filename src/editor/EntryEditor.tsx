@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { EditorView } from '@codemirror/view'
-import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Info, Archive, ArchiveRestore } from 'lucide-react'
+import { Calendar, Clock, Timer, Flag, Repeat, CheckSquare, CalendarDays, FileText, Archive, ArchiveRestore } from 'lucide-react'
 import type { Occurrence, StoreItem, Roots, EditScope } from '@/types'
 import type { SeriesContext } from '@/model'
 import { PRIORITY_LABELS } from '@/occView'
@@ -11,6 +11,7 @@ import type { DialogHandlers } from './useEntryDialogs'
 import { badgeVariants } from '@/components/primitives/badge'
 import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
 import { Button } from '@/components/primitives/button'
+import { Notice } from '@/components/primitives/notice'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { segmentedGroupVariants, segmentedItemVariants } from './segmentedGroup'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -210,45 +211,42 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]"><div className="px-3.5 pt-4.5 pb-30 lg:max-w-3xl lg:mx-auto">
 
         {archived && (
-          <div className="flex items-center gap-2 rounded-lg bg-warning px-3 py-2 mb-3 text-xs text-warning-foreground shadow-(--shadow-card)">
-            <Archive size={14} className="shrink-0" />
-            <span className="flex-1">
-              Archived — hidden from the calendar and search.
-              {vaultId && vaultName && (
-                <> Find it under Settings →{' '}
-                  <Link to="/settings/vault/$vaultId" params={{ vaultId }} className="underline">
-                    {vaultName}
-                  </Link>
-                </>
-              )}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="shrink-0 gap-1.5"
-              onClick={handleUnarchive}
-            >
-              <ArchiveRestore className="size-3.5 stroke-[1.7]" />
-              Unarchive
-            </Button>
-          </div>
+          <Notice
+            tone="warning"
+            icon={Archive}
+            className="mb-3"
+            action={
+              <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleUnarchive}>
+                <ArchiveRestore className="size-3.5 stroke-[1.7]" />
+                Unarchive
+              </Button>
+            }
+          >
+            Archived — hidden from the calendar and search.
+            {vaultId && vaultName && (
+              <> Find it under Settings →{' '}
+                <Link to="/settings/vault/$vaultId" params={{ vaultId }} className="underline">
+                  {vaultName}
+                </Link>
+              </>
+            )}
+          </Notice>
         )}
 
         {readOnlyVault && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted-subtle px-3 py-2 mb-3 text-xs text-muted-foreground">
-            <Info size={14} className="shrink-0" />
+          <Notice tone="info" className="mb-3">
             {readOnlyVault.name} is a sandbox — your changes last until you reload.
-          </div>
+          </Notice>
         )}
 
         {!vaultId && !item && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted-subtle px-3 py-2 mb-3 text-xs text-muted-foreground">
-            <Info size={14} className="shrink-0" />
-            <span className="flex-1">No vault to save to yet.</span>
-            <Link to="/settings/vault/new" className="shrink-0 text-primary-text hover:underline">
-              Add a vault
-            </Link>
-          </div>
+          <Notice
+            tone="info"
+            className="mb-3"
+            action={<Link to="/settings/vault/new" className="text-primary-text hover:underline">Add a vault</Link>}
+          >
+            No vault to save to yet.
+          </Notice>
         )}
 
         {/* ── FILE-LEVEL: title + slug ── */}

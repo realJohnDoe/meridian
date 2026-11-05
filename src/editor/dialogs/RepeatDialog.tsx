@@ -15,7 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { badgeVariants } from '@/components/primitives/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Input } from '@/components/ui/input'
+import { Input, inputVariants } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import { NumberUnitInput } from './NumberUnitInput'
 import DatePickerDialog from './DatePickerDialog'
@@ -337,7 +337,7 @@ export default function RepeatDialog({
                   <button
                     type="button"
                     onClick={() => setEndCalOpen(true)}
-                    className="w-full flex items-center justify-between bg-secondary border border-border hover:bg-secondary hover-layer focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary-text transition-colors cursor-pointer"
+                    className={cn(inputVariants(), 'items-center justify-between gap-2 cursor-pointer')}
                   >
                     <span>On date</span>
                     <span className="font-mono text-muted-foreground">

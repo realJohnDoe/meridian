@@ -7,12 +7,12 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ConfirmDialogContent } from '@/components/primitives/confirm-dialog-content'
 import { previewVaultIcsImport, importVaultIcs } from '@/vaultActions'
 import type { VaultRef, IcsImportSummary } from '@/vaultActions'
 import { SettingsRow } from './SettingsSection'
@@ -96,7 +96,7 @@ export function VaultImportRow({ vault }: { vault: VaultRef }) {
         }
       />
       <AlertDialog open={importOpen} onOpenChange={setImportOpen}>
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+        <ConfirmDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {importCount === null
@@ -123,7 +123,7 @@ export function VaultImportRow({ vault }: { vault: VaultRef }) {
               </AlertDialogAction>
             ) : null}
           </AlertDialogFooter>
-        </AlertDialogContent>
+        </ConfirmDialogContent>
       </AlertDialog>
     </>
   )

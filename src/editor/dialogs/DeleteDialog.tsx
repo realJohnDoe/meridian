@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
 import {
   AlertDialog,
-  AlertDialogContent,
   AlertDialogDescription,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ConfirmDialogContent } from '@/components/primitives/confirm-dialog-content'
 import DeleteDialogFooter from './DeleteDialogFooter'
 
 interface Props {
@@ -41,7 +41,7 @@ interface Props {
 export default function DeleteDialog({ open, title, onConfirm, onClose, onArchive, heading, description, confirmLabel }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+      <ConfirmDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{heading ?? 'Delete'}</AlertDialogTitle>
           <AlertDialogDescription>
@@ -54,7 +54,7 @@ export default function DeleteDialog({ open, title, onConfirm, onClose, onArchiv
           deleteLabel={confirmLabel}
           onArchive={onArchive ? () => { onArchive(); onClose() } : undefined}
         />
-      </AlertDialogContent>
+      </ConfirmDialogContent>
     </AlertDialog>
   )
 }

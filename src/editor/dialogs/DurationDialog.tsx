@@ -16,7 +16,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { segmentedGroupVariants, segmentedItemVariants } from '../segmentedGroup'
 import { badgeVariants } from '@/components/primitives/badge'
-import { Input } from '@/components/ui/input'
+import { Input, inputVariants } from '@/components/ui/input'
 import { cn } from '@/lib/cn'
 import { NumberUnitInput } from './NumberUnitInput'
 import DatePickerDialog from './DatePickerDialog'
@@ -217,7 +217,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className="flex-1 flex items-center justify-between bg-background border border-border hover:border-input focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-normal text-foreground transition-colors"
+                  className={cn(inputVariants(), 'flex-1 items-center justify-between gap-2 cursor-pointer')}
                   onClick={() => setDateDlgOpen(true)}
                 >
                   <span className={endDate ? '' : 'text-muted-foreground'}>
@@ -229,7 +229,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                 {hasTime && isTouch && (
                   <button
                     type="button"
-                    className="bg-background border border-border hover:border-input focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors"
+                    className={cn(inputVariants(), 'w-auto items-center cursor-pointer')}
                     onClick={() => setTimeDlgOpen(true)}
                   >
                     {endTime || '—'}
