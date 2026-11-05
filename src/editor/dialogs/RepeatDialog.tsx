@@ -303,7 +303,7 @@ export default function RepeatDialog({
                           "px-3 py-2.5 rounded-lg border text-xs text-left transition-all cursor-pointer",
                           monthly === o.id
                             ? "bg-state-selected border-primary text-primary font-semibold"
-                            : "bg-secondary border-border text-muted-foreground hover:bg-secondary-hover"
+                            : "bg-secondary border-border text-muted-foreground hover:bg-secondary hover-layer"
                         )}
                       >
                         {o.label}
@@ -337,7 +337,7 @@ export default function RepeatDialog({
                   <button
                     type="button"
                     onClick={() => setEndCalOpen(true)}
-                    className="w-full flex items-center justify-between bg-secondary border border-border hover:bg-secondary-hover focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-between bg-secondary border border-border hover:bg-secondary hover-layer focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary transition-colors cursor-pointer"
                   >
                     <span>On date</span>
                     <span className="font-mono text-muted-foreground">

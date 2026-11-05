@@ -106,7 +106,7 @@ function MiniMonthDay({ date, other, isToday, highlight, dots, onSelectDay }: Da
         // off --background (see index.css), so the selected day was easy to
         // lose in a grid of 35+ cells. The tint/outline split keeps it
         // plainly distinct from today's solid fill.
-        isToday && 'bg-primary text-primary-foreground hover:bg-primary-hover hover:text-primary-foreground',
+        isToday && 'bg-primary text-primary-foreground hover:bg-primary hover-layer hover:text-primary-foreground',
         highlight && !isToday && 'bg-state-selected text-foreground font-semibold ring-2 ring-inset ring-primary',
       )}
     >

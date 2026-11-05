@@ -69,19 +69,12 @@
   --color-priority-2:     var(--priority-2);
   --color-priority-3:     var(--priority-3);
 
-  /* Derived colors — every translucent or hover shade the app uses, defined
-     once here so components never do color arithmetic (`bg-x/30`) at the call
-     site. Each derives from its theme token, so all ten themes follow. */
-  /* Solid-fill hover (shadcn's /90 convention) */
-  --color-primary-hover:           color-mix(in oklab, var(--primary) 90%, transparent);
-  --color-destructive-hover:       color-mix(in oklab, var(--destructive) 90%, transparent);
-  --color-event-hover:             color-mix(in oklab, var(--primary) 90%, transparent);
-  --color-task-hover:              color-mix(in oklab, var(--task) 90%, transparent);
-  --color-note-hover:              color-mix(in oklab, var(--note) 90%, transparent);
-  --color-priority-1-hover:        color-mix(in oklab, var(--priority-1) 90%, transparent);
-  --color-priority-2-hover:        color-mix(in oklab, var(--priority-2) 90%, transparent);
-  --color-priority-3-hover:        color-mix(in oklab, var(--priority-3) 90%, transparent);
-  --color-muted-foreground-hover:  color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+  /* Derived colors — every translucent shade the app uses, defined once here
+     so components never do color arithmetic (`bg-x/30`) at the call site.
+     Each derives from its theme token, so all ten themes follow. One opacity
+     scale: 10% subtle, 15% selected, 30% tint (+ the frosted backdrop and the
+     underline, which are not fills). Hover on a fill is not a token at all —
+     see the `hover-layer` utility below. */
   /* Chip tint — always paired with text-chip-tint-foreground (see badge.tsx) */
   --color-primary-tint:            color-mix(in oklab, var(--primary) 30%, transparent);
   --color-event-tint:              color-mix(in oklab, var(--primary) 30%, transparent);
@@ -92,20 +85,15 @@
   --color-priority-3-tint:         color-mix(in oklab, var(--priority-3) 30%, transparent);
   --color-muted-foreground-tint:   color-mix(in oklab, var(--muted-foreground) 30%, transparent);
   --color-warning-tint:            color-mix(in oklab, var(--warning) 30%, transparent);
-  /* Primary state layers: resting wash, hover, selected (cf. Material 3) */
-  --color-state-subtle:   color-mix(in oklab, var(--primary) 5%, transparent);
-  --color-state-hover:    color-mix(in oklab, var(--primary) 10%, transparent);
-  --color-state-selected: color-mix(in oklab, var(--primary) 15%, transparent);
-  /* One-off washes */
-  --color-destructive-subtle: color-mix(in oklab, var(--destructive) 10%, transparent);
-  --color-destructive-border: color-mix(in oklab, var(--destructive) 40%, transparent);
-  --color-note-subtle:        color-mix(in oklab, var(--note) 15%, transparent);
-  --color-muted-subtle:       color-mix(in oklab, var(--muted) 40%, transparent);
-  --color-secondary-hover:    color-mix(in oklab, var(--secondary) 80%, transparent);
-  --color-background-frosted: color-mix(in oklab, var(--background) 90%, transparent);
+  --color-muted-subtle:            color-mix(in oklab, var(--muted) 30%, transparent);
+  /* Primary washes: resting and selected */
+  --color-state-subtle:            color-mix(in oklab, var(--primary) 10%, transparent);
+  --color-state-selected:          color-mix(in oklab, var(--primary) 15%, transparent);
   /* currentColor resolves where the utility is used, so these follow the text */
-  --color-current-tint:       color-mix(in oklab, currentColor 20%, transparent);
-  --color-current-underline:  color-mix(in oklab, currentColor 60%, transparent);
+  --color-current-hover:           color-mix(in oklab, currentColor 10%, transparent);
+  --color-current-tint:            color-mix(in oklab, currentColor 15%, transparent);
+  --color-current-underline:       color-mix(in oklab, currentColor 60%, transparent);
+  --color-background-frosted:      color-mix(in oklab, var(--background) 90%, transparent);
   /* On-accent text for solid domain-color chips — each theme picks whichever
      of its two ink colors (--ink-light/--ink-dark) contrasts best against
      that specific swatch, so swatches can stay at their vivid brand hue
@@ -1003,6 +991,20 @@
 }
 
 /* Element resets in @layer base so Tailwind utilities can override them */
+/* Hover state layer (Material 3): a 10% wash of the element's own text color
+   painted over whatever background it has, so one rule serves every hue —
+   solid fills, outlined and ghost buttons alike. A background-image, not a
+   pseudo-element, so it never collides with an element's own ::before/::after.
+   An element whose variant sets its own hover background (shadcn's ghost and
+   outline set hover:bg-accent) must pin it back to its resting one. */
+@utility hover-layer {
+  @media (hover: hover) {
+    &:hover {
+      background-image: linear-gradient(var(--color-current-hover), var(--color-current-hover));
+    }
+  }
+}
+
 @layer base {
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   /* The document flows by default: focusing an input inside a scrolling entry
