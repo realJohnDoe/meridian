@@ -11,7 +11,7 @@ const badgeVariants = cva(
         tag: 'px-1.5 py-0.5 text-2xs rounded-lg border-[var(--chip-border)] bg-secondary text-secondary-foreground',
         // Wikilink / topic chip — always primary (indigo); underline only when interactive (applied via className).
         // bg-primary-tint (a tint, not a solid fill) reads as an accent rather than a
-        // dominant block; text-chip-tint-foreground (not text-primary) is what makes
+        // dominant block; text-chip-tint-foreground (not text-primary-text) is what makes
         // that safe — see the token's doc comment in index.css. A same-hue text color
         // on this tint is what made the original yellow "Low" priority chip unreadable.
         link: 'px-1.5 py-0.5 text-2xs rounded-lg border-[var(--chip-border)] bg-primary-tint text-chip-tint-foreground',

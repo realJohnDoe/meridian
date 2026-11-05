@@ -47,7 +47,7 @@ export default function AppearanceSettings() {
             >
               <span className="flex items-center justify-between gap-2">
                 <span className="truncate">{label}</span>
-                {active && <Check className="size-4 shrink-0 stroke-[2.2] text-primary" />}
+                {active && <Check className="size-4 shrink-0 stroke-[2.2] text-primary-text" />}
               </span>
               <span className="flex gap-1.5">
                 {SWATCH_CLASSES.map(swatchClass => (

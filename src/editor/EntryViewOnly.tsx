@@ -101,7 +101,7 @@ export default function EntryViewOnly({ occ, vault, items, roots }: Props) {
             )}
             {url && (isSafeUrl(url) ? (
               <a href={url} target="_blank" rel="noreferrer"
-                className="flex items-center gap-1.5 w-fit text-primary hover:underline">
+                className="flex items-center gap-1.5 w-fit text-primary-text hover:underline">
                 <Link2 size={13} className="shrink-0" />{url}
               </a>
             ) : (

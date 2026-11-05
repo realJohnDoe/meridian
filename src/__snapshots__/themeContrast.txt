@@ -9,8 +9,8 @@
  40  below 45  meridian: muted-foreground on card
  39  below 45  meridian: muted-foreground on muted
  40  below 45  meridian: muted-foreground on sidebar
- 42  below 60  meridian: primary on background
- 38  below 60  meridian: primary on card + state-subtle
+ 73  ok 60     meridian: primary-text on background
+ 70  ok 60     meridian: primary-text on card + state-subtle
  65  ok 60     meridian: primary-foreground on primary
  58  below 60  meridian: destructive-foreground on destructive
  78  ok 60     meridian: warning-foreground on warning
@@ -39,8 +39,8 @@
  75  ok 45     meridian-light: muted-foreground on card
  78  ok 45     meridian-light: muted-foreground on muted
  75  ok 45     meridian-light: muted-foreground on sidebar
- 68  ok 60     meridian-light: primary on background
- 66  ok 60     meridian-light: primary on card + state-subtle
+ 68  ok 60     meridian-light: primary-text on background
+ 66  ok 60     meridian-light: primary-text on card + state-subtle
  82  ok 60     meridian-light: primary-foreground on primary
  81  ok 60     meridian-light: destructive-foreground on destructive
  68  ok 60     meridian-light: warning-foreground on warning
@@ -69,8 +69,8 @@
  42  below 45  tokyo-night: muted-foreground on card
  40  below 45  tokyo-night: muted-foreground on muted
  42  below 45  tokyo-night: muted-foreground on sidebar
- 55  below 60  tokyo-night: primary on background
- 51  below 60  tokyo-night: primary on card + state-subtle
+ 55  below 60  tokyo-night: primary-text on background
+ 51  below 60  tokyo-night: primary-text on card + state-subtle
  56  below 60  tokyo-night: primary-foreground on primary
  51  below 60  tokyo-night: destructive-foreground on destructive
  63  ok 60     tokyo-night: warning-foreground on warning
@@ -99,8 +99,8 @@
  71  ok 45     rose-pine-dawn: muted-foreground on card
  75  ok 45     rose-pine-dawn: muted-foreground on muted
  71  ok 45     rose-pine-dawn: muted-foreground on sidebar
- 53  below 60  rose-pine-dawn: primary on background
- 53  below 60  rose-pine-dawn: primary on card + state-subtle
+ 53  below 60  rose-pine-dawn: primary-text on background
+ 53  below 60  rose-pine-dawn: primary-text on card + state-subtle
  68  ok 60     rose-pine-dawn: primary-foreground on primary
  83  ok 60     rose-pine-dawn: destructive-foreground on destructive
  56  below 60  rose-pine-dawn: warning-foreground on warning
@@ -129,11 +129,11 @@
  74  ok 45     solarized-light: muted-foreground on card
  71  ok 45     solarized-light: muted-foreground on muted
  74  ok 45     solarized-light: muted-foreground on sidebar
- 57  below 60  solarized-light: primary on background
- 57  below 60  solarized-light: primary on card + state-subtle
+ 57  below 60  solarized-light: primary-text on background
+ 57  below 60  solarized-light: primary-text on card + state-subtle
  70  ok 60     solarized-light: primary-foreground on primary
  70  ok 60     solarized-light: destructive-foreground on destructive
- 45  below 60  solarized-light: warning-foreground on warning
+ 59  below 60  solarized-light: warning-foreground on warning
  70  ok 60     solarized-light: event-foreground on event
  59  below 60  solarized-light: task-foreground on task
  58  below 60  solarized-light: note-foreground on note
@@ -159,11 +159,11 @@
  51  ok 45     solarized-dark: muted-foreground on card
  46  ok 45     solarized-dark: muted-foreground on muted
  51  ok 45     solarized-dark: muted-foreground on sidebar
- 28  below 60  solarized-dark: primary on background
- 24  below 60  solarized-dark: primary on card + state-subtle
+ 71  ok 60     solarized-dark: primary-text on background
+ 67  ok 60     solarized-dark: primary-text on card + state-subtle
  70  ok 60     solarized-dark: primary-foreground on primary
  70  ok 60     solarized-dark: destructive-foreground on destructive
- 41  below 60  solarized-dark: warning-foreground on warning
+ 59  below 60  solarized-dark: warning-foreground on warning
  70  ok 60     solarized-dark: event-foreground on event
  59  below 60  solarized-dark: task-foreground on task
  58  below 60  solarized-dark: note-foreground on note
@@ -189,8 +189,8 @@
  49  ok 45     dracula: muted-foreground on card
  45  ok 45     dracula: muted-foreground on muted
  49  ok 45     dracula: muted-foreground on sidebar
- 53  below 60  dracula: primary on background
- 48  below 60  dracula: primary on card + state-subtle
+ 53  below 60  dracula: primary-text on background
+ 48  below 60  dracula: primary-text on card + state-subtle
  55  below 60  dracula: primary-foreground on primary
  45  below 60  dracula: destructive-foreground on destructive
  97  ok 60     dracula: warning-foreground on warning
@@ -219,8 +219,8 @@
  71  ok 45     catppuccin-latte: muted-foreground on card
  74  ok 45     catppuccin-latte: muted-foreground on muted
  71  ok 45     catppuccin-latte: muted-foreground on sidebar
- 63  ok 60     catppuccin-latte: primary on background
- 59  below 60  catppuccin-latte: primary on card + state-subtle
+ 63  ok 60     catppuccin-latte: primary-text on background
+ 59  below 60  catppuccin-latte: primary-text on card + state-subtle
  72  ok 60     catppuccin-latte: primary-foreground on primary
  71  ok 60     catppuccin-latte: destructive-foreground on destructive
  77  ok 60     catppuccin-latte: warning-foreground on warning
@@ -249,8 +249,8 @@
  46  ok 45     catppuccin-mocha: muted-foreground on card
  42  below 45  catppuccin-mocha: muted-foreground on muted
  46  ok 45     catppuccin-mocha: muted-foreground on sidebar
- 62  ok 60     catppuccin-mocha: primary on background
- 58  below 60  catppuccin-mocha: primary on card + state-subtle
+ 62  ok 60     catppuccin-mocha: primary-text on background
+ 58  below 60  catppuccin-mocha: primary-text on card + state-subtle
  64  ok 60     catppuccin-mocha: primary-foreground on primary
  58  below 60  catppuccin-mocha: destructive-foreground on destructive
  89  ok 60     catppuccin-mocha: warning-foreground on warning
