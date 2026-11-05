@@ -4,39 +4,44 @@ import {
   AlertDialogCancel,
   AlertDialogFooter,
 } from '@/components/ui/alert-dialog'
+import { buttonVariants } from '@/components/ui/button'
 
 interface Props {
   onClose: () => void
-  onDelete: () => void
+  /** Omitted by `SeriesDeleteDialog`, whose scope buttons are the delete actions. */
+  onDelete?: () => void
   deleteLabel?: string
   onArchive?: () => void
   archiveLabel?: string
 }
 
-/** Shared Cancel/Archive/Delete button row for the delete dialogs. */
+/**
+ * Shared footer for the delete dialogs. Archive is outlined, like Cancel: a
+ * real alternative to deleting, but not the primary action.
+ */
 export default function DeleteDialogFooter(props: Props) {
   const { onClose, onDelete, onArchive } = props
-  const deleteLabel = props.deleteLabel ?? 'Delete'
-  const archiveLabel = props.archiveLabel ?? 'Archive instead'
   return (
     <AlertDialogFooter className="gap-2 sm:gap-0">
       <AlertDialogCancel onClick={onClose} className="mt-0">Cancel</AlertDialogCancel>
       {onArchive && (
         <AlertDialogAction
-          className="bg-priority-3 text-priority-3-foreground hover:bg-priority-3/90 gap-1.5"
+          className={buttonVariants({ variant: 'outline', className: 'gap-1.5' })}
           onClick={onArchive}
         >
           <Archive size={13} />
-          {archiveLabel}
+          {props.archiveLabel ?? 'Archive instead'}
         </AlertDialogAction>
       )}
-      <AlertDialogAction
-        className="bg-priority-1 text-priority-1-foreground hover:bg-priority-1/90 gap-1.5"
-        onClick={onDelete}
-      >
-        <Trash2 size={13} />
-        {deleteLabel}
-      </AlertDialogAction>
+      {onDelete && (
+        <AlertDialogAction
+          className="bg-destructive text-destructive-foreground hover:bg-destructive hover-layer gap-1.5"
+          onClick={onDelete}
+        >
+          <Trash2 size={13} />
+          {props.deleteLabel ?? 'Delete'}
+        </AlertDialogAction>
+      )}
     </AlertDialogFooter>
   )
 }

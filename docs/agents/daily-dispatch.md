@@ -45,15 +45,16 @@ digest.
   (touches only `.claude/skills/survey-*/SKILL.md`). `opus`/`opus-plan` PRs
   are never merged by the script; they go in the digest's Review list.
   Dependabot PRs aren't merged by the script either:
-  `dependabot-automerge.yml` queues non-majors, and a green major goes in the
-  Review list.
+  `dependabot-automerge.yml` queues non-majors, and drops auto-merge once
+  anyone but Dependabot pushes (a follow-up, a merge of `main`); a green PR
+  without auto-merge (a major, or one an agent changed) goes in the Review list.
 - **Caps**: at most `--max-sessions` (4) sessions per run, follow-ups first;
   at most `--max-followups` (2) follow-ups per PR. After that the PR goes in
   the digest instead.
 - **Digest**: one issue titled `Farm digest`, listing what is waiting on the
   maintainer, each line saying what to do: **Decide** (open
   `decision-required` issues), **Review** (green, quiet `opus`/`opus-plan`
-  PRs), **Unstick** (PRs at their follow-up cap, conflicts included, a follow-up with no push
+  PRs and Dependabot PRs without auto-merge), **Unstick** (PRs at their follow-up cap, conflicts included, a follow-up with no push
   after 2 days, a dispatched issue with no PR after 2 days). Below that,
   **Merged since** lists every PR merged since the last digest, with the issue
   it closed and that issue's labels. The body is rewritten, and a comment

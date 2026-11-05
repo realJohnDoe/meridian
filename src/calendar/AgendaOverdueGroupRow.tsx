@@ -82,7 +82,7 @@ function AgendaOverdueGroupRow({ occ, count, oldest, onOpen, onToggleDone, onSwi
             >
               <Badge
                 variant="tag"
-                className="bg-warning/30 text-chip-tint-foreground font-bold tabular-nums"
+                className="bg-warning-tint text-chip-tint-foreground font-bold tabular-nums"
               >
                 ×{count}
               </Badge>

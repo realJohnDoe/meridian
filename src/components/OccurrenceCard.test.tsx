@@ -132,7 +132,7 @@ describe('OccurrenceCard', () => {
       const occ = makeOcc()
       render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       const badge = screen.getByText('Work')
-      expect(badge).toHaveClass('bg-note/30', 'border-[var(--chip-border)]')
+      expect(badge).toHaveClass('bg-note-tint', 'border-[var(--chip-border)]')
     })
 
     it('replaces the vault badge with a priority one when coloring by vault', () => {
@@ -147,7 +147,7 @@ describe('OccurrenceCard', () => {
       const { container } = render(<OccurrenceCard occ={occ} onOpen={vi.fn()} onToggleDone={vi.fn()} leadingIcon="kind" />)
       expect(screen.queryByText('Work')).toBeNull()
       const badge = screen.getByText('High')
-      expect(badge).toHaveClass('bg-priority-1/30', 'border-[var(--chip-border)]')
+      expect(badge).toHaveClass('bg-priority-1-tint', 'border-[var(--chip-border)]')
       // …and the stripe takes the vault's color, not the priority's.
       expect(container.querySelector('.bg-note')).not.toBeNull()
     })

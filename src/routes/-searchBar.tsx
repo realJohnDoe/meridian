@@ -198,7 +198,7 @@ export default function SearchBar() {
         // below. Undocked: plain fixed spacing under whatever sits above
         // it (the app topbar handles its own inset).
         dockTop ? 'pt-[var(--search-top-inset)]' : 'pt-3.5',
-        searchOpen ? 'bg-background' : 'bg-background/85 backdrop-blur-sm',
+        searchOpen ? 'bg-background' : 'bg-background-frosted backdrop-blur-sm',
       )}>
         <div className="search-bar-wrap w-full max-w-xl mx-auto">
           <Search size={15} className="shrink-0 stroke-card-foreground fill-none" />

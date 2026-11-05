@@ -45,10 +45,8 @@ export function removeItemLink(target: EntryKey, sourceSlug: string): void {
 // ── SERIES-DELETE SHEET CONFIG ────────────────────────────────
 
 type SeriesSheetOption = {
-  icon: 'calendar' | 'calendar-range'
   label: string
-  sublabel: string
-  /** Shown as a warning banner while this option is selected. */
+  /** Shown as a note under this option's button. */
   warning?: string
   onClick: () => void
 }
@@ -57,11 +55,8 @@ export type SeriesSheetConfig = {
   options:  SeriesSheetOption[]
   /**
    * Archives the whole file instead of deleting some slice of its
-   * occurrences. Deliberately not a fourth `option`: the radio group above
-   * answers "which occurrences", a file-level action answers a different
-   * question, and giving it its own slot keeps a scope choice from ever
-   * looking like a peer of a one-shot action — see `plans/archived-entries.md`
-   * PR 2. Optional for the same reason `DeleteDialog`'s `onArchive` is.
+   * occurrences. Deliberately not one of the `options`: those are all
+   * deletes, and archiving is the non-destructive alternative to them. Optional for the same reason `DeleteDialog`'s `onArchive` is.
    */
   onArchive?: () => void
 }
@@ -450,24 +445,23 @@ export function deleteNode(
 
   const options: SeriesSheetOption[] = [
     {
-      icon: 'calendar', label: 'This occurrence', sublabel: 'Remove only this occurrence', onClick: excludeThis,
+      label: 'Delete this occurrence', onClick: excludeThis,
       ...(endsSeries ? { warning: 'This series only creates its next occurrence when you complete the current one. Deleting this occurrence leaves nothing to complete, so the series ends here.' } : {}),
     },
   ]
   if (isRecurring) {
     if (isScheduled) {
-      options.push({ icon: 'calendar-range', label: 'This and all following', sublabel: 'Remove this and all future occurrences', onClick: deleteFuture })
+      options.push({ label: 'Delete this and following', onClick: deleteFuture })
     }
-    options.push({ icon: 'calendar-range', label: 'All occurrences', sublabel: 'Remove all occurrences of this series', onClick: deleteAllOfSeries })
+    options.push({ label: 'Delete all occurrences', onClick: deleteAllOfSeries })
   }
-  // A wider, categorically different action from the ones above — it reaches
-  // past this occurrence's own series into every other series/occurrence the
-  // file holds — so it only appears when there is something else to lose,
-  // and carries its own warning rather than reading as one more peer scope.
+  // Wider than the scopes above — it reaches past this occurrence's own
+  // series into every other series/occurrence the file holds — so it only
+  // appears when there is something else to lose, and says so.
   if (hasOtherContent) {
     options.push({
-      icon: 'calendar-range', label: 'Delete whole file', sublabel: 'Remove everything in this file, not just this series',
-      warning: 'This deletes the whole file, including its other events and series — not just this one.',
+      label: 'Delete whole file',
+      warning: 'Also deletes the other events and series in this file.',
       onClick: deleteWholeFile,
     })
   }

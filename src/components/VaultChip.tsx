@@ -43,7 +43,7 @@ export default function VaultChip({ vaultId, onChange, className }: Props) {
   if (!vault) return null
 
   const base = cn(
-    'inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40',
+    'inline-flex items-center gap-1.5 rounded-full border border-border bg-muted-subtle',
     'px-2 py-0.5 text-xs text-muted-foreground max-w-40',
     className,
   )

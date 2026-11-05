@@ -46,7 +46,7 @@ export default function VaultList() {
                   </span>
                 )}
                 {attention && (
-                  <span className="shrink-0 rounded-full bg-note/15 px-1.5 py-0.5 text-2xs font-medium text-note">
+                  <span className="shrink-0 rounded-full bg-current-tint px-1.5 py-0.5 text-2xs font-medium text-note">
                     {attentionLabel(attention.kind)}
                   </span>
                 )}
