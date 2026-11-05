@@ -111,10 +111,7 @@ const TARGET = {
 const ABSOLUTE_FLOOR = 30
 
 /** Pairs under ABSOLUTE_FLOOR today, pinned at their current |Lc|: may improve, not drop. */
-const KNOWN_BELOW_FLOOR: Record<string, number> = {
-  'solarized-dark: primary on background': 28,
-  'solarized-dark: primary on card + state-subtle': 24,
-}
+const KNOWN_BELOW_FLOOR: Record<string, number> = {}
 
 type Role = keyof typeof TARGET
 type Pair = { role: Role; text: string; on: string[] }
@@ -126,8 +123,8 @@ const PAIRS: Pair[] = [
   { role: 'body', text: 'sidebar-foreground', on: ['sidebar'] },
   { role: 'body', text: 'accent-foreground', on: ['accent'] },
   ...['background', 'card', 'muted', 'sidebar'].map(s => ({ role: 'muted' as const, text: 'muted-foreground', on: [s] })),
-  { role: 'accent', text: 'primary', on: ['background'] },
-  { role: 'accent', text: 'primary', on: ['card', 'state-subtle'] },
+  { role: 'accent', text: 'primary-text', on: ['background'] },
+  { role: 'accent', text: 'primary-text', on: ['card', 'state-subtle'] },
   { role: 'button', text: 'primary-foreground', on: ['primary'] },
   { role: 'button', text: 'destructive-foreground', on: ['destructive'] },
   { role: 'button', text: 'warning-foreground', on: ['warning'] },

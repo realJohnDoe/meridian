@@ -61,15 +61,15 @@ const editorTheme = EditorView.theme({
   },
   // Rendered markdown link on non-cursor lines
   '.cm-md-link': {
-    color: 'var(--primary)',
+    color: 'var(--primary-text)',
     textDecoration: 'underline',
     textUnderlineOffset: '2px',
-    textDecorationColor: 'color-mix(in oklab, var(--primary), transparent 40%)',
+    textDecorationColor: 'var(--color-current-underline)',
     cursor: 'pointer',
   },
   // Raw wikilink text shown when cursor is on the line
   '.wl': {
-    color: 'var(--primary)',
+    color: 'var(--primary-text)',
     borderBottom: '1px solid var(--event-border)',
     cursor: 'pointer',
   },
