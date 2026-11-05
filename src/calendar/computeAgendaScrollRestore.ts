@@ -285,7 +285,7 @@ export function useAnchoredAgendaScroll(
   useLayoutEffect(() => {
     const prevRows = prevRowsRef.current
     prevRowsRef.current = rows
-    const excludeKey = excludeAnchorKeyRef.current
+    let excludeKey = excludeAnchorKeyRef.current
     excludeAnchorKeyRef.current = null
     if (prevRows === rows) return
 
@@ -300,6 +300,11 @@ export function useAnchoredAgendaScroll(
     // where the user is dragging to and the next rebuild corrects from there
     // instead of from a position they have already left.
     if (touchingRef.current) { captureAnchor(); return }
+
+    // An anchor resting on its day's first row means "the top of that day", not
+    // that particular row: the clock tick can end the top event and sort it
+    // lower within the day, and chasing it would scroll the day's label away.
+    if (anchor.index === prevRows.findIndex(r => r.dateKey >= anchor.dateKey)) excludeKey = anchor.key
 
     let index = findAnchorIndex(rows, anchor, excludeKey)
     if (index < 0) return
