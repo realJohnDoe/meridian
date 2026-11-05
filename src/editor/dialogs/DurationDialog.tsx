@@ -184,7 +184,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                   className={cn(
                     badgeVariants({ variant: 'chip' }),
                     'cursor-pointer',
-                    serialiseInterval(Math.max(1, n), unit) === p.value && 'bg-primary/20 text-primary border-primary',
+                    serialiseInterval(Math.max(1, n), unit) === p.value && 'bg-state-selected text-primary border-primary',
                   )}
                   onClick={() => {
                     const parsed = parseDuration(p.value)
@@ -217,7 +217,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className="flex-1 flex items-center justify-between bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-normal text-foreground transition-colors"
+                  className="flex-1 flex items-center justify-between bg-background border border-border hover:border-input focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-normal text-foreground transition-colors"
                   onClick={() => setDateDlgOpen(true)}
                 >
                   <span className={endDate ? '' : 'text-muted-foreground'}>
@@ -229,7 +229,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                 {hasTime && isTouch && (
                   <button
                     type="button"
-                    className="bg-background border border-border/50 hover:border-border focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors"
+                    className="bg-background border border-border hover:border-input focus:border-primary focus:outline-none rounded-lg px-3 h-control text-sm font-mono text-foreground transition-colors"
                     onClick={() => setTimeDlgOpen(true)}
                   >
                     {endTime || '—'}

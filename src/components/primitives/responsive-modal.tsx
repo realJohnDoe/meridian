@@ -117,7 +117,7 @@ function ResponsiveModalActions(props: ResponsiveModalActionsProps) {
         <Button
           variant="outline"
           size="sm"
-          className="text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+          className="text-destructive border-destructive-border hover:bg-destructive-subtle hover:text-destructive"
           onClick={onRemove}
         >
           <X size={13} />

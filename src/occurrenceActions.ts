@@ -216,7 +216,7 @@ export function beginSwipeDelete(o: Occurrence): () => void {
 // so `setData` runs immediately here and only the persist/backend write (and
 // therefore Undo) waits on the toast.
 
-/** "This occurrence" — a series' single instance, or a standalone sharing its file with other content. */
+/** "Delete this occurrence" — a series' single instance, or a standalone sharing its file with other content. */
 export function deleteOccurrenceWithUndo(o: Occurrence): void {
   const snapshot = getSnapshot()
   const next = excludeOccurrence(snapshot, o)
@@ -229,7 +229,7 @@ export function deleteOccurrenceWithUndo(o: Occurrence): void {
   )
 }
 
-/** "This and all following" — caps the series' repeat.end. */
+/** "Delete this and following" — caps the series' repeat.end. */
 export function deleteFutureWithUndo(o: Occurrence): void {
   const snapshot = getSnapshot()
   const next = deleteFollowing(snapshot, o)
@@ -242,7 +242,7 @@ export function deleteFutureWithUndo(o: Occurrence): void {
 }
 
 /**
- * "All occurrences of this series" — only reachable when the series isn't
+ * "Delete all occurrences" — only reachable when the series isn't
  * the file's only content (see `deleteSeries`'s doc comment in model/); a
  * lone series goes through `deleteWholeFileWithUndo` instead, for the
  * backlink cleanup a file that vanishes needs.

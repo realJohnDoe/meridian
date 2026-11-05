@@ -71,7 +71,7 @@ export default function SearchResults(props: Props) {
             aria-selected={highlighted?.entryKey === null}
             id="search-option-create"
             className={cn(
-              'flex w-full items-center gap-2.5 pl-3 pr-3.5 py-3.5 rounded-lg bg-primary/5 shadow-none cursor-pointer hover:bg-primary/10 transition-colors text-primary',
+              'flex w-full items-center gap-2.5 pl-3 pr-3.5 py-3.5 rounded-lg bg-state-subtle shadow-none cursor-pointer hover:bg-state-hover transition-colors text-primary',
               highlighted?.entryKey === null && 'pointer-fine:ring-2 pointer-fine:ring-ring',
             )}
             onClick={() => onCreate(query)}

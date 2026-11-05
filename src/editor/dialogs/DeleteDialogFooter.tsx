@@ -1,9 +1,10 @@
-import { Trash2 } from 'lucide-react'
+import { Archive, Trash2 } from 'lucide-react'
 import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogFooter,
 } from '@/components/ui/alert-dialog'
+import { buttonVariants } from '@/components/ui/button'
 
 interface Props {
   onClose: () => void
@@ -15,25 +16,26 @@ interface Props {
 }
 
 /**
- * Shared footer for the delete dialogs. Archive is a quiet text action on the
- * left — a real alternative, but not a peer of the destructive button(s).
+ * Shared footer for the delete dialogs. Archive is outlined, like Cancel: a
+ * real alternative to deleting, but not the primary action.
  */
 export default function DeleteDialogFooter(props: Props) {
   const { onClose, onDelete, onArchive } = props
   return (
     <AlertDialogFooter className="gap-2 sm:gap-0">
+      <AlertDialogCancel onClick={onClose} className="mt-0">Cancel</AlertDialogCancel>
       {onArchive && (
         <AlertDialogAction
-          className="bg-transparent px-0 text-muted-foreground underline-offset-4 shadow-none hover:bg-transparent hover:text-foreground hover:underline sm:mr-auto"
+          className={buttonVariants({ variant: 'outline', className: 'gap-1.5' })}
           onClick={onArchive}
         >
+          <Archive size={13} />
           {props.archiveLabel ?? 'Archive instead'}
         </AlertDialogAction>
       )}
-      <AlertDialogCancel onClick={onClose} className="mt-0">Cancel</AlertDialogCancel>
       {onDelete && (
         <AlertDialogAction
-          className="bg-priority-1 text-priority-1-foreground hover:bg-priority-1/90 gap-1.5"
+          className="bg-destructive text-destructive-foreground hover:bg-destructive-hover gap-1.5"
           onClick={onDelete}
         >
           <Trash2 size={13} />

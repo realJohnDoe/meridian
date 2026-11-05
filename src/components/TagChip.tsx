@@ -49,7 +49,7 @@ export default function TagChip({ label, isTopic, interactive, onRemove, onNavig
           // <button> can't contain another <button>).
           <button
             type="button"
-            className="relative cursor-pointer underline underline-offset-2 decoration-current/60 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-y-3 before:inset-x-0 before:content-['']"
+            className="relative cursor-pointer underline underline-offset-2 decoration-current-underline rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring before:absolute before:-inset-y-3 before:inset-x-0 before:content-['']"
             onClick={onNavigate}
           >
             {label}

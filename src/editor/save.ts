@@ -445,22 +445,22 @@ export function deleteNode(
 
   const options: SeriesSheetOption[] = [
     {
-      label: 'This occurrence', onClick: excludeThis,
+      label: 'Delete this occurrence', onClick: excludeThis,
       ...(endsSeries ? { warning: 'This series only creates its next occurrence when you complete the current one. Deleting this occurrence leaves nothing to complete, so the series ends here.' } : {}),
     },
   ]
   if (isRecurring) {
     if (isScheduled) {
-      options.push({ label: 'This and all following', onClick: deleteFuture })
+      options.push({ label: 'Delete this and following', onClick: deleteFuture })
     }
-    options.push({ label: 'All occurrences', onClick: deleteAllOfSeries })
+    options.push({ label: 'Delete all occurrences', onClick: deleteAllOfSeries })
   }
   // Wider than the scopes above — it reaches past this occurrence's own
   // series into every other series/occurrence the file holds — so it only
   // appears when there is something else to lose, and says so.
   if (hasOtherContent) {
     options.push({
-      label: 'Whole file',
+      label: 'Delete whole file',
       warning: 'Also deletes the other events and series in this file.',
       onClick: deleteWholeFile,
     })

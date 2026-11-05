@@ -27,7 +27,7 @@ const TIME_ONLY_WIDTH_GATE = '@max-[96px]:hidden'   // start-time chip alone
 // own foreground ink (bg-current), so it contrasts on every block state/theme
 // without hardcoding a surface color the way Badge's `tag` variant does.
 const eventPillCls =
-  'inline-flex items-center rounded-md px-1.5 py-0.5 text-2xs font-medium leading-none bg-current/20 whitespace-nowrap'
+  'inline-flex items-center rounded-md px-1.5 py-0.5 text-2xs font-medium leading-none bg-current-tint whitespace-nowrap'
 
 interface TimedBlockProps {
   o: Occurrence

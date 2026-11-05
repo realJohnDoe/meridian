@@ -68,6 +68,44 @@
   --color-priority-1:     var(--priority-1);
   --color-priority-2:     var(--priority-2);
   --color-priority-3:     var(--priority-3);
+
+  /* Derived colors — every translucent or hover shade the app uses, defined
+     once here so components never do color arithmetic (`bg-x/30`) at the call
+     site. Each derives from its theme token, so all ten themes follow. */
+  /* Solid-fill hover (shadcn's /90 convention) */
+  --color-primary-hover:           color-mix(in oklab, var(--primary) 90%, transparent);
+  --color-destructive-hover:       color-mix(in oklab, var(--destructive) 90%, transparent);
+  --color-event-hover:             color-mix(in oklab, var(--primary) 90%, transparent);
+  --color-task-hover:              color-mix(in oklab, var(--task) 90%, transparent);
+  --color-note-hover:              color-mix(in oklab, var(--note) 90%, transparent);
+  --color-priority-1-hover:        color-mix(in oklab, var(--priority-1) 90%, transparent);
+  --color-priority-2-hover:        color-mix(in oklab, var(--priority-2) 90%, transparent);
+  --color-priority-3-hover:        color-mix(in oklab, var(--priority-3) 90%, transparent);
+  --color-muted-foreground-hover:  color-mix(in oklab, var(--muted-foreground) 90%, transparent);
+  /* Chip tint — always paired with text-chip-tint-foreground (see badge.tsx) */
+  --color-primary-tint:            color-mix(in oklab, var(--primary) 30%, transparent);
+  --color-event-tint:              color-mix(in oklab, var(--primary) 30%, transparent);
+  --color-task-tint:               color-mix(in oklab, var(--task) 30%, transparent);
+  --color-note-tint:               color-mix(in oklab, var(--note) 30%, transparent);
+  --color-priority-1-tint:         color-mix(in oklab, var(--priority-1) 30%, transparent);
+  --color-priority-2-tint:         color-mix(in oklab, var(--priority-2) 30%, transparent);
+  --color-priority-3-tint:         color-mix(in oklab, var(--priority-3) 30%, transparent);
+  --color-muted-foreground-tint:   color-mix(in oklab, var(--muted-foreground) 30%, transparent);
+  --color-warning-tint:            color-mix(in oklab, var(--warning) 30%, transparent);
+  /* Primary state layers: resting wash, hover, selected (cf. Material 3) */
+  --color-state-subtle:   color-mix(in oklab, var(--primary) 5%, transparent);
+  --color-state-hover:    color-mix(in oklab, var(--primary) 10%, transparent);
+  --color-state-selected: color-mix(in oklab, var(--primary) 15%, transparent);
+  /* One-off washes */
+  --color-destructive-subtle: color-mix(in oklab, var(--destructive) 10%, transparent);
+  --color-destructive-border: color-mix(in oklab, var(--destructive) 40%, transparent);
+  --color-note-subtle:        color-mix(in oklab, var(--note) 15%, transparent);
+  --color-muted-subtle:       color-mix(in oklab, var(--muted) 40%, transparent);
+  --color-secondary-hover:    color-mix(in oklab, var(--secondary) 80%, transparent);
+  --color-background-frosted: color-mix(in oklab, var(--background) 90%, transparent);
+  /* currentColor resolves where the utility is used, so these follow the text */
+  --color-current-tint:       color-mix(in oklab, currentColor 20%, transparent);
+  --color-current-underline:  color-mix(in oklab, currentColor 60%, transparent);
   /* On-accent text for solid domain-color chips — each theme picks whichever
      of its two ink colors (--ink-light/--ink-dark) contrasts best against
      that specific swatch, so swatches can stay at their vivid brand hue

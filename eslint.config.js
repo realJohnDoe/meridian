@@ -72,6 +72,16 @@ const tsRecommendedTypeCheckedRules = {
   ...tseslint.plugin.configs['flat/recommended-type-checked'][2].rules,
 }
 
+// No color arithmetic at the call site (`bg-primary/30`, `hover:bg-note/90`):
+// every translucent or hover shade is a named token in index.css's @theme
+// block, defined once and derived from its theme color. `\u002F` is a `/` —
+// esquery's regex literal can't contain one.
+const COLOR_OPACITY = '/\\b(bg|text|border|ring|decoration|divide|outline|fill|stroke|from|via|to|shadow)-[a-z0-9-]+\\u002F\\d+\\b/'
+const NO_COLOR_ARITHMETIC = ['Literal[value', 'TemplateElement[value.raw'].map(node => ({
+  selector: `${node}=${COLOR_OPACITY}]`,
+  message: 'Use a named color token from index.css (e.g. bg-primary-tint) instead of an opacity modifier.',
+}))
+
 export default [
   // Auto-generated files — skip entirely
   { ignores: ['src/routeTree.gen.ts'] },
@@ -431,8 +441,16 @@ export default [
       'no-restricted-syntax': ['error', {
         selector: ':matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression) > ObjectPattern > Property > AssignmentPattern',
         message: 'A default in a destructured parameter makes babel-plugin-react-compiler silently skip memoizing this component, whether declared with `function` or as an arrow. Use `props.x ?? default` in the body (see OccurrenceCard.tsx).',
-      }],
+      }, ...NO_COLOR_ARITHMETIC],
     },
+  },
+  // Same color rule for plain .ts class maps (cva variants, CodeMirror
+  // decorations). A separate block because flat config replaces, not merges,
+  // a rule's options — the .tsx block above carries it alongside its own.
+  {
+    files: ['src/**/*.ts'],
+    ignores: ['src/components/ui/**', 'src/debug/**', 'src/**/*.test.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...NO_COLOR_ARITHMETIC] },
   },
 
   // Within a module, relative imports into its own subdirectories (e.g.

@@ -147,7 +147,7 @@ export default function SearchOverlay({ open, query, onQueryChange, onClose, onO
         type="button"
         aria-label="Close search"
         onClick={onClose}
-        className={cn('fixed inset-y-0 right-0 z-search-backdrop bg-background/90 pointer-events-auto transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')}
+        className={cn('fixed inset-y-0 right-0 z-search-backdrop bg-background-frosted pointer-events-auto transition-[left] duration-200 ease-linear', sidebarOpen ? 'left-[var(--sidebar-width)]' : 'left-0')}
       />
       <div
         id="filterOverlay"

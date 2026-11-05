@@ -112,7 +112,7 @@ export function TimelineScroller({
 // pane was paying 7 columns × HOURS times, per mounted pane.
 const HOUR_CELL_CLASS = cn(
   occRadius,
-  'absolute inset-x-0 bg-muted/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'absolute inset-x-0 bg-muted-subtle cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
 )
 
 interface HourCellsProps {
@@ -168,7 +168,7 @@ export function HourCells({ date, hour12, onCreate, hourAriaLabel }: HourCellsPr
 // cursor/focus affordances, since a skeleton pane is already `inert`.
 const HOUR_STRIPE_CLASS = cn(
   occRadius,
-  'absolute inset-x-0 bg-muted/40',
+  'absolute inset-x-0 bg-muted-subtle',
 )
 
 /**

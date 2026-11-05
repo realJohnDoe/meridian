@@ -30,7 +30,7 @@ export const HUE_SOLID: Record<OccHue, string> = {
  * foreground (each theme picks whichever of its two ink colors contrasts best
  * against that specific swatch — see index.css) is deliberate: a light tint
  * behind colored text can't clear AA on light themes, no matter the text
- * color. hover:bg-{color}/90 (matching the buttonVariants hover convention) and an
+ * color. hover:bg-{color}-hover (matching the buttonVariants hover convention) and an
  * explicit hover:text so neither gets silently overridden by SurfaceButton's own
  * ghost-variant hover styles. Identical across all item-display contexts — one edit
  * here changes every view.
@@ -40,13 +40,13 @@ export const HUE_SOLID: Record<OccHue, string> = {
  * wherever that one does.
  */
 const TINT_CLASSES = {
-  event:        'bg-event text-event-foreground hover:bg-event/90 hover:text-event-foreground',
-  task:         'bg-task text-task-foreground hover:bg-task/90 hover:text-task-foreground',
-  'priority-1': 'bg-priority-1 text-priority-1-foreground hover:bg-priority-1/90 hover:text-priority-1-foreground',
-  'priority-2': 'bg-priority-2 text-priority-2-foreground hover:bg-priority-2/90 hover:text-priority-2-foreground',
-  'priority-3': 'bg-priority-3 text-priority-3-foreground hover:bg-priority-3/90 hover:text-priority-3-foreground',
-  note:         'bg-note text-note-foreground hover:bg-note/90 hover:text-note-foreground',
-  neutral:      'bg-muted-foreground text-background hover:bg-muted-foreground/90 hover:text-background',
+  event:        'bg-event text-event-foreground hover:bg-event-hover hover:text-event-foreground',
+  task:         'bg-task text-task-foreground hover:bg-task-hover hover:text-task-foreground',
+  'priority-1': 'bg-priority-1 text-priority-1-foreground hover:bg-priority-1-hover hover:text-priority-1-foreground',
+  'priority-2': 'bg-priority-2 text-priority-2-foreground hover:bg-priority-2-hover hover:text-priority-2-foreground',
+  'priority-3': 'bg-priority-3 text-priority-3-foreground hover:bg-priority-3-hover hover:text-priority-3-foreground',
+  note:         'bg-note text-note-foreground hover:bg-note-hover hover:text-note-foreground',
+  neutral:      'bg-muted-foreground text-background hover:bg-muted-foreground-hover hover:text-background',
 } satisfies Record<OccHue, string>
 
 /**
@@ -114,7 +114,7 @@ export const dvBlockVariants = cva('', {
 })
 
 /**
- * Chip tint per hue — bg-{color}/30 (a tint, not TINT_CLASSES' solid fill)
+ * Chip tint per hue — bg-{color}-tint (a tint, not TINT_CLASSES' solid fill)
  * plus text-chip-tint-foreground: a full solid fill reads as too dominant at
  * chip size, and the palette isn't uniformly tuned for it as a full fill +
  * matching -foreground ink across every theme. --chip-tint-foreground is
@@ -129,13 +129,13 @@ export const dvBlockVariants = cva('', {
  * included.
  */
 export const HUE_CHIP: Record<OccHue, string> = {
-  event:        'bg-event/30 text-chip-tint-foreground',
-  'priority-1': 'bg-priority-1/30 text-chip-tint-foreground',
-  'priority-2': 'bg-priority-2/30 text-chip-tint-foreground',
-  'priority-3': 'bg-priority-3/30 text-chip-tint-foreground',
-  task:         'bg-task/30 text-chip-tint-foreground',
-  note:         'bg-note/30 text-chip-tint-foreground',
-  neutral:      'bg-muted-foreground/30 text-chip-tint-foreground',
+  event:        'bg-event-tint text-chip-tint-foreground',
+  'priority-1': 'bg-priority-1-tint text-chip-tint-foreground',
+  'priority-2': 'bg-priority-2-tint text-chip-tint-foreground',
+  'priority-3': 'bg-priority-3-tint text-chip-tint-foreground',
+  task:         'bg-task-tint text-chip-tint-foreground',
+  note:         'bg-note-tint text-chip-tint-foreground',
+  neutral:      'bg-muted-foreground-tint text-chip-tint-foreground',
 }
 
 /**
@@ -145,9 +145,9 @@ export const HUE_CHIP: Record<OccHue, string> = {
  * pressable, and the border is what shows the pressed state's edge).
  */
 export const PRIORITY_CLASS: Record<Priority, string> = {
-  high:   'aria-[pressed=true]:bg-priority-1/30 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-1',
-  medium: 'aria-[pressed=true]:bg-priority-2/30 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-2',
-  low:    'aria-[pressed=true]:bg-priority-3/30 aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-3',
+  high:   'aria-[pressed=true]:bg-priority-1-tint aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-1',
+  medium: 'aria-[pressed=true]:bg-priority-2-tint aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-2',
+  low:    'aria-[pressed=true]:bg-priority-3-tint aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-priority-3',
 }
 
 /** Solid swatch fill for each `VaultColor`, for the color picker in Settings. */

@@ -49,7 +49,7 @@ function PropChip({ icon: Icon, label, value, pressed, onClick, className }: {
 
 
 // Colors only the segment's icon, not its fill/text — unlike PRIORITY_CLASS's
-// bg-{color}/30 tint (occurrence-variants.ts), this reads well as-is: the
+// bg-{color}-tint (occurrence-variants.ts), this reads well as-is: the
 // "on" segment is already shown by segmentedItemVariants' raised
 // bg-background pill, so the icon alone is enough of a color cue here.
 const TYPE_CHIP_ACTIVE_CLS: Record<string, string> = {
@@ -235,14 +235,14 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
         )}
 
         {readOnlyVault && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 mb-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted-subtle px-3 py-2 mb-3 text-xs text-muted-foreground">
             <Info size={14} className="shrink-0" />
             {readOnlyVault.name} is a sandbox — your changes last until you reload.
           </div>
         )}
 
         {!vaultId && !item && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 mb-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-muted-subtle px-3 py-2 mb-3 text-xs text-muted-foreground">
             <Info size={14} className="shrink-0" />
             <span className="flex-1">No vault to save to yet.</span>
             <Link to="/settings/vault/new" className="shrink-0 text-primary hover:underline">
