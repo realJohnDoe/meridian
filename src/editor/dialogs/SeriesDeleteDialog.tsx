@@ -34,7 +34,7 @@ export default function SeriesDeleteDialog({ config, onClose }: Props) {
           {config?.options.map(opt => (
             <div key={opt.label} className="flex flex-col gap-1">
               <AlertDialogAction
-                className={buttonVariants({ variant: 'outline', className: 'w-full text-destructive border-destructive hover:bg-background hover-layer hover:text-destructive' })}
+                className={buttonVariants({ variant: 'destructive', className: 'w-full' })}
                 onClick={() => { opt.onClick(); onClose() }}
               >
                 {opt.label}
