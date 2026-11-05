@@ -245,7 +245,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted-subtle px-3 py-2 mb-3 text-xs text-muted-foreground">
             <Info size={14} className="shrink-0" />
             <span className="flex-1">No vault to save to yet.</span>
-            <Link to="/settings/vault/new" className="shrink-0 text-primary hover:underline">
+            <Link to="/settings/vault/new" className="shrink-0 text-primary-text hover:underline">
               Add a vault
             </Link>
           </div>

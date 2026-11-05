@@ -167,7 +167,7 @@ export default function RepeatDialog({
         <div className="px-4 pt-4 pb-4 flex flex-col gap-4">
           {/* Hint */}
           <div className="flex gap-2 items-start bg-muted-subtle rounded-lg p-3 text-xs text-muted-foreground">
-            <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <Info className="h-4 w-4 text-primary-text shrink-0 mt-0.5" />
             <span>{hintText}</span>
           </div>
 
@@ -302,7 +302,7 @@ export default function RepeatDialog({
                         className={cn(
                           "px-3 py-2.5 rounded-lg border text-xs text-left transition-all cursor-pointer",
                           monthly === o.id
-                            ? "bg-state-selected border-primary text-primary font-semibold"
+                            ? "bg-state-selected border-primary text-primary-text font-semibold"
                             : "bg-secondary border-border text-muted-foreground hover:bg-secondary hover-layer"
                         )}
                       >
@@ -337,7 +337,7 @@ export default function RepeatDialog({
                   <button
                     type="button"
                     onClick={() => setEndCalOpen(true)}
-                    className="w-full flex items-center justify-between bg-secondary border border-border hover:bg-secondary hover-layer focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-between bg-secondary border border-border hover:bg-secondary hover-layer focus:border-primary focus:outline-none rounded-lg px-3 py-2 text-xs font-semibold text-primary-text transition-colors cursor-pointer"
                   >
                     <span>On date</span>
                     <span className="font-mono text-muted-foreground">

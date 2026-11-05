@@ -30,6 +30,7 @@
   --color-popover-foreground:   var(--popover-foreground);
   --color-primary:              var(--primary);
   --color-primary-foreground:   var(--primary-foreground);
+  --color-primary-text:         var(--primary-text);
   --color-secondary:            var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted:                var(--muted);
@@ -328,6 +329,18 @@
   --accent:                    var(--muted);
   --sidebar-accent:            var(--muted);
   --sidebar-accent-foreground: var(--accent-foreground);
+  /* Primary as a text color (links, selected options, row actions). Same as
+     the fill by default; a dark theme whose --primary is dark enough to carry
+     white button text overrides it with a lighter shade (below), since no one
+     indigo is both — the solid-fill/text split of Radix's step 9 vs 11. */
+  --primary-text:              var(--primary);
+}
+
+/* Measured with APCA (src/themeContrast.test.ts): --primary as text was Lc
+   42 here (38 on a selected row) against a target of 60. Lightness 0.84 at
+   the most chroma sRGB allows there. */
+.meridian {
+  --primary-text: oklch(0.84 0.080 278);
 }
 
 /* Light-theme card/float shadows — plain Tailwind shadow-sm reads fine on a
@@ -588,6 +601,9 @@
    tokens (each theme's own block, below) actually differ,
    since those depend on the surface itself rather than the accent hues. */
 .solarized-light, .solarized-dark {
+  /* Solarized's yellow is darker than other themes', so dark ink on the
+     warning fill was APCA Lc 41; light ink reads at 59. */
+  --warning-foreground: var(--ink-light);
   /* Brand — violet */
   --primary:            #6c71c4;
   --primary-foreground: var(--ink-light);
@@ -670,6 +686,8 @@
 
 /* ── SOLARIZED DARK THEME ───────────────────────────────────────── */
 .solarized-dark {
+  /* APCA: --primary as text was Lc 28 (24 on a selected row) — see .meridian. */
+  --primary-text: oklch(0.84 0.080 279);
   /* Surfaces — Solarized base03/base02 elevation ramp */
   --backdrop:   #001e27;
   --background: #002b36;
