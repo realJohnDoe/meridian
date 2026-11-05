@@ -1,0 +1,270 @@
+ 98  ok 75     meridian: foreground on background
+ 97  ok 75     meridian: foreground on card
+ 97  ok 75     meridian: foreground on popover
+ 78  ok 75     meridian: secondary-foreground on background
+ 76  ok 75     meridian: secondary-foreground on card
+ 76  ok 75     meridian: sidebar-foreground on sidebar
+ 95  ok 75     meridian: accent-foreground on accent
+ 42  below 45  meridian: muted-foreground on background
+ 40  below 45  meridian: muted-foreground on card
+ 39  below 45  meridian: muted-foreground on muted
+ 40  below 45  meridian: muted-foreground on sidebar
+ 42  below 60  meridian: primary on background
+ 38  below 60  meridian: primary on card + state-subtle
+ 65  ok 60     meridian: primary-foreground on primary
+ 58  below 60  meridian: destructive-foreground on destructive
+ 78  ok 60     meridian: warning-foreground on warning
+ 65  ok 60     meridian: event-foreground on event
+ 78  ok 60     meridian: task-foreground on task
+ 65  ok 60     meridian: note-foreground on note
+ 50  below 60  meridian: priority-1-foreground on priority-1
+ 58  below 60  meridian: priority-2-foreground on priority-2
+ 78  ok 60     meridian: priority-3-foreground on priority-3
+ 97  ok 60     meridian: chip-tint-foreground on card + event-tint
+ 91  ok 60     meridian: chip-tint-foreground on card + task-tint
+ 94  ok 60     meridian: chip-tint-foreground on card + note-tint
+ 98  ok 60     meridian: chip-tint-foreground on card + priority-1-tint
+ 96  ok 60     meridian: chip-tint-foreground on card + priority-2-tint
+ 92  ok 60     meridian: chip-tint-foreground on card + priority-3-tint
+ 97  ok 60     meridian: chip-tint-foreground on card + primary-tint
+ 92  ok 60     meridian: chip-tint-foreground on card + warning-tint
+ 84  ok 75     meridian-light: foreground on background
+ 91  ok 75     meridian-light: foreground on card
+ 91  ok 75     meridian-light: foreground on popover
+ 74  below 75  meridian-light: secondary-foreground on background
+ 81  ok 75     meridian-light: secondary-foreground on card
+ 81  ok 75     meridian-light: sidebar-foreground on sidebar
+ 94  ok 75     meridian-light: accent-foreground on accent
+ 68  ok 45     meridian-light: muted-foreground on background
+ 75  ok 45     meridian-light: muted-foreground on card
+ 78  ok 45     meridian-light: muted-foreground on muted
+ 75  ok 45     meridian-light: muted-foreground on sidebar
+ 68  ok 60     meridian-light: primary on background
+ 66  ok 60     meridian-light: primary on card + state-subtle
+ 82  ok 60     meridian-light: primary-foreground on primary
+ 81  ok 60     meridian-light: destructive-foreground on destructive
+ 68  ok 60     meridian-light: warning-foreground on warning
+ 82  ok 60     meridian-light: event-foreground on event
+ 77  ok 60     meridian-light: task-foreground on task
+ 76  ok 60     meridian-light: note-foreground on note
+ 81  ok 60     meridian-light: priority-1-foreground on priority-1
+ 50  below 60  meridian-light: priority-2-foreground on priority-2
+ 68  ok 60     meridian-light: priority-3-foreground on priority-3
+ 74  ok 60     meridian-light: chip-tint-foreground on card + event-tint
+ 77  ok 60     meridian-light: chip-tint-foreground on card + task-tint
+ 75  ok 60     meridian-light: chip-tint-foreground on card + note-tint
+ 71  ok 60     meridian-light: chip-tint-foreground on card + priority-1-tint
+ 83  ok 60     meridian-light: chip-tint-foreground on card + priority-2-tint
+ 90  ok 60     meridian-light: chip-tint-foreground on card + priority-3-tint
+ 74  ok 60     meridian-light: chip-tint-foreground on card + primary-tint
+ 90  ok 60     meridian-light: chip-tint-foreground on card + warning-tint
+ 74  below 75  tokyo-night: foreground on background
+ 73  below 75  tokyo-night: foreground on card
+ 73  below 75  tokyo-night: foreground on popover
+ 59  below 75  tokyo-night: secondary-foreground on background
+ 58  below 75  tokyo-night: secondary-foreground on card
+ 58  below 75  tokyo-night: sidebar-foreground on sidebar
+ 71  below 75  tokyo-night: accent-foreground on accent
+ 43  below 45  tokyo-night: muted-foreground on background
+ 42  below 45  tokyo-night: muted-foreground on card
+ 40  below 45  tokyo-night: muted-foreground on muted
+ 42  below 45  tokyo-night: muted-foreground on sidebar
+ 55  below 60  tokyo-night: primary on background
+ 51  below 60  tokyo-night: primary on card + state-subtle
+ 56  below 60  tokyo-night: primary-foreground on primary
+ 51  below 60  tokyo-night: destructive-foreground on destructive
+ 63  ok 60     tokyo-night: warning-foreground on warning
+ 56  below 60  tokyo-night: event-foreground on event
+ 68  ok 60     tokyo-night: task-foreground on task
+ 71  ok 60     tokyo-night: note-foreground on note
+ 51  below 60  tokyo-night: priority-1-foreground on priority-1
+ 62  ok 60     tokyo-night: priority-2-foreground on priority-2
+ 63  ok 60     tokyo-night: priority-3-foreground on priority-3
+ 94  ok 60     tokyo-night: chip-tint-foreground on card + event-tint
+ 92  ok 60     tokyo-night: chip-tint-foreground on card + task-tint
+ 91  ok 60     tokyo-night: chip-tint-foreground on card + note-tint
+ 96  ok 60     tokyo-night: chip-tint-foreground on card + priority-1-tint
+ 94  ok 60     tokyo-night: chip-tint-foreground on card + priority-2-tint
+ 93  ok 60     tokyo-night: chip-tint-foreground on card + priority-3-tint
+ 94  ok 60     tokyo-night: chip-tint-foreground on card + primary-tint
+ 93  ok 60     tokyo-night: chip-tint-foreground on card + warning-tint
+ 73  below 75  rose-pine-dawn: foreground on background
+ 79  ok 75     rose-pine-dawn: foreground on card
+ 79  ok 75     rose-pine-dawn: foreground on popover
+ 69  below 75  rose-pine-dawn: secondary-foreground on background
+ 76  ok 75     rose-pine-dawn: secondary-foreground on card
+ 76  ok 75     rose-pine-dawn: sidebar-foreground on sidebar
+ 83  ok 75     rose-pine-dawn: accent-foreground on accent
+ 65  ok 45     rose-pine-dawn: muted-foreground on background
+ 71  ok 45     rose-pine-dawn: muted-foreground on card
+ 75  ok 45     rose-pine-dawn: muted-foreground on muted
+ 71  ok 45     rose-pine-dawn: muted-foreground on sidebar
+ 53  below 60  rose-pine-dawn: primary on background
+ 53  below 60  rose-pine-dawn: primary on card + state-subtle
+ 68  ok 60     rose-pine-dawn: primary-foreground on primary
+ 83  ok 60     rose-pine-dawn: destructive-foreground on destructive
+ 56  below 60  rose-pine-dawn: warning-foreground on warning
+ 68  ok 60     rose-pine-dawn: event-foreground on event
+ 69  ok 60     rose-pine-dawn: task-foreground on task
+ 83  ok 60     rose-pine-dawn: note-foreground on note
+ 83  ok 60     rose-pine-dawn: priority-1-foreground on priority-1
+ 70  ok 60     rose-pine-dawn: priority-2-foreground on priority-2
+ 56  below 60  rose-pine-dawn: priority-3-foreground on priority-3
+ 78  ok 60     rose-pine-dawn: chip-tint-foreground on card + event-tint
+ 78  ok 60     rose-pine-dawn: chip-tint-foreground on card + task-tint
+ 72  ok 60     rose-pine-dawn: chip-tint-foreground on card + note-tint
+ 69  ok 60     rose-pine-dawn: chip-tint-foreground on card + priority-1-tint
+ 76  ok 60     rose-pine-dawn: chip-tint-foreground on card + priority-2-tint
+ 84  ok 60     rose-pine-dawn: chip-tint-foreground on card + priority-3-tint
+ 78  ok 60     rose-pine-dawn: chip-tint-foreground on card + primary-tint
+ 84  ok 60     rose-pine-dawn: chip-tint-foreground on card + warning-tint
+ 72  below 75  solarized-light: foreground on background
+ 80  ok 75     solarized-light: foreground on card
+ 80  ok 75     solarized-light: foreground on popover
+ 69  below 75  solarized-light: secondary-foreground on background
+ 77  ok 75     solarized-light: secondary-foreground on card
+ 77  ok 75     solarized-light: sidebar-foreground on sidebar
+ 77  ok 75     solarized-light: accent-foreground on accent
+ 66  ok 45     solarized-light: muted-foreground on background
+ 74  ok 45     solarized-light: muted-foreground on card
+ 71  ok 45     solarized-light: muted-foreground on muted
+ 74  ok 45     solarized-light: muted-foreground on sidebar
+ 57  below 60  solarized-light: primary on background
+ 57  below 60  solarized-light: primary on card + state-subtle
+ 70  ok 60     solarized-light: primary-foreground on primary
+ 70  ok 60     solarized-light: destructive-foreground on destructive
+ 45  below 60  solarized-light: warning-foreground on warning
+ 70  ok 60     solarized-light: event-foreground on event
+ 59  below 60  solarized-light: task-foreground on task
+ 58  below 60  solarized-light: note-foreground on note
+ 70  ok 60     solarized-light: priority-1-foreground on priority-1
+ 71  ok 60     solarized-light: priority-2-foreground on priority-2
+ 59  below 60  solarized-light: priority-3-foreground on priority-3
+ 78  ok 60     solarized-light: chip-tint-foreground on card + event-tint
+ 82  ok 60     solarized-light: chip-tint-foreground on card + task-tint
+ 82  ok 60     solarized-light: chip-tint-foreground on card + note-tint
+ 74  ok 60     solarized-light: chip-tint-foreground on card + priority-1-tint
+ 76  ok 60     solarized-light: chip-tint-foreground on card + priority-2-tint
+ 82  ok 60     solarized-light: chip-tint-foreground on card + priority-3-tint
+ 78  ok 60     solarized-light: chip-tint-foreground on card + primary-tint
+ 82  ok 60     solarized-light: chip-tint-foreground on card + warning-tint
+ 67  below 75  solarized-dark: foreground on background
+ 65  below 75  solarized-dark: foreground on card
+ 65  below 75  solarized-dark: foreground on popover
+ 61  below 75  solarized-dark: secondary-foreground on background
+ 59  below 75  solarized-dark: secondary-foreground on card
+ 59  below 75  solarized-dark: sidebar-foreground on sidebar
+ 61  below 75  solarized-dark: accent-foreground on accent
+ 53  ok 45     solarized-dark: muted-foreground on background
+ 51  ok 45     solarized-dark: muted-foreground on card
+ 46  ok 45     solarized-dark: muted-foreground on muted
+ 51  ok 45     solarized-dark: muted-foreground on sidebar
+ 28  below 60  solarized-dark: primary on background
+ 24  below 60  solarized-dark: primary on card + state-subtle
+ 70  ok 60     solarized-dark: primary-foreground on primary
+ 70  ok 60     solarized-dark: destructive-foreground on destructive
+ 41  below 60  solarized-dark: warning-foreground on warning
+ 70  ok 60     solarized-dark: event-foreground on event
+ 59  below 60  solarized-dark: task-foreground on task
+ 58  below 60  solarized-dark: note-foreground on note
+ 70  ok 60     solarized-dark: priority-1-foreground on priority-1
+ 71  ok 60     solarized-dark: priority-2-foreground on priority-2
+ 59  below 60  solarized-dark: priority-3-foreground on priority-3
+ 90  ok 60     solarized-dark: chip-tint-foreground on card + event-tint
+ 88  ok 60     solarized-dark: chip-tint-foreground on card + task-tint
+ 87  ok 60     solarized-dark: chip-tint-foreground on card + note-tint
+ 94  ok 60     solarized-dark: chip-tint-foreground on card + priority-1-tint
+ 93  ok 60     solarized-dark: chip-tint-foreground on card + priority-2-tint
+ 89  ok 60     solarized-dark: chip-tint-foreground on card + priority-3-tint
+ 90  ok 60     solarized-dark: chip-tint-foreground on card + primary-tint
+ 89  ok 60     solarized-dark: chip-tint-foreground on card + warning-tint
+101  ok 75     dracula: foreground on background
+ 99  ok 75     dracula: foreground on card
+ 99  ok 75     dracula: foreground on popover
+ 80  ok 75     dracula: secondary-foreground on background
+ 78  ok 75     dracula: secondary-foreground on card
+ 78  ok 75     dracula: sidebar-foreground on sidebar
+ 95  ok 75     dracula: accent-foreground on accent
+ 51  ok 45     dracula: muted-foreground on background
+ 49  ok 45     dracula: muted-foreground on card
+ 45  ok 45     dracula: muted-foreground on muted
+ 49  ok 45     dracula: muted-foreground on sidebar
+ 53  below 60  dracula: primary on background
+ 48  below 60  dracula: primary on card + state-subtle
+ 55  below 60  dracula: primary-foreground on primary
+ 45  below 60  dracula: destructive-foreground on destructive
+ 97  ok 60     dracula: warning-foreground on warning
+ 55  below 60  dracula: event-foreground on event
+ 84  ok 60     dracula: task-foreground on task
+ 83  ok 60     dracula: note-foreground on note
+ 45  below 60  dracula: priority-1-foreground on priority-1
+ 72  ok 60     dracula: priority-2-foreground on priority-2
+ 97  ok 60     dracula: priority-3-foreground on priority-3
+ 93  ok 60     dracula: chip-tint-foreground on card + event-tint
+ 87  ok 60     dracula: chip-tint-foreground on card + task-tint
+ 87  ok 60     dracula: chip-tint-foreground on card + note-tint
+ 96  ok 60     dracula: chip-tint-foreground on card + priority-1-tint
+ 89  ok 60     dracula: chip-tint-foreground on card + priority-2-tint
+ 84  ok 60     dracula: chip-tint-foreground on card + priority-3-tint
+ 93  ok 60     dracula: chip-tint-foreground on card + primary-tint
+ 84  ok 60     dracula: chip-tint-foreground on card + warning-tint
+ 75  ok 75     catppuccin-latte: foreground on background
+ 79  ok 75     catppuccin-latte: foreground on card
+ 79  ok 75     catppuccin-latte: foreground on popover
+ 69  below 75  catppuccin-latte: secondary-foreground on background
+ 74  below 75  catppuccin-latte: secondary-foreground on card
+ 74  below 75  catppuccin-latte: sidebar-foreground on sidebar
+ 82  ok 75     catppuccin-latte: accent-foreground on accent
+ 66  ok 45     catppuccin-latte: muted-foreground on background
+ 71  ok 45     catppuccin-latte: muted-foreground on card
+ 74  ok 45     catppuccin-latte: muted-foreground on muted
+ 71  ok 45     catppuccin-latte: muted-foreground on sidebar
+ 63  ok 60     catppuccin-latte: primary on background
+ 59  below 60  catppuccin-latte: primary on card + state-subtle
+ 72  ok 60     catppuccin-latte: primary-foreground on primary
+ 71  ok 60     catppuccin-latte: destructive-foreground on destructive
+ 77  ok 60     catppuccin-latte: warning-foreground on warning
+ 72  ok 60     catppuccin-latte: event-foreground on event
+ 57  below 60  catppuccin-latte: task-foreground on task
+ 61  ok 60     catppuccin-latte: note-foreground on note
+ 71  ok 60     catppuccin-latte: priority-1-foreground on priority-1
+ 51  below 60  catppuccin-latte: priority-2-foreground on priority-2
+ 77  ok 60     catppuccin-latte: priority-3-foreground on priority-3
+ 71  ok 60     catppuccin-latte: chip-tint-foreground on card + event-tint
+ 78  ok 60     catppuccin-latte: chip-tint-foreground on card + task-tint
+ 77  ok 60     catppuccin-latte: chip-tint-foreground on card + note-tint
+ 67  ok 60     catppuccin-latte: chip-tint-foreground on card + priority-1-tint
+ 78  ok 60     catppuccin-latte: chip-tint-foreground on card + priority-2-tint
+ 90  ok 60     catppuccin-latte: chip-tint-foreground on card + priority-3-tint
+ 71  ok 60     catppuccin-latte: chip-tint-foreground on card + primary-tint
+ 90  ok 60     catppuccin-latte: chip-tint-foreground on card + warning-tint
+ 81  ok 75     catppuccin-mocha: foreground on background
+ 80  ok 75     catppuccin-mocha: foreground on card
+ 80  ok 75     catppuccin-mocha: foreground on popover
+ 69  below 75  catppuccin-mocha: secondary-foreground on background
+ 68  below 75  catppuccin-mocha: secondary-foreground on card
+ 68  below 75  catppuccin-mocha: sidebar-foreground on sidebar
+ 76  ok 75     catppuccin-mocha: accent-foreground on accent
+ 47  ok 45     catppuccin-mocha: muted-foreground on background
+ 46  ok 45     catppuccin-mocha: muted-foreground on card
+ 42  below 45  catppuccin-mocha: muted-foreground on muted
+ 46  ok 45     catppuccin-mocha: muted-foreground on sidebar
+ 62  ok 60     catppuccin-mocha: primary on background
+ 58  below 60  catppuccin-mocha: primary on card + state-subtle
+ 64  ok 60     catppuccin-mocha: primary-foreground on primary
+ 58  below 60  catppuccin-mocha: destructive-foreground on destructive
+ 89  ok 60     catppuccin-mocha: warning-foreground on warning
+ 64  ok 60     catppuccin-mocha: event-foreground on event
+ 80  ok 60     catppuccin-mocha: task-foreground on task
+ 80  ok 60     catppuccin-mocha: note-foreground on note
+ 58  below 60  catppuccin-mocha: priority-1-foreground on priority-1
+ 71  ok 60     catppuccin-mocha: priority-2-foreground on priority-2
+ 89  ok 60     catppuccin-mocha: priority-3-foreground on priority-3
+ 85  ok 60     catppuccin-mocha: chip-tint-foreground on card + event-tint
+ 81  ok 60     catppuccin-mocha: chip-tint-foreground on card + task-tint
+ 81  ok 60     catppuccin-mocha: chip-tint-foreground on card + note-tint
+ 86  ok 60     catppuccin-mocha: chip-tint-foreground on card + priority-1-tint
+ 83  ok 60     catppuccin-mocha: chip-tint-foreground on card + priority-2-tint
+ 79  ok 60     catppuccin-mocha: chip-tint-foreground on card + priority-3-tint
+ 85  ok 60     catppuccin-mocha: chip-tint-foreground on card + primary-tint
+ 79  ok 60     catppuccin-mocha: chip-tint-foreground on card + warning-tint
