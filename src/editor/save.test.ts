@@ -458,7 +458,7 @@ describe('deleteNode — scope options for multi-occurrence files', () => {
   setupStore()
   const persistence = installFakePersistence()
 
-  it('a standalone sharing its file with another standalone offers "This occurrence" and "Delete whole file", not "All occurrences"', () => {
+  it('a standalone sharing its file with another standalone offers "This occurrence" and "Whole file", not "All occurrences"', () => {
     const occA = makeOcc({ entryKey: testKey('multi'), id: 'multi-a', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
     const occB = makeOcc({ entryKey: testKey('multi'), id: 'multi-b', date: '2026-06-16', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
     seedStore([occA, occB], makeRoots('multi', { title: 'Task A' }))
@@ -466,7 +466,7 @@ describe('deleteNode — scope options for multi-occurrence files', () => {
     let config: SeriesSheetConfig | undefined
     deleteNode(occA, vi.fn(), c => { config = c }, vi.fn())
 
-    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'Delete whole file'])
+    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'Whole file'])
   })
 
   it('"This occurrence" removes just the selected occurrence, leaving its sibling', () => {
@@ -481,20 +481,20 @@ describe('deleteNode — scope options for multi-occurrence files', () => {
     expect(useStore.getState().items.map(i => i.id)).toEqual(['multi-b'])
   })
 
-  it('"Delete whole file" removes everything, including the sibling occurrence', () => {
+  it('"Whole file" removes everything, including the sibling occurrence', () => {
     const occA = makeOcc({ entryKey: testKey('multi'), id: 'multi-a', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
     const occB = makeOcc({ entryKey: testKey('multi'), id: 'multi-b', date: '2026-06-16', metadata: { vaultId: TEST_VAULT, fileSlug: 'multi', title: 'Task A' } })
     seedStore([occA, occB], makeRoots('multi', { title: 'Task A' }))
 
     let config: SeriesSheetConfig | undefined
     deleteNode(occA, vi.fn(), c => { config = c }, vi.fn())
-    config!.options.find(o => o.label === 'Delete whole file')!.onClick()
+    config!.options.find(o => o.label === 'Whole file')!.onClick()
 
     expect(useStore.getState().items).toEqual([])
     expect(useStore.getState().roots.has(testKey('multi'))).toBe(false)
   })
 
-  it('a recurring occurrence sharing its file with another series offers a scoped "All occurrences" AND a separate "Delete whole file"', () => {
+  it('a recurring occurrence sharing its file with another series offers a scoped "All occurrences" AND a separate "Whole file"', () => {
     const series1 = makeSeries({ id: 'series-1', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'daily' } })
     const series2 = makeSeries({ id: 'series-2', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'weekly' } })
     const occ = makeOcc({ id: 'occ-1', entryKey: testKey('multi'), ownerId: 'series-1' })
@@ -503,7 +503,7 @@ describe('deleteNode — scope options for multi-occurrence files', () => {
     let config: SeriesSheetConfig | undefined
     deleteNode(occ, vi.fn(), c => { config = c }, vi.fn())
 
-    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'This and all following', 'All occurrences', 'Delete whole file'])
+    expect(config?.options.map(o => o.label)).toEqual(['This occurrence', 'This and all following', 'All occurrences', 'Whole file'])
   })
 
   it('"All occurrences" on that file only removes the targeted series, leaving its sibling series', () => {
@@ -519,7 +519,7 @@ describe('deleteNode — scope options for multi-occurrence files', () => {
     expect(useStore.getState().items.map(i => i.id)).toEqual(['series-2'])
   })
 
-  it('"Delete whole file" on that same file removes everything, including the sibling series', () => {
+  it('"Whole file" on that same file removes everything, including the sibling series', () => {
     const series1 = makeSeries({ id: 'series-1', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'daily' } })
     const series2 = makeSeries({ id: 'series-2', entryKey: testKey('multi'), repeat: { type: 'schedule', freq: 'weekly' } })
     const occ = makeOcc({ id: 'occ-1', entryKey: testKey('multi'), ownerId: 'series-1' })
@@ -527,7 +527,7 @@ describe('deleteNode — scope options for multi-occurrence files', () => {
 
     let config: SeriesSheetConfig | undefined
     deleteNode(occ, vi.fn(), c => { config = c }, vi.fn())
-    config!.options.find(o => o.label === 'Delete whole file')!.onClick()
+    config!.options.find(o => o.label === 'Whole file')!.onClick()
 
     expect(useStore.getState().items).toEqual([])
   })
