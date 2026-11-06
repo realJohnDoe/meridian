@@ -1,13 +1,14 @@
 # Pausing the farm
 
-The maintainer pauses and resumes the farm with one label on the
-`Farm digest` issue. State lives on GitHub (the label plus marker comments),
+The maintainer pauses and resumes the farm with one label on the current
+(newest open) `Farm digest` issue. No new digest opens while paused, so the
+label stays on the current one. State lives on GitHub (the label plus marker comments),
 not in any session. `node scripts/farm-pause.mjs` reads it and prints
 `state`; both scheduled tasks run it before anything else.
 
 ## Maintainer procedure
 
-- **Pause**: add the `farm-paused` label to the `Farm digest` issue.
+- **Pause**: add the `farm-paused` label to the current `Farm digest` issue.
 - **Resume**: remove the label.
 
 Nothing else. While the subscription is paused, scheduled tasks use nothing;

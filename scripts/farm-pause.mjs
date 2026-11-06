@@ -30,10 +30,11 @@ const names = (x) => x.labels.map((l) => l.name);
 const tiered = (x) => names(x).some((l) => TIERS.includes(l));
 const ranking = () => run("node", ["scripts/survey-next.mjs"]).trim();
 
-// --- State: one digest issue, its label and its marker comments --------------
-const digest = all(`repos/${REPO}/issues?state=open&per_page=100`).find(
-  (i) => !i.pull_request && i.title === "Farm digest",
-);
+// --- State: the current (newest open) digest issue, its label and its marker comments
+const digest = all(`repos/${REPO}/issues?state=open&per_page=100`)
+  .filter((i) => !i.pull_request && i.title.startsWith("Farm digest"))
+  .sort((a, b) => a.number - b.number)
+  .at(-1);
 if (!digest) {
   console.log(JSON.stringify({ state: "normal", plan: null }));
   process.exit(0);

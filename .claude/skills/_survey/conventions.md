@@ -313,8 +313,8 @@ files"); this section states only what a survey run does.
 - A finding closes when a PR saying `Fixes #N` merges. Do not edit a file to
   close one. Dropping one as invalid or won't-fix is a close with `not planned`
   plus a comment saying why; deferring one is an open issue with a `deferred`
-  label plus a comment. The parent issue itself closes once every finding
-  sub-issue is resolved.
+  label plus a comment. The daily dispatcher closes the parent issue
+  once every finding sub-issue is resolved (`docs/agents/daily-dispatch.md`).
 
 `data-integrity.md`'s "Known suspects" section, which appends a verdict to each
 suspect's hypothesis in-place, is unchanged: that survey keeps its suspects list

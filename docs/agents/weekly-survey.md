@@ -19,15 +19,21 @@ remembering, and no new findings while the backlog is already full.
 2. `node scripts/survey-next.mjs` (un-shallows itself; needs `gh`). Rows marked
    `-` are unranked, skip them.
 3. Walk the ranked rows in order. **Skip** a row if its score is `0` (fresh) or
-   its survey already has an open parent issue with open findings:
+   its survey already has an open parent issue with open findings that the
+   farm can still work. Findings that are `decision-required` or `deferred`
+   don't count, so one parked decision doesn't block the survey for good (the
+   digest lists such parents under **Surveys held open**). For each open
+   parent:
 
    ```bash
    gh api "repos/realJohnDoe/meridian/issues?labels=<label>&state=open&per_page=100" \
      --jq '.[] | select(.pull_request|not) | select(.sub_issues_summary.total>.sub_issues_summary.completed) | .number'
+   gh api "repos/realJohnDoe/meridian/issues/<parent>/sub_issues?per_page=100" \
+     --jq '[.[] | select(.state=="open") | select([.labels[].name] | any(. == "decision-required" or . == "deferred") | not)] | length'
    ```
 
-   `<label>` is the survey's `label:` frontmatter key. Take the first row that
-   survives.
+   `<label>` is the survey's `label:` frontmatter key; skip the row if any
+   parent's count is above 0. Take the first row that survives.
 4. **None survives → stop. Post nothing, open nothing.**
 5. Run that survey's skill (`.claude/skills/<survey>/SKILL.md`; for a health row
    `(test code)`, the test-code corpus). Its parent issue's body must open with
