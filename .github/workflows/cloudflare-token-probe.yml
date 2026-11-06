@@ -63,4 +63,6 @@ jobs:
 
       - name: Delete throwaway worker
         if: always()
-        run: pnpm --filter meridian-oauth-worker exec wrangler delete --config "$PROBE/wrangler.toml" --force
+        # Not `wrangler delete`: it lists KV namespaces first, which this token can't.
+        run: |
+          curl -fsS -X DELETE -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts/0c9a990d5cdac68612909eceef590d10/workers/scripts/meridian-token-probe?force=true" | jq '{success, errors}'
