@@ -69,7 +69,7 @@ A defect two surveys both find is one issue: search open issues first, per
   one browser alive across steps (a driver that polls a scratchpad directory
   for snippets works; a local HTTP control port is refused by the sandbox), and
   start it and vite with the maximum background timeout, since the default
-  stops both mid-run. Probe what no task crosses: swipe both ways and
+  stops both mid-run. Probe what no task crosses: the editor's series delete dialog for a recurring occurrence (the sweep must open it, not judge it from the one-off variant); swipe both ways and
   long-press every list card, and open every settings sub-screen, each vault's
   own included — runs missed swipe-to-delete (2026-09-23) and the vault
   screen's `Archived` list (2026-10-31) until the PR history named them. Use the default theme plus one dark theme — contrast
@@ -130,7 +130,7 @@ core, and say which you added:
 6. Write a note that links to another entry; follow the backlink.
 7. Find an entry by searching.
 8. Move between agenda, day, week, month, unscheduled tasks and notes, and back to today.
-9. Delete an entry, then undo it.
+9. Delete one occurrence of a recurring event from its editor, then undo it (the Tutorial vault's `team-standup` or `morning-run`); delete a one-off entry from its editor; swipe-delete from the agenda. Walk each route separately: swipe-delete never reaches the editor's dialogs.
 10. Change the theme and one other preference.
 11. Start adding a vault (up to the environment's limit).
 
