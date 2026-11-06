@@ -52,7 +52,8 @@ A defect two surveys both find is one issue: search open issues first, per
   exists to avoid. The only sources are the running app and what it shows,
   including the Tutorial vault's content as rendered. The root `CLAUDE.md` is
   loaded into every session regardless and names routes, slugs and features;
-  say so in the coverage statement and don't use it to find a control.
+  say so in the coverage statement and don't use it to find a control. The app is served under `/meridian/`
+  (`docs/agents/dev-server.md`).
 - **Then locate, don't re-judge.** Once findings are written, you may grep for
   a finding's on-screen string or component to fill its Task context block, so
   the fixer gets a location. Do not revise a finding's verdict from what the

@@ -76,7 +76,7 @@ are specific to this survey:
   state (no dialog, drawer, search result or selected row) and tolerates 1–3
   violations per theme and route; `e2e/layout-smoke.spec.ts` pins shell geometry
   plus route coverage. Open dialogs, drawers and selected states yourself. If the
-  session has no `preview_*` tooling, drive Chromium yourself rather than
+  session has no `preview_*` tooling (base path and routes: `docs/agents/dev-server.md`), drive Chromium yourself rather than
   skipping: `@playwright/test` is a devDependency and `e2e/` is the worked
   example — `pnpm exec vite --port <unique> --strictPort`, then
   `import { chromium } from '@playwright/test'` launched with
