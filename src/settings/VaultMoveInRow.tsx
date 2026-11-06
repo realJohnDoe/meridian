@@ -6,12 +6,12 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ConfirmDialogContent } from '@/components/primitives/confirm-dialog-content'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useStore } from '@/store'
 import { removeVault, previewVaultCopy, copyVaultInto } from '@/vaultActions'
@@ -101,7 +101,7 @@ export function VaultMoveInRow({ vault }: { vault: VaultRef }) {
         }
       />
       <AlertDialog open={moveInOpen} onOpenChange={setMoveInOpen}>
-        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+        <ConfirmDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Move &ldquo;{vault.name}&rdquo; into a vault</AlertDialogTitle>
             <AlertDialogDescription>
@@ -136,7 +136,7 @@ export function VaultMoveInRow({ vault }: { vault: VaultRef }) {
               </AlertDialogAction>
             )}
           </AlertDialogFooter>
-        </AlertDialogContent>
+        </ConfirmDialogContent>
       </AlertDialog>
     </>
   )

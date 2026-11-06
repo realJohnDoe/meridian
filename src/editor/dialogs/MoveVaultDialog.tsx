@@ -3,12 +3,12 @@ import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ConfirmDialogContent } from '@/components/primitives/confirm-dialog-content'
 
 /** What the editor knows about a move the user has asked for but not confirmed. */
 export interface PendingMove {
@@ -56,7 +56,7 @@ export default function MoveVaultDialog({ move, onConfirm, onClose }: Props) {
 
   return (
     <AlertDialog open={!!move} onOpenChange={(o) => !o && onClose()}>
-      <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-xl sm:max-w-md">
+      <ConfirmDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Move to {move?.toVault}?</AlertDialogTitle>
           <AlertDialogDescription asChild>
@@ -90,7 +90,7 @@ export default function MoveVaultDialog({ move, onConfirm, onClose }: Props) {
             Move
           </AlertDialogAction>
         </AlertDialogFooter>
-      </AlertDialogContent>
+      </ConfirmDialogContent>
     </AlertDialog>
   )
 }
