@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The daily dispatcher's plan: which findings to start, which PRs need a follow-up
-// session, and the weekly digest. See docs/agents/daily-dispatch.md.
+// session, and the twice-weekly digest. See docs/agents/daily-dispatch.md.
 // Usage: node scripts/farm-dispatch.mjs [--apply] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--followups-only]
 // Without --apply it is a dry run: it prints the plan and writes nothing.
 import { execFileSync } from "node:child_process";
@@ -16,7 +16,11 @@ const FOLLOWUPS_ONLY = process.argv.includes("--followups-only"); // drain: merg
 const MAX_SESSIONS = Number(arg("--max-sessions", 4));
 const MAX_FOLLOWUPS = Number(arg("--max-followups", 2));
 const STALE_DAYS = 2; // a claim or follow-up with nothing to show after this is stuck
-const DIGEST_DAYS = 7;
+// The digest is published on the first run of the day after each survey start
+// (the "Start Top-Ranked Survey" task runs Mon and Thu), so each one carries
+// that survey's findings. Keep in step with that task's schedule.
+const DIGEST_WEEKDAYS = [2, 5]; // Tue, Fri (UTC getDay)
+const DIGEST_DAYS = 2.5; // minimum window, so a second run that day doesn't publish again
 const TODAY = new Date(arg("--today", new Date().toISOString().slice(0, 10)));
 // When this run's digest window ends; a new digest's window starts here.
 const NOW = arg("--today") ? TODAY.toISOString() : new Date().toISOString();
@@ -287,8 +291,8 @@ for (const p of parents.filter(
 }
 
 // --- Digest -----------------------------------------------------------------
-// One issue per week. Its body is rewritten on every run (an edit notifies
-// nobody); opening next week's issue is the weekly ping.
+// One issue per survey cycle. Its body is rewritten on every run (an edit
+// notifies nobody); publishing it is the ping.
 const decide = issues
   .filter((i) => names(i).includes("decision-required"))
   .map((i) => ({ issue: i.number, title: i.title, url: i.html_url }));
@@ -297,7 +301,7 @@ const line = (x, ask) =>
 const section = (h, xs, ask) =>
   xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, ask)), ""] : [];
 const NOTE =
-  "_The draft digest is rewritten by every daily run and published as the week's digest after 7 days. Answer on the issue or PR, or reply here: the next daily run copies replies onto their issues._\n\n";
+  "_The draft digest is rewritten by every daily run and published the day after each survey run (Tuesdays and Fridays). Answer on the issue or PR, or reply here: the next daily run copies replies onto their issues._\n\n";
 const asks = [
   ...section("Decide", decide, "Decide:"),
   ...section("Review", review, "Review:"),
@@ -314,7 +318,7 @@ const info = [
   ),
   ...section("Not picked up", notPicked),
 ];
-// The draft collects the week; at its end it is published (retitled, pinged)
+// The draft collects one survey cycle; at its end it is published (retitled, pinged)
 // and the next draft opens. The previous published digest is then closed.
 const isDraft = (i) => i.title.includes("(draft)");
 const digests = issues.filter(isDigest).sort((a, b) => a.number - b.number);
@@ -350,12 +354,13 @@ const render = (start, mergedLines, prev) =>
       : ""
   }`.trim() + FOOTER;
 const body = render(since, merged, published?.number);
-const week = (start) => `week of ${start.slice(0, 10)}`;
-// A quiet week (nothing merged, nothing to act on) stays a draft.
+const week = (start) => `from ${start.slice(0, 10)}`;
+// A quiet cycle (nothing merged, nothing to act on) stays a draft.
 const publish =
   !FOLLOWUPS_ONLY &&
   !!draft &&
   days(since) >= DIGEST_DAYS &&
+  DIGEST_WEEKDAYS.includes(new Date(NOW).getUTCDay()) &&
   (merged.length > 0 || asks.length > 0);
 // Maintainer replies on either digest not yet copied onto their issues.
 const replies = [draft, published].filter(Boolean).flatMap((d) => {
@@ -460,7 +465,7 @@ if (APPLY) {
         { title: `${DIGEST_PREFIX} — ${week(since)}` },
         "PATCH",
       );
-      // A title or body edit notifies nobody; this comment is the weekly ping.
+      // A title or body edit notifies nobody; this comment is the ping.
       const { decide: x, review: r, unstick: u, merged: m } = digest.counts;
       post(`repos/${REPO}/issues/${d}/comments`, {
         body: `Published: ${x} to decide, ${r} to review, ${u} to unstick, ${m} merged.${FOOTER}`,

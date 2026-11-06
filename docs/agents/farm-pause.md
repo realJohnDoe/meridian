@@ -50,4 +50,4 @@ second firing in the same state sees the new state and does nothing.
 2. `node scripts/farm-pause.mjs --apply` does it and posts the "resumed"
    comment with those findings. If the peer range's upper bound is no longer
    below 7, open a `sonnet` issue to revisit the TypeScript pin. Then continue
-   with the normal dispatch; the week's digest goes out as usual.
+   with the normal dispatch; the digest goes out as usual.

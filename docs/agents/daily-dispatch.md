@@ -2,7 +2,7 @@
 
 Run by the daily scheduled task ("Daily dispatcher"); the task's prompt only
 says to follow this file. Goal: open findings move forward without anyone
-starting sessions by hand, and the maintainer's part comes down to one weekly
+starting sessions by hand, and the maintainer's part comes down to one twice-weekly
 digest issue, which also says why anything isn't moving.
 
 0. Run `node scripts/farm-pause.mjs` first and act on its `state` as
@@ -70,7 +70,7 @@ digest issue, which also says why anything isn't moving.
 - **Survey parents**: a survey run's parent issue is closed once every
   finding sub-issue is closed. One whose open findings are all
   `decision-required` or `deferred` is listed under **Not picked up**.
-- **Digest**: a draft issue, `Farm digest (draft) — week of <date>`, is
+- **Digest**: a draft issue, `Farm digest (draft) — from <date>`, is
   rewritten on every run (an edit notifies nobody), so it always shows
   today's state: what waits on the maintainer,
   each line saying what to do, **Decide** (open `decision-required` issues),
@@ -80,10 +80,13 @@ digest issue, which also says why anything isn't moving.
   days); then what's coming, **Queue** (dispatchable issues past today's cap)
   and **Not picked up**; then **Merged since** the
   draft opened, each PR with the issue it closed and its labels. Once the
-  draft is 7 days old and something merged or waits, the run publishes it
-  (drops `(draft)` from the title and comments the counts, the weekly ping),
+  first run on a Tuesday or Friday comes (the day after each Monday/Thursday
+  survey start, so it carries that survey's findings; `DIGEST_WEEKDAYS` in the
+  script, kept in step with that task's schedule) and something merged or
+  waits, the run publishes it
+  (drops `(draft)` from the title and comments the counts, the ping),
   closes the previously published digest with a link, and opens the next
-  draft. A quiet week stays a draft. Replies on the draft or the published
+  draft. A quiet cycle stays a draft. Replies on the draft or the published
   digest are relayed (step 4). Nothing is decided on silence.
 
 To re-dispatch a stuck issue, unassign it. To stop a PR from getting
