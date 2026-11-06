@@ -1,3 +1,5 @@
+<img src="public/screenshots/banner.webp" alt="Meridian — Plan, Organize, Get Things Done" />
+
 # Meridian
 
 **Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**
