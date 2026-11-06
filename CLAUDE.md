@@ -274,6 +274,11 @@ surveys are the explicit ask. Skipping that phase because of the paragraph
 above is a silent failure: it lands as "partially assessed", which the survey
 conventions permit, so nothing surfaces that the run never looked.
 
+**Nor does it apply to a finding's acceptance check.** When the issue gives a
+measurement or repro recipe, running it is the explicit ask: re-run it
+(headless Chromium works in cloud sessions) and put before → after in the PR's
+"Acceptance check" section. If it truly can't run, say why there.
+
 ## Preview tools (gotchas — read before using `preview_*`)
 
 These bit us repeatedly; follow them to avoid a long debug loop:
