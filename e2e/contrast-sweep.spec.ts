@@ -4,12 +4,17 @@ import { fileURLToPath } from 'node:url'
 import { PNG } from 'pngjs'
 import { test, expect } from '@playwright/test'
 import { BASE_URL } from '../playwright.config'
+import { APCAcontrast, sRGBtoY } from 'apca-w3'
 
 /**
  * Contrast sweep — issue #1005. Samples the *rendered* text/background pixel
  * pair for every text-bearing element, across every theme and a representative
  * set of routes, and asserts each (theme, route) combo against its own ratchet
- * floor (`FLOOR` below).
+ * floor (`FLOOR` below). Measured with APCA (`MIN_LC` below), not WCAG 2's
+ * ratio, which misjudges saturated fills and dark themes; the history below
+ * predates that switch. src/themeContrast.test.ts checks the same metric on
+ * the theme tokens, including states (dialogs, selected rows) these routes
+ * never render.
  *
  * Ratcheted per combo, not a single global count: eleven merged PRs (#302,
  * #329, #331, #340, #445, #478, #801, #912, #924, #930, #954) already fixed
@@ -58,8 +63,8 @@ import { BASE_URL } from '../playwright.config'
  *      the deterministic way into next-themes' `class` strategy, matching
  *      `routes/__root.tsx`'s `storageKey`.
  *   2. Collect every element with a direct (non-whitespace) text-node child:
- *      its viewport-clipped rect, font-size/weight (for the WCAG large-text
- *      threshold), and its *computed* `color` — resolved to concrete sRGB via
+ *      its viewport-clipped rect, font-size/weight (reported with each
+ *      failure), and its *computed* `color` — resolved to concrete sRGB via
  *      a 1x1 canvas rather than string-parsed, exactly because computed
  *      `color` can come back as `oklab()`/`lab()` and canvas is the one thing
  *      guaranteed to resolve any CSS <color> the same way the page painted
@@ -147,82 +152,52 @@ const ROUTES = [
 ]
 
 /**
- * The ratchet floor, per (theme, route) — see the file doc comment. Set from
- * PR #1012's report-only baseline, broken out per combo instead of summed
- * into one number, and confirmed reproducible across three consecutive runs
- * against the same build before being turned into a gate (PR #1013). Lower
- * an entry whenever a fix drops that combo's count — the corresponding test
- * logs the new number to use.
- *
- * Re-baselined for #1026: the sweep now pins "today" (see the fixed clock
- * below) instead of drifting with the calendar, so every number here is
- * against 2026-09-04 specifically, not whatever date the floors were last
- * measured on. Two effects from that one change, both intentional:
- *  - meridian-light/catppuccin-latte/solarized-light dropped sharply (11-12
- *    to 2-3 on the six app routes) because darkening --muted-foreground
- *    (src/index.css) fixed the one token behind 12 of the original 13
- *    reported violations.
- *  - rose-pine-dawn rose (2 to 3 on the same six routes): pinning "today" to
- *    a date those routes actually render surfaced a real, previously-masked
- *    violation — the white-on-purple "today" day-badge — that a moving,
- *    usually-elsewhere "today" never used to land on a pinned route. Not
- *    fixed here, same reasoning as the "Calendar" chip below: a color-only
- *    fix risks legibility regressions this file's own contrast math can't
- *    catch (WCAG doesn't model chip-on-row compositing — see the on-accent
- *    text comments throughout this file), so it wants a deliberate look
- *    rather than a reflexive token nudge.
- *
- * meridian rose separately (0 to 2 on the six app routes, from its own
- * baseline, not #1026): src/index.css's --primary-foreground for .meridian
- * moved from ink-dark to ink-light so occurrence pills/priority buttons on
- * event/priority-1/priority-2 read with the same light ink as event's own
- * "alias of primary" comment implies (WCAG's luminance math prefers dark ink
- * there too, but light reads better in practice — see index.css). --primary
- * itself moved with it, so anything painted bg-primary/text-primary-foreground
- * now reads white-on-indigo at 3.25-3.48:1 rather than dark-on-indigo at
- * 5.79:1 — the mini-month's "today" day-badge and CoachTour's "Next →"
- * button, both only present on the app-shell routes. Same call as
- * rose-pine-dawn's own white-on-purple today-badge above: a deliberate
- * design tradeoff, not something a token nudge should silently claw back.
+ * The ratchet floor, per (theme, route): how many text elements sit below
+ * APCA Lc 45 today. Re-baselined when the sweep moved from WCAG 2 to APCA;
+ * almost every remaining one is `text-muted-foreground` in meridian,
+ * tokyo-night and catppuccin-mocha — the same pairs src/themeContrast.test.ts
+ * reports below its muted target. Lower an entry whenever a fix drops that
+ * combo's count; the test logs the new number to use.
  */
 const FLOOR: Record<string, Record<string, number>> = {
   meridian: {
-    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09-01': 2,
-    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
+    '/': 12, '/unscheduled': 12, '/notes': 12, '/day/2026-09-04': 12, '/week/2026-09-04': 12, '/calendar/2026-09-01': 12,
+    '/entry/example/01-start-here': 7, '/entry/new': 5, '/settings': 9, '/settings/appearance': 1, '/settings/vault/example': 7,
   },
   'meridian-light': {
-    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09-01': 2,
-    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
-  },
-  'tokyo-night': {
-    '/': 1, '/unscheduled': 1, '/notes': 1, '/day/2026-09-04': 1, '/week/2026-09-04': 1, '/calendar/2026-09-01': 1,
-    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
-  },
-  'catppuccin-latte': {
-    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09-01': 3,
-    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
-  },
-  'catppuccin-mocha': {
     '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
     '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
+  'tokyo-night': {
+    '/': 13, '/unscheduled': 13, '/notes': 13, '/day/2026-09-04': 13, '/week/2026-09-04': 13, '/calendar/2026-09-01': 13,
+    '/entry/example/01-start-here': 8, '/entry/new': 6, '/settings': 10, '/settings/appearance': 2, '/settings/vault/example': 8,
+  },
+  'catppuccin-latte': {
+    '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
+    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
+  },
+  'catppuccin-mocha': {
+    '/': 1, '/unscheduled': 1, '/notes': 1, '/day/2026-09-04': 1, '/week/2026-09-04': 1, '/calendar/2026-09-01': 1,
+    '/entry/example/01-start-here': 3, '/entry/new': 3, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
+  },
   'rose-pine-dawn': {
-    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09-01': 3,
-    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 1,
+    '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
+    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
   'solarized-light': {
-    '/': 3, '/unscheduled': 3, '/notes': 3, '/day/2026-09-04': 3, '/week/2026-09-04': 3, '/calendar/2026-09-01': 3,
-    '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 2,
+    '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
+    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
   },
   'solarized-dark': {
-    '/': 2, '/unscheduled': 2, '/notes': 2, '/day/2026-09-04': 2, '/week/2026-09-04': 2, '/calendar/2026-09-01': 2,
+    '/': 1, '/unscheduled': 1, '/notes': 1, '/day/2026-09-04': 1, '/week/2026-09-04': 1, '/calendar/2026-09-01': 1,
     '/entry/example/01-start-here': 1, '/entry/new': 1, '/settings': 1, '/settings/appearance': 1, '/settings/vault/example': 2,
   },
   dracula: {
     '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
-    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 0,
+    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 1,
   },
 }
+
 
 /** Stylesheet injected before the second screenshot — blanks ink, leaves every background untouched. */
 const HIDE_INK_CSS = `
@@ -382,23 +357,20 @@ function sampleModeColor(png: PNG, rect: { x: number; y: number; w: number; h: n
   return [(bestKey >> 16) & 0xff, (bestKey >> 8) & 0xff, bestKey & 0xff]
 }
 
-function relLuminance([r, g, b]: number[]): number {
-  const lin = (c: number) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4 }
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+/** APCA |Lc| of sRGB text on an sRGB background (apca-w3, the reference implementation). */
+function apcaLc(text: number[], bg: number[]): number {
+  return Math.abs(Number(APCAcontrast(sRGBtoY(text), sRGBtoY(bg))))
 }
 
-function contrastRatio(rgbA: number[], rgbB: number[]): number {
-  const lA = relLuminance(rgbA)
-  const lB = relLuminance(rgbB)
-  const [hi, lo] = lA > lB ? [lA, lB] : [lB, lA]
-  return (hi + 0.05) / (lo + 0.05)
-}
-
-/** WCAG 2 AA: large text (>=24px, or >=18.66px/14pt at bold weight) needs 3:1; everything else needs 4.5:1. */
-function aaThreshold(fontSizePx: number, fontWeight: number): number {
-  const large = fontSizePx >= 24 || (fontWeight >= 700 && fontSizePx >= 18.66)
-  return large ? 3.0 : 4.5
-}
+/**
+ * APCA Lc 45: the floor below which text stops being readable as content at
+ * any size this app uses — the same level src/themeContrast.test.ts reports
+ * for muted labels, so the two suites share one metric and one bar. APCA's
+ * full size × weight lookup (`fontLookupAPCA`) was tried first and rejected:
+ * it rules 8–10px text out at any contrast, so 4,706 of its "failures" were
+ * font-size verdicts, not contrast ones, and would have buried a regression.
+ */
+const MIN_LC = 45
 
 interface Failure {
   tag: string
@@ -408,8 +380,7 @@ interface Failure {
   fontWeight: number
   textRGB: number[]
   bgRGB: number[]
-  ratio: number
-  threshold: number
+  lc: number
 }
 
 const themeIds = extractThemeIds()
@@ -448,13 +419,12 @@ for (const themeId of themeIds) {
           const textRGB = el.textAlpha >= 0.999
             ? el.textRGB
             : el.textRGB.map((c, i) => Math.round(el.textAlpha * c + (1 - el.textAlpha) * bgRGB[i]))
-          const ratio = contrastRatio(textRGB, bgRGB)
-          const threshold = aaThreshold(el.fontSize, el.fontWeight)
-          if (ratio < threshold) {
+          const lc = apcaLc(textRGB, bgRGB)
+          if (lc < MIN_LC) {
             failures.push({
               tag: el.tag, cls: el.cls, text: el.text,
               fontSize: el.fontSize, fontWeight: el.fontWeight,
-              textRGB, bgRGB, ratio: Math.round(ratio * 100) / 100, threshold,
+              textRGB, bgRGB, lc: Math.round(lc),
             })
           }
         }
@@ -465,9 +435,9 @@ for (const themeId of themeIds) {
         }
 
         const detail = failures
-          .map(f => `  ${f.ratio}:1 (needs ${f.threshold}:1) <${f.tag} class="${f.cls}"> "${f.text}" — text rgb(${f.textRGB.join(',')}) on bg rgb(${f.bgRGB.join(',')}), ${f.fontSize}px/${f.fontWeight}`)
+          .map(f => `  Lc ${f.lc} (needs ${MIN_LC}) <${f.tag} class="${f.cls}"> "${f.text}" — text rgb(${f.textRGB.join(',')}) on bg rgb(${f.bgRGB.join(',')}), ${f.fontSize}px/${f.fontWeight}`)
           .join('\n')
-        expect(failures.length, `${failures.length} below WCAG AA, floor is ${floor}:\n${detail}`).toBeLessThanOrEqual(floor)
+        expect(failures.length, `${failures.length} below APCA Lc ${MIN_LC}, floor is ${floor}:\n${detail}`).toBeLessThanOrEqual(floor)
       })
     }
   })
