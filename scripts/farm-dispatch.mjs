@@ -298,7 +298,7 @@ const line = (x, ask) =>
 const section = (h, xs, ask) =>
   xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, ask)), ""] : [];
 const NOTE =
-  "_Rewritten by every daily run; a new digest opens each week. Answer on the issue or PR, or reply here: the next daily run copies replies here onto their issues._\n\n";
+  "_The draft digest is rewritten by every daily run and published as the week's digest after 7 days. Answer on the issue or PR, or reply here: the next daily run copies replies onto their issues._\n\n";
 const asks = [
   ...section("Decide", decide, "Decide:"),
   ...section("Review", review, "Review:"),
@@ -316,11 +316,15 @@ const info = [
   ...section("Not picked up", notPicked),
   ...section("Surveys held open", held),
 ];
+// The draft collects the week; at its end it is published (retitled, pinged)
+// and the next draft opens. The previous published digest is then closed.
+const isDraft = (i) => i.title.includes("(draft)");
 const digests = issues.filter(isDigest).sort((a, b) => a.number - b.number);
-const digestIssue = digests.at(-1);
+const draft = digests.findLast(isDraft);
+const published = digests.findLast((i) => !isDraft(i));
 const marker = /<!-- digest-(?:date|since): (\S+) -->/;
 const since =
-  digestIssue?.body?.match(marker)?.[1] ??
+  (draft ?? published)?.body?.match(marker)?.[1] ??
   new Date(TODAY - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
 // What merged in this digest's window, each with the issue it closed and its labels.
 const merged = api(
@@ -347,37 +351,37 @@ const render = (start, mergedLines, prev) =>
       ? `\n## Merged since ${start.slice(0, 10)} (${mergedLines.length})\n\n${mergedLines.join("\n")}\n`
       : ""
   }`.trim() + FOOTER;
-const body = render(
-  since,
-  merged,
-  digestIssue?.body?.match(/Previous digest: #(\d+)/)?.[1],
-);
-// A quiet week (nothing merged, nothing to act on) opens no new issue.
-const rollover =
+const body = render(since, merged, published?.number);
+const week = (start) => `week of ${start.slice(0, 10)}`;
+// A quiet week (nothing merged, nothing to act on) stays a draft.
+const publish =
   !FOLLOWUPS_ONLY &&
-  (!digestIssue ||
-    (days(since) >= DIGEST_DAYS && (merged.length > 0 || asks.length > 0)));
-// Maintainer replies on the digest not yet copied onto their issues.
-const digestComments = digestIssue
-  ? all(`repos/${REPO}/issues/${digestIssue.number}/comments?per_page=100`)
-  : [];
-const relayedAt =
-  digestComments.findLast((c) => c.body.includes(RELAYED))?.created_at ?? "";
-const replies = digestComments
-  .filter(
-    (c) =>
-      c.created_at > relayedAt && c.user.type !== "Bot" && !AGENT.test(c.body),
-  )
-  .map((c) => ({
-    digest: digestIssue.number,
-    url: c.html_url,
-    author: c.user.login,
-    body: c.body,
-  }));
+  !!draft &&
+  days(since) >= DIGEST_DAYS &&
+  (merged.length > 0 || asks.length > 0);
+// Maintainer replies on either digest not yet copied onto their issues.
+const replies = [draft, published].filter(Boolean).flatMap((d) => {
+  const cs = all(`repos/${REPO}/issues/${d.number}/comments?per_page=100`);
+  const relayedAt =
+    cs.findLast((c) => c.body.includes(RELAYED))?.created_at ?? "";
+  return cs
+    .filter(
+      (c) =>
+        c.created_at > relayedAt &&
+        c.user.type !== "Bot" &&
+        !AGENT.test(c.body),
+    )
+    .map((c) => ({
+      digest: d.number,
+      url: c.html_url,
+      author: c.user.login,
+      body: c.body,
+    }));
+});
 const digest = {
-  issue: digestIssue?.number ?? null,
-  rollover,
-  bodyChanged: !FOLLOWUPS_ONLY && digestIssue?.body !== body,
+  draft: draft?.number ?? null,
+  published: published?.number ?? null,
+  publish,
   replies,
   counts: {
     decide: decide.length,
@@ -442,24 +446,40 @@ if (APPLY) {
       "PATCH",
     );
   }
-  if (digest.bodyChanged && digestIssue)
-    post(`repos/${REPO}/issues/${digestIssue.number}`, { body }, "PATCH");
-  if (digest.rollover) {
-    digest.issue = JSON.parse(
-      post(`repos/${REPO}/issues`, {
-        title: `${DIGEST_PREFIX} — week of ${TODAY.toISOString().slice(0, 10)}`,
-        body: render(NOW, [], digestIssue?.number),
-      }),
-    ).number;
-    if (digestIssue) {
-      post(`repos/${REPO}/issues/${digestIssue.number}/comments`, {
-        body: `Superseded by #${digest.issue}; reply there.${FOOTER}`,
-      });
+  if (!FOLLOWUPS_ONLY) {
+    const newDraft = (start, b) =>
+      JSON.parse(
+        post(`repos/${REPO}/issues`, {
+          title: `${DIGEST_PREFIX} (draft) — ${week(start)}`,
+          body: b,
+        }),
+      ).number;
+    const d = draft?.number ?? newDraft(since, body);
+    if (draft && draft.body !== body)
+      post(`repos/${REPO}/issues/${d}`, { body }, "PATCH");
+    if (publish) {
       post(
-        `repos/${REPO}/issues/${digestIssue.number}`,
-        { state: "closed", state_reason: "completed" },
+        `repos/${REPO}/issues/${d}`,
+        { title: `${DIGEST_PREFIX} — ${week(since)}` },
         "PATCH",
       );
+      // A title or body edit notifies nobody; this comment is the weekly ping.
+      const { decide: x, review: r, unstick: u, merged: m } = digest.counts;
+      post(`repos/${REPO}/issues/${d}/comments`, {
+        body: `Published: ${x} to decide, ${r} to review, ${u} to unstick, ${m} merged.${FOOTER}`,
+      });
+      if (published) {
+        post(`repos/${REPO}/issues/${published.number}/comments`, {
+          body: `Superseded by #${d}.${FOOTER}`,
+        });
+        post(
+          `repos/${REPO}/issues/${published.number}`,
+          { state: "closed", state_reason: "completed" },
+          "PATCH",
+        );
+      }
+      digest.draft = newDraft(NOW, render(NOW, [], d));
+      digest.published = d;
     }
   }
 }

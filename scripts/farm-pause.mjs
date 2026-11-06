@@ -30,20 +30,21 @@ const names = (x) => x.labels.map((l) => l.name);
 const tiered = (x) => names(x).some((l) => TIERS.includes(l));
 const ranking = () => run("node", ["scripts/survey-next.mjs"]).trim();
 
-// --- State: the current (newest open) digest issue, its label and its marker comments
-const digest = all(`repos/${REPO}/issues?state=open&per_page=100`)
+// --- State: the label on either open digest; marker comments on the newest (the draft)
+const digests = all(`repos/${REPO}/issues?state=open&per_page=100`)
   .filter((i) => !i.pull_request && i.title.startsWith("Farm digest"))
-  .sort((a, b) => a.number - b.number)
-  .at(-1);
+  .sort((a, b) => a.number - b.number);
+const digest = digests.at(-1);
 if (!digest) {
   console.log(JSON.stringify({ state: "normal", plan: null }));
   process.exit(0);
 }
-const paused = names(digest).includes(LABEL);
+const labelled = digests.find((d) => names(d).includes(LABEL));
+const paused = !!labelled;
 const comments = all(`repos/${REPO}/issues/${digest.number}/comments?per_page=100`);
 const snap = comments.findLast((c) => c.body.includes(SNAPSHOT));
 const labeledAt = paused
-  ? all(`repos/${REPO}/issues/${digest.number}/events?per_page=100`).findLast(
+  ? all(`repos/${REPO}/issues/${labelled.number}/events?per_page=100`).findLast(
       (e) => e.event === "labeled" && e.label.name === LABEL,
     )?.created_at
   : null;

@@ -14,7 +14,7 @@ digest issue, which also says why anything isn't moving.
    (assigns each dispatched issue and leaves a `farm-dispatch` marker comment;
    leaves a `farm-followup` marker comment on each followed-up PR), labels
    PRs with their merge policy, merges the `automerge` PRs, closes finished
-   survey parents, rewrites the digest and opens next week's when due. It
+   survey parents, rewrites the draft digest and publishes it when due. It
    prints the same plan.
 3. For each entry in `sessions`, start one background subagent with the
    `Agent` tool: the entry's `prompt`, `description` from its `title`,
@@ -70,20 +70,21 @@ digest issue, which also says why anything isn't moving.
   finding sub-issue is closed. One whose open findings are all
   `decision-required` or `deferred` is listed under **Surveys held open**,
   since `weekly-survey.md` won't re-run that survey until they move.
-- **Digest**: one issue per week, `Farm digest — week of <date>`; the newest
-  open one is current. Its body is rewritten on every run (an edit notifies
-  nobody), so it always shows today's state: what waits on the maintainer,
+- **Digest**: a draft issue, `Farm digest (draft) — week of <date>`, is
+  rewritten on every run (an edit notifies nobody), so it always shows
+  today's state: what waits on the maintainer,
   each line saying what to do, **Decide** (open `decision-required` issues),
   **Review** (green, quiet `needs-review` PRs and Dependabot PRs without
   auto-merge), **Unstick** (PRs at their follow-up cap, conflicts included, a
   follow-up with no push after 2 days, a dispatched issue with no PR after 2
   days); then what's coming, **Queue** (dispatchable issues past today's cap),
   **Not picked up** and **Surveys held open**; then **Merged since** the
-  digest opened, each PR with the issue it closed and its labels. Once a
-  digest is 7 days old and something merged or waits, the run opens the next
-  week's issue (the weekly ping) and closes the old one with a link. A quiet
-  week opens nothing. Replies on the digest are relayed (step 4). Nothing is
-  decided on silence.
+  draft opened, each PR with the issue it closed and its labels. Once the
+  draft is 7 days old and something merged or waits, the run publishes it
+  (drops `(draft)` from the title and comments the counts, the weekly ping),
+  closes the previously published digest with a link, and opens the next
+  draft. A quiet week stays a draft. Replies on the draft or the published
+  digest are relayed (step 4). Nothing is decided on silence.
 
 To re-dispatch a stuck issue, unassign it. To stop a PR from getting
 follow-ups, mark it draft. To hold a PR the farm would merge, swap its
