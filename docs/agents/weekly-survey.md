@@ -22,7 +22,7 @@ remembering, and no new findings while the backlog is already full.
    its survey already has an open parent issue with open findings that the
    farm can still work. Findings that are `decision-required` or `deferred`
    don't count, so one parked decision doesn't block the survey for good (the
-   digest lists such parents under **Surveys held open**). For each open
+   digest lists such parents under **Not picked up**). For each open
    parent:
 
    ```bash

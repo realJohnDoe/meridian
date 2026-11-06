@@ -40,7 +40,8 @@ digest issue, which also says why anything isn't moving.
   sub-issues, and no open PR that closes them. Oldest first. Every other open
   issue is either somewhere else in the digest (its PR, Decide, Unstick) or
   under **Not picked up** with its reason (no tier label, `opus-plan`, blocked
-  by `#N`, assigned by hand), so nothing is skipped silently.
+  by `#N`, assigned by hand, a survey run whose open findings all wait on a
+  decision), so nothing is skipped silently.
 - **Follow-up**: open, non-draft PRs that close a tier-labelled issue, survey
   learnings PRs and Dependabot PRs (as `opus`), once CI
   has finished. A PR gets one narrow session if it conflicts with `main`
@@ -68,8 +69,7 @@ digest issue, which also says why anything isn't moving.
   the digest instead.
 - **Survey parents**: a survey run's parent issue is closed once every
   finding sub-issue is closed. One whose open findings are all
-  `decision-required` or `deferred` is listed under **Surveys held open**,
-  since `weekly-survey.md` won't re-run that survey until they move.
+  `decision-required` or `deferred` is listed under **Not picked up**.
 - **Digest**: a draft issue, `Farm digest (draft) — week of <date>`, is
   rewritten on every run (an edit notifies nobody), so it always shows
   today's state: what waits on the maintainer,
@@ -77,8 +77,8 @@ digest issue, which also says why anything isn't moving.
   **Review** (green, quiet `needs-review` PRs and Dependabot PRs without
   auto-merge), **Unstick** (PRs at their follow-up cap, conflicts included, a
   follow-up with no push after 2 days, a dispatched issue with no PR after 2
-  days); then what's coming, **Queue** (dispatchable issues past today's cap),
-  **Not picked up** and **Surveys held open**; then **Merged since** the
+  days); then what's coming, **Queue** (dispatchable issues past today's cap)
+  and **Not picked up**; then **Merged since** the
   draft opened, each PR with the issue it closed and its labels. Once the
   draft is 7 days old and something merged or waits, the run publishes it
   (drops `(draft)` from the title and comments the counts, the weekly ping),

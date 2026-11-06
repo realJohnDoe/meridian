@@ -261,8 +261,8 @@ const queue = dispatches.slice(Math.max(0, MAX_SESSIONS - followups.length));
 
 // --- Survey parents ---------------------------------------------------------
 // A survey run's parent closes once every finding is resolved; one whose open
-// findings all wait on a decision (or are deferred) is held, and weekly-survey.md
-// doesn't re-run that survey until they move.
+// findings all wait on a decision (or are deferred) is not picked up, like any
+// other stalled ticket.
 const parents = issues.filter(
   (i) =>
     i.sub_issues_summary?.total > 0 &&
@@ -271,7 +271,6 @@ const parents = issues.filter(
 const closeParents = parents
   .filter((p) => p.sub_issues_summary.completed === p.sub_issues_summary.total)
   .map((p) => ({ issue: p.number, title: p.title }));
-const held = [];
 for (const p of parents.filter(
   (p) => p.sub_issues_summary.completed < p.sub_issues_summary.total,
 )) {
@@ -279,11 +278,11 @@ for (const p of parents.filter(
     `repos/${REPO}/issues/${p.number}/sub_issues?per_page=100`,
   ).filter((s) => s.state === "open");
   if (open.every((s) => names(s).some((l) => HELD.includes(l))))
-    held.push({
+    notPicked.push({
       issue: p.number,
       title: p.title,
       url: p.html_url,
-      why: `waits only on ${open.map((s) => `#${s.number}`).join(", ")}`,
+      why: `survey run; its open findings wait on ${open.map((s) => `#${s.number}`).join(", ")}`,
     });
 }
 
@@ -314,7 +313,6 @@ const info = [
     })),
   ),
   ...section("Not picked up", notPicked),
-  ...section("Surveys held open", held),
 ];
 // The draft collects the week; at its end it is published (retitled, pinged)
 // and the next draft opens. The previous published digest is then closed.
@@ -389,7 +387,6 @@ const digest = {
     unstick: unstick.length,
     queue: queue.length,
     notPicked: notPicked.length,
-    held: held.length,
     merged: merged.length,
   },
 };
