@@ -1,0 +1,66 @@
+# Temporary: checks that CLOUDFLARE_API_TOKEN can deploy a *new* Worker with
+# static assets (the #1343 move), then deletes it. Remove before merging.
+name: Cloudflare token probe
+
+on:
+  push:
+    branches: [ccr-773117c6-bnhnhn]
+    paths: ['.github/workflows/cloudflare-token-probe.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Verify token is active
+        run: |
+          echo "PROBE=$RUNNER_TEMP/probe" >> "$GITHUB_ENV"
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify | jq '{success, status: .result.status, expires_on: .result.expires_on, errors}'
+
+      - name: Write throwaway worker with assets
+        run: |
+          mkdir -p "$PROBE/public"
+          echo '<h1>meridian token probe</h1>' > "$PROBE/public/index.html"
+          echo 'export default { fetch: () => Response.json({ ok: true }) }' > "$PROBE/index.js"
+          cat > "$PROBE/wrangler.toml" <<'EOF'
+          name = "meridian-token-probe"
+          main = "index.js"
+          compatibility_date = "2026-07-01"
+          account_id = "0c9a990d5cdac68612909eceef590d10"
+          workers_dev = true
+          [assets]
+          directory = "./public"
+          not_found_handling = "single-page-application"
+          run_worker_first = ["/health"]
+          EOF
+
+      - name: Deploy new worker with assets
+        run: pnpm --filter meridian-oauth-worker exec wrangler deploy --config "$PROBE/wrangler.toml"
+
+      - name: Fetch asset and worker route
+        run: |
+          url=https://meridian-token-probe.realjohndoe.workers.dev
+          for i in $(seq 1 12); do
+            if curl -fsS "$url/some/deep/link" | grep -q 'token probe' && curl -fsS "$url/health" | grep -q '"ok":true'; then
+              echo "asset + SPA fallback + worker route all served"; exit 0
+            fi
+            sleep 10
+          done
+          echo "deployed but $url did not serve as expected"; exit 1
+
+      - name: Delete throwaway worker
+        if: always()
+        run: pnpm --filter meridian-oauth-worker exec wrangler delete --config "$PROBE/wrangler.toml" --force
