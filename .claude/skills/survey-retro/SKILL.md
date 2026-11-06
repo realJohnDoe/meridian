@@ -46,6 +46,10 @@ its commits. It tags each PR with the signals it can read from GitHub:
 | `reverted` | a later PR titled `Revert "<this title>"` |
 | `abandoned` | closed without merging |
 
+**Asked why a survey missed something?** Skip the script: read the sessions that
+ran that survey. Its parent issue links the survey-file PR, whose body carries
+the session id (precedent: #1372).
+
 Read the **worst-tagged 5 to 10 sessions** and skip the clean ones. A `not-run`
 that only says "no source changed, so build was skipped" is noise. A `not-run`
 that skips a finding's acceptance check is not noise. Before #1308, every session
@@ -67,7 +71,8 @@ node scripts/session-digest.mjs <saved-file>   # ~300 KB transcript -> ~6 KB
 Results under the size limit come back inline and cost full context, so read
 those sessions last. The newest page usually holds the CI failure and the
 user's correction. Page further back with `before_id` set to `first_id` only
-when the cause happened earlier. `RESULT` lines carry turns, cost and permission
+when the cause happened earlier. A survey session's newest pages are PR
+babysitting; its survey work sits 4–5 pages back. `RESULT` lines carry turns, cost and permission
 denials. Use the user's correction ("The build failed in CI") as the anchor:
 find what the session did just before it.
 
