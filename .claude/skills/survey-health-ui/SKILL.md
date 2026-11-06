@@ -70,10 +70,12 @@ are specific to this survey:
   exempts; until 2026-09-13 this file never asked for it, while `CLAUDE.md` said
   it did.
 
-  Read the two CI gates first so the pass is spent on what they cannot see:
-  `e2e/contrast-sweep.spec.ts` is an enforced contrast floor across all nine
-  themes and `e2e/layout-smoke.spec.ts` pins shell geometry plus route coverage,
-  so contrast findings need to clear that floor to be findings at all. If the
+  Read `src/__snapshots__/themeContrast.txt` first: each `below` row is a
+  candidate, and the phone-pass themes are the two with the most `below` rows.
+  `e2e/contrast-sweep.spec.ts` is no bar — it samples 11 routes in their default
+  state (no dialog, drawer, search result or selected row) and tolerates 1–3
+  violations per theme and route; `e2e/layout-smoke.spec.ts` pins shell geometry
+  plus route coverage. Open dialogs, drawers and selected states yourself. If the
   session has no `preview_*` tooling, drive Chromium yourself rather than
   skipping: `@playwright/test` is a devDependency and `e2e/` is the worked
   example — `pnpm exec vite --port <unique> --strictPort`, then
@@ -181,8 +183,8 @@ Examples (not exhaustive):
 Examples (not exhaustive):
 
 - Raw CSS files or inline `style={{...}}` where Tailwind utilities would suffice — or the reverse: utility-class soup where a shared variant/component is warranted
-- Hardcoded colors/spacing/z-index bypassing the theme tokens (e.g. `#hex` or arbitrary values `[...]` instead of design-token classes) — grep for these, count them
-- Repeated multi-class Tailwind strings that should be a `cva` variant, shared component, or `@apply`-free abstraction
+- Colour drift: call sites are enforced by `NO_COLOR_ARITHMETIC` in `eslint.config.js`, so census what lint can't see — `index.css`'s derived tokens and distinct opacity levels (vs the last run), tokens identical in every theme, `--*` tokens referenced nowhere
+- Repeated multi-class Tailwind strings that should be a `cva` variant, shared component, or `@apply`-free abstraction. Census: `grep -rhoE 'className="[^"]{30,}"' src --include=*.tsx | sort | uniq -c | sort -rn | awk '$1>=3'`, then per shadcn action/container (`AlertDialogAction`, `AlertDialogContent`, `Button` with `bg-*` overrides) list the distinct className sets — more than one for one role is a candidate
 - Divergence inside `components/ui/` — shadcn primitives locally patched in ways that fork them from upstream without a recorded reason
 - Dark-mode/theming gaps — components styled for one scheme only
 - Conditional class logic built by string concatenation where the project's `cn`/`clsx` helper exists
