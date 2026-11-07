@@ -38,7 +38,7 @@ Findings must be anchored to one or more of these flows — an issue that no com
   - **Baseline:** the measured cost (ms of handler time, render count, chunk kB, time-to-interactive) on the test vault.
   - **Measurement recipe:** the exact, re-runnable steps that produced the number — the instrumentation snippet (`performance.mark`/`performance.measure` pairs, a render counter, `why-did-you-render`-style logging), where it was patched in, the interaction performed, and how the number was read out. This recipe is the acceptance test for the fix: after the fix, rerun it and compare.
   - Instrumentation is temporary — patch it in, measure, and revert; do not leave measurement code in the working tree.
-- **How to measure in this environment:** Playwright, not `preview_*` tools —
+- **How to measure in this environment:** (base path `/meridian/`: see `docs/agents/dev-server.md`) Playwright, not `preview_*` tools —
   their absence is never a reason to skip phase 2. `scripts/perf/stress.mjs`
   launches its own Chromium; for the four flows it does not cover, drive your own
   the same way (`pnpm exec vite --port <unique> --strictPort`, then `chromium` from
