@@ -36,7 +36,7 @@ digest issue, which also says why anything isn't moving.
 ## What the script decides
 
 - **Dispatch**: open issues that have a `haiku`/`sonnet`/`opus` label, no
-  `opus-plan`, `decision-required` or `deferred`, no assignee, no open native blocker, no
+  `opus-plan`, `decision-required` or `deferred`, no assignee, no open blocker (native, or named in the body by a `Blocked by: #n` line or `## Blocked by` section), no
   sub-issues, and no open PR that closes them. Oldest first. Every other open
   issue is either somewhere else in the digest (its PR, Decide, Unstick) or
   under **Not picked up** with its reason (no tier label, `opus-plan`, `deferred`, blocked
