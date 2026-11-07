@@ -198,6 +198,7 @@ const skip = (i) => {
   if (isDigest(i) || i.sub_issues_summary?.total > 0) return null;
   if (linked.has(i.number) || l.includes("decision-required")) return null;
   if (i.assignees.length) return null;
+  if (l.includes("deferred")) return "`deferred`; remove the label to queue it";
   if (!tierOf(l) && !l.includes("opus-plan"))
     return "no tier label; add `haiku`, `sonnet` or `opus` to queue it";
   if (l.includes("opus-plan"))
