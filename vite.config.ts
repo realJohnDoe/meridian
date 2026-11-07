@@ -12,6 +12,17 @@ import { createHash } from 'crypto'
 import type { Plugin } from 'vite'
 
 /**
+ * The one build-time base path every URL below derives from. `BASE_PATH=/`
+ * builds for an origin of its own; the default is today's Pages subpath.
+ * Normalised to a leading and trailing slash, as Vite's `base` requires.
+ */
+const BASE_SEGMENT = (process.env.BASE_PATH ?? '/meridian/').replace(/^\/+|\/+$/g, '')
+const BASE_PATH = BASE_SEGMENT ? `/${BASE_SEGMENT}/` : '/'
+const BASE_NO_SLASH = BASE_PATH.slice(0, -1)
+const PAGES_ORIGIN = 'https://realjohndoe.github.io'
+const WORKER_ORIGIN = process.env.VITE_WORKER_ORIGIN ?? 'https://meridian-oauth.realjohndoe.workers.dev'
+
+/**
  * Short commit SHA, baked in at build time for the About section (settings/AboutSettings.tsx).
  * package.json's version is still the un-bumped placeholder 0.1.0, so printing
  * it would be misleading — the commit is the only thing that actually
@@ -27,9 +38,9 @@ function getCommitSha(): string {
 }
 
 /**
- * Serves debug.html at /meridian/debug.html (and /meridian/debug/) in dev mode.
+ * Serves debug.html under the base path (e.g. /meridian/debug.html) in dev mode.
  *
- * Why a custom plugin instead of Vite's built-in MPA mode: with base '/meridian/'
+ * Why a custom plugin instead of Vite's built-in MPA mode: with a non-root base
  * the VitePWA plugin's transformIndexHtml hook intercepts all HTML requests and
  * replaces the entry script with the main app's. We bypass that by injecting the
  * Vite HMR + React-refresh preamble manually and serving the file directly.
@@ -41,7 +52,7 @@ function debugPagePlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url ?? ''
         if (
-          url === '/meridian/debug.html' || url === '/meridian/debug/' || url === '/meridian/debug' ||
+          url === `${BASE_PATH}debug.html` || url === `${BASE_PATH}debug/` || url === `${BASE_NO_SLASH}/debug` ||
           url === '/debug.html' || url === '/debug/' || url === '/debug'
         ) {
           try {
@@ -50,9 +61,9 @@ function debugPagePlugin(): Plugin {
             // otherwise replace our entry script with the main app's script.
             let html = fs.readFileSync(resolve(import.meta.dirname, 'debug.html'), 'utf-8')
             const viteHead = [
-              `<script type="module" src="/meridian/@vite/client"></script>`,
+              `<script type="module" src="${BASE_PATH}@vite/client"></script>`,
               `<script type="module">`,
-              `  import RefreshRuntime from '/meridian/@react-refresh'`,
+              `  import RefreshRuntime from '${BASE_PATH}@react-refresh'`,
               `  RefreshRuntime.injectIntoGlobalHook(window)`,
               `  window.$RefreshReg$ = () => {}`,
               `  window.$RefreshSig$ = () => (type) => type`,
@@ -62,7 +73,7 @@ function debugPagePlugin(): Plugin {
             // Add base prefix to the entry script path
             html = html.replace(
               'src="/src/debug/main.tsx"',
-              'src="/meridian/src/debug/main.tsx"',
+              `src="${BASE_PATH}src/debug/main.tsx"`,
             )
             html = html.replace('</head>', `${viteHead}\n  </head>`)
             res.setHeader('Content-Type', 'text/html; charset=utf-8')
@@ -105,7 +116,7 @@ function cspPlugin(): Plugin {
     // codeload.github.com: the repo-archive (zipball) endpoint on api.github.com
     // 302-redirects here, and CSP is enforced against the redirected URL too — so
     // fetching a vault as an archive needs this host explicitly allowed.
-    "connect-src 'self' https://api.github.com https://codeload.github.com https://meridian-oauth.realjohndoe.workers.dev",
+    `connect-src 'self' https://api.github.com https://codeload.github.com ${WORKER_ORIGIN}`,
     "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
@@ -148,14 +159,23 @@ function spaFallbackPlugin(): Plugin {
   }
 }
 
+/** Fills index.html's absolute social-card URLs from the base path. */
+function socialUrlPlugin(): Plugin {
+  return {
+    name: 'social-urls',
+    transformIndexHtml: html => html.replaceAll('%APP_URL%', `${PAGES_ORIGIN}${BASE_PATH}`),
+  }
+}
+
 export default defineConfig({
-  base: '/meridian/',
+  base: BASE_PATH,
   define: {
     __APP_VERSION__: JSON.stringify(getCommitSha()),
   },
   plugins: [
     debugPagePlugin(),
     cspPlugin(),
+    socialUrlPlugin(),
     TanStackRouterVite({ target: 'react', autoCodeSplitting: true, routeFileIgnorePattern: '(^|/)index\\.tsx?$' }),
     react(),
     // babel-plugin-react-compiler auto-memoizes components/hooks at build time.
@@ -171,7 +191,7 @@ export default defineConfig({
         // Without this, the NavigationRoute catches all navigations and serves
         // the main app instead of the debug page.
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/meridian\/debug(\.html)?$/],
+        navigateFallbackDenylist: [new RegExp(`^${BASE_NO_SLASH}/debug(\\.html)?$`)],
       },
       manifest: {
         name: 'Meridian',
@@ -200,7 +220,7 @@ export default defineConfig({
         // Splash-screen background only — not the status bar.
         background_color: '#011227',
         display: 'standalone',
-        start_url: '/meridian/',
+        start_url: BASE_PATH,
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },

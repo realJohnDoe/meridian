@@ -178,7 +178,7 @@ describe('VaultSettings — invite', () => {
     expect(writeText).toHaveBeenCalledTimes(1)
     const [message] = writeText.mock.calls[0]!
     expect(message).toContain('acme/notes')
-    expect(message).toContain('https://realjohndoe.github.io/meridian/')
+    expect(message).toContain(`${window.location.origin}${import.meta.env.BASE_URL}`)
     // No GitHub App install step — a collaborator's sign-in is their whole setup.
     expect(message).not.toMatch(/install/i)
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeInTheDocument()

@@ -10,7 +10,7 @@ window.addEventListener('vite:preloadError', () => { window.location.reload() })
 
 export const router = createRouter({
   routeTree,
-  basepath: '/meridian',
+  basepath: import.meta.env.BASE_URL.replace(/\/$/, '') || '/',
   // Every route match (including root) is wrapped in its own CatchBoundary,
   // so this single fallback catches render-time throws app-wide instead of
   // white-screening the PWA — see AppErrorFallback.

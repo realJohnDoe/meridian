@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Copy, Check, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
-import { APP_URL } from '@/vaultActions'
+import { appUrl } from '@/vaultActions'
 import { SettingsRow } from './SettingsSection'
 
 /**
@@ -12,7 +12,7 @@ import { SettingsRow } from './SettingsSection'
  * install would send them somewhere confusing.
  */
 function inviteMessage(owner: string, repo: string): string {
-  return `I'm sharing a calendar with you in Meridian — tasks and events as plain Markdown files in a GitHub repo, no plugin needed. Once you're added as a collaborator on ${owner}/${repo}, open ${APP_URL}, sign in with GitHub, and pick that repo.`
+  return `I'm sharing a calendar with you in Meridian — tasks and events as plain Markdown files in a GitHub repo, no plugin needed. Once you're added as a collaborator on ${owner}/${repo}, open ${appUrl()}, sign in with GitHub, and pick that repo.`
 }
 
 /** The "Invite someone" row of a GitHub vault. */
