@@ -29,7 +29,7 @@ export { cacheDirtyCount } from './cache/files'
 
 export {
   startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos, findReusableGitHubSession,
-  OAuthCallbackError, GITHUB_APP_INSTALL_URL, APP_URL,
+  OAuthCallbackError, GITHUB_APP_INSTALL_URL, appUrl,
 } from './githubOAuth'
 export type { OAuthTokens, InstalledRepo, ReusableGitHubSession } from './githubOAuth'
 

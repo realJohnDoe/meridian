@@ -8,9 +8,9 @@ const GITHUB_CLIENT_ID = 'Iv23liMpUq1CUQl4TcaT'
 export const GITHUB_APP_INSTALL_URL = 'https://github.com/apps/realjohndoe-meridian/installations/new'
 
 /** The deployed app's URL — also where an invite message sends a collaborator. */
-export const APP_URL = 'https://realjohndoe.github.io/meridian/'
+export const appUrl = () => `${window.location.origin}${import.meta.env.BASE_URL}`
 
-const REDIRECT_URI = `${APP_URL}auth/callback`
+const redirectUri = () => `${appUrl()}auth/callback`
 
 const VERIFIER_KEY = 'meridian_oauth_verifier'
 const STATE_KEY = 'meridian_oauth_state'
@@ -59,7 +59,7 @@ export async function startGitHubSignIn(opts?: { reconnectVaultId?: string }): P
 
     const url = new URL('https://github.com/login/oauth/authorize')
     url.searchParams.set('client_id', GITHUB_CLIENT_ID)
-    url.searchParams.set('redirect_uri', REDIRECT_URI)
+    url.searchParams.set('redirect_uri', redirectUri())
     url.searchParams.set('code_challenge', challenge)
     url.searchParams.set('code_challenge_method', 'S256')
     url.searchParams.set('state', state)

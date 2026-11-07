@@ -100,6 +100,6 @@ export function copyVaultInto(fromVaultId: string, toVaultId: string): IcsImport
 
 export {
   startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos, findReusableGitHubSession,
-  OAuthCallbackError, GITHUB_APP_INSTALL_URL, APP_URL,
+  OAuthCallbackError, GITHUB_APP_INSTALL_URL, appUrl,
 } from '@/storage'
 export type { OAuthTokens, InstalledRepo, ReusableGitHubSession } from '@/storage'

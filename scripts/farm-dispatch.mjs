@@ -29,8 +29,9 @@ const DIGEST_PREFIX = "Farm digest";
 const DISPATCH = "<!-- farm-dispatch -->";
 const FOLLOWUP = "<!-- farm-followup -->";
 const RELAYED = "<!-- farm-relayed -->"; // digest replies up to here are copied to their issues
-// A PR's merge policy, written onto it the first time the dispatcher sees it.
-const POLICY = ["automerge", "needs-review"];
+// The one merge policy: a green, quiet PR with this label is merged; any other
+// non-draft PR waits for review. Whoever opens the PR decides.
+const AUTOMERGE = "automerge";
 const HELD = ["decision-required", "deferred"];
 const SURVEY_LABELS = readdirSync(".claude/skills")
   .filter((d) => d.startsWith("survey-"))
@@ -76,39 +77,21 @@ const linkedIssues = (pr) =>
 const linked = new Set(prs.flatMap(linkedIssues));
 
 // --- PR follow-up -----------------------------------------------------------
-// Ours to follow up: PRs that close a tier-labelled issue, survey learnings PRs
-// and Dependabot PRs.
+// Ours to follow up: every non-draft PR (draft = keep out of the farm).
 const followups = [];
 const review = [];
 const unstick = [];
 const automerge = [];
-const policyLabels = [];
-// A survey run's process-learnings PR touches only survey skill files.
-const isLearnings = (pr) =>
-  all(`repos/${REPO}/pulls/${pr.number}/files?per_page=100`).every((f) =>
-    /^\.claude\/skills\/survey-[^/]+\/SKILL\.md$/.test(f.filename),
-  );
 const isDependabot = (pr) => pr.user.login === "dependabot[bot]";
 for (const pr of prs.filter((p) => !p.draft)) {
   const issue = linkedIssues(pr)
     .map((n) => byNumber.get(n))
     .find((i) => i && tierOf(names(i)));
   const bot = isDependabot(pr);
-  if (!issue && !bot && !isLearnings(pr)) continue;
   // A red bump is undiagnosed and often rooted in a dependency's own change.
   const tier = issue ? tierOf(names(issue)) : bot ? "opus" : "sonnet";
-  // Dependabot's policy is native auto-merge (dependabot-automerge.yml). For the
-  // rest, a policy label already on the PR wins; else opus work needs review.
-  const own = names(pr);
-  const labels = own.concat(issue ? names(issue) : []);
-  const policy = bot
-    ? null
-    : (POLICY.find((p) => own.includes(p)) ??
-      (["opus", "opus-plan"].some((t) => labels.includes(t))
-        ? "needs-review"
-        : "automerge"));
-  if (policy && !own.includes(policy))
-    policyLabels.push({ pr: pr.number, label: policy });
+  // Dependabot's policy is native auto-merge (dependabot-automerge.yml).
+  const auto = names(pr).includes(AUTOMERGE);
   const head = api(`repos/${REPO}/commits/${pr.head.sha}`);
   const headDate = head.commit.committer.date;
   const runs = api(
@@ -143,7 +126,7 @@ for (const pr of prs.filter((p) => !p.draft)) {
   if (failing.length === 0 && feedback.length === 0 && !conflict) {
     // dependabot-automerge.yml queues all but majors, and drops a PR anyone else
     // pushed to; those wait for a human.
-    if (bot ? !pr.auto_merge : policy === "needs-review")
+    if (bot ? !pr.auto_merge : !auto)
       review.push({ pr: pr.number, title: pr.title, url: pr.html_url });
     else if (!pr.auto_merge)
       automerge.push({ pr: pr.number, sha: pr.head.sha, title: pr.title });
@@ -199,6 +182,7 @@ const skip = (i) => {
   if (isDigest(i) || i.sub_issues_summary?.total > 0) return null;
   if (linked.has(i.number) || l.includes("decision-required")) return null;
   if (i.assignees.length) return null;
+  if (l.includes("deferred")) return "`deferred`; remove the label to queue it";
   if (!tierOf(l) && !l.includes("opus-plan"))
     return "no tier label; add `haiku`, `sonnet` or `opus` to queue it";
   if (l.includes("opus-plan"))
@@ -234,7 +218,9 @@ const dispatches = ready
       `Implement #${i.number} (${i.html_url}) in ${REPO}, following CLAUDE.md.`,
       `Work on a new branch \`claude/issue-${i.number}\` from \`origin/main\` and push it.`,
       `Open a PR whose description fills in .github/pull_request_template.md: \`Fixes #${i.number}\`, the acceptance check re-run with before → after, and the build & lint result.`,
-      `Label the PR \`${tierOf(names(i)) === "opus" ? "needs-review" : "automerge"}\`: it says whether the dispatcher merges it once green.`,
+      tierOf(names(i)) === "opus"
+        ? `Don't label the PR \`${AUTOMERGE}\`: it waits for the maintainer's review.`
+        : `Label the PR \`${AUTOMERGE}\`: the dispatcher merges it once green.`,
       `Do not subscribe to PR activity: the daily dispatcher follows up on red CI and review comments.`,
     ].join("\n"),
   }));
@@ -419,21 +405,15 @@ if (APPLY) {
     } catch (e) {
       console.error(`merge #${m.pr} refused: ${e.stderr ?? e.message}`);
     }
-  for (const name of POLICY)
-    try {
-      post(`repos/${REPO}/labels`, {
-        name,
-        color: name === "automerge" ? "0e8a16" : "d93f0b",
-      });
-    } catch {} // already exists
-  for (const p of policyLabels)
-    post(`repos/${REPO}/issues/${p.pr}/labels`, { labels: [p.label] });
+  try {
+    post(`repos/${REPO}/labels`, { name: AUTOMERGE, color: "0e8a16" });
+  } catch {} // already exists
   for (const s of sessions) {
     if (s.kind === "dispatch") {
       post(`repos/${REPO}/issues/${s.issue}/assignees`, { assignees: [me] });
       const auto = s.tier !== "opus";
       post(`repos/${REPO}/issues/${s.issue}/comments`, {
-        body: `${DISPATCH}\nDispatched by the daily pass to a ${s.tier} session. Its PR gets \`${auto ? "automerge" : "needs-review"}\`: once green it ${auto ? "is merged by the next daily run" : "waits in the digest for your review"}. Swap the label on the PR to change that.${FOOTER}`,
+        body: `${DISPATCH}\nDispatched by the daily pass to a ${s.tier} session. Its PR ${auto ? "gets" : "doesn't get"} \`${AUTOMERGE}\`: once green it ${auto ? "is merged by the next daily run" : "waits in the digest for your review"}. Add or remove the label on the PR to change that.${FOOTER}`,
       });
     } else {
       post(`repos/${REPO}/issues/${s.pr}/comments`, {
@@ -498,7 +478,6 @@ console.log(
       applied: APPLY,
       sessions,
       automerge,
-      policyLabels,
       closeParents,
       deferred: [...followups, ...dispatches]
         .slice(MAX_SESSIONS)

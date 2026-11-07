@@ -6,4 +6,5 @@
  * feeds the browser cannot reach directly (calendar providers serve them
  * without CORS headers). One constant so the two can never drift apart.
  */
-export const WORKER_ORIGIN = 'https://meridian-oauth.realjohndoe.workers.dev'
+export const WORKER_ORIGIN: string =
+  import.meta.env.VITE_WORKER_ORIGIN ?? 'https://meridian-oauth.realjohndoe.workers.dev'
