@@ -60,6 +60,9 @@ const post = (path, body, method = "POST") =>
 const days = (iso) => (TODAY - new Date(iso)) / 864e5;
 const names = (x) => x.labels.map((l) => l.name);
 const tierOf = (labels) => labels.find((l) => TIERS.includes(l));
+// Opus work, or an issue labelled `needs-review`, must not auto-merge.
+const needsReview = (labels) =>
+  ["opus", "opus-plan", "needs-review"].some((l) => labels.includes(l));
 
 const issues = all(`repos/${REPO}/issues?state=open&per_page=100`).filter(
   (i) => !i.pull_request,
@@ -103,9 +106,7 @@ for (const pr of prs.filter((p) => !p.draft)) {
   const policy = bot
     ? null
     : (POLICY.find((p) => own.includes(p)) ??
-      (["opus", "opus-plan"].some((t) => labels.includes(t))
-        ? "needs-review"
-        : "automerge"));
+      (needsReview(labels) ? "needs-review" : "automerge"));
   if (policy && !own.includes(policy))
     policyLabels.push({ pr: pr.number, label: policy });
   const head = api(`repos/${REPO}/commits/${pr.head.sha}`);
@@ -223,12 +224,13 @@ const dispatches = ready
     kind: "dispatch",
     issue: i.number,
     tier: tierOf(names(i)),
+    review: needsReview(names(i)),
     title: `#${i.number} ${i.title}`,
     prompt: [
       `Implement #${i.number} (${i.html_url}) in ${REPO}, following CLAUDE.md.`,
       `Work on a new branch \`claude/issue-${i.number}\` from \`origin/main\` and push it.`,
       `Open a PR whose description fills in .github/pull_request_template.md: \`Fixes #${i.number}\`, the acceptance check re-run with before → after, and the build & lint result.`,
-      `Label the PR \`${tierOf(names(i)) === "opus" ? "needs-review" : "automerge"}\`: it says whether the dispatcher merges it once green.`,
+      `Label the PR \`${needsReview(names(i)) ? "needs-review" : "automerge"}\`: it says whether the dispatcher merges it once green.`,
       `Do not subscribe to PR activity: the daily dispatcher follows up on red CI and review comments.`,
     ].join("\n"),
   }));
@@ -425,7 +427,7 @@ if (APPLY) {
   for (const s of sessions) {
     if (s.kind === "dispatch") {
       post(`repos/${REPO}/issues/${s.issue}/assignees`, { assignees: [me] });
-      const auto = s.tier !== "opus";
+      const auto = !s.review;
       post(`repos/${REPO}/issues/${s.issue}/comments`, {
         body: `${DISPATCH}\nDispatched by the daily pass to a ${s.tier} session. Its PR gets \`${auto ? "automerge" : "needs-review"}\`: once green it ${auto ? "is merged by the next daily run" : "waits in the digest for your review"}. Swap the label on the PR to change that.${FOOTER}`,
       });

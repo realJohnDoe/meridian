@@ -54,7 +54,8 @@ digest issue, which also says why anything isn't moving.
 - **Auto-merge**: the policy is a label on the PR, `automerge` or
   `needs-review`. The dispatched session sets it when opening the PR, and the
   script adds it the first time it sees a PR without one: `needs-review` if
-  the PR or its issue is `opus`/`opus-plan`, else `automerge` (`haiku`/`sonnet`
+  the PR or its issue is `opus`/`opus-plan` or its issue carries
+  `needs-review` (risk, independent of tier), else `automerge` (`haiku`/`sonnet`
   issues and survey learnings PRs, which touch only
   `.claude/skills/survey-*/SKILL.md`). After that only the label counts, so
   swap it to override. A green, quiet `automerge` PR is merged by the script,

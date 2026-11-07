@@ -9,3 +9,5 @@ This repo has no triage state labels. The skills' triage roles map onto the labe
 | `ready-for-agent`         | a tier label and no `decision-required`                 |
 | `ready-for-human`         | `decision-required`                                     |
 | `wontfix`                 | close as `not planned` (no label)                       |
+
+`needs-review` on an issue means its PR must not auto-merge, whatever the tier: the tier rates how hard the fix is, this rates how risky it is to ship. The dispatcher copies it to the PR as the merge-policy label.
