@@ -201,6 +201,9 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
                   onToggleDone()
                 }}
                 className="pointer-events-auto"
+                // Its own hover cue, distinct from the card's background
+                // change, so it reads as "tick off" rather than "open".
+                visualClassName="group-hover:border-task"
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => e.stopPropagation()}
               />
