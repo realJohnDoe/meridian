@@ -29,6 +29,9 @@ jobs:
       # writes worker/worker-configuration.d.ts (gitignored, from wrangler.toml) via
       # the worker's pretypecheck; without it Request/Response/Env resolve to `any`.
       - run: pnpm run build
+      # A second build under the root base: a path that only works under
+      # /meridian/ fails here instead of breaking one deployment silently.
+      - run: BASE_PATH=/ pnpm exec vite build --outDir "$RUNNER_TEMP/dist-root" && ! grep -rIl '/meridian/' "$RUNNER_TEMP/dist-root" --include='*.html' --include='*.js' --include='*.webmanifest'
       # Also runs `lint:deps` (dependency-cruiser), which needs the same
       # generated routeTree.gen.ts the type-aware rules do — it is part of the
       # module graph. ESLint enforces the per-file import boundaries; this is
