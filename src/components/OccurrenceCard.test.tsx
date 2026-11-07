@@ -200,8 +200,17 @@ describe('OccurrenceCard', () => {
       expect(container.querySelector('[title="Alice"]')).toBeInTheDocument()
       expect(container.querySelector('[title="Bob"]')).toBeInTheDocument()
       expect(container.querySelector('[title="Carol"]')).toBeInTheDocument()
-      expect(container.querySelector('[title="Dave"]')).not.toBeInTheDocument()
-      expect(screen.getByText('+1')).toBeInTheDocument()
+      expect(screen.getByText('+1')).toHaveAttribute('title', 'Dave')
+    })
+
+    it('describes the card with every participant, and a click on the stack opens the entry', () => {
+      const onOpen = vi.fn()
+      const occ = makeOcc({ metadata: { fileSlug: 'note', participants: ['Alice', 'Bob', 'Carol', 'Dave'] } })
+      render(<OccurrenceCard occ={occ} onOpen={onOpen} onToggleDone={vi.fn()} leadingIcon="kind" />)
+      expect(screen.getByRole('button', { name: occ.metadata.title }))
+        .toHaveAccessibleDescription('Participants: Alice, Bob, Carol, Dave')
+      fireEvent.click(screen.getByTitle('Alice'))
+      expect(onOpen).toHaveBeenCalledOnce()
     })
 
     it('hides participant avatars and listed-on chips when showTagsParticipants is false', () => {
