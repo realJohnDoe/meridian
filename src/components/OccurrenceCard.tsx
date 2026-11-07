@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Repeat2 } from 'lucide-react'
 import { isTracked } from '@/types'
 import type { Occurrence } from '@/types'
@@ -56,36 +56,35 @@ interface OccurrenceCardProps {
 const titleCls = (isDone: boolean) =>
   cn('text-sm font-medium truncate text-foreground', isDone && 'line-through')
 
-function ParticipantAvatars({ participants }: { participants: string[] }) {
+/**
+ * The stack sits above the card's full-bleed button, so it takes pointer
+ * events itself (for the per-avatar `title` tooltips) and forwards a click to
+ * `onOpen` — otherwise it would be a dead spot on an otherwise clickable card.
+ * It is hidden from assistive tech: keyboard and screen-reader users reach the
+ * entry through that button, which names every participant in its description.
+ */
+function ParticipantAvatars({ participants, onOpen }: { participants: string[]; onOpen: () => void }) {
   if (!participants.length) return null
   const shown = participants.slice(0, 3)
-  const overflow = participants.length - shown.length
+  const hidden = participants.slice(shown.length)
+  const avatarCls = cn(
+    'size-5.5 rounded-full border-2 border-card bg-secondary',
+    'flex items-center justify-center text-2xs font-semibold',
+  )
   return (
-    <div className="flex items-center self-center shrink-0 pl-1">
-      {shown.map((name, i) => {
-        const initials = name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'
-        return (
-          <div
-            key={name}
-            title={name}
-            className={cn(
-              'size-5.5 rounded-full border-2 border-card bg-secondary',
-              'flex items-center justify-center',
-              'text-3xs font-semibold text-secondary-foreground',
-              i > 0 && '-ml-2'
-            )}
-          >
-            {initials}
-          </div>
-        )
-      })}
-      {overflow > 0 && (
-        <div className={cn(
-          'size-5.5 rounded-full border-2 border-card bg-secondary -ml-2',
-          'flex items-center justify-center',
-          'text-3xs font-semibold text-muted-foreground'
-        )}>
-          +{overflow}
+    <div
+      aria-hidden
+      className="flex items-center self-center shrink-0 pl-1 pointer-events-auto cursor-pointer"
+      onClick={onOpen}
+    >
+      {shown.map((name, i) => (
+        <div key={name} title={name} className={cn(avatarCls, 'text-secondary-foreground', i > 0 && '-ml-2')}>
+          {name.trim().split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'}
+        </div>
+      ))}
+      {hidden.length > 0 && (
+        <div title={hidden.join(', ')} className={cn(avatarCls, 'text-muted-foreground -ml-2')}>
+          +{hidden.length}
         </div>
       )}
     </div>
@@ -146,6 +145,8 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
   const t            = fmtT(occ.time, hour12)
   const hasTrack     = isTracked(occ)
   const participants = occ.metadata.participants
+  const participantsId = useId()
+  const describeParticipants = showTagsParticipants && participants.length > 0
   const rawDuration  = occ.metadata.duration
   const durationLabel = rawDuration
     ? (occ.time
@@ -180,7 +181,9 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
         className="absolute inset-0 z-0 rounded-lg"
         aria-label={title}
         onClick={onOpen}
+        aria-describedby={describeParticipants ? participantsId : undefined}
       />
+      {describeParticipants && <span id={participantsId} hidden>Participants: {participants.join(', ')}</span>}
 
       <span className={cn(occBarVariants({ hue, dimmed }), 'relative z-20')} />
 
@@ -198,6 +201,9 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
                   onToggleDone()
                 }}
                 className="pointer-events-auto"
+                // Its own hover cue, distinct from the card's background
+                // change, so it reads as "tick off" rather than "open".
+                visualClassName="group-hover:border-task"
                 onPointerDown={e => e.stopPropagation()}
                 onClick={e => e.stopPropagation()}
               />
@@ -243,7 +249,7 @@ export default function OccurrenceCard(props: OccurrenceCardProps) {
       {/* Participant avatar stack on the right */}
       {showTagsParticipants && (
         <div className={cn('relative z-20 flex items-center pointer-events-none', dimmed && 'opacity-60')}>
-          <ParticipantAvatars participants={participants} />
+          <ParticipantAvatars participants={participants} onOpen={onOpen} />
         </div>
       )}
     </DimmableCard>
