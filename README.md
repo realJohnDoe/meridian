@@ -1,12 +1,10 @@
-<img src="public/screenshots/banner.webp" alt="Meridian — Plan, Organize, Get Things Done" />
+<img src="public/screenshots/banner.webp" alt="Meridian — a local-first, Markdown-powered calendar &amp; task manager" />
 
 # Meridian
 
-**Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**
+**Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 
 <img src="public/screenshots/capture-narrow.webp" width="340" alt="Meridian on a phone: the agenda, then tapping the bottom bar, typing 'Call mom' and pressing Enter creates a task dated today." />
-
-**Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 
 **And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins, and no event owned by whoever happened to create it. Write access is a GitHub collaborator invite, so the people you share *with* need a (free) GitHub account. The people you *name* on entries need nothing at all: participants are just names in a file, so a child or a partner can be on the calendar without being a user of anything.
 
