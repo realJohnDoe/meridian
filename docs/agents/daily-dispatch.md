@@ -42,8 +42,8 @@ digest issue, which also says why anything isn't moving.
   under **Not picked up** with its reason (no tier label, `opus-plan`, `deferred`, blocked
   by `#N`, assigned by hand, a survey run whose open findings all wait on a
   decision), so nothing is skipped silently.
-- **Follow-up**: open, non-draft PRs that close a tier-labelled issue, survey
-  learnings PRs and Dependabot PRs (as `opus`), once CI
+- **Follow-up**: every open, non-draft PR (Dependabot's as `opus`, one with no
+  tier-labelled issue as `sonnet`), once CI
   has finished. A PR gets one narrow session if it conflicts with `main`
   (checked without waiting for CI, since GitHub runs none on a conflicting PR;
   the session merges `main` in and pushes; an "unknown" mergeability is
@@ -51,15 +51,12 @@ digest issue, which also says why anything isn't moving.
   review feedback newer than its head commit that isn't an agent's (no Claude
   Code footer). It waits while a follow-up is newer than the head commit.
   Green, quiet PRs cost nothing.
-- **Auto-merge**: the policy is a label on the PR, `automerge` or
-  `needs-review`. The dispatched session sets it when opening the PR, and the
-  script adds it the first time it sees a PR without one: `needs-review` if
-  the PR or its issue is `opus`/`opus-plan`, else `automerge` (`haiku`/`sonnet`
-  issues and survey learnings PRs, which touch only
-  `.claude/skills/survey-*/SKILL.md`). After that only the label counts, so
-  swap it to override. A green, quiet `automerge` PR is merged by the script,
-  pinned to the head commit it checked; a `needs-review` one goes in the
-  digest's Review list.
+- **Auto-merge**: the `automerge` label on the PR is the only condition, and
+  whoever opens the PR sets it: a dispatched session for a `haiku`/`sonnet`
+  issue, a survey run for its learnings PR, anyone else deliberately. A green,
+  quiet `automerge` PR is merged by the script, pinned to the head commit it
+  checked; any other green, quiet non-draft PR goes in the digest's Review
+  list. Add or remove the label to override.
   Dependabot PRs aren't merged by the script either:
   `dependabot-automerge.yml` queues non-majors, and drops auto-merge once
   anyone but Dependabot pushes (a follow-up, a merge of `main`); a green PR
@@ -90,5 +87,5 @@ digest issue, which also says why anything isn't moving.
   digest are relayed (step 4). Nothing is decided on silence.
 
 To re-dispatch a stuck issue, unassign it. To stop a PR from getting
-follow-ups, mark it draft. To hold a PR the farm would merge, swap its
-`automerge` label for `needs-review`, and the reverse to let it merge.
+follow-ups or keep it out of the farm entirely, mark it draft. To hold a PR
+the farm would merge, remove its `automerge` label; add it to let one merge.

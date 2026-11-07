@@ -337,8 +337,10 @@ findings, which are issues. Still propose rather than silently commit past
 review: keep it on the branch the session is already working on — a remote
 session is *assigned* its branch name, so the `survey-run/<name>` branch this
 paragraph used to ask for was never available to follow and no such branch has
-ever existed here — and note in the run's parent issue, in one line, that the
-survey file was updated and why, so the two stay linked.
+ever existed here — label that PR `automerge` (the farm merges it once green;
+the maintainer removes the label to hold it), and note in the run's parent
+issue, in one line, that the survey file was updated and why, so the two stay
+linked.
 
 **Bias the diff toward shrinking, not just adding.** A single run's evidence
 naturally produces an addition — one more caveat, one more bullet, one more

@@ -9,7 +9,7 @@ on it.
 
 | Label | Means | Set by | What the farm does | Cleared by |
 | --- | --- | --- | --- | --- |
-| `haiku` / `sonnet` / `opus` | The cheapest model tier that can do the fix well (exactly one) | Whoever files the issue | Dispatches it to a session on that model once unblocked; a `haiku`/`sonnet` PR auto-merges when green, an `opus` one waits for review | Changing tier = swapping the label |
+| `haiku` / `sonnet` / `opus` | The cheapest model tier that can do the fix well (exactly one) | Whoever files the issue | Dispatches it to a session on that model once unblocked; the session labels a `haiku`/`sonnet` PR `automerge`, an `opus` one waits for review | Changing tier = swapping the label |
 | `opus-plan` | A plan spanning several PRs | Whoever files the issue | Never dispatched; listed under **Not picked up** for a plan session started by hand | Splitting it into tier-labelled sub-issues |
 | `decision-required` | A human must decide before work starts | Whoever files the issue | Not dispatched; listed under **Decide** in the digest | The maintainer, once decided (replies on the digest are copied over and remove it) |
 | `deferred` | Parked on purpose; not now, not dropped | The maintainer, a survey run, or a farm pause (on PRs) | Not dispatched; listed under **Not picked up**; doesn't hold a survey's next run | Removing it re-queues the issue |
@@ -18,7 +18,7 @@ Order between issues is not a label: it is a native blocked-by edge (**Blocking*
 
 ## PR labels
 
-`automerge` / `needs-review`: the PR's merge policy, set once by the dispatched session or the dispatcher and then only changed by hand (`docs/agents/daily-dispatch.md`, **Auto-merge**).
+`automerge`: the only merge condition. Whoever opens the PR sets it (a dispatched session for a `haiku`/`sonnet` issue, a survey run for its learnings PR, anyone else deliberately); a green, quiet PR with it is merged, any other non-draft PR waits in the digest's Review list. A draft PR is outside the farm (`docs/agents/daily-dispatch.md`, **Auto-merge**).
 
 ## Mapping to mattpocock/skills triage roles
 
