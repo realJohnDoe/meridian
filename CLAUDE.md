@@ -53,6 +53,10 @@ Label every issue an agent creates with exactly one model-tier label —
 `haiku`, `sonnet` (well-scoped, mechanical), `opus` (needs design or
 cross-module reasoning) or `opus-plan` (a plan spanning several PRs) — plus
 `decision-required` when a human must decide before work starts.
+Order between issues is a native **blocked-by** edge, not prose: the farm
+(`docs/agents/daily-dispatch.md`) dispatches every tier-labelled issue without
+an open native blocker, so a `Blocked by` line alone holds nothing back. How
+to add one: **Blocking** in `docs/agents/issue-tracker.md`.
 
 ## Dev server base path
 
