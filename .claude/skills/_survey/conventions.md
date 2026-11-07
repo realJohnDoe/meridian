@@ -204,7 +204,8 @@ needed. Where findings touch the same code, add a one-line **sequencing
 note** saying which order avoids rebasing the same file twice.
 Also record each such note as a native **blocked-by** edge on the later finding's
 sub-issue, so order is queryable and not only prose; the API call is under
-**Blocking** in `docs/agents/issue-tracker.md`. Worked example: #1289's note
+**Blocking** in `docs/agents/issue-tracker.md`, which also has the
+publish-time check that the farm sees them. Worked example: #1289's note
 "land #1294 before #1290" is the edge `#1290 blocked_by #1294`. Open findings
 that can start now (`<parent>` = the run's parent issue number):
 
