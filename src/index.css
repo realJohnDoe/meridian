@@ -266,7 +266,7 @@
      nearly invisible against these dark, already-low-contrast surfaces —
      needs real opacity/blur to actually show, same reasoning as --shadow-float
      above just toned down for a resting (non-floating) element. */
-  --shadow-card: 0 1px 3px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
+  --shadow-card: 0 1px 2px rgba(0,0,0,.40), 0 1px 5px rgba(0,0,0,.25);
   --shadow-inset: inset 0 1px 3px rgba(0,0,0,.35);
 
   /* event-border used in EntryBody wikilink underline. var(--primary), not
@@ -353,7 +353,7 @@
 .meridian-light, .rose-pine-dawn, .solarized-light, .catppuccin-latte {
   --shadow-float:       0 2px 12px rgba(0,0,0,.12), 0 8px 32px color-mix(in oklab,var(--primary-dark),transparent 82%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 88%);
   --shadow-float-focus: 0 2px 12px rgba(0,0,0,.14), 0 10px 36px color-mix(in oklab,var(--primary-dark),transparent 72%), 0 0 0 1px color-mix(in oklab,var(--primary),transparent 72%);
-  --shadow-card:        0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+  --shadow-card:        0 1px 2px rgba(0,0,0,.06), 0 1px 4px rgba(0,0,0,.04);
   --shadow-inset:       inset 0 1px 2px rgba(0,0,0,.10);
 }
 
