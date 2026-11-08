@@ -70,7 +70,7 @@ export default function MarkdownTaskCard({
         ) : onClickText ? (
           <button
             type="button"
-            className={cn('flex-1 min-w-0 text-left text-sm leading-5 font-medium truncate cursor-pointer', done ? 'line-through' : 'text-foreground')}
+            className={cn('flex-1 min-w-0 text-left text-sm leading-5 font-medium truncate cursor-text', done ? 'line-through' : 'text-foreground')}
             onClick={e => {
               caretOffsetRef.current = caretOffsetFromPoint(e.clientX, e.clientY)
               onClickText()
