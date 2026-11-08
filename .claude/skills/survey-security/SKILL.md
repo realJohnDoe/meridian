@@ -21,8 +21,10 @@ without an attacker belongs in the data-integrity survey.
 
 ## Threat model (state it, then check it)
 
-Meridian is a static SPA on `https://realjohndoe.github.io/meridian/` with no
-server of its own, plus one Cloudflare Worker (`worker/`). Re-derive this from
+Meridian is a static SPA served by its Cloudflare Worker (`worker/`) at
+`https://meridian.realjohndoe.workers.dev/`, which also hosts its endpoints;
+the same Worker code deploys as `legacy` for the old GitHub Pages copy at
+`https://realjohndoe.github.io/meridian/` (`worker/wrangler.toml`). Re-derive this from
 the code at the start of every run rather than trusting the summary below — a
 new endpoint, a new storage location or a new renderer changes it.
 

@@ -1,4 +1,14 @@
-name = "meridian-oauth"
+# Two deployments of the same code, both from `.github/workflows/deploy-worker.yml`:
+#
+# - top level, `meridian`: serves the built app (`dist/`, built with base `/`)
+#   as static assets *and* the endpoints below, on an origin no other app
+#   shares (#1343). The app calls the endpoints same-origin.
+# - `env.legacy`, `meridian-oauth`: the endpoints only, for the GitHub Pages
+#   site at realjohndoe.github.io/meridian/ during its grace period.
+#
+# `vars` and `ratelimits` are not inherited by environments, so `env.legacy`
+# repeats them; `assets` is, and TOML cannot unset it — see `env.legacy.assets`.
+name = "meridian"
 main = "src/index.ts"
 compatibility_date = "2026-07-01"
 # Pinned so the CI deploy token only needs Workers Scripts:Edit — without
@@ -6,9 +16,18 @@ compatibility_date = "2026-07-01"
 # etc.) to figure out which account to deploy to.
 account_id = "0c9a990d5cdac68612909eceef590d10"
 
+# Everything but the Worker's own routes is the app. Unmatched navigations
+# (deep links, the OAuth callback) get index.html, so no 404.html trick here.
+[assets]
+directory = "../dist"
+not_found_handling = "single-page-application"
+run_worker_first = ["/oauth/*", "/ical", "/health"]
+
 [vars]
 # Not secret — GITHUB_CLIENT_SECRET is set separately via `wrangler secret put`.
 GITHUB_CLIENT_ID = "Iv23liMpUq1CUQl4TcaT"
+# The one browser origin the Worker serves; see src/cors.ts.
+ALLOWED_ORIGIN = "https://meridian.realjohndoe.workers.dev"
 
 # Per-IP request budget for /ical (health survey 2026-09-06, finding #5). The
 # proxy needs no credential, so without this it is an open fetcher anyone can
@@ -17,7 +36,24 @@ GITHUB_CLIENT_ID = "Iv23liMpUq1CUQl4TcaT"
 # see RATE_LIMIT_PERIOD_S in src/icalFetch.ts for how the limit was derived and
 # keep the two in step. namespace_id is an arbitrary account-local id, not a
 # secret; it only has to stay stable so the counter isn't reset by a rename.
+# Both deployments share it, so an address has one budget across the two.
 [[ratelimits]]
+name = "ICAL_RATE_LIMIT"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }
+
+[env.legacy]
+name = "meridian-oauth"
+# Inherited `assets` can't be removed, only overridden: routing every request
+# to the Worker, which has no assets binding, means none is ever served, so
+# this origin stays an API and never becomes a third copy of the app.
+assets = { directory = "../dist", run_worker_first = true }
+
+[env.legacy.vars]
+GITHUB_CLIENT_ID = "Iv23liMpUq1CUQl4TcaT"
+ALLOWED_ORIGIN = "https://realjohndoe.github.io"
+
+[[env.legacy.ratelimits]]
 name = "ICAL_RATE_LIMIT"
 namespace_id = "1001"
 simple = { limit = 30, period = 60 }

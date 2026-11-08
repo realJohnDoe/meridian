@@ -3,7 +3,7 @@
   "ignoreIssues": {
     "src/components/ui/!(sidebar).{ts,tsx}": ["exports", "types"]
   },
-  "ignoreUnresolved": ["^/meridian/src/"],
+  "ignoreUnresolved": ["^/src/"],
   "workspaces": {
     ".": {
       "entry": [

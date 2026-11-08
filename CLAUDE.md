@@ -62,7 +62,7 @@ to add one: **Blocking** in `docs/agents/issue-tracker.md`.
 
 ## Dev server base path
 
-The app is served under `/meridian/`, not `/`. Before driving the dev server or a browser (preview tools, Playwright, surveys), read `docs/agents/dev-server.md` for URLs, entry routes and preview-tool gotchas.
+The app is served at `/` (only the GitHub Pages build is under `/meridian/`). Before driving the dev server or a browser (preview tools, Playwright, surveys), read `docs/agents/dev-server.md` for URLs, entry routes and preview-tool gotchas.
 
 ## Build verification
 

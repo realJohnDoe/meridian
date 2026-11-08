@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import worker from './index'
 import type { Env } from './env'
-import { ALLOWED_ORIGIN } from './cors'
+
+const ALLOWED_ORIGIN = 'https://app.example'
 
 const env: Env = {
   GITHUB_CLIENT_ID: 'id',
   GITHUB_CLIENT_SECRET: 'secret',
+  ALLOWED_ORIGIN,
   ICAL_RATE_LIMIT: { limit: () => Promise.resolve({ success: true }) },
 }
 
@@ -21,7 +23,7 @@ describe('routing + CORS', () => {
     expect(res.status).toBe(404)
   })
 
-  it('allows the Pages origin via CORS', async () => {
+  it('allows the app’s origin via CORS', async () => {
     const res = await worker.fetch(new Request('https://worker.example/health', { headers: { Origin: ALLOWED_ORIGIN } }), env)
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe(ALLOWED_ORIGIN)
   })
