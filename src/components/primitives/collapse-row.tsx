@@ -125,7 +125,9 @@ export function CollapseRow(props: CollapseRowProps) {
       inert={collapsed}
       {...rest}
     >
-      <div style={{ overflow: 'hidden', minHeight: 0 }}>{children}</div>
+      {/* Clip only while collapsing: at rest `overflow: hidden` would cut off
+          a child's box-shadow, since the child fills this box exactly. */}
+      <div style={{ overflow: collapsed ? 'hidden' : 'visible', minHeight: 0 }}>{children}</div>
     </Tag>
   )
 }
