@@ -5,6 +5,7 @@
 // Without --apply it is a dry run: it prints the plan and writes nothing.
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
+import { bodyBlockers } from "./bodyBlockers.mjs";
 
 const REPO = "realJohnDoe/meridian";
 const arg = (name, dflt) => {
@@ -186,13 +187,18 @@ const skip = (i) => {
     return "no tier label; add `haiku`, `sonnet` or `opus` to queue it";
   if (l.includes("opus-plan"))
     return "`opus-plan`; start a plan session by hand";
-  if (i.issue_dependencies_summary?.blocked_by > 0)
-    return `blocked by ${all(
-      `repos/${REPO}/issues/${i.number}/dependencies/blocked_by?per_page=100`,
-    )
-      .filter((b) => b.state === "open")
-      .map((b) => `#${b.number}`)
-      .join(", ")}`;
+  const blockers = new Set(
+    i.issue_dependencies_summary?.blocked_by > 0
+      ? all(
+          `repos/${REPO}/issues/${i.number}/dependencies/blocked_by?per_page=100`,
+        )
+          .filter((b) => b.state === "open")
+          .map((b) => b.number)
+      : [],
+  );
+  // The documented fallback: a blocker named in the body counts while it is open.
+  for (const n of bodyBlockers(i.body)) if (byNumber.has(n)) blockers.add(n);
+  if (blockers.size) return `blocked by ${[...blockers].map((n) => `#${n}`).join(", ")}`;
 };
 const notPicked = [];
 const ready = issues.filter((i) => {
