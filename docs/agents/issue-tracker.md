@@ -31,7 +31,7 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 Create a GitHub issue. After publishing tickets with blockers, confirm each blocked ticket is seen as blocked and only the intended frontier is dispatchable, and fix any mismatch before ending the turn:
 
-- Preferred: the dispatcher's dry run, `node scripts/farm-dispatch.mjs` (writes nothing). Compare its `sessions` and **Not picked up** reasons against the intended order.
+- Preferred: the dispatcher's dry run, `node scripts/workshop-dispatch.mjs` (writes nothing). Compare its `sessions` and **Not picked up** reasons against the intended order.
 - If `gh` is limited to search: `gh api -X GET search/issues -f q='repo:realJohnDoe/meridian is:issue is:open blocked-by:<n>'` lists the issues natively blocked by `#n`.
 - If native edges can't be created from the session, tell the user rather than relying on the `Blocked by:` body fallback silently.
 

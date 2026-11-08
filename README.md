@@ -1,6 +1,8 @@
-<img src="public/screenshots/banner.webp" alt="Meridian — a local-first, Markdown-powered calendar &amp; task manager" />
+<img src="public/screenshots/banner.webp" alt="Meridian" />
 
 # Meridian
+
+**Tasks and a calendar that are actually good on your phone — stored as plain Markdown files you own.**
 
 **Who it's for:** you keep your life in Markdown — Obsidian, TaskNotes, or just a folder of `.md` files — and you're tired of tasks and dates being something a plugin bolts onto a desktop-first app. In Meridian they're first-class, and they're fast on a phone.
 

@@ -52,10 +52,10 @@ Use the `tracemap-pr` skill from [realJohnDoe/tracemap](https://github.com/realJ
 Label every issue an agent creates with exactly one model-tier label —
 `haiku`, `sonnet` (well-scoped, mechanical), `opus` (needs design or
 cross-module reasoning) or `opus-plan` (a plan spanning several PRs) — plus
-any farm label that applies, e.g. `decision-required` when a human must decide
-before work starts. Every farm label, what it does and how it's cleared:
+any workshop label that applies, e.g. `decision-required` when a human must decide
+before work starts. Every workshop label, what it does and how it's cleared:
 `docs/agents/triage-labels.md`.
-Order between issues is a native **blocked-by** edge, not prose: the farm
+Order between issues is a native **blocked-by** edge, not prose: the workshop
 (`docs/agents/daily-dispatch.md`) dispatches every tier-labelled issue without
 an open native blocker, so a `Blocked by` line alone holds nothing back. How
 to add one: **Blocking** in `docs/agents/issue-tracker.md`.
@@ -269,7 +269,7 @@ GitHub Issues via `gh`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Model-tier labels plus the farm's own labels. See `docs/agents/triage-labels.md`.
+Model-tier labels plus the workshop's own labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 

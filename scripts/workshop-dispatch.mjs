@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The daily dispatcher's plan: which findings to start, which PRs need a follow-up
 // session, and the twice-weekly digest. See docs/agents/daily-dispatch.md.
-// Usage: node scripts/farm-dispatch.mjs [--apply] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--followups-only]
+// Usage: node scripts/workshop-dispatch.mjs [--apply] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--followups-only]
 // Without --apply it is a dry run: it prints the plan and writes nothing.
 import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
@@ -25,10 +25,12 @@ const DIGEST_DAYS = 2.5; // minimum window, so a second run that day doesn't pub
 const TODAY = new Date(arg("--today", new Date().toISOString().slice(0, 10)));
 // When this run's digest window ends; a new digest's window starts here.
 const NOW = arg("--today") ? TODAY.toISOString() : new Date().toISOString();
-const DIGEST_PREFIX = "Farm digest";
-const DISPATCH = "<!-- farm-dispatch -->";
-const FOLLOWUP = "<!-- farm-followup -->";
-const RELAYED = "<!-- farm-relayed -->"; // digest replies up to here are copied to their issues
+const DIGEST_PREFIX = "Workshop digest";
+const DISPATCH = "<!-- workshop-dispatch -->";
+const FOLLOWUP = "<!-- workshop-followup -->";
+const RELAYED = "<!-- workshop-relayed -->"; // digest replies up to here are copied to their issues
+// Comments written before the farm → workshop rename still carry `farm-` markers.
+const marked = (c, m) => c.body.includes(m) || c.body.includes(m.replace("workshop", "farm"));
 // The one merge policy: a green, quiet PR with this label is merged; any other
 // non-draft PR waits for review. Whoever opens the PR decides.
 const AUTOMERGE = "automerge";
@@ -77,7 +79,7 @@ const linkedIssues = (pr) =>
 const linked = new Set(prs.flatMap(linkedIssues));
 
 // --- PR follow-up -----------------------------------------------------------
-// Ours to follow up: every non-draft PR (draft = keep out of the farm).
+// Ours to follow up: every non-draft PR (draft = keep out of the workshop).
 const followups = [];
 const review = [];
 const unstick = [];
@@ -132,7 +134,7 @@ for (const pr of prs.filter((p) => !p.draft)) {
       automerge.push({ pr: pr.number, sha: pr.head.sha, title: pr.title });
     continue;
   }
-  const marks = comments.filter((c) => c.body.includes(FOLLOWUP));
+  const marks = comments.filter((c) => marked(c, FOLLOWUP));
   const last = marks.at(-1);
   const pending = last && new Date(last.created_at) > new Date(headDate);
   if (
@@ -176,7 +178,7 @@ for (const pr of prs.filter((p) => !p.draft)) {
 // --- Dispatch ---------------------------------------------------------------
 // Why an open issue isn't dispatched: undefined = dispatchable, null = shown
 // elsewhere (its PR, the Decide list, the Unstick check, the digest itself).
-const isDigest = (i) => i.title.startsWith(DIGEST_PREFIX);
+const isDigest = (i) => /^(Workshop|Farm) digest/.test(i.title);
 const skip = (i) => {
   const l = names(i);
   if (isDigest(i) || i.sub_issues_summary?.total > 0) return null;
@@ -232,7 +234,7 @@ for (const i of issues.filter(
   if (isDigest(i) || i.sub_issues_summary?.total > 0) continue;
   const mark = i.comments
     ? all(`repos/${REPO}/issues/${i.number}/comments?per_page=100`)
-        .filter((c) => c.body.includes(DISPATCH))
+        .filter((c) => marked(c, DISPATCH))
         .at(-1)
     : null;
   if (!mark && tierOf(names(i)))
@@ -358,7 +360,7 @@ const publish =
 const replies = [draft, published].filter(Boolean).flatMap((d) => {
   const cs = all(`repos/${REPO}/issues/${d.number}/comments?per_page=100`);
   const relayedAt =
-    cs.findLast((c) => c.body.includes(RELAYED))?.created_at ?? "";
+    cs.findLast((c) => marked(c, RELAYED))?.created_at ?? "";
   return cs
     .filter(
       (c) =>

@@ -4,7 +4,7 @@ Run twice a week by the scheduled task "Start top-ranked survey"; the task's
 prompt only says to follow this file. Goal: survey cadence without anyone
 remembering, and no new findings while the backlog is already full.
 
-0. `node scripts/farm-pause.mjs`: if `state` is not `normal`, **stop. Post
+0. `node scripts/workshop-pause.mjs`: if `state` is not `normal`, **stop. Post
    nothing, open nothing.** (Resume is the dispatcher's job; this task waits.)
 1. **Count the open backlog**: open issues with a model-tier label, not counting
    parent issues (ones with sub-issues):
@@ -20,7 +20,7 @@ remembering, and no new findings while the backlog is already full.
    `-` are unranked, skip them.
 3. Walk the ranked rows in order. **Skip** a row if its score is `0` (fresh) or
    its survey already has an open parent issue with open findings that the
-   farm can still work. Findings that are `decision-required` or `deferred`
+   workshop can still work. Findings that are `decision-required` or `deferred`
    don't count, so one parked decision doesn't block the survey for good (the
    digest lists such parents under **Not picked up**). For each open
    parent:

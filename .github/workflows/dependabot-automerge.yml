@@ -20,7 +20,7 @@ jobs:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # A push by anyone but Dependabot (a farm follow-up, a merge of main) is
+  # A push by anyone but Dependabot (a workshop follow-up, a merge of main) is
   # code nobody reviewed: drop auto-merge so the PR waits in the digest's
   # Review list, like an opus PR.
   hold-for-review:
