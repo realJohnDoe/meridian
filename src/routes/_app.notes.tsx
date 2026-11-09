@@ -1,9 +1,10 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useOpenEntry } from '@/hooks'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
+import { lazyChunk } from './-lazyChunk'
 
-const NotesView = lazy(() => import('@/calendar').then(m => ({ default: m.NotesView })))
+const NotesView = lazyChunk(() => import('@/calendar').then(m => m.NotesView))
 
 export const Route = createFileRoute('/_app/notes')({
   component: NotesPage,

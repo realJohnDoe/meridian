@@ -1,9 +1,10 @@
-import { lazy, Suspense } from 'react'
+import { Suspense } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useOpenEntry } from '@/hooks'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
+import { lazyChunk } from './-lazyChunk'
 
-const UnscheduledView = lazy(() => import('@/calendar').then(m => ({ default: m.UnscheduledView })))
+const UnscheduledView = lazyChunk(() => import('@/calendar').then(m => m.UnscheduledView))
 
 export const Route = createFileRoute('/_app/unscheduled')({
   component: UnscheduledPage,

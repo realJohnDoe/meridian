@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
+import { Suspense, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO, weekStartsOn } from '@/model'
 import { useStore } from '@/store'
@@ -6,8 +6,9 @@ import { useOpenEntry } from '@/hooks'
 import { setCurrentDate, weekdayKeptDate, useQuickNavBrowsePreview, setQuickNavBrowsePreview } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 import { newEntryRoute } from '@/entryRoute'
+import { lazyChunk } from './-lazyChunk'
 
-const WeekView = lazy(() => import('@/calendar').then(m => ({ default: m.WeekView })))
+const WeekView = lazyChunk(() => import('@/calendar').then(m => m.WeekView))
 
 export const Route = createFileRoute('/_app/week/$date')({
   component: WeekPage,

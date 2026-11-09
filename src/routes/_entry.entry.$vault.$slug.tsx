@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
@@ -14,9 +14,10 @@ import { EntryTopbar } from './-entryTopbar'
 import type { Occurrence, EditScope, StoreItem, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
 import type { VaultRef } from '@/vaultRef'
+import { lazyChunk } from './-lazyChunk'
 
-const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))
-const EntryViewOnly = lazy(() => import('@/editor').then(m => ({ default: m.EntryViewOnly })))
+const EntryEditor = lazyChunk(() => import('@/editor').then(m => m.EntryEditor))
+const EntryViewOnly = lazyChunk(() => import('@/editor').then(m => m.EntryViewOnly))
 
 export const Route = createFileRoute('/_entry/entry/$vault/$slug')({
   component: EntrySlugPage,
