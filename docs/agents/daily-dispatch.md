@@ -5,14 +5,14 @@ says to follow this file. Goal: open findings move forward without anyone
 starting sessions by hand, and the maintainer's part comes down to one twice-weekly
 digest issue, which also says why anything isn't moving.
 
-0. Run `node scripts/farm-pause.mjs` first and act on its `state` as
-   `docs/agents/farm-pause.md` says. Anything but `normal` ends this
+0. Run `node scripts/workshop-pause.mjs` first and act on its `state` as
+   `docs/agents/workshop-pause.md` says. Anything but `normal` ends this
    procedure.
-1. `node scripts/farm-dispatch.mjs` is the **dry run**: it prints the plan as
+1. `node scripts/workshop-dispatch.mjs` is the **dry run**: it prints the plan as
    JSON and writes nothing. Read it before applying.
-2. `node scripts/farm-dispatch.mjs --apply` claims what the plan starts
-   (assigns each dispatched issue and leaves a `farm-dispatch` marker comment;
-   leaves a `farm-followup` marker comment on each followed-up PR), labels
+2. `node scripts/workshop-dispatch.mjs --apply` claims what the plan starts
+   (assigns each dispatched issue and leaves a `workshop-dispatch` marker comment;
+   leaves a `workshop-followup` marker comment on each followed-up PR), labels
    PRs with their merge policy, merges the `automerge` PRs, closes finished
    survey parents, rewrites the draft digest and publishes it when due. It
    prints the same plan.
@@ -26,11 +26,12 @@ digest issue, which also says why anything isn't moving.
 4. For each entry in `digest.replies` (the maintainer replying on the
    digest), copy the decision onto the issue or PR it is about, as a comment
    linking the reply, and remove `decision-required` if it settles one. Skip
-   a reply already copied there. Then comment `<!-- farm-relayed -->` on
+   a reply already copied there. Then comment `<!-- workshop-relayed -->` on
    that digest issue (with the footer) so the next run doesn't relay it again.
    A reply that names no item gets an answer on the digest instead.
 5. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is
-   the follow-up.
+   the follow-up. Don't open PRs or issues yourself beyond what the script
+   writes and what the subagents open.
 6. If `sessions`, `automerge` and `digest.replies` are empty, stop. Post nothing.
 
 ## What the script decides
@@ -67,7 +68,7 @@ digest issue, which also says why anything isn't moving.
 - **Survey parents**: a survey run's parent issue is closed once every
   finding sub-issue is closed. One whose open findings are all
   `decision-required` or `deferred` is listed under **Not picked up**.
-- **Digest**: a draft issue, `Farm digest (draft) — from <date>`, is
+- **Digest**: a draft issue, `Workshop digest (draft) — from <date>`, is
   rewritten on every run (an edit notifies nobody), so it always shows
   today's state: what waits on the maintainer,
   each line saying what to do, **Decide** (open `decision-required` issues),
@@ -87,5 +88,5 @@ digest issue, which also says why anything isn't moving.
   digest are relayed (step 4). Nothing is decided on silence.
 
 To re-dispatch a stuck issue, unassign it. To stop a PR from getting
-follow-ups or keep it out of the farm entirely, mark it draft. To hold a PR
-the farm would merge, remove its `automerge` label; add it to let one merge.
+follow-ups or keep it out of the workshop entirely, mark it draft. To hold a PR
+the workshop would merge, remove its `automerge` label; add it to let one merge.

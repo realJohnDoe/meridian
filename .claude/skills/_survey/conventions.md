@@ -205,7 +205,7 @@ note** saying which order avoids rebasing the same file twice.
 Also record each such note as a native **blocked-by** edge on the later finding's
 sub-issue, so order is queryable and not only prose; the API call is under
 **Blocking** in `docs/agents/issue-tracker.md`, which also has the
-publish-time check that the farm sees them. Worked example: #1289's note
+publish-time check that the workshop sees them. Worked example: #1289's note
 "land #1294 before #1290" is the edge `#1290 blocked_by #1294`. Open findings
 that can start now (`<parent>` = the run's parent issue number):
 
@@ -338,7 +338,7 @@ findings, which are issues. Still propose rather than silently commit past
 review: keep it on the branch the session is already working on — a remote
 session is *assigned* its branch name, so the `survey-run/<name>` branch this
 paragraph used to ask for was never available to follow and no such branch has
-ever existed here — label that PR `automerge` (the farm merges it once green;
+ever existed here — label that PR `automerge` (the workshop merges it once green;
 the maintainer removes the label to hold it), and note in the run's parent
 issue, in one line, that the survey file was updated and why, so the two stay
 linked.
