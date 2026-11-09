@@ -1,12 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
+import { Suspense, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO } from '@/model'
 import { useOpenEntry } from '@/hooks'
 import { setCurrentDate, useQuickNavBrowsePreview, setQuickNavBrowsePreview } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 import { newEntryRoute } from '@/entryRoute'
+import { lazyChunk } from './-lazyChunk'
 
-const DayView = lazy(() => import('@/calendar').then(m => ({ default: m.DayView })))
+const DayView = lazyChunk(() => import('@/calendar').then(m => m.DayView))
 
 export const Route = createFileRoute('/_app/day/$date')({
   component: DayPage,

@@ -5,7 +5,9 @@ import { routeTree } from './routeTree.gen'
 import { AppErrorFallback } from '@/components'
 
 // After a PWA update the old chunk hashes are gone from the cache. Reload so
-// the new SW serves the updated bundles instead of crashing on a stale import.
+// the new SW serves the updated bundles instead of crashing on a stale import;
+// routes' lazyChunk() keeps its Suspense fallback up meanwhile, rather than
+// flashing the error boundary.
 window.addEventListener('vite:preloadError', () => { window.location.reload() })
 
 export const router = createRouter({

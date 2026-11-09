@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { createFileRoute, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
@@ -7,8 +7,9 @@ import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
 import { keyRoute } from '@/entryRoute'
 import { EntryTopbar } from './-entryTopbar'
+import { lazyChunk } from './-lazyChunk'
 
-const EntryEditor = lazy(() => import('@/editor').then(m => ({ default: m.EntryEditor })))
+const EntryEditor = lazyChunk(() => import('@/editor').then(m => m.EntryEditor))
 
 type ItemTypeSearch = 'task' | 'event' | 'note'
 const ITEM_TYPES: ItemTypeSearch[] = ['task', 'event', 'note']

@@ -1,10 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo } from 'react'
+import { Suspense, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO, parseMonth } from '@/model'
 import { setCurrentDate, monthDayKeptDate } from '@/calendar'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
+import { lazyChunk } from './-lazyChunk'
 
-const MonthView = lazy(() => import('@/calendar').then(m => ({ default: m.MonthView })))
+const MonthView = lazyChunk(() => import('@/calendar').then(m => m.MonthView))
 
 export const Route = createFileRoute('/_app/calendar/$date')({
   // Month URLs used to carry just `YYYY-MM`; keep those links working.

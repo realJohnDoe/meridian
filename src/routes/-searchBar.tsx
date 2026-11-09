@@ -9,7 +9,7 @@
  * `components → calendar → components`): a leaf-UI directory that features
  * import, importing those features back.
  */
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { Search, Plus, X } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
@@ -22,11 +22,12 @@ import { fmtISO } from '@/model'
 import { useSidebar } from '@/components/ui/sidebar'
 import { cn } from '@/lib/cn'
 import type { SearchRow } from '@/search'
+import { lazyChunk } from './-lazyChunk'
 
 // Lazy: SearchResults/FileResultsList pull in enough weight that they
 // shouldn't sit on the agenda's cold-start critical path — deferred until
 // search is actually opened.
-const SearchOverlay = lazy(() => import('@/search').then(m => ({ default: m.SearchOverlay })))
+const SearchOverlay = lazyChunk(() => import('@/search').then(m => m.SearchOverlay))
 
 // A new entry defaults to today rather than a past date the view happens to
 // be scrolled to; a future date is kept, since browsing ahead is deliberate.
