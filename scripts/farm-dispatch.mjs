@@ -58,6 +58,9 @@ const all = (path) => api(path, "--paginate", "--slurp").flat();
 const post = (path, body, method = "POST") =>
   execFileSync("gh", ["api", "-X", method, path, "--input", "-"], {
     input: JSON.stringify(body),
+    // Keep gh's stderr out of the log: a failure still throws with it
+    // attached, and the expected "already exists" 422 stays quiet.
+    stdio: ["pipe", "pipe", "pipe"],
   });
 const days = (iso) => (TODAY - new Date(iso)) / 864e5;
 const names = (x) => x.labels.map((l) => l.name);
