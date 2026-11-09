@@ -30,7 +30,8 @@ digest issue, which also says why anything isn't moving.
    that digest issue (with the footer) so the next run doesn't relay it again.
    A reply that names no item gets an answer on the digest instead.
 5. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is
-   the follow-up.
+   the follow-up. Don't open PRs or issues yourself beyond what the script
+   writes and what the subagents open.
 6. If `sessions`, `automerge` and `digest.replies` are empty, stop. Post nothing.
 
 ## What the script decides
