@@ -503,7 +503,11 @@ if (APPLY) {
     if (publish) {
       post(
         `repos/${REPO}/issues/${d}`,
-        { title: `${DIGEST_PREFIX} — ${NOW.slice(0, 10)}` },
+        // The draft note explains drafts; a published digest no longer is one.
+        {
+          title: `${DIGEST_PREFIX} — ${NOW.slice(0, 10)}`,
+          body: body.replace(NOTE, ""),
+        },
         "PATCH",
       );
       // A title or body edit notifies nobody; this comment is the ping.
