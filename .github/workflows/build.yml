@@ -29,9 +29,10 @@ jobs:
       # writes worker/worker-configuration.d.ts (gitignored, from wrangler.toml) via
       # the worker's pretypecheck; without it Request/Response/Env resolve to `any`.
       - run: pnpm run build
-      # A second build under the root base: a path that only works under
-      # /meridian/ fails here instead of breaking one deployment silently.
-      - run: BASE_PATH=/ pnpm exec vite build --outDir "$RUNNER_TEMP/dist-root" && ! grep -rIl '/meridian/' "$RUNNER_TEMP/dist-root" --include='*.html' --include='*.js' --include='*.webmanifest'
+      # That build is the `meridian` Worker's, under the root base; the Pages
+      # build below is under /meridian/. A path that only works under one base
+      # fails here instead of breaking one deployment silently.
+      - run: "! grep -rIl '/meridian/' dist --include='*.html' --include='*.js' --include='*.webmanifest'"
       # Also runs `lint:deps` (dependency-cruiser), which needs the same
       # generated routeTree.gen.ts the type-aware rules do — it is part of the
       # module graph. ESLint enforces the per-file import boundaries; this is
@@ -39,6 +40,13 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run test:coverage
       - run: pnpm run knip
+      # The GitHub Pages site: its subpath, its origin, and the `legacy` Worker
+      # for its endpoints (see vite.config.ts and worker/wrangler.toml).
+      - run: pnpm exec vite build
+        env:
+          BASE_PATH: /meridian/
+          APP_ORIGIN: https://realjohndoe.github.io
+          VITE_WORKER_ORIGIN: https://meridian-oauth.realjohndoe.workers.dev
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist

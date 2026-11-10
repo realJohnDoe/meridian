@@ -22,8 +22,12 @@
 //
 // Two layers, deliberately not one (health survey 2026-09-06, finding #5):
 //
-//   1. `Origin` must be the app's. Spoofable by any non-browser client, so it
-//      is not a security boundary and is not treated as one — it is the layer
+//   1. The request must come from the app: `Origin` is the app's, or — on the
+//      `meridian` Worker, which serves the app itself — absent on a request
+//      the browser marks `Sec-Fetch-Site: same-origin`, since a same-origin
+//      GET carries no `Origin` header. Both headers are forbidden to page
+//      script, so another site can't forge either. Spoofable by any
+//      non-browser client, though, so it is not a security boundary and is not treated as one — it is the layer
 //      that removes casual and accidental reuse (another site hotlinking the
 //      proxy, a copied fetch snippet) so that layer 2 only has to deal with
 //      deliberate abuse. This costs nothing that was not already lost: `cors.ts`
@@ -36,7 +40,6 @@
 // design (see `cors.ts`), and it has its own natural gate.
 
 import type { Env } from './env'
-import { ALLOWED_ORIGIN } from './cors'
 
 /** Injectable so tests can stand in for the network — same pattern as `GitHubTokenExchanger`. */
 export type CalendarFetcher = (url: string, init: RequestInit) => Promise<Response>
@@ -310,7 +313,9 @@ export async function handleIcalFetch(
   // to bound what an unauthenticated caller can make this Worker do, and
   // validating first would hand out free work (and free probing of the host
   // rules) to a caller who is over budget or has no business here at all.
-  if (request.headers.get('Origin') !== ALLOWED_ORIGIN) {
+  const origin = request.headers.get('Origin')
+  const sameOrigin = origin === null && request.headers.get('Sec-Fetch-Site') === 'same-origin'
+  if (origin !== env.ALLOWED_ORIGIN && !sameOrigin) {
     return errorResponse(403, 'This calendar proxy only serves the Meridian app')
   }
 

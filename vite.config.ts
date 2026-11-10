@@ -12,15 +12,19 @@ import { createHash } from 'crypto'
 import type { Plugin } from 'vite'
 
 /**
- * The one build-time base path every URL below derives from. `BASE_PATH=/`
- * builds for an origin of its own; the default is today's Pages subpath.
- * Normalised to a leading and trailing slash, as Vite's `base` requires.
+ * Where the build will be served. The defaults are the `meridian` Worker, which
+ * serves the app at `/` on an origin of its own and its endpoints same-origin
+ * (empty `VITE_WORKER_ORIGIN`). The GitHub Pages build overrides all three —
+ * see `.github/workflows/build.yml`.
+ *
+ * `BASE_PATH` is the one base path every URL below derives from, normalised to
+ * a leading and trailing slash, as Vite's `base` requires.
  */
-const BASE_SEGMENT = (process.env.BASE_PATH ?? '/meridian/').replace(/^\/+|\/+$/g, '')
+const BASE_SEGMENT = (process.env.BASE_PATH ?? '/').replace(/^\/+|\/+$/g, '')
 const BASE_PATH = BASE_SEGMENT ? `/${BASE_SEGMENT}/` : '/'
 const BASE_NO_SLASH = BASE_PATH.slice(0, -1)
-const PAGES_ORIGIN = 'https://realjohndoe.github.io'
-const WORKER_ORIGIN = process.env.VITE_WORKER_ORIGIN ?? 'https://meridian-oauth.realjohndoe.workers.dev'
+const APP_ORIGIN = process.env.APP_ORIGIN ?? 'https://meridian.realjohndoe.workers.dev'
+const WORKER_ORIGIN = process.env.VITE_WORKER_ORIGIN ?? ''
 
 /**
  * Short commit SHA, baked in at build time for the About section (settings/AboutSettings.tsx).
@@ -116,7 +120,7 @@ function cspPlugin(): Plugin {
     // codeload.github.com: the repo-archive (zipball) endpoint on api.github.com
     // 302-redirects here, and CSP is enforced against the redirected URL too — so
     // fetching a vault as an archive needs this host explicitly allowed.
-    `connect-src 'self' https://api.github.com https://codeload.github.com ${WORKER_ORIGIN}`,
+    `connect-src 'self' https://api.github.com https://codeload.github.com ${WORKER_ORIGIN}`.trim(),
     "manifest-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
@@ -141,7 +145,8 @@ function cspPlugin(): Plugin {
 
 /**
  * Copies the built index.html to 404.html — the standard GitHub Pages
- * SPA-fallback trick. GitHub Pages does no server-side rewrites, so a fresh
+ * SPA-fallback trick. Unused on the Worker, which has a real SPA fallback
+ * (`worker/wrangler.toml`). GitHub Pages does no server-side rewrites, so a fresh
  * top-level navigation to any client-only route (e.g. GitHub's OAuth redirect
  * landing on /meridian/auth/callback) hits the static file server directly and
  * 404s before our JS ever loads. Serving the same app shell for 404s means the
@@ -163,7 +168,7 @@ function spaFallbackPlugin(): Plugin {
 function socialUrlPlugin(): Plugin {
   return {
     name: 'social-urls',
-    transformIndexHtml: html => html.replaceAll('%APP_URL%', `${PAGES_ORIGIN}${BASE_PATH}`),
+    transformIndexHtml: html => html.replaceAll('%APP_URL%', `${APP_ORIGIN}${BASE_PATH}`),
   }
 }
 

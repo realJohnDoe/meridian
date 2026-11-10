@@ -25,7 +25,7 @@ import { defineConfig } from '@playwright/test'
 // loopback never answers.
 const HOST = '127.0.0.1'
 const PORT = 4183
-export const BASE_URL = `http://${HOST}:${PORT}/meridian`
+export const BASE_URL = `http://${HOST}:${PORT}`
 
 export default defineConfig({
   testDir: './e2e',

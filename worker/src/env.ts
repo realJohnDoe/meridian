@@ -16,6 +16,8 @@
 export interface Env {
   GITHUB_CLIENT_ID: string
   GITHUB_CLIENT_SECRET: string
+  /** The app's origin, per deployment in `wrangler.toml`; see `cors.ts`. */
+  ALLOWED_ORIGIN: string
   /**
    * Per-IP request budget for `/ical`, declared as a `[[ratelimits]]` binding
    * in `wrangler.toml`. `RateLimit` is an ambient type from the generated

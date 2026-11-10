@@ -5,6 +5,7 @@ import type { Env } from './env'
 const env: Env = {
   GITHUB_CLIENT_ID: 'test-client-id',
   GITHUB_CLIENT_SECRET: 'test-secret',
+  ALLOWED_ORIGIN: 'https://app.example',
   ICAL_RATE_LIMIT: { limit: () => Promise.reject(new Error('must not consult the iCal rate limit')) },
 }
 

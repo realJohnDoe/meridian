@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { handleIcalFetch, validateFeedUrl, type CalendarFetcher } from './icalFetch'
-import { ALLOWED_ORIGIN } from './cors'
 import type { Env } from './env'
+
+const ALLOWED_ORIGIN = 'https://app.example'
 
 const FEED = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n'
 
@@ -29,6 +30,7 @@ function env(allow = true): Env & { keys: string[] } {
   return {
     GITHUB_CLIENT_ID: 'test-id',
     GITHUB_CLIENT_SECRET: 'test-secret',
+    ALLOWED_ORIGIN,
     ICAL_RATE_LIMIT: {
       limit: ({ key }: { key: string }) => {
         keys.push(key)
@@ -287,11 +289,14 @@ describe('handleIcalFetch', () => {
     it.each([
       ['no Origin at all (a non-browser client)', undefined],
       ['another site’s Origin', 'https://evil.example'],
-      ['a lookalike prefix of the real origin', 'https://realjohndoe.github.io.evil.example'],
-    ])('403s and never fetches upstream for %s', async (_label, origin) => {
+      ['a lookalike prefix of the real origin', `${ALLOWED_ORIGIN}.evil.example`],
+      ['another site’s Origin, cross-site', 'https://evil.example', 'cross-site'],
+      ['no Origin, but not same-origin either', undefined, 'same-site'],
+    ])('403s and never fetches upstream for %s', async (_label, origin, fetchSite?: string) => {
       const fetcher = stubFetcher([ok()])
       const headers: Record<string, string> = { 'CF-Connecting-IP': '203.0.113.7' }
       if (origin) headers.Origin = origin
+      if (fetchSite) headers['Sec-Fetch-Site'] = fetchSite
 
       const res = await handleIcalFetch(
         new Request(`https://worker.example/ical?url=${encodeURIComponent('https://cal.example/f.ics')}`, { headers }),
@@ -305,6 +310,19 @@ describe('handleIcalFetch', () => {
 
     it('lets the app’s own origin through', async () => {
       const res = await handleIcalFetch(req('https://cal.example/f.ics'), env(), stubFetcher([ok()]))
+      expect(res.status).toBe(200)
+    })
+
+    // The `meridian` Worker serves the app itself, and a same-origin GET carries
+    // no Origin header — only the browser-set Sec-Fetch-Site says where it came from.
+    it('lets a same-origin request without Origin through', async () => {
+      const res = await handleIcalFetch(
+        new Request(`https://worker.example/ical?url=${encodeURIComponent('https://cal.example/f.ics')}`, {
+          headers: { 'CF-Connecting-IP': '203.0.113.7', 'Sec-Fetch-Site': 'same-origin' },
+        }),
+        env(),
+        stubFetcher([ok()]),
+      )
       expect(res.status).toBe(200)
     })
   })

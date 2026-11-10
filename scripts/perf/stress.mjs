@@ -29,7 +29,7 @@ import { PROBE } from './probe.mjs'
 
 const HOST = '127.0.0.1'
 const PORT = Number(process.env.PERF_PORT || 5291)
-const BASE = `http://${HOST}:${PORT}/meridian`
+const BASE = `http://${HOST}:${PORT}`
 const STARTUP_TIMEOUT_MS = 90_000
 
 const argv = process.argv.slice(2)
@@ -281,8 +281,8 @@ async function measureUI(browser, spec) {
 /**
  * Runs the real pipeline modules in the page via Vite's dev server, so each
  * stage's cost is attributable rather than lumped into "cold start". The
- * modules are imported by URL — the app is served under /meridian/, so its
- * source tree is at /meridian/src/….
+ * modules are imported by URL — the app is served under /, so its source tree
+ * is at /src/….
  */
 async function measurePipeline(browser, spec) {
   const { context, page, crashes } = await freshPage(browser, spec)
@@ -291,14 +291,14 @@ async function measurePipeline(browser, spec) {
     await page.goto(`${BASE}/`, { waitUntil: 'commit' })
     await page.waitForSelector('[data-index]', { timeout: FLOW_TIMEOUT_MS })
     out.result = await page.evaluate(async (spec) => {
-      const gen = await import('/meridian/src/storage/devFixtures/testVaultGen.ts')
-      const model = await import('/meridian/src/model/index.ts')
-      const fio = await import('/meridian/src/fileIO.ts')
-      const fom = await import('/meridian/src/fileOccurrence.ts')
-      const store = await import('/meridian/src/store.ts')
-      const sections = await import('/meridian/src/calendar/agendaSections.ts')
-      const chunks = await import('/meridian/src/calendar/agendaChunks.ts')
-      const matching = await import('/meridian/src/lib/matching.ts')
+      const gen = await import('/src/storage/devFixtures/testVaultGen.ts')
+      const model = await import('/src/model/index.ts')
+      const fio = await import('/src/fileIO.ts')
+      const fom = await import('/src/fileOccurrence.ts')
+      const store = await import('/src/store.ts')
+      const sections = await import('/src/calendar/agendaSections.ts')
+      const chunks = await import('/src/calendar/agendaChunks.ts')
+      const matching = await import('/src/lib/matching.ts')
       // Repeat cheap sizes for a median; at the top end one run each, since a
       // single pass already takes seconds and the extra copies are what push
       // the tab into an out-of-memory kill rather than a measurement.
@@ -428,8 +428,8 @@ async function measureDexie(browser, spec) {
     await page.goto(`${BASE}/`, { waitUntil: 'commit' })
     await page.waitForSelector('[data-index]', { timeout: FLOW_TIMEOUT_MS })
     out.result = await page.evaluate(async (spec) => {
-      const gen = await import('/meridian/src/storage/devFixtures/testVaultGen.ts')
-      const cache = await import('/meridian/src/storage/cache/files.ts')
+      const gen = await import('/src/storage/devFixtures/testVaultGen.ts')
+      const cache = await import('/src/storage/cache/files.ts')
       const r = {}
       const files = gen.generateBigVault(spec.count, spec)
         .map(e => ({ path: e.id + '.md', content: e.content, version: 'v1' }))

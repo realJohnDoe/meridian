@@ -76,11 +76,11 @@ allowances there — both narrow, and neither weakens the check over `src/`:
   non-recursive, so anything one directory down was in `project` but reachable
   from no entry, which knip reports as an unused file. That is also why
   `probe.mjs` carries the repo's `.mjs` extension rather than `.js`.
-- **`ignoreUnresolved: ["^/meridian/src/"]`.** `stress.mjs` imports the app's
-  own modules by their *dev-server URL* (`/meridian/src/model/index.ts`) so
+- **`ignoreUnresolved: ["^/src/"]`.** `stress.mjs` imports the app's
+  own modules by their *dev-server URL* (`/src/model/index.ts`) so
   they run inside the page against the real Vite graph. Those are browser
   paths, not filesystem paths, and knip cannot resolve them. The pattern is
-  anchored to that leading `/meridian/src/`, which no real source import uses —
+  anchored to that leading `/src/`, which no real source import uses —
   app code imports via `@/…` or a relative path.
 
 ## Timing conventions
