@@ -106,7 +106,7 @@ with `retro` as the survey-type label.
    plus:
    - **Sessions** — the PRs/session ids it was seen in, and what happened in each
      (one line, with a verbatim quote from the transcript or PR).
-   - **Category** — one of the tags below. Label only `retro` + the tier.
+   - **Category** — one of the tags below. Label only `retro` + `survey-finding` + the tier.
    - **Impact** — 1–10, where 10 = it already shipped a wrong change that no
      check caught; 5 = it costs a red CI round or a follow-up session each time
      it fires; 1 = wasted tokens only.

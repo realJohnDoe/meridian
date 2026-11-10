@@ -282,8 +282,8 @@ files"); this section states only what a survey run does.
 
 - **One parent issue per run**, titled with the survey and its scope
   (`Codebase health survey — test code — 2026-09-12` is the worked example,
-  #1065), labelled with the survey-type label (`health`, `ui`, `performance`,
-  `product`, `data-integrity`, `security`, `ux`, `retro`). Its body carries the coverage statement, the
+  #1065), labelled `survey` plus the survey-type label (`health`, `ui`,
+  `performance`, `product`, `data-integrity`, `security`, `ux`, `retro`). Its body carries the coverage statement, the
   category verdicts and the summary table — with the table's rows linking to
   each finding's sub-issue rather than restating it. This **replaces** the
   report file the old convention wrote to `plans/reports/`: there is no
@@ -295,7 +295,7 @@ files"); this section states only what a survey run does.
   `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton. Label each with:
   - the survey's own `Category` tag(s) (the list each survey defines below,
     e.g. `dry`, `srp`, `testing`, `security`);
-  - the same survey-type label as the parent issue;
+  - `survey-finding`, plus the same survey-type label as the parent issue;
   - a model-tier label — exactly one of `haiku`, `sonnet`, `opus`,
     `opus-plan` — matching the Recommended model field;
   - `decision-required`, when the finding hinges on a product decision only

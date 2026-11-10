@@ -2,20 +2,20 @@
 
 Run twice a week by the scheduled task "Start top-ranked survey"; the task's
 prompt only says to follow this file. Goal: survey cadence without anyone
-remembering, and no new findings while the backlog is already full.
+remembering, and no new findings while earlier ones are still open.
 
 0. `node scripts/workshop-pause.mjs`: if `state` is not `normal`, **stop. Post
    nothing, open nothing.** (Resume is the dispatcher's job; this task waits.)
-1. **Count the open backlog**: open issues with a model-tier label, not counting
-   parent issues (ones with sub-issues):
+1. **Count the open survey findings** (issues labelled `survey-finding`; other
+   issues don't count):
 
    ```bash
-   gh api --paginate "repos/realJohnDoe/meridian/issues?state=open&per_page=100" \
-     --jq '[.[] | select(.pull_request|not) | select((.sub_issues_summary.total // 0) == 0) | select([.labels[].name] | any(. == "haiku" or . == "sonnet" or . == "opus" or . == "opus-plan"))] | length' \
+   gh api --paginate "repos/realJohnDoe/meridian/issues?labels=survey-finding&state=open&per_page=100" \
+     --jq '[.[] | select(.pull_request|not)] | length' \
      | awk '{s+=$1} END {print s}'
    ```
 
-   **5 or more → stop. Post nothing, open nothing.**
+   **3 or more → stop. Post nothing, open nothing.**
 2. `node scripts/survey-next.mjs` (un-shallows itself; needs `gh`). Rows marked
    `-` are unranked, skip them.
 3. Walk the ranked rows in order. **Skip** a row if its score is `0` (fresh) or
