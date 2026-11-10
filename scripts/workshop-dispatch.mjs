@@ -330,8 +330,9 @@ const line = (x, ask) => {
 };
 const section = (h, xs, ask) =>
   xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, ask)), ""] : [];
-const NOTE =
-  "_The draft digest is rewritten by every daily run and published the day after each survey run (Tuesdays and Fridays). Answer on the issue or PR, or reply here: the next daily run copies replies onto their issues._\n\n";
+const ANSWER =
+  "Answer on the issue or PR, or reply here: the next daily run copies replies onto their issues.";
+const NOTE = `_The draft digest is rewritten by every daily run and published the day after each survey run (Tuesdays and Fridays). ${ANSWER}_\n\n`;
 // PRs first: they are finished work, and go stale while they wait.
 const asks = [
   ...section("Review", review, "Review:"),
@@ -503,10 +504,10 @@ if (APPLY) {
     if (publish) {
       post(
         `repos/${REPO}/issues/${d}`,
-        // The draft note explains drafts; a published digest no longer is one.
+        // A published digest is no draft: keep only where to answer.
         {
           title: `${DIGEST_PREFIX} — ${NOW.slice(0, 10)}`,
-          body: body.replace(NOTE, ""),
+          body: body.replace(NOTE, `_${ANSWER}_\n\n`),
         },
         "PATCH",
       );

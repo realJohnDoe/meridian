@@ -85,7 +85,7 @@ digest issue, which also says why anything isn't moving.
   survey start, so it carries that survey's findings; `DIGEST_WEEKDAYS` in the
   script, kept in step with that task's schedule) and something merged or
   waits, the run publishes it
-  (retitles it `Workshop digest — <publish date>`, drops the draft note, and comments the counts, the ping),
+  (retitles it `Workshop digest — <publish date>`, cuts the draft note down to where to answer, and comments the counts, the ping),
   closes the previously published digest with a link, and opens the next
   draft. A quiet cycle stays a draft. Replies on the draft or the published
   digest are relayed (step 4). Nothing is decided on silence.
