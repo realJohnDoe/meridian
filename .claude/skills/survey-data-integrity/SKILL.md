@@ -172,7 +172,7 @@ shared rule allows, and `Fix` must say **how the repro should behave
 afterwards**. This survey adds:
 
 - **Invariant violated** — which of the numbered invariants above, and under what conditions (every save / only on hand-authored files / only with two devices / only offline)
-- **Category** — one or more of: `round-trip` `edit-locality` `lost-update` `cache-coherence` `durability` `recoverability` `temporal` `validation` `atomicity` `testing-gap` — these are not repo labels (as of 2026-10-31 none exist), so state the category in the issue body and label only `data-integrity` + the tier
+- **Category** — one or more of: `round-trip` `edit-locality` `lost-update` `cache-coherence` `durability` `recoverability` `temporal` `validation` `atomicity` `testing-gap` — these are not repo labels (as of 2026-10-31 none exist), so state the category in the issue body and label only `data-integrity` + `survey-finding` + the tier
 - **Failure mode** — **silent** or **loud**, stated explicitly; if silent, say how a user would ever notice
 - **Impact** — 1–10, where 10 = silent, unrecoverable loss or corruption of user-authored content on a common path; 5 = recoverable or visible corruption, or silent loss on a rare path; 1 = cosmetic normalization the user would not miss
 - **Repro** — the starting file content (verbatim), the operation sequence, the observed result, and the expected result. Include the failing test verbatim where you wrote one
