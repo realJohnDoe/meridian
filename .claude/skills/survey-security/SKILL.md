@@ -114,7 +114,7 @@ with `security` as the survey-type label.
    plus:
    - **Invariant violated** — which numbered invariant, under what conditions.
    - **Category** — one of the category tags below. These are not repo labels;
-     state the tag in the body and label only `security` + the tier.
+     state the tag in the body and label only `security` + `survey-finding` + the tier.
    - **Attacker** — who can trigger it, and what they need (a link click, a
      shared repo, nothing).
    - **Impact** — 1–10, where 10 = token theft or arbitrary vault write by an

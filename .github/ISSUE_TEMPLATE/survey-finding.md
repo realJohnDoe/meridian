@@ -10,8 +10,9 @@ Survey finding: attach this as a sub-issue of the run's parent issue (see
 plans/CLAUDE.md and .claude/skills/_survey/conventions.md) — do not label it `survey:<name>`,
 that label is retired. Label it instead with:
   - the survey's own Category tag(s) (`dry`, `srp`, `testing`, `security`, …)
-  - the survey-type label matching the parent issue (`health`, `ui`,
-    `performance`, `product`, `data-integrity`, `security`, `ux`, `retro`)
+  - `survey-finding`, plus the survey-type label matching the parent issue
+    (`health`, `ui`, `performance`, `product`, `data-integrity`, `security`,
+    `ux`, `retro`)
   - a model-tier label: exactly one of `haiku`, `sonnet`, `opus`, `opus-plan`
   - `decision-required`, if the finding hinges on a product decision only the
     maintainer can make
