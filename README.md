@@ -10,7 +10,7 @@
 
 **And whoever you share with doesn't have to be you.** Point Meridian at a repo and everyone you share it with reads and writes the same repo — no vault to configure, no plugins, and no event owned by whoever happened to create it. Write access is a GitHub collaborator invite, so the people you share *with* need a (free) GitHub account. The people you *name* on entries need nothing at all: participants are just names in a file, so a child or a partner can be on the calendar without being a user of anything.
 
-**[Open the app →](https://realjohndoe.github.io/meridian/)** — try the Tutorial vault first, nothing to sign up for.
+**[Open the app →](https://meridian.realjohndoe.workers.dev/)** — try the Tutorial vault first, nothing to sign up for.
 
 *Meridian does tasks and calendar. It doesn't try to out-note Obsidian, and doesn't want to.*
 
@@ -82,7 +82,7 @@ Files you own only stay yours if your edits actually arrive. That plumbing is ta
 
 ## 🚀 Getting started
 
-1. **Open the app** at [realjohndoe.github.io/meridian](https://realjohndoe.github.io/meridian/).
+1. **Open the app** at [meridian.realjohndoe.workers.dev](https://meridian.realjohndoe.workers.dev/).
 2. Try the **Tutorial vault** to get a feel for the interface — click through the onboarding tour.
 3. When you're ready, connect your own storage:
    - **GitHub** (recommended) — Menu → **Settings** → **Add vault** → **GitHub repository**, sign in, then pick a repository that has Meridian's GitHub App installed (the picker links to creating a new empty repo and to installing the app) — no token to create by hand. Meridian reads and writes files directly, so you can reach your vault from any device.
