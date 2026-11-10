@@ -75,10 +75,11 @@ digest issue, which also says why anything isn't moving.
   `needs-review` PRs and Dependabot PRs without auto-merge), **Unstick** (PRs
   at their follow-up cap, conflicts included, a follow-up with no push after 2
   days, a dispatched issue with no PR after 2 days), then **Decide** (open
-  `decision-required` issues); then what's coming, **Queue** (dispatchable
+  `decision-required` issues not blocked by another), each saying which issues
+  it unblocks; then what's coming, **Queue** (dispatchable
   issues past today's cap) and **Not picked up**, where issues blocked,
   `deferred` or a survey run waiting on its findings are only counted, in a
-  collapsed list, since they'd repeat every time; then **Merged since** the
+  collapsed list, since they'd repeat every time; then, also collapsed, what merged since the
   draft opened, each PR with the issue it closed and its labels. Once the
   first run on a Tuesday or Friday comes (the day after each Monday/Thursday
   survey start, so it carries that survey's findings; `DIGEST_WEEKDAYS` in the

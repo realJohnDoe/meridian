@@ -30,7 +30,8 @@ const DISPATCH = "<!-- workshop-dispatch -->";
 const FOLLOWUP = "<!-- workshop-followup -->";
 const RELAYED = "<!-- workshop-relayed -->"; // digest replies up to here are copied to their issues
 // Comments written before the farm → workshop rename still carry `farm-` markers.
-const marked = (c, m) => c.body.includes(m) || c.body.includes(m.replace("workshop", "farm"));
+const marked = (c, m) =>
+  c.body.includes(m) || c.body.includes(m.replace("workshop", "farm"));
 // The one merge policy: a green, quiet PR with this label is merged; any other
 // non-draft PR waits for review. Whoever opens the PR decides.
 const AUTOMERGE = "automerge";
@@ -80,6 +81,25 @@ const linkedIssues = (pr) =>
     ),
   ].map((m) => Number(m[1]));
 const linked = new Set(prs.flatMap(linkedIssues));
+// Open issues an issue waits on: native blocked-by edges, plus the documented
+// fallback of a blocker named in the body while it is open.
+const blockersOf = new Map(
+  issues.map((i) => [
+    i.number,
+    new Set([
+      ...(i.issue_dependencies_summary?.blocked_by > 0
+        ? all(
+            `repos/${REPO}/issues/${i.number}/dependencies/blocked_by?per_page=100`,
+          )
+            .filter((b) => b.state === "open")
+            .map((b) => b.number)
+        : []),
+      ...bodyBlockers(i.body).filter((n) => byNumber.has(n)),
+    ]),
+  ]),
+);
+const blockedText = (n) =>
+  `blocked by ${[...blockersOf.get(n)].map((b) => `#${b}`).join(", ")}`;
 
 // --- PR follow-up -----------------------------------------------------------
 // Ours to follow up: every non-draft PR (draft = keep out of the workshop).
@@ -192,18 +212,7 @@ const skip = (i) => {
     return "no tier label; add `haiku`, `sonnet` or `opus` to queue it";
   if (l.includes("opus-plan"))
     return "`opus-plan`; start a plan session by hand";
-  const blockers = new Set(
-    i.issue_dependencies_summary?.blocked_by > 0
-      ? all(
-          `repos/${REPO}/issues/${i.number}/dependencies/blocked_by?per_page=100`,
-        )
-          .filter((b) => b.state === "open")
-          .map((b) => b.number)
-      : [],
-  );
-  // The documented fallback: a blocker named in the body counts while it is open.
-  for (const n of bodyBlockers(i.body)) if (byNumber.has(n)) blockers.add(n);
-  if (blockers.size) return `blocked by ${[...blockers].map((n) => `#${n}`).join(", ")}`;
+  if (blockersOf.get(i.number).size) return blockedText(i.number);
 };
 const notPicked = [];
 const ready = issues.filter((i) => {
@@ -290,11 +299,35 @@ for (const p of parents.filter(
 // --- Digest -----------------------------------------------------------------
 // One issue per survey cycle. Its body is rewritten on every run (an edit
 // notifies nobody); publishing it is the ping.
-const decide = issues
-  .filter((i) => names(i).includes("decision-required"))
-  .map((i) => ({ issue: i.number, title: i.title, url: i.html_url }));
-const line = (x, ask) =>
-  `- ${ask ? `[ ] **${ask}** ` : ""}[#${x.pr ?? x.issue}](${x.url}) ${x.title}${x.why ? ` (${x.why})` : ""}`;
+// A decision on a blocked issue can wait until its blocker is done.
+const decide = [];
+for (const i of issues.filter((i) => names(i).includes("decision-required"))) {
+  const x = { issue: i.number, title: i.title, url: i.html_url };
+  if (blockersOf.get(i.number).size)
+    notPicked.push({ ...x, why: blockedText(i.number) });
+  else decide.push(x);
+}
+// What finishing an ask frees: the open issues waiting on it (or, for a PR, on
+// the issues it closes).
+const unblocks = (x) => {
+  const done = x.pr
+    ? linkedIssues(prs.find((p) => p.number === x.pr))
+    : [x.issue];
+  return issues
+    .filter((i) => done.some((n) => blockersOf.get(i.number).has(n)))
+    .map((i) => `#${i.number}`);
+};
+const line = (x, ask) => {
+  const why = [
+    x.why,
+    ...(ask && unblocks(x).length
+      ? [`unblocks ${unblocks(x).join(", ")}`]
+      : []),
+  ]
+    .filter(Boolean)
+    .join("; ");
+  return `- ${ask ? `[ ] **${ask}** ` : ""}[#${x.pr ?? x.issue}](${x.url}) ${x.title}${why ? ` (${why})` : ""}`;
+};
 const section = (h, xs, ask) =>
   xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, ask)), ""] : [];
 const NOTE =
@@ -319,7 +352,10 @@ const info = [
       url: `https://github.com/${REPO}/issues/${q.issue}`,
     })),
   ),
-  ...section("Not picked up", notPicked.filter((x) => !isWaiting(x))),
+  ...section(
+    "Not picked up",
+    notPicked.filter((x) => !isWaiting(x)),
+  ),
   ...(waiting.length
     ? [
         `<details><summary>${waiting.length} issues waiting on a blocker, a decision or <code>deferred</code></summary>`,
@@ -363,7 +399,7 @@ const render = (start, mergedLines, prev) =>
     [...asks, ...info].join("\n") || "Nothing is waiting on the maintainer.\n"
   }${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
     mergedLines.length
-      ? `\n## Merged since ${start.slice(0, 10)} (${mergedLines.length})\n\n${mergedLines.join("\n")}\n`
+      ? `\n<details><summary>${mergedLines.length} merged since ${start.slice(0, 10)}</summary>\n\n${mergedLines.join("\n")}\n\n</details>\n`
       : ""
   }`.trim() + FOOTER;
 const body = render(since, merged, published?.number);
@@ -377,8 +413,7 @@ const publish =
 // Maintainer replies on either digest not yet copied onto their issues.
 const replies = [draft, published].filter(Boolean).flatMap((d) => {
   const cs = all(`repos/${REPO}/issues/${d.number}/comments?per_page=100`);
-  const relayedAt =
-    cs.findLast((c) => marked(c, RELAYED))?.created_at ?? "";
+  const relayedAt = cs.findLast((c) => marked(c, RELAYED))?.created_at ?? "";
   return cs
     .filter(
       (c) =>
