@@ -71,18 +71,21 @@ digest issue, which also says why anything isn't moving.
 - **Digest**: a draft issue, `Workshop digest (draft) — from <date>`, is
   rewritten on every run (an edit notifies nobody), so it always shows
   today's state: what waits on the maintainer,
-  each line saying what to do, **Decide** (open `decision-required` issues),
-  **Review** (green, quiet `needs-review` PRs and Dependabot PRs without
-  auto-merge), **Unstick** (PRs at their follow-up cap, conflicts included, a
-  follow-up with no push after 2 days, a dispatched issue with no PR after 2
-  days); then what's coming, **Queue** (dispatchable issues past today's cap)
-  and **Not picked up**; then **Merged since** the
+  each line saying what to do, PRs first: **Review** (green, quiet
+  `needs-review` PRs and Dependabot PRs without auto-merge), **Unstick** (PRs
+  at their follow-up cap, conflicts included, a follow-up with no push after 2
+  days, a dispatched issue with no PR after 2 days), then **Decide** (open
+  `decision-required` issues not blocked by another), each saying which issues
+  it unblocks; then what's coming, **Queue** (dispatchable
+  issues past today's cap) and **Not picked up**, where issues blocked,
+  `deferred` or a survey run waiting on its findings are only counted, in a
+  collapsed list, since they'd repeat every time; then, also collapsed, what merged since the
   draft opened, each PR with the issue it closed and its labels. Once the
   first run on a Tuesday or Friday comes (the day after each Monday/Thursday
   survey start, so it carries that survey's findings; `DIGEST_WEEKDAYS` in the
   script, kept in step with that task's schedule) and something merged or
   waits, the run publishes it
-  (drops `(draft)` from the title and comments the counts, the ping),
+  (retitles it `Workshop digest — <publish date>`, cuts the draft note down to where to answer, and comments the counts, the ping),
   closes the previously published digest with a link, and opens the next
   draft. A quiet cycle stays a draft. Replies on the draft or the published
   digest are relayed (step 4). Nothing is decided on silence.
