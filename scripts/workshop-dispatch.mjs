@@ -299,11 +299,17 @@ const section = (h, xs, ask) =>
   xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, ask)), ""] : [];
 const NOTE =
   "_The draft digest is rewritten by every daily run and published the day after each survey run (Tuesdays and Fridays). Answer on the issue or PR, or reply here: the next daily run copies replies onto their issues._\n\n";
+// PRs first: they are finished work, and go stale while they wait.
 const asks = [
-  ...section("Decide", decide, "Decide:"),
   ...section("Review", review, "Review:"),
   ...section("Unstick", unstick, "Unstick:"),
+  ...section("Decide", decide, "Decide:"),
 ];
+// Issues that wait on another issue, a decision or the maintainer's own
+// `deferred` would repeat in every digest, so they are only counted; what
+// they wait on is listed above.
+const isWaiting = (x) => /^(blocked by|`deferred`|survey run;)/.test(x.why);
+const waiting = notPicked.filter(isWaiting);
 const info = [
   ...section(
     "Queue (dispatched next, oldest first)",
@@ -313,7 +319,17 @@ const info = [
       url: `https://github.com/${REPO}/issues/${q.issue}`,
     })),
   ),
-  ...section("Not picked up", notPicked),
+  ...section("Not picked up", notPicked.filter((x) => !isWaiting(x))),
+  ...(waiting.length
+    ? [
+        `<details><summary>${waiting.length} issues waiting on a blocker, a decision or <code>deferred</code></summary>`,
+        "",
+        ...waiting.map((x) => line(x)),
+        "",
+        "</details>",
+        "",
+      ]
+    : []),
 ];
 // The draft collects one survey cycle; at its end it is published (retitled, pinged)
 // and the next draft opens. The previous published digest is then closed.
@@ -351,7 +367,6 @@ const render = (start, mergedLines, prev) =>
       : ""
   }`.trim() + FOOTER;
 const body = render(since, merged, published?.number);
-const week = (start) => `from ${start.slice(0, 10)}`;
 // A quiet cycle (nothing merged, nothing to act on) stays a draft.
 const publish =
   !FOLLOWUPS_ONLY &&
@@ -443,7 +458,7 @@ if (APPLY) {
     const newDraft = (start, b) =>
       JSON.parse(
         post(`repos/${REPO}/issues`, {
-          title: `${DIGEST_PREFIX} (draft) — ${week(start)}`,
+          title: `${DIGEST_PREFIX} (draft) — from ${start.slice(0, 10)}`,
           body: b,
         }),
       ).number;
@@ -453,13 +468,13 @@ if (APPLY) {
     if (publish) {
       post(
         `repos/${REPO}/issues/${d}`,
-        { title: `${DIGEST_PREFIX} — ${week(since)}` },
+        { title: `${DIGEST_PREFIX} — ${NOW.slice(0, 10)}` },
         "PATCH",
       );
       // A title or body edit notifies nobody; this comment is the ping.
       const { decide: x, review: r, unstick: u, merged: m } = digest.counts;
       post(`repos/${REPO}/issues/${d}/comments`, {
-        body: `Published: ${x} to decide, ${r} to review, ${u} to unstick, ${m} merged.${FOOTER}`,
+        body: `Published: ${r} to review, ${u} to unstick, ${x} to decide, ${m} merged.${FOOTER}`,
       });
       if (published) {
         post(`repos/${REPO}/issues/${published.number}/comments`, {
