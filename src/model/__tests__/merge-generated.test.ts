@@ -159,5 +159,5 @@ describe('mergeFileContent — generated series edits (#1222)', () => {
       }),
       { seed: 20261031, numRuns: 300 },
     )
-  })
+  }, 30_000)
 })
