@@ -125,6 +125,7 @@ const PAIRS: Pair[] = [
   ...['background', 'card', 'muted', 'sidebar'].map(s => ({ role: 'muted' as const, text: 'muted-foreground', on: [s] })),
   { role: 'accent', text: 'primary-text', on: ['background'] },
   { role: 'accent', text: 'primary-text', on: ['card', 'state-subtle'] },
+  { role: 'accent', text: 'primary-text', on: ['secondary'] },
   { role: 'button', text: 'primary-foreground', on: ['primary'] },
   { role: 'button', text: 'destructive-foreground', on: ['destructive'] },
   { role: 'button', text: 'warning-foreground', on: ['warning'] },

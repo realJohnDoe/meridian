@@ -23,7 +23,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       className={cn(
         'flex h-control items-center justify-between gap-2 rounded-lg border border-border/50 bg-secondary',
-        'px-3 text-xs font-semibold text-primary whitespace-nowrap',
+        'px-3 text-xs font-semibold text-primary-text whitespace-nowrap',
         'transition-colors focus:outline-hidden focus:border-primary',
         'disabled:cursor-not-allowed disabled:text-muted-foreground/70',
         'aria-invalid:border-destructive',
@@ -134,7 +134,7 @@ function SelectItem({
     >
       <span className="absolute right-2 flex size-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator data-slot="select-item-indicator">
-          <Check className="size-3.5 text-primary" />
+          <Check className="size-3.5 text-primary-text" />
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
