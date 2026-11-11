@@ -240,7 +240,7 @@ export default defineConfig({
         // 2026-09-12 (#1039): both measured 100/100/100/100 — floored at
         // 97/97/97/97 rather than raised to 100, which would leave zero
         // headroom and fail CI on the first untested branch added later.
-        'src/components/primitives/responsive-modal.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
+        'src/editor/dialogs/responsive-modal.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
         'src/components/primitives/icon-button.tsx': { statements: 97, branches: 97, functions: 97, lines: 97 },
         // Re-measured 2026-09-12 (#1039): measured 96.32/88.46/96.77/99.1.
         'src/editor/dialogs/TimeWheels.tsx': { statements: 91, branches: 83, functions: 92, lines: 94 },

@@ -1,10 +1,10 @@
 import * as React from 'react'
 import { useMediaQuery } from '@/hooks'
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from '../ui/dialog'
-import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerFooter } from '../ui/drawer'
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer'
 import { X } from 'lucide-react'
-import { Separator } from './separator'
-import { Button } from './button'
+import { Separator } from '@/components/primitives/separator'
+import { Button } from '@/components/primitives/button'
 import { cn } from '@/lib/cn'
 
 const ModalContext = React.createContext(false) // false = mobile (drawer)

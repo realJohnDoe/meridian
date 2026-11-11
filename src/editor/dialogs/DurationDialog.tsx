@@ -12,7 +12,7 @@ import {
   ResponsiveModalTitle,
   ResponsiveModalDescription,
   ResponsiveModalActions,
-} from '@/components/primitives/responsive-modal'
+} from './responsive-modal'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { segmentedGroupVariants, segmentedItemVariants } from '../segmentedGroup'
 import { badgeVariants } from '@/components/primitives/badge'

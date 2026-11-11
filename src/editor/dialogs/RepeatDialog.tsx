@@ -11,7 +11,7 @@ import {
   ResponsiveModalTitle,
   ResponsiveModalDescription,
   ResponsiveModalActions,
-} from '@/components/primitives/responsive-modal'
+} from './responsive-modal'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { badgeVariants } from '@/components/primitives/badge'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'

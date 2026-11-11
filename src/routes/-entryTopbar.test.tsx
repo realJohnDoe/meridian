@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { EntryTopbar } from './-entryTopbar'
 
 // A collaborator, not the subject: SyncButton drags in the whole sync/store stack.
-vi.mock('@/components', () => ({ SyncButton: () => <div data-testid="sync-button" /> }))
+vi.mock('./-syncButton', () => ({ default: () => <div data-testid="sync-button" /> }))
 
 interface Opts {
   isFavorited?: boolean

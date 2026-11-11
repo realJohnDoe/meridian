@@ -6,7 +6,7 @@ import { setupStore, makeOcc } from '@/test-utils'
 import { entryKey } from '@/fileIO'
 import type { Occurrence } from '@/types'
 import type { VaultRef } from '@/vaultRef'
-import ViewFilterButton from './ViewFilterButton'
+import ViewFilterButton from './-viewFilterButton'
 
 setupStore()
 

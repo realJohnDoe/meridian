@@ -103,10 +103,8 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 // Heavy siblings _app.tsx mounts alongside AppMain, irrelevant to this
 // test and each with its own real dependencies (auth, vaults, onboarding
 // state) not worth wiring up here.
-vi.mock('@/components', () => ({
-  SyncButton: () => null,
-  ViewFilterButton: () => null,
-}))
+vi.mock('./-syncButton', () => ({ default: () => null }))
+vi.mock('./-viewFilterButton', () => ({ default: () => null }))
 vi.mock('./-appSidebar', () => ({ default: () => null }))
 vi.mock('./-searchBar', () => ({ default: () => null }))
 vi.mock('@/onboarding', () => ({ CoachTour: () => null }))

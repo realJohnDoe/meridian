@@ -457,7 +457,7 @@ Despite the shape of the name, **not** a fourth occurrence renderer: it draws
 one `FileMetadata.items` checklist line (`text` + `done`), which is the other
 meaning of *items*. Its `onPromote` is what turns such a line into a real
 entry.
-→ `components/MarkdownTaskCard.tsx` · `MarkdownTaskCard`
+→ `editor/MarkdownTaskCard.tsx` · `MarkdownTaskCard`
 
 ### View vs Pane / Grid
 A `*View` is the swipeable carousel container; the `*Pane` or `*Grid` inside it
@@ -528,7 +528,7 @@ items, independent of the agenda's window.
 `components/primitives/` holds **our own** shared primitives. The split is
 load-bearing for coverage, knip, and `shadcn diff`; see CLAUDE.md's *Directory
 structure* for what each exemption keys off.
-→ `components/primitives/responsive-modal.tsx` · `ResponsiveModal`
+→ `components/primitives/icon-button.tsx` · `IconButton`
 
 ### visible viewport
 The strip of the layout viewport not covered by an on-screen keyboard — `top`,

@@ -5,7 +5,7 @@ import {
   ResponsiveModalContent,
   ResponsiveModalTitle,
   ResponsiveModalActions,
-} from '@/components/primitives/responsive-modal'
+} from './responsive-modal'
 import { badgeVariants } from '@/components/primitives/badge'
 import { PRIORITY_CLASS } from '@/components/primitives/occurrence-variants'
 import { cn } from '@/lib/cn'
