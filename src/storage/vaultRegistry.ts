@@ -1,10 +1,6 @@
 import { cacheInit } from '@/storage/cache/db'
 import { cacheLoadAll, applyRemoteBatch, cacheDeleteAll } from '@/storage/cache/files'
-import {
-  handleSave, handleLoad, handleClear,
-  tokenLoad, refreshTokenLoad, tokenClear, refreshTokenClear, tokenExpiryClear,
-  credentialsSave,
-} from '@/storage/cache/credentials'
+import { handleSave, credentialsSave } from '@/storage/cache/credentials'
 import {
   vaultRefsSave, vaultRefsLoad, activeVaultIdSave, activeVaultIdLoad,
   exampleVaultRemovedLoad, exampleVaultRemovedSave,
@@ -12,11 +8,9 @@ import {
 import { titleToSlug, keyVaultId } from '@/fileIO'
 import type { EntryKey } from '@/fileIO'
 import { diskPickDirectory } from './fs'
-import { SEEN_SKIPPED_PREFIX } from './icalBackend'
-import { clearVaultKey } from '@/lib/vaultStorage'
 import { LocalBackend }   from './localBackend'
 import { ExampleBackend } from './exampleBackend'
-import { ensureFreshAccessToken, revokeGitHubToken } from './githubOAuth'
+import { vaultKindOps } from './vaultKinds'
 import type { OAuthTokens } from './githubOAuth'
 import type { StorageBackend } from './backend'
 import { isWritableVault } from '@/vaultRef'
@@ -77,18 +71,7 @@ const EXAMPLE_REF: VaultRef = { id: 'example', name: 'Tutorial', kind: 'example'
  */
 const isWritableKind = isWritableVault
 
-/**
- * Every persisted vault is mountable; only the synthesized Tutorial vault is
- * not, because it is never in the persisted list to begin with.
- *
- * Deliberately not `isWritableKind`: a calendar subscription is read-only but
- * mounts, caches and syncs exactly like any other vault — that equivalence is
- * the whole point of splitting writability out of the vault lifecycle. The two
- * predicates answer different questions and must not be collapsed.
- */
-function isMountableKind(ref: VaultRef): boolean {
-  return ref.kind !== 'example'
-}
+const isMountableKind = (ref: VaultRef): boolean => vaultKindOps(ref).mountable
 
 // ── VAULT IDS ─────────────────────────────────────────────────
 
@@ -274,33 +257,6 @@ async function loadVaultContent(backend: StorageBackend, prePainted = false): Pr
   }
 }
 
-/** Builds the backend for a local/github ref, fetching its stored credential
- * (file handle or token). Returns `null` if the credential is missing. */
-async function buildBackend(ref: VaultRef): Promise<StorageBackend | null> {
-  if (ref.kind === 'local') {
-    const handle = await handleLoad(ref.id)
-    return handle ? new LocalBackend(ref.id, ref.name, handle) : null
-  }
-  if (ref.kind === 'github') {
-    // A refresh that failed transiently, or a credential GitHub has since
-    // refused, still hands back the last known token — the backend is built
-    // with it and the first API call becomes the real test, which is where the
-    // sync path's classification and recovery already live. Only "nothing
-    // stored at all" is a reason not to build one.
-    const result = await ensureFreshAccessToken(ref.id)
-    if (result.status === 'no-credential') return null
-    const { GitHubBackend } = await import('./githubBackend')
-    return new GitHubBackend(ref.id, ref.name, { ...ref.github, token: result.token })
-  }
-  if (ref.kind === 'ical') {
-    // The feed URL travels on the ref, so a subscription has no credential to
-    // be missing — it can always build a backend.
-    const { IcalBackend } = await import('./icalBackend')
-    return new IcalBackend(ref.id, ref.name, ref.ical.url)
-  }
-  return null
-}
-
 type MountOutcome = 'granted' | 'offline' | 'prompt' | 'denied' | 'no-credential'
 
 /**
@@ -322,16 +278,14 @@ type MountOutcome = 'granted' | 'offline' | 'prompt' | 'denied' | 'no-credential
 async function mountVaultRef(
   ref: VaultRef, interactive: boolean, prePainted = false,
 ): Promise<MountOutcome> {
-  const backend = await buildBackend(ref)
+  const backend = await vaultKindOps(ref).build(ref)
   if (!backend) return 'no-credential'
 
-  // A network backend has no permission gate, only failures — the first sync
-  // IS the probe. Skip it on restore (interactive: false) so one dropped
-  // request can no longer leave the vault unmounted for the rest of the
-  // session; runSync's own classification, retry and backoff take over from
-  // here. A reconnect click (interactive: true) still probes, because a
-  // human is waiting on the answer.
-  if ((ref.kind === 'github' || ref.kind === 'ical') && !interactive) {
+  // Skipping the probe on restore means one dropped request can no longer
+  // leave a network vault unmounted for the rest of the session. A reconnect
+  // click (interactive: true) still probes, because a human is waiting on
+  // the answer.
+  if (!vaultKindOps(ref).probesOnRestore && !interactive) {
     mountBackend(backend)
     setVaultSync(ref.id, { needsAttention: null })
     await loadVaultContent(backend, prePainted)
@@ -481,9 +435,7 @@ async function restoreVaultsInner(): Promise<void> {
       try {
         const outcome = await mountVaultRef(ref, false, prePainted.get(ref.id) ?? false)
         if (outcome === 'no-credential') {
-          warn(ref.kind === 'local'
-            ? `Vault "${ref.name}" is missing its folder permission — remove and re-add it.`
-            : `Vault "${ref.name}" isn't signed in to GitHub — sign in again.`)
+          warn(vaultKindOps(ref).notices.noCredentialOnRestore(ref.name))
         }
         // `github`/`ical` skip the probe on restore (see mountVaultRef), so
         // `outcome` is always 'granted' for them here — never 'denied', never
@@ -519,9 +471,7 @@ export async function reconnectVault(id: string): Promise<void> {
 
     const outcome = await mountVaultRef(ref, true)
     if (outcome === 'no-credential') {
-      notify(ref.kind === 'local'
-        ? 'Vault handle not found — try removing and re-adding it.'
-        : `"${ref.name}" isn't signed in to GitHub — sign in again.`)
+      notify(vaultKindOps(ref).notices.noCredentialOnReconnect(ref.name))
       return
     }
     if (outcome === 'offline') {
@@ -531,9 +481,7 @@ export async function reconnectVault(id: string): Promise<void> {
       return
     }
     if (outcome !== 'granted') {
-      notify(ref.kind === 'local'
-        ? `Permission denied for vault "${ref.name}".`
-        : `Could not connect to "${ref.name}" — sign in to GitHub again.`)
+      notify(vaultKindOps(ref).notices.denied(ref.name))
     }
   } catch (e) {
     if ((e as Error).name === 'AbortError') return
@@ -726,26 +674,6 @@ export async function addIcalVault(feedUrl: string, name: string): Promise<void>
 }
 
 /**
- * Revokes vault `id`'s GitHub grant, unless another GitHub vault holds the same
- * access or refresh token (`findReusableGitHubSession` copies one sign-in into
- * further vaults) — revoking it would sign those out too. Never throws.
- */
-async function revokeUnlessShared(id: string, refs: VaultRef[]): Promise<void> {
-  try {
-    const [token, refresh] = await Promise.all([tokenLoad(id), refreshTokenLoad(id)])
-    if (!token) return
-    for (const other of refs) {
-      if (other.kind !== 'github' || other.id === id) continue
-      const [t, r] = await Promise.all([tokenLoad(other.id), refreshTokenLoad(other.id)])
-      if (t === token || (refresh && r === refresh)) return
-    }
-    await revokeGitHubToken(token)
-  } catch (e) {
-    console.warn('[vault] could not revoke GitHub token:', e)
-  }
-}
-
-/**
  * Unregister a vault: unmount its backend, drop its layer and its sync state,
  * clear its credential, and delete its cache rows.
  *
@@ -774,14 +702,7 @@ export async function removeVault(id: string): Promise<void> {
     removeVaultLayer(id)
     removeVaultSync(id)
 
-    if (ref.kind === 'local') await handleClear(id)
-    if (ref.kind === 'github') {
-      await revokeUnlessShared(id, existing)
-      await tokenClear(id)
-      await refreshTokenClear(id)
-      await tokenExpiryClear(id)
-    }
-    if (ref.kind === 'ical') clearVaultKey(SEEN_SKIPPED_PREFIX, id)
+    await vaultKindOps(ref).cleanup(id, existing)
 
     await cacheDeleteAll(id)
     await updateVaultRefs(current => current.filter(r => r.id !== id))
