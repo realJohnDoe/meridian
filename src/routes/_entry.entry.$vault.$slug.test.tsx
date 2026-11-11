@@ -59,7 +59,7 @@ vi.mock('@/editor', () => ({
 }))
 
 // A collaborator, not the subject: SyncButton drags in the whole sync/store stack.
-vi.mock('@/components', () => ({ SyncButton: () => <div data-testid="sync-button" /> }))
+vi.mock('./-syncButton', () => ({ default: () => <div data-testid="sync-button" /> }))
 
 setupStore()
 installFakePersistence()

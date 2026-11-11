@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act, within } from '@testing-library/react'
 import AgendaView from './AgendaView'
-import { setupStore, seedStore, makeOcc, makeSeries, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
+import { setupStore, installFakePersistence, seedStore, makeOcc, makeSeries, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
 import { fmtISO, weekStartsOn } from '@/model'
 import { addDays } from '@/format'
 import { useStore } from '@/store'
@@ -11,6 +11,7 @@ import { chunkIndexFor, maxLoadableChunk } from './agendaChunks'
 import type { Occurrence } from '@/types'
 
 setupStore()
+installFakePersistence()
 
 /**
  * Pin the clock (see FIXED_NOW below for what depended on it).

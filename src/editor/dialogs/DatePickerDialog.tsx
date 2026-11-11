@@ -8,7 +8,7 @@ import {
   ResponsiveModalContent,
   ResponsiveModalTitle,
   ResponsiveModalActions,
-} from '@/components/primitives/responsive-modal'
+} from './responsive-modal'
 import { Calendar } from '@/components/ui/calendar'
 import { Button } from '@/components/primitives/button'
 import { SlideTransition } from '@/components/primitives/slide-transition'

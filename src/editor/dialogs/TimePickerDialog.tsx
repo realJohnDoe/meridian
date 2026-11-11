@@ -7,7 +7,7 @@ import {
   ResponsiveModalTitle,
   ResponsiveModalDescription,
   ResponsiveModalActions,
-} from '@/components/primitives/responsive-modal'
+} from './responsive-modal'
 import TimeWheels from './TimeWheels'
 import { Input } from '@/components/ui/input'
 

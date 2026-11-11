@@ -1,5 +1,5 @@
 import { ArrowLeft, Heart, Trash2 } from 'lucide-react'
-import { SyncButton } from '@/components'
+import SyncButton from './-syncButton'
 import { IconButton } from '@/components/primitives/icon-button'
 import { TopbarShell } from './-topbarShell'
 

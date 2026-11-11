@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate, useRouterState } from '@tanstack/react-ro
 import { useStore } from '@/store'
 import { useEntryEditor } from '@/editor'
 import { draftEntryKey } from '@/model'
-import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
+import { EntrySkeleton } from './-entrySkeleton'
 import { titleToSlug, entryKey as makeEntryKey } from '@/fileIO'
 import { keyRoute } from '@/entryRoute'
 import { EntryTopbar } from './-entryTopbar'

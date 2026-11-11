@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { useStore, emptySyncStatus } from '@/store'
 import { setupStore } from '@/test-utils'
 import type { VaultRef } from '@/vaultRef'
-import SyncButton from './SyncButton'
+import SyncButton from './-syncButton'
 
 const { reconnectVault, startGitHubSignIn } = vi.hoisted(() => ({
   reconnectVault: vi.fn(),

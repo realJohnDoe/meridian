@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useStore } from '@/store'
 import { isEditScope } from '@/types'
-import { EntrySkeleton } from '@/components/primitives/entry-skeleton'
+import { EntrySkeleton } from './-entrySkeleton'
 import type { EditScope } from '@/types'
 
 /**
