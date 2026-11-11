@@ -112,8 +112,8 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   })()
 
   const toggleTask = (idx: number, text: string, done: boolean, row?: Row) => {
-    // Animate out when marking done; commit immediately (optimistic)
-    if (!done && row != null) beginLeave(row)
+    // Animate out of whichever section it's leaving; commit immediately (optimistic)
+    if (row != null) leave(row)
     const next = [...items]
     next[idx] = serializeTaskEntry(text, !done)
     onChange(next)
@@ -147,7 +147,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   // Animate out, exactly as ticking a row done does — a removal is the same
   // shape of change, so it reads the same way instead of snapping out.
   const remove = (row: Row) => {
-    beginLeave(row)
+    leave(row)
     onChange(items.filter((_, i) => i !== row.entry.idx))
   }
 
@@ -182,11 +182,13 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   const activeRows = sortedRows.filter(r => !isDoneRow(r))
   const doneRows   = sortedRows.filter(r => isDoneRow(r))
 
-  // A row ticked done drops straight out of `activeRows`, so it has to be held
-  // back here to have anything left to animate. `rows` is `activeRows` with the
-  // held ones spliced back where they were, each flagged `leaving`.
-  const { rows: activeRenderRows, beginLeave, endLeave, anyLeaving } =
-    useLeavingRows(activeRows, row => row.entry.key)
+  // A row ticked done drops straight out of `activeRows` (and an un-ticked one
+  // out of `doneRows`), so it has to be held back here to have anything left to
+  // animate. Each list's `rows` has its held ones spliced back where they were,
+  // each flagged `leaving`.
+  const activeList = useLeavingRows(activeRows, row => row.entry.key)
+  const doneList   = useLeavingRows(doneRows,   row => row.entry.key)
+  const leave = (row: Row) => (isDoneRow(row) ? doneList : activeList).beginLeave(row)
 
   const donePickerRows = (() => {
     const q = pickerQuery.toLowerCase()
@@ -200,7 +202,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   const redoItem = (row: Row) => {
     const { entry, occ } = row
     if (entry.kind === 'task') {
-      toggleTask(entry.idx, entry.text, entry.done, undefined)
+      toggleTask(entry.idx, entry.text, entry.done, row)
     } else if (occ) {
       reopenOcc(occ)
     }
@@ -238,11 +240,11 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
                   // (see fileOccurrenceMap's resolveOneKey). Animating an exit
                   // in that case would fade a stale copy over a row that's
                   // still there, just showing a different date. Only animate
-                  // when the file's representative occurrence actually became
-                  // dimmed — read post-toggle via the store directly, since the
+                  // when the file's representative occurrence actually changed
+                  // section — read post-toggle via the store directly, since the
                   // occBySlug this render closed over is the pre-toggle value.
                   const fresh = fileOccurrenceMap(useStore.getState().entries, roots).get(occ.entryKey)
-                  if (!fresh || isDimmed(fresh)) beginLeave(row)
+                  if (!fresh || isDimmed(fresh) !== isDoneRow(row)) leave(row)
                 }}
                 animate={false}
               />
@@ -293,7 +295,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   // already on screen and the collapse has a height to transition *from*.
   // A leaving row also drops its `data-item-key`, which takes it out of the
   // FlipList's diff: it is being animated by CSS, not glided.
-  function renderRow(row: Row, leaving = false) {
+  function renderRow(row: Row, leaving: boolean, endLeave: (key: string) => void) {
     const { key } = row.entry
     return (
       <CollapseRow
@@ -310,6 +312,16 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
     )
   }
 
+  function renderSection({ rows, endLeave, anyLeaving }: typeof activeList) {
+    return (
+      <FlipList items={rows} itemAttr="data-item-key" suspended={anyLeaving}>
+        <div className="flex flex-col" style={{ gap: ROW_GAP }}>
+          {rows.map(({ item, leaving }) => renderRow(item, leaving, endLeave))}
+        </div>
+      </FlipList>
+    )
+  }
+
   return (
     <div className="mt-6 pt-5 border-t border-border">
       <div className="text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase mb-2.5">Items</div>
@@ -318,11 +330,7 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
             shrinks the section — no height is measured or pinned. The FlipList
             only glides rows that *move*, and stands down while a collapse is
             running so the two never animate the same rows at once. */}
-        <FlipList items={activeRenderRows} itemAttr="data-item-key" suspended={anyLeaving}>
-          <div className="flex flex-col" style={{ gap: ROW_GAP }}>
-            {activeRenderRows.map(({ item, leaving }) => renderRow(item, leaving))}
-          </div>
-        </FlipList>
+        {renderSection(activeList)}
 
         {/* Add item — half-card affordance, same dimensions as item cards.
             The input never moves once opened (see useFloatingCombobox); only
@@ -412,14 +420,14 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
           <span className="w-5 shrink-0" aria-hidden="true" />
         </div>
 
-        {doneRows.length > 0 && (
+        {doneList.rows.length > 0 && (
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="flex items-center gap-1 mt-1 text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-180">
               <ChevronDown size={12} className="transition-transform duration-200" />
               Done · {doneRows.length}
             </CollapsibleTrigger>
-            <CollapsibleBody className="flex flex-col gap-1.5 pt-1.5">
-              {doneRows.map(row => renderRow(row))}
+            <CollapsibleBody className="pt-1.5">
+              {renderSection(doneList)}
             </CollapsibleBody>
           </Collapsible>
         )}
