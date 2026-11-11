@@ -193,13 +193,15 @@ describe('ItemsList exit animation', () => {
     expect(collapsingRows()).toHaveLength(1)
   })
 
-  it('does not begin an exit animation when un-checking an already-done task', () => {
+  it('animates a task out of the Done section when it is un-checked', () => {
     render(<Harness initialItems={['[x] Return books']} roots={makeRoots('current.md')} />)
 
     fireEvent.click(screen.getByText('Done · 1'))
     fireEvent.click(screen.getByRole('checkbox'))
 
-    expect(collapsingRows()).toHaveLength(0)
+    // One copy collapses out of Done; the reopened task lands in the active list.
+    expect(collapsingRows()).toHaveLength(1)
+    expect(screen.getAllByText('Return books')).toHaveLength(2)
   })
 })
 
