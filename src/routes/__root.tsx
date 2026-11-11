@@ -8,6 +8,7 @@ import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaul
 import { requestScrollToToday, getCurrentDate, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
 import { flushActiveAutoSave } from '@/autoSaveFlushPort'
 import { Toaster } from '@/components/ui/sonner'
+import { MovedNotice } from './-movedNotice'
 
 export const Route = createRootRoute({
   component: Root,
@@ -307,6 +308,7 @@ function Root() {
       <div id="app" className="flex flex-col">
         <Outlet />
       </div>
+      <MovedNotice />
       <Toaster />
     </ThemeProvider>
   )
