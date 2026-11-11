@@ -71,7 +71,7 @@ export default function IcalStep({ onBack, onDone }: { onBack: () => void; onDon
           pass through that server; nothing is stored there.
         </p>
 
-        {feedError && <p className="text-xs text-destructive">{feedError}</p>}
+        {feedError && <p className="text-xs text-destructive-text">{feedError}</p>}
 
         {preview && (
           <div className="rounded-lg border border-border p-3 text-xs">

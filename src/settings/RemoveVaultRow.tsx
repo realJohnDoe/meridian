@@ -40,7 +40,7 @@ export function RemoveVaultRow({ vault }: { vault: VaultRef }) {
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-destructive hover:bg-transparent hover-layer hover:text-destructive"
+            className="gap-1.5 text-destructive-text hover:bg-transparent hover-layer hover:text-destructive-text"
             onClick={handleRemoveClick}
           >
             <Trash2 className="size-3.5 stroke-[1.7]" />

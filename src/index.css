@@ -31,6 +31,9 @@
   --color-primary:              var(--primary);
   --color-primary-foreground:   var(--primary-foreground);
   --color-primary-text:         var(--primary-text);
+  --color-destructive-text:     var(--destructive-text);
+  --color-note-text:            var(--note-text);
+  --color-warning-text:         var(--warning-text);
   --color-secondary:            var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted:                var(--muted);
@@ -334,6 +337,13 @@
      white button text overrides it with a lighter shade (below), since no one
      indigo is both — the solid-fill/text split of Radix's step 9 vs 11. */
   --primary-text:              var(--primary);
+  /* Same split for the other accents painted as text (errors, sync status,
+     warnings). A theme whose fill doesn't read as text on its own surfaces
+     overrides these in its block, same hue; every override clears APCA Lc 60
+     and WCAG 4.5:1 there (src/themeContrast.test.ts). */
+  --destructive-text:          var(--destructive);
+  --note-text:                 var(--note);
+  --warning-text:              var(--warning);
 }
 
 /* Measured with APCA (src/themeContrast.test.ts): --primary as text was Lc
@@ -341,6 +351,7 @@
    the most chroma sRGB allows there. */
 .meridian {
   --primary-text: oklch(0.84 0.080 278);
+  --destructive-text: oklch(0.79 0.125 22);
 }
 
 /* Light-theme card/float shadows — plain Tailwind shadow-sm reads fine on a
@@ -373,6 +384,8 @@
    raised --secondary/--muted surface at 4.43:1) and ink-light on --note at
    4.66:1, so treat those two as the floor when retuning. */
 .meridian-light {
+  --note-text:    oklch(0.515 0.092 215);
+  --warning-text: oklch(0.525 0.109 82);
   /* Surfaces — 4-step ramp, darkest at the backdrop so it recedes */
   --backdrop:   oklch(0.90  0.015 252);
   --background: oklch(0.945 0.010 252);
@@ -451,6 +464,8 @@
    The two absolute derived tokens (--primary-dark, --brand-cyan-dark) are
    not color-mix based, so they are restated here too. */
 .tokyo-night {
+  --primary-text:     #c9adff;
+  --destructive-text: #ff99a9;
   /* Surfaces — Tokyo Night elevation ramp */
   --backdrop:   #13141e;
   --background: #1a1b2e;
@@ -516,6 +531,8 @@
 
 /* ── ROSÉ PINE DAWN THEME ───────────────────────────────────────── */
 .rose-pine-dawn {
+  --primary-text: #75608d;
+  --warning-text: #7c6900;
   /* Surfaces — warm parchment, darker→lighter as elevation increases */
   --backdrop:   #e8e0d8;
   --background: #f2e9e1;
@@ -634,6 +651,10 @@
 }
 
 .solarized-light {
+  --primary-text:     #5b5fb0;
+  --destructive-text: #cc1d20;
+  --note-text:        #00736b;
+  --warning-text:     #846300;
   /* Surfaces — warm cream, darker→lighter as elevation increases */
   --backdrop:   #d5cfbc;
   --background: #eee8d5;
@@ -686,6 +707,9 @@
 
 /* ── SOLARIZED DARK THEME ───────────────────────────────────────── */
 .solarized-dark {
+  --destructive-text: #ffa499;
+  --note-text:        #5eccc2;
+  --warning-text:     #e2b549;
   /* APCA: --primary as text was Lc 28 (24 on a selected row) — see .meridian. */
   --primary-text: oklch(0.84 0.080 279);
   /* Surfaces — Solarized base03/base02 elevation ramp */
@@ -743,6 +767,8 @@
 
 /* ── DRACULA THEME ──────────────────────────────────────────────── */
 .dracula {
+  --primary-text:     #d0b2ff;
+  --destructive-text: #ff9f98;
   /* Surfaces — Dracula elevation ramp (darker→lighter as elevation increases) */
   --backdrop:   #191a21;
   --background: #1e1f29;
@@ -814,6 +840,10 @@
 /* Latte flavor of Catppuccin. Elevation ramp runs darker→lighter so
    the backdrop recedes and foreground surfaces feel raised. */
 .catppuccin-latte {
+  --primary-text:     #8231e8;
+  --destructive-text: #d00a38;
+  --note-text:        #00747a;
+  --warning-text:     #7b6700;
   /* Surfaces — Crust→Mantle→Base, then a near-white lift for chips */
   --backdrop:   #dce0e8;   /* crust — deepest, recedes behind column */
   --background: #e6e9ef;   /* mantle — app column */
@@ -897,6 +927,8 @@
 /* Dark flavor of Catppuccin, pairing .catppuccin-latte. Elevation ramp
    runs Crust→Mantle→Base→Surface0, darkest at the backdrop. */
 .catppuccin-mocha {
+  --primary-text:     #d1acfe;
+  --destructive-text: #ff96b3;
   /* Surfaces */
   --backdrop:   #11111b;   /* crust */
   --background: #181825;   /* mantle */

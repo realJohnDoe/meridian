@@ -73,7 +73,7 @@ class ChipWidget extends ReactWidget {
           Badge,
           {
             variant: 'link' as const,
-            className: cn('!bg-current-tint !text-destructive underline underline-offset-2 decoration-current-underline'),
+            className: cn('!bg-current-tint !text-destructive-text underline underline-offset-2 decoration-current-underline'),
           },
           this.label,
         )

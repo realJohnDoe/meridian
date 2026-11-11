@@ -174,7 +174,7 @@ describe('EntryEditor — no vault to save to', () => {
     // taken the titleMissing branch, which would paint the (present) title's
     // placeholder as an error.
     expect(persistence.writes).toEqual([])
-    expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive/)
+    expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive-text/)
   })
 })
 
@@ -197,6 +197,6 @@ describe('EntryEditor — new entry in the Tutorial sandbox', () => {
 
     expect(screen.getByText(/tutorial is a sandbox/i)).toBeInTheDocument()
     expect(screen.queryByText(/no vault to save to yet/i)).not.toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive/)
+    expect(screen.getByPlaceholderText('Title').className).not.toMatch(/text-destructive-text/)
   })
 })
