@@ -54,7 +54,7 @@ function ArchivedRows({ archived }: { archived: ArchivedEntry[] }) {
           <IconButton
             label={`Delete ${title}`}
             hit="pad"
-            className="p-1.5 text-muted-foreground hover:text-destructive"
+            className="p-1.5 text-muted-foreground hover:text-destructive-text"
             onClick={() => deleteWholeFileWithUndo(key, title)}
           >
             <Trash2 className="size-3.5 stroke-[1.7]" />
@@ -234,7 +234,7 @@ export function VaultSettings({ vault }: Props) {
             {needsAttention.kind === 'reauth' && (
               <button
                 type="button"
-                className="flex items-center gap-1.5 text-left text-xs text-note hover:underline"
+                className="flex items-center gap-1.5 text-left text-xs text-note-text hover:underline"
                 onClick={() => void startGitHubSignIn({ reconnectVaultId: vault.id })}
               >
                 <AlertCircle className="size-3.5 shrink-0" />
@@ -246,14 +246,14 @@ export function VaultSettings({ vault }: Props) {
                 href={GITHUB_APP_INSTALL_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1.5 text-xs text-note hover:underline"
+                className="flex items-center gap-1.5 text-xs text-note-text hover:underline"
               >
                 <AlertCircle className="size-3.5 shrink-0" />
                 Meridian no longer has access to {vault.github.owner}/{vault.github.repo}
               </a>
             )}
             {needsAttention.kind === 'config' && (
-              <p className="flex items-center gap-1.5 text-xs text-note">
+              <p className="flex items-center gap-1.5 text-xs text-note-text">
                 <AlertCircle className="size-3.5 shrink-0" />
                 {vault.kind === 'github'
                   ? `${vault.github.owner}/${vault.github.repo} (${vault.github.branch})`
@@ -261,7 +261,7 @@ export function VaultSettings({ vault }: Props) {
               </p>
             )}
             {needsAttention.kind === 'fs-permission' && (
-              <p className="flex items-center gap-1.5 text-xs text-note">
+              <p className="flex items-center gap-1.5 text-xs text-note-text">
                 <AlertCircle className="size-3.5 shrink-0" />
                 {needsAttention.message}
               </p>

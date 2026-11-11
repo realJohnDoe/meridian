@@ -88,6 +88,14 @@ const NO_COLOR_ARITHMETIC = COLOR_PATTERNS.flatMap(re => ['Literal[value', 'Temp
   selector: `${node}=/${re}/]`,
   message: 'Use a named color or shadow token from index.css (e.g. bg-primary-tint, shadow-(--shadow-card)) instead of an opacity modifier or a literal color.',
 })))
+// An accent fill is tuned to sit behind ink, not to be read as text; each has
+// a `-text` twin retuned per theme for that (index.css, themeContrast.test.ts).
+// A class aimed at an icon (`[&>svg]:text-note`) is exempt: icons are graphics,
+// held to 3:1, and the type toggles match their icon to the item's fill hue.
+const NO_FILL_AS_TEXT = ['Literal[value', 'TemplateElement[value.raw'].map(node => ({
+  selector: `${node}=/(?<!svg\\]:)\\btext-(primary|destructive|note|warning)(?![\\w-])/]`,
+  message: 'Accent fills are not text colors: use text-primary-text / text-destructive-text / text-note-text / text-warning-text.',
+}))
 
 export default [
   // Auto-generated files — skip entirely
@@ -448,7 +456,7 @@ export default [
       'no-restricted-syntax': ['error', {
         selector: ':matches(FunctionDeclaration, FunctionExpression, ArrowFunctionExpression) > ObjectPattern > Property > AssignmentPattern',
         message: 'A default in a destructured parameter makes babel-plugin-react-compiler silently skip memoizing this component, whether declared with `function` or as an arrow. Use `props.x ?? default` in the body (see OccurrenceCard.tsx).',
-      }, ...NO_COLOR_ARITHMETIC],
+      }, ...NO_COLOR_ARITHMETIC, ...NO_FILL_AS_TEXT],
     },
   },
   // Same color rule for plain .ts class maps (cva variants, CodeMirror
@@ -457,7 +465,7 @@ export default [
   {
     files: ['src/**/*.ts'],
     ignores: ['src/components/ui/**', 'src/debug/**', 'src/**/*.test.ts'],
-    rules: { 'no-restricted-syntax': ['error', ...NO_COLOR_ARITHMETIC] },
+    rules: { 'no-restricted-syntax': ['error', ...NO_COLOR_ARITHMETIC, ...NO_FILL_AS_TEXT] },
   },
 
   // Within a module, relative imports into its own subdirectories (e.g.

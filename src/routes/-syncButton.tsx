@@ -51,16 +51,16 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
       )}
 
       {status.dirtyCount > 0 && (
-        <p className="text-2xs text-warning pl-5">
+        <p className="text-2xs text-warning-text pl-5">
           {status.dirtyCount} change{status.dirtyCount > 1 ? 's' : ''} waiting to sync
         </p>
       )}
 
       {status.offline && !status.error && (
-        <p className="text-2xs text-warning pl-5">Offline — changes are saved locally.</p>
+        <p className="text-2xs text-warning-text pl-5">Offline — changes are saved locally.</p>
       )}
 
-      {status.error && <p className="text-2xs text-destructive pl-5">{status.error}</p>}
+      {status.error && <p className="text-2xs text-destructive-text pl-5">{status.error}</p>}
 
       {/* Absorbed from the sidebar's old per-vault list, which is gone: this is
           now the one place a local vault can ask for its permission back, and
@@ -68,7 +68,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
       {status.needsAttention?.kind === 'fs-permission' && (
         <button
           type="button"
-          className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
+          className="flex items-center gap-1 pl-5 text-2xs text-note-text hover:underline text-left"
           onClick={() => void reconnectVault(vault.id)}
         >
           <AlertCircle className="size-3 shrink-0" />
@@ -79,7 +79,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
       {status.needsAttention?.kind === 'reauth' && (
         <button
           type="button"
-          className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
+          className="flex items-center gap-1 pl-5 text-2xs text-note-text hover:underline text-left"
           onClick={() => void startGitHubSignIn({ reconnectVaultId: vault.id })}
         >
           <AlertCircle className="size-3 shrink-0" />
@@ -92,7 +92,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
           href={GITHUB_APP_INSTALL_URL}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
+          className="flex items-center gap-1 pl-5 text-2xs text-note-text hover:underline text-left"
         >
           <AlertCircle className="size-3 shrink-0" />
           Meridian no longer has access to {vault.github.owner}/{vault.github.repo}
@@ -106,7 +106,7 @@ function VaultRow({ vault, status }: { vault: VaultRef; status: VaultSyncStatus 
         <Link
           to="/settings/vault/$vaultId"
           params={{ vaultId: vault.id }}
-          className="flex items-center gap-1 pl-5 text-2xs text-note hover:underline text-left"
+          className="flex items-center gap-1 pl-5 text-2xs text-note-text hover:underline text-left"
         >
           <AlertCircle className="size-3 shrink-0" />
           {vault.github.owner}/{vault.github.repo} ({vault.github.branch}) isn&rsquo;t reachable — it may have been renamed or deleted
@@ -157,7 +157,7 @@ export default function SyncButton() {
         </div>
 
         {unreadableFiles.size > 0 && (
-          <div className="text-xs text-destructive space-y-1 pt-2 border-t border-border">
+          <div className="text-xs text-destructive-text space-y-1 pt-2 border-t border-border">
             <p>
               {unreadableFiles.size} file{unreadableFiles.size > 1 ? 's' : ''} couldn&rsquo;t be read:
             </p>

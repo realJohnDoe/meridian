@@ -11,7 +11,7 @@ export default function AppErrorFallback({ error, reset }: ErrorComponentProps) 
   console.error(error)
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-      <AlertTriangle className="text-destructive" size={32} />
+      <AlertTriangle className="text-destructive-text" size={32} />
       <div className="space-y-1">
         <p className="text-base font-medium text-foreground">Something went wrong</p>
         <p className="max-w-sm text-sm text-muted-foreground">

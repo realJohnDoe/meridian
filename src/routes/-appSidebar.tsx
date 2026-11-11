@@ -184,7 +184,7 @@ export default function AppSidebar() {
                             <span className="flex-1 truncate">{title}</span>
                             <IconButton hit="pad" label="Move up" title="Move up" disabled={at === 0} onClick={() => reorderFavorites(at, at - 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronUp size={13} /></IconButton>
                             <IconButton hit="pad" label="Move down" title="Move down" disabled={at === favorites.length - 1} onClick={() => reorderFavorites(at, at + 1)} className="disabled:opacity-30 hover:text-sidebar-foreground"><ChevronDown size={13} /></IconButton>
-                            <IconButton hit="pad" label="Remove from favorites" title="Remove from favorites" onClick={() => { beginLeave(key); toggleFavorite(key) }} className="hover:text-destructive"><X size={13} /></IconButton>
+                            <IconButton hit="pad" label="Remove from favorites" title="Remove from favorites" onClick={() => { beginLeave(key); toggleFavorite(key) }} className="hover:text-destructive-text"><X size={13} /></IconButton>
                           </div>
                         ) : (
                           <SidebarMenuButton

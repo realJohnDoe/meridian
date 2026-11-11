@@ -264,7 +264,7 @@ export default function EntryEditor({ hooks, items, roots }: Props) {
               ref={titleRef}
               className={cn(
                 'w-full text-2xl font-light text-foreground bg-transparent border-none outline-none leading-snug resize-none',
-                titleMissing ? 'placeholder:text-destructive' : 'placeholder:text-muted-foreground',
+                titleMissing ? 'placeholder:text-destructive-text' : 'placeholder:text-muted-foreground',
               )}
               placeholder="Title"
               rows={1}

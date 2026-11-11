@@ -6,14 +6,15 @@
  * which misjudges saturated fills and dark themes. Even so, a number is not
  * the judge of a palette — the eye is — so this enforces only APCA's absolute
  * floor for text, and otherwise snapshots every pair's |Lc| next to its
- * recommended target. Retuning a color changes the snapshot; `vitest -u` and
+ * recommended target, with the WCAG 2 ratio alongside since that is the
+ * figure conformance claims still cite. Retuning a color changes the snapshot; `vitest -u` and
  * the snapshot diff then shows, per theme, exactly which pairs gained or lost
  * contrast and whether one crossed its target, for review alongside the
  * screenshots.
  */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { converter, parse, type Oklab, type Rgb } from 'culori'
+import { converter, parse, wcagContrast, type Oklab, type Rgb } from 'culori'
 import { APCAcontrast, sRGBtoY } from 'apca-w3'
 
 const css = readFileSync(new URL('./index.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
@@ -88,12 +89,13 @@ function over(top: Oklab, under: Oklab): Rgb {
 
 const y = (c: Rgb) => sRGBtoY([c.r, c.g, c.b].map(v => Math.round(Math.min(1, Math.max(0, v)) * 255)))
 
-/** |Lc| of text token on surface token(s), layered bottom → top. */
-function lc(theme: string, text: string, ...surfaces: string[]): number {
+/** |Lc| and WCAG 2 ratio of text token on surface token(s), layered bottom → top. */
+function contrast(theme: string, text: string, ...surfaces: string[]): { lc: number; wcag: number } {
   const vars = themeVars(theme)
   const get = (t: string) => color(resolve(`var(--color-${t})`, vars))
   const bg = surfaces.reduce<Rgb | undefined>((under, s) => over(get(s), under ? toOklab(under) : get(s)), undefined)!
-  return Math.abs(Math.round(Number(APCAcontrast(y(over(get(text), toOklab(bg))), y(bg)))))
+  const fg = over(get(text), toOklab(bg))
+  return { lc: Math.abs(Math.round(Number(APCAcontrast(y(fg), y(bg))))), wcag: wcagContrast(fg, bg) }
 }
 
 /**
@@ -126,6 +128,7 @@ const PAIRS: Pair[] = [
   { role: 'accent', text: 'primary-text', on: ['background'] },
   { role: 'accent', text: 'primary-text', on: ['card', 'state-subtle'] },
   { role: 'accent', text: 'primary-text', on: ['secondary'] },
+  ...['destructive-text', 'note-text', 'warning-text'].flatMap(t => ['background', 'card'].map(s => ({ role: 'accent' as const, text: t, on: [s] }))),
   { role: 'button', text: 'primary-foreground', on: ['primary'] },
   { role: 'button', text: 'destructive-foreground', on: ['destructive'] },
   { role: 'button', text: 'warning-foreground', on: ['warning'] },
@@ -135,7 +138,7 @@ const PAIRS: Pair[] = [
 
 const rows = THEMES.flatMap(theme => PAIRS.map(p => ({
   key: `${theme}: ${p.text} on ${p.on.join(' + ')}`,
-  lc: lc(theme, p.text, ...p.on),
+  ...contrast(theme, p.text, ...p.on),
   target: TARGET[p.role],
 })))
 
@@ -150,7 +153,7 @@ describe('theme contrast (APCA)', () => {
   })
 
   it('matches the reviewed contrast table', async () => {
-    const table = rows.map(r => `${String(r.lc).padStart(3)}  ${r.lc < r.target ? `below ${r.target}` : `ok ${r.target}   `}  ${r.key}`).join('\n')
+    const table = rows.map(r => `${String(r.lc).padStart(3)}  ${r.lc < r.target ? `below ${r.target}` : `ok ${r.target}   `}  ${r.wcag.toFixed(2).padStart(5)}:1  ${r.key}`).join('\n')
     await expect(table + '\n').toMatchFileSnapshot('./__snapshots__/themeContrast.txt')
   })
 })
