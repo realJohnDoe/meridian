@@ -109,6 +109,11 @@ function debugPagePlugin(): Plugin {
  * channel to read IndexedDB and make network requests. `<meta>` CSP
  * delivery doesn't support frame-ancestors, report-uri, or sandbox —
  * omitted rather than silently ignored.
+ *
+ * The Worker build (base `/`) also writes a Cloudflare `_headers` file, so the
+ * same policy ships as a real header there, plus `frame-ancestors 'none'` and
+ * the other hardening headers. The GitHub Pages build ignores `_headers`, so
+ * it is not emitted for it.
  */
 function cspPlugin(): Plugin {
   const csp = (scriptHashes: string[]) => [
@@ -126,13 +131,24 @@ function cspPlugin(): Plugin {
     "base-uri 'none'",
   ].join('; ')
 
+  let hashes: string[] = []
   return {
     name: 'inject-csp',
     apply: 'build',
+    closeBundle() {
+      if (BASE_PATH !== '/') return
+      const headers = [
+        `Content-Security-Policy: ${csp(hashes)}; frame-ancestors 'none'`,
+        'Cross-Origin-Opener-Policy: same-origin',
+        'X-Content-Type-Options: nosniff',
+        'Referrer-Policy: strict-origin-when-cross-origin',
+      ]
+      fs.writeFileSync(resolve(import.meta.dirname, 'dist/_headers'), `/*\n${headers.map(h => `  ${h}`).join('\n')}\n`)
+    },
     transformIndexHtml(html) {
       // Allow index.html's inline pre-paint theme script by hash, so the
       // policy stays free of 'unsafe-inline' for scripts.
-      const hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
+      hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
         m => `'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`,
       )
       return html.replace(
