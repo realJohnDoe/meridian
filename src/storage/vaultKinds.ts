@@ -95,7 +95,10 @@ const VAULT_KINDS: { [K in VaultKind]: VaultKindOps<Extract<VaultRef, { kind: K 
     },
     probesOnRestore: false,
     cleanup: id => Promise.resolve(clearVaultKey(SEEN_SKIPPED_PREFIX, id)),
-    notices: NO_CREDENTIAL_NOTICES,
+    notices: {
+      ...NO_CREDENTIAL_NOTICES,
+      denied: name => `Could not reach the calendar feed for "${name}" — check the feed URL.`,
+    },
   },
   // Synthesized in memory and never persisted: `vaultRegistry` mounts and
   // removes it on its own path, so none of the lifecycle steps below reach it.
