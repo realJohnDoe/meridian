@@ -4,6 +4,9 @@ import { coverageConfigDefaults, defineConfig } from 'vitest/config'
 
 const SRC_DIR = path.resolve(import.meta.dirname, './src')
 const alias = { '@': SRC_DIR }
+// Pin a DST zone that isn't UTC so local-vs-UTC mix-ups fail on every machine.
+process.env.TZ = 'America/New_York'
+
 const setupFiles = ['src/test-utils/setup.ts']
 
 /**

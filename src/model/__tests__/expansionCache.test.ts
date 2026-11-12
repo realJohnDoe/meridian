@@ -125,8 +125,8 @@ describe('hasSameStructure', () => {
 })
 
 describe('computeExpansionCache', () => {
-  const from = new Date('2026-05-25T00:00:00Z')
-  const to = new Date('2026-06-08T00:00:00Z')
+  const from = new Date(2026, 4, 25)
+  const to = new Date(2026, 5, 8)
 
   /** Roots keyed the way the store keys them, with the provenance a parse supplies. */
   function rootsOf(entries: [string, { title: string; tags: string[]; items: string[] }][]): Roots {

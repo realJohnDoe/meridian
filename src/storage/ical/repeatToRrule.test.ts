@@ -713,7 +713,7 @@ describe('repeatToRrule — spelling', () => {
     expect(repeatToRrule(sched({ end: { type: 'until', date: '2026-11-15' } }), MON))
       .toBe('FREQ=DAILY;UNTIL=20261115')
     expect(repeatToRrule(sched({ end: { type: 'until', date: '2026-11-15', time: '09:00' } }), MON))
-      .toBe('FREQ=DAILY;UNTIL=20261115T090000Z') // the suite runs in UTC
+      .toBe('FREQ=DAILY;UNTIL=' + new Date(2026, 10, 15, 9, 0).toISOString().replace(/[-:]|\.\d{3}/g, '')) // 09:00 local, as a UTC instant
   })
 
   it('ignores an until that names no date, since it bounds nothing', () => {

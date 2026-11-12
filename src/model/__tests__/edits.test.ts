@@ -1058,7 +1058,7 @@ instances:
     const occ = occOn(itemsOf(data), rootsIn(data), '2026-03-02')
     const fields = editFields(occ, { scheduled: { date: '2026-03-04', time: '' }, repeat: repeat('2026-03-04') })
     const next = applyEdit(data, occ, 'all', fields, NEW_TARGET, new Set(['scheduled']))
-    expect(expandRange(itemsOf(next), rootsIn(next), new Date('2026-03-01'), new Date('2026-03-06')).map(o => o.date))
+    expect(expandRange(itemsOf(next), rootsIn(next), new Date(2026, 2, 1), new Date(2026, 2, 6)).map(o => o.date))
       .toEqual(['2026-03-04', '2026-03-05', '2026-03-06'])
   })
 
