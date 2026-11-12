@@ -6,13 +6,14 @@ import { toast } from 'sonner'
 import { useStore } from '@/store'
 import { setupStore } from '@/test-utils'
 
-const { navigateMock, completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultOAuth, reauthGitHubVault, searchMock, OAuthCallbackError } =
+const { navigateMock, completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultOAuth, reauthGitHubVault, takePendingGitHub, searchMock, OAuthCallbackError } =
   vi.hoisted(() => ({
     navigateMock: vi.fn(),
     completeGitHubSignIn: vi.fn(),
     fetchInstalledRepos: vi.fn(),
     addGitHubVaultOAuth: vi.fn(),
     reauthGitHubVault: vi.fn(),
+    takePendingGitHub: vi.fn(() => [] as { github: { owner: string; repo: string; branch: string } }[]),
     // Typed so the createFileRoute mock's useSearch does not return `any`.
     searchMock: vi.fn<() => { code?: string; state?: string; error?: string }>(),
     // Must be the same class the component checks with `instanceof`, so it is
@@ -38,6 +39,7 @@ vi.mock('@/vaultActions', () => ({
   addGitHubVaultOAuth,
   reauthGitHubVault,
   OAuthCallbackError,
+  takePendingGitHub,
   GITHUB_APP_INSTALL_URL: 'https://github.com/apps/test-app/installations/new',
 }))
 
@@ -432,5 +434,19 @@ describe('auth.callback — reconnect', () => {
 
     await waitFor(() => expect(addGitHubVaultOAuth).toHaveBeenCalledTimes(1))
     expect(reauthGitHubVault).not.toHaveBeenCalled()
+  })
+
+  it('adds the vaults queued by a hand-off from the old origin after one sign-in', async () => {
+    completeGitHubSignIn.mockResolvedValue(TOKENS)
+    fetchInstalledRepos.mockResolvedValue([repo('notes'), repo('two')])
+    takePendingGitHub.mockReturnValueOnce([
+      { github: { owner: 'acme', repo: 'notes', branch: 'dev' } },
+      { github: { owner: 'acme', repo: 'gone', branch: 'main' } },
+    ])
+
+    render(<AuthCallbackPage />)
+
+    await waitFor(() => expect(addGitHubVaultOAuth).toHaveBeenCalledTimes(1))
+    expect(addGitHubVaultOAuth).toHaveBeenCalledWith(expect.objectContaining({ repo: 'notes', branch: 'dev', accessToken: 'at' }))
   })
 })

@@ -62,6 +62,7 @@ vi.mock('@/storage', () => ({ restoreVaults, autoSyncTick, resetSyncBackoff, flu
 vi.mock('@/calendar', () => ({ requestScrollToToday, getCurrentDate, setCurrentDate, resetCalendarOnVaultChange }))
 vi.mock('@/autoSaveFlushPort', () => ({ flushActiveAutoSave }))
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }))
+vi.mock('./-reconnectVaults', () => ({ ReconnectVaults: () => null }))
 
 // The createRootRoute mock hands back the plain options object at runtime; the
 // static type still describes the real RootRoute, which has no `component`.

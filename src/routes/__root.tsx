@@ -9,6 +9,7 @@ import { requestScrollToToday, getCurrentDate, setCurrentDate, resetCalendarOnVa
 import { flushActiveAutoSave } from '@/autoSaveFlushPort'
 import { Toaster } from '@/components/ui/sonner'
 import { MovedNotice } from './-movedNotice'
+import { ReconnectVaults } from './-reconnectVaults'
 
 export const Route = createRootRoute({
   component: Root,
@@ -309,6 +310,7 @@ function Root() {
         <Outlet />
       </div>
       <MovedNotice />
+      <ReconnectVaults />
       <Toaster />
     </ThemeProvider>
   )

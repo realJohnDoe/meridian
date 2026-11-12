@@ -5,6 +5,7 @@ export {
 export { previewIcalFeed } from '@/storage'
 export type { SkippedEvent, VaultRef } from '@/storage'
 export { syncToBackend, cacheDirtyCount } from '@/storage'
+export { takePendingGitHub } from '@/storage'
 
 import type { SkippedEvent, VaultRef } from '@/storage'
 import { entriesToIcs, planIcsImport, planEntryImport, vaultImportCandidates } from '@/storage'

@@ -29,3 +29,14 @@ describe('MovedNotice', () => {
     expect(container.innerHTML).toBe('')
   })
 })
+
+describe("MovedNotice link", () => {
+  it("carries the vault list in the fragment, without tokens", () => {
+    setupStore()
+    useStore.setState({ vaults: [{ id: "a", name: "acme/n", kind: "github", github: { owner: "acme", repo: "n", branch: "main" } }] })
+    render(<MovedNotice origin={OLD} />)
+    const href = screen.getByRole("link").getAttribute("href") ?? ""
+    expect(href).toContain("#reconnect=")
+    expect(href).not.toMatch(/token/i)
+  })
+})
