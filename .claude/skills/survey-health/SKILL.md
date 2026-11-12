@@ -110,7 +110,7 @@ from training data. Two rules are specific to this survey:
   `transform / setup / import / tests / environment` — is the other half: when
   `import` is several times `tests`, the suite is paying for isolation rather
   than for assertions, and the question is which files actually need it.
-- **Establish which workspace each gate actually covers, and record it as a matrix.** Give **coverage its own row, separate from `test`** — they are usually different scripts, and the common shape is a `test` script that fans out to every workspace beside a `test:coverage` script that does not, so the suite runs everywhere while coverage is measured and gated in one package only. A sub-package whose own test config has no `coverage` block at all is the same finding seen from the other side. Do not assume a root-level `build`/`test` script reaches a sub-workspace — verify it (e.g. does the root test runner's `include` glob match the sub-package? does the root `tsc -b` reference its tsconfig?) and list the gates on one axis against the workspaces on the other. A package that CI checks in a separate job but the documented local command silently skips is a real finding, and it is invisible unless you build this matrix: every gate is green, and the gap only shows in what each one *ran on*. This is the single cheapest high-yield check in this section for any repo with more than one package.
+- **Establish which workspace each gate actually covers, and record it as a matrix.** Give **coverage its own row, separate from `test`** — they are usually different scripts, and the common shape is a `test` script that fans out to every workspace beside a `test:coverage` script that does not, so the suite runs everywhere while coverage is measured and gated in one package only. Directories that aren't packages count as columns too: `scripts/` holds the dispatcher that merges PRs, and on 2026-11-12 it had no lint, no typecheck and one 18-line test (#1434). Do not assume a root-level `build`/`test` script reaches a sub-workspace — verify it (e.g. does the root test runner's `include` glob match the sub-package? does the root `tsc -b` reference its tsconfig?) and list the gates on one axis against the workspaces on the other. A package that CI checks in a separate job but the documented local command silently skips is a real finding, and it is invisible unless you build this matrix: every gate is green, and the gap only shows in what each one *ran on*. This is the single cheapest high-yield check in this section for any repo with more than one package.
 - **Build the app and look at what shipped, not just at what was written.** Run
   the production build and rank the emitted chunks by size, then grep the largest
   one for markers of the heavy dependencies (`cm-content` for CodeMirror, `rdp-`
@@ -242,18 +242,17 @@ Examples (not exhaustive):
 - Core domain logic with no test coverage at all, or coverage concentrated on trivial code while the risky paths go untested
 - Tests that can't fail meaningfully — over-mocked tests, snapshot rot, assertions on implementation details, or a test whose *subject* is a copy of production rather than production itself. The tell is the import list: a test file that imports no function from the module named in its own header is asserting against a stand-in. Grep test files for comments admitting the coupling (`mirrors`, `must match`, `keep in sync`) — on 2026-09-12 that grep found a 232-line file whose nine tests all ran against a hand-written copy of `pushDirty`, and a test re-declaring three production constants plus a line-for-line copy of a layout function
 - The same behaviour asserted at more than one activation level — a pure function tested directly *and* through the component that calls it, or one code path covered by a fake-everything unit test, a partly-faked integration test, and a real end-to-end test. Not automatically a fault: levels that assert genuinely different things (the logic vs the wiring vs the real I/O) each earn their place, and the good ones say so in their headers. It is a fault when the expensive level asserts nothing the cheap one does not, which it usually does by taking a callback payload rather than inspecting rendered output — compare the per-test cost from the timing data (235ms through a React render against 0.6ms direct, in the case found on 2026-09-12), and check whether the cheap level's fixtures are byte-identical to the expensive one's
-- **Tests that fail nondeterministically.** Nothing in any of the five surveys
-  looked for this until 2026-09-13, and the repo paid for five of them in the
-  preceding fortnight: a fixed 120 ms real wait too tight under load (#1031, PR
-  #1050), a fixture date colliding with the test's own "today" (PR #897), an e2e
-  assertion racing layout (PR #887), and two harnesses accumulating state across
-  runs (#1023, plus fake-indexeddb retaining every transaction a soak opened,
-  under #1052). The greps that find the class: `setTimeout` or
-  `await new Promise` inside a test body (a *real* wait, not a fake timer),
-  `new Date()`/`Date.now()` with no `vi.setSystemTime` nearby, and a module-level
-  `let` or cache in a shared test helper that no `beforeEach` resets. Rate these
-  above their apparent size: a flake teaches everyone to re-run CI instead of
-  reading it, which disarms every other gate in the matrix
+- **Tests that fail nondeterministically.** The repo paid for five in the
+  fortnight before 2026-09-13 (#1031, #1023, PRs #897/#887/#1050). The greps:
+  `setTimeout`/`await new Promise` in a test body (Playwright: `waitForTimeout`),
+  `new Date()`/`Date.now()` with no `vi.setSystemTime`, and a module-level `let`
+  in a shared helper that no `beforeEach` resets. **Then run the suite once
+  under a non-UTC zone** (`TZ=America/New_York pnpm exec vitest run`): every
+  session and CI runner is UTC, the one zone where local time equals UTC, so a
+  zone assumption is invisible to all of the greps. On 2026-11-12 it failed 11
+  tests (#1429); once that pins `TZ` in `vitest.config.ts`, check instead that
+  the pin is still a non-UTC zone. Rate flakes above their apparent size: they teach everyone to
+  re-run CI instead of reading it
 - Swallowed errors — empty or log-only `catch` blocks, unhandled promise rejections, errors caught without surfacing to the user or a recovery path
 - No consistent error strategy — each layer inventing its own mix of throw / return-null / silent-default
 
