@@ -246,7 +246,7 @@ export default function DurationDialog({ open, value, scheduled, itemType, onCon
                 )}
               </div>
               {!computedDuration && endDate && (
-                <p className="text-xs text-destructive">End must be after start</p>
+                <p className="text-xs text-destructive-text">End must be after start</p>
               )}
             </div>
           )}

@@ -111,7 +111,7 @@ export default function GithubStep({ onBack, onDone }: { onBack: () => void; onD
         </div>
 
         {githubPhase.kind === 'repos-error' && (
-          <p className="px-1 text-xs text-destructive">{githubPhase.message}</p>
+          <p className="px-1 text-xs text-destructive-text">{githubPhase.message}</p>
         )}
         {githubPhase.kind === 'picking' && githubPhase.repos.length === 0 && (
           <p className="px-1 text-xs text-muted-foreground">

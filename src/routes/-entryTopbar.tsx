@@ -38,7 +38,7 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, h
             <SyncButton />
             <IconButton
               variant="ghost"
-              className={isFavorited ? 'text-destructive' : 'text-muted-foreground'}
+              className={isFavorited ? 'text-destructive-text' : 'text-muted-foreground'}
               onClick={onToggleFavorite ?? undefined}
               disabled={!onToggleFavorite}
               title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
@@ -47,7 +47,7 @@ export function EntryTopbar({ isFavorited, onToggleFavorite, onDelete, onBack, h
               <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
             </IconButton>
             {!hideDelete && (
-              <IconButton variant="ghost" className="text-destructive" onClick={onDelete} title="Delete" label="Delete">
+              <IconButton variant="ghost" className="text-destructive-text" onClick={onDelete} title="Delete" label="Delete">
                 <Trash2 size={18} />
               </IconButton>
             )}
