@@ -1,5 +1,5 @@
 import { cacheInit } from './db'
-import type { VaultRef } from '@/vaultRef'
+import type { VaultKind, VaultRef } from '@/vaultRef'
 
 // Which vaults exist and which one is active — the list vaultRegistry.ts
 // restores on startup, kept in the `meta` table alongside the credentials.
@@ -9,17 +9,27 @@ export async function vaultRefsSave(refs: VaultRef[]): Promise<void> {
   await d.meta.put({ key: 'vaults', value: refs })
 }
 
+// One validator per kind, so a new `VaultKind` without a row fails to compile
+// instead of silently dropping its saved vaults on the next load.
+const always = () => true
+const KIND_VALID: Record<VaultKind, (r: Record<string, unknown>) => boolean> = {
+  local: always,
+  example: always,
+  github: always,
+  // An iCal ref without its feed URL cannot build a backend, so it is rejected
+  // here rather than mounted into a vault that can never load.
+  ical: r => {
+    const ical = r['ical']
+    return !!ical && typeof ical === 'object' && typeof (ical as Record<string, unknown>)['url'] === 'string'
+  },
+}
+
 function isVaultRef(v: unknown): v is VaultRef {
   if (!v || typeof v !== 'object') return false
   const r = v as Record<string, unknown>
   if (typeof r['id'] !== 'string' || typeof r['name'] !== 'string') return false
-  // An iCal ref without its feed URL cannot build a backend, so it is rejected
-  // here rather than mounted into a vault that can never load.
-  if (r['kind'] === 'ical') {
-    const ical = r['ical']
-    return !!ical && typeof ical === 'object' && typeof (ical as Record<string, unknown>)['url'] === 'string'
-  }
-  return r['kind'] === 'local' || r['kind'] === 'example' || r['kind'] === 'github'
+  const kind = r['kind']
+  return typeof kind === 'string' && Object.hasOwn(KIND_VALID, kind) && KIND_VALID[kind as VaultKind](r)
 }
 
 export async function vaultRefsLoad(): Promise<VaultRef[]> {
