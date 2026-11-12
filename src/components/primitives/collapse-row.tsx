@@ -126,8 +126,10 @@ export function CollapseRow(props: CollapseRowProps) {
       {...rest}
     >
       {/* Clip only while collapsing: at rest `overflow: hidden` would cut off
-          a child's box-shadow, since the child fills this box exactly. */}
-      <div style={{ overflow: collapsed ? 'hidden' : 'visible', minHeight: 0 }}>{children}</div>
+          a child's box-shadow, since the child fills this box exactly.
+          `minWidth: 0` because a grid item's default `min-width: auto` would
+          let a long `truncate`d title widen the row past its list. */}
+      <div style={{ overflow: collapsed ? 'hidden' : 'visible', minHeight: 0, minWidth: 0 }}>{children}</div>
     </Tag>
   )
 }
