@@ -30,7 +30,6 @@ const post = (path, body, method = "POST") =>
   run("gh", ["api", "-X", method, path, "--input", "-"], JSON.stringify(body));
 const names = (x) => x.labels.map((l) => l.name);
 const tiered = (x) => names(x).some((l) => TIERS.includes(l));
-const ranking = () => run("node", ["scripts/survey-next.mjs"]).trim();
 
 // --- State: the label on either open digest; marker comments on the newest (the draft)
 const digests = all(`repos/${REPO}/issues?state=open&per_page=100`)
@@ -90,7 +89,6 @@ if (state === "drain") {
     `Deferred PRs: ${plan.defer.map((d) => `#${d.pr} (${d.why})`).join(", ") || "none"}.`,
     `Unassigned issues: ${plan.unassign.map((u) => `#${u.issue}`).join(", ") || "none"}.`,
     `Open decisions: ${plan.decisions.map((n) => `#${n}`).join(", ") || "none"}.`,
-    `Survey ranking:\n\n\`\`\`\n${ranking()}\n\`\`\``,
   ].join("\n\n") + FOOTER;
 } else {
   const deferred = prs.filter((p) => p.draft && names(p).includes("deferred"));
@@ -100,18 +98,17 @@ if (state === "drain") {
     const behind = api(`repos/${REPO}/compare/main...${p.head.label}`).behind_by;
     (behind > DRIFT ? plan.close : plan.undraft).push({ ...pr_(p, `${behind} commits behind main`), issues: closes(p) });
   }
-  // Facts CLAUDE.md says go stale; the survey ranking decides where to start.
+  // A fact CLAUDE.md says goes stale.
   let peer;
   try { peer = run("npm", ["view", "@typescript-eslint/typescript-estree@latest", "peerDependencies.typescript"]).trim(); }
   catch { peer = "lookup failed"; }
-  plan.recheck = { tsEslintPeerRange: peer, surveyRanking: ranking() };
+  plan.recheck = { tsEslintPeerRange: peer };
   plan.resumed = [
     RESUMED,
     `Workshop resumed ${TODAY}.`,
     `Closed (drifted over ${DRIFT} commits, issues go back to the dispatcher): ${plan.close.map((c) => `#${c.pr}`).join(", ") || "none"}.`,
     `Back to ready: ${plan.undraft.map((c) => `#${c.pr}`).join(", ") || "none"}.`,
     `typescript-eslint peer range for typescript: \`${peer}\` (CLAUDE.md pin stands while its upper bound is below 7).`,
-    `Fresh survey ranking:\n\n\`\`\`\n${plan.recheck.surveyRanking}\n\`\`\``,
   ].join("\n\n") + FOOTER;
 }
 

@@ -13,8 +13,7 @@ digest issue, which also says why anything isn't moving.
 2. `node scripts/workshop-dispatch.mjs --apply` claims what the plan starts
    (assigns each dispatched issue and leaves a `workshop-dispatch` marker comment;
    leaves a `workshop-followup` marker comment on each followed-up PR), labels
-   PRs with their merge policy, merges the `automerge` PRs, closes finished
-   survey parents, rewrites the draft digest and publishes it when due. It
+   PRs with their merge policy, merges the `automerge` PRs, rewrites the draft digest and publishes it when due. It
    prints the same plan.
 3. For each entry in `sessions`, start one background subagent with the
    `Agent` tool: the entry's `prompt`, `description` from its `title`,
@@ -41,8 +40,7 @@ digest issue, which also says why anything isn't moving.
   sub-issues, and no open PR that closes them. Oldest first. Every other open
   issue is either somewhere else in the digest (its PR, Decide, Unstick) or
   under **Not picked up** with its reason (no tier label, `opus-plan`, `deferred`, blocked
-  by `#N`, assigned by hand, a survey run whose open findings all wait on a
-  decision), so nothing is skipped silently.
+  by `#N`, assigned by hand), so nothing is skipped silently.
 - **Follow-up**: every open, non-draft PR (Dependabot's as `opus`, one with no
   tier-labelled issue as `sonnet`), once CI
   has finished. A PR gets one narrow session if it conflicts with `main`
@@ -65,9 +63,6 @@ digest issue, which also says why anything isn't moving.
 - **Caps**: at most `--max-sessions` (4) sessions per run, follow-ups first;
   at most `--max-followups` (2) follow-ups per PR. After that the PR goes in
   the digest instead.
-- **Survey parents**: a survey run's parent issue is closed once every
-  finding sub-issue is closed. One whose open findings are all
-  `decision-required` or `deferred` is listed under **Not picked up**.
 - **Digest**: a draft issue, `Workshop digest (draft) — from <date>`, is
   rewritten on every run (an edit notifies nobody), so it always shows
   today's state: what waits on the maintainer,
@@ -78,12 +73,10 @@ digest issue, which also says why anything isn't moving.
   `decision-required` issues not blocked by another), each saying which issues
   it unblocks; then what's coming, **Queue** (dispatchable
   issues past today's cap) and **Not picked up**, where issues blocked,
-  `deferred` or a survey run waiting on its findings are only counted, in a
+  or `deferred` are only counted, in a
   collapsed list, since they'd repeat every time; then, also collapsed, what merged since the
   draft opened, each PR with the issue it closed and its labels. Once the
-  first run on a Tuesday or Friday comes (the day after each Monday/Thursday
-  survey start, so it carries that survey's findings; `DIGEST_WEEKDAYS` in the
-  script, kept in step with that task's schedule) and something merged or
+  first run on a Tuesday or Friday comes (`DIGEST_WEEKDAYS` in the script) and something merged or
   waits, the run publishes it
   (retitles it `Workshop digest — <publish date>`, cuts the draft note down to where to answer, and comments the counts, the ping),
   closes the previously published digest with a link, and opens the next
