@@ -34,3 +34,5 @@ export {
 export type { OAuthTokens, InstalledRepo, ReusableGitHubSession } from './githubOAuth'
 
 export type { VaultRef } from '@/vaultRef'
+
+export { encodeHandoff, parseHandoff, isHandoffPresent, savePendingGitHub, takePendingGitHub } from './vaultHandoff'

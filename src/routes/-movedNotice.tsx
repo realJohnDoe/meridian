@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '@/store'
+import { encodeHandoff } from '@/storage'
 import { Button } from '@/components/primitives/button'
 
 const OLD_ORIGIN = 'https://realjohndoe.github.io'
@@ -13,15 +14,16 @@ const NEW_URL = 'https://meridian.realjohndoe.workers.dev/'
 export function MovedNotice(props: { origin?: string }) {
   const [dismissed, setDismissed] = useState(false)
   const hasDirty = useStore(s => [...s.syncByVault.values()].some(v => v.dirtyCount > 0))
+  const vaults = useStore(s => s.vaults)
   const origin = props.origin ?? window.location.origin
   if (origin !== OLD_ORIGIN || dismissed) return null
   return (
     <div role="status" className="fixed inset-x-3 bottom-3 z-50 mx-auto max-w-md rounded-lg border bg-popover p-4 text-sm text-popover-foreground shadow-lg">
       <p className="font-medium">Meridian has moved</p>
       <p className="mt-1">
-        Meridian now lives at <a className="underline" href={NEW_URL}>{NEW_URL}</a>. There, sign in
+        Meridian now lives at <a className="underline" href={NEW_URL + encodeHandoff(vaults)}>{NEW_URL}</a>. There, sign in
         again for GitHub vaults, pick the folder again for local-folder vaults, and re-install
-        if you use it as an app. This copy keeps working.
+        if you use it as an app. The link carries your vault list, not your sign-ins. This copy keeps working.
       </p>
       {hasDirty && (
         <p className="mt-1 font-medium">Some vaults have changes that are not pushed yet. Sync first, then move.</p>

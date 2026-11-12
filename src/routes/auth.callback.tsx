@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultOAuth, reauthGitHubVault,
-  OAuthCallbackError, GITHUB_APP_INSTALL_URL,
+  OAuthCallbackError, GITHUB_APP_INSTALL_URL, takePendingGitHub,
   type InstalledRepo, type OAuthTokens,
 } from '@/vaultActions'
 import { Button } from '@/components/primitives/button'
@@ -68,10 +68,10 @@ function AuthCallbackPage() {
   // picks up the same closure the effect would have seen anyway. Written as a
   // mount ref rather than an exhaustive-deps suppression because such a
   // suppression makes the React Compiler skip optimizing the whole component.
-  const startRef = useRef({ search, reconnect })
+  const startRef = useRef({ search, reconnect, connectPending })
 
   useEffect(() => {
-    const { search: mountSearch, reconnect: mountReconnect } = startRef.current
+    const { search: mountSearch, reconnect: mountReconnect, connectPending: mountPending } = startRef.current
     const params = new URLSearchParams()
     if (mountSearch.code) params.set('code', mountSearch.code)
     if (mountSearch.state) params.set('state', mountSearch.state)
@@ -86,6 +86,7 @@ function AuthCallbackPage() {
         }
         const repos = await fetchInstalledRepos(tokens.accessToken)
         if (cancelled) return
+        if (await mountPending(tokens, repos)) return
         setPhase({ kind: 'picking', tokens, repos })
       })
       .catch((e: unknown) => {
@@ -126,6 +127,21 @@ function AuthCallbackPage() {
     setPhase({ kind: 'connecting' })
     await reauthGitHubVault(vaultId, tokens)
     void navigate({ to: '/' })
+  }
+
+  /** Adds the vaults a hand-off from the old origin queued before this sign-in; false when there were none to add. */
+  async function connectPending(tokens: OAuthTokens, repos: InstalledRepo[]): Promise<boolean> {
+    const wanted = takePendingGitHub().flatMap(v => {
+      const r = repos.find(x => x.owner === v.github.owner && x.repo === v.github.repo)
+      return r ? [{ ...r, branch: v.github.branch }] : []
+    })
+    if (wanted.length === 0) return false
+    setPhase({ kind: 'connecting' })
+    for (const r of wanted) {
+      await addGitHubVaultOAuth({ owner: r.owner, repo: r.repo, branch: r.branch, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, expiresAt: tokens.expiresAt })
+    }
+    void navigate({ to: '/' })
+    return true
   }
 
   async function connect(tokens: OAuthTokens, repo: InstalledRepo) {
