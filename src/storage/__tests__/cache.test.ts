@@ -549,16 +549,28 @@ describe('cache/broadcast', () => {
     return { heard, channel, close: () => { channel.close() } }
   }
 
-  /** Delivery is a macrotask on the event loop, not a microtask. */
-  const delivered = () => new Promise(resolve => setTimeout(resolve, 20))
+  /** Delivery is a macrotask on the event loop, so its timing is not knowable
+   *  in advance: a sentinel posted after the writes under test is the barrier.
+   *  BroadcastChannel delivers in order per sender, so once it has landed,
+   *  anything announced before it has too — which is what lets an absence be
+   *  asserted, where polling for silence never could. */
+  const BARRIER: BroadcastModule.CacheChange = { vaultId: 'barrier', paths: ['barrier'] }
+  async function barrier(heard: BroadcastModule.CacheChange[]): Promise<void> {
+    const from = heard.length
+    const sender = new BroadcastChannel('meridian-cache')
+    sender.postMessage(BARRIER)
+    await vi.waitFor(() => { expect(heard.slice(from)).toContainEqual(BARRIER) }, { timeout: 2000, interval: 5 })
+    sender.close()
+  }
 
   it('announces a recorded local edit, once, with its path', async () => {
     const other = otherTab()
 
     await m.files.recordLocalEdit(V, 'a.md', 'body')
-    await delivered()
 
-    expect(other.heard).toEqual([{ vaultId: V, paths: ['a.md'] }])
+    await vi.waitFor(() => {
+      expect(other.heard).toEqual([{ vaultId: V, paths: ['a.md'] }])
+    }, { timeout: 2000, interval: 5 })
     other.close()
   })
 
@@ -570,9 +582,9 @@ describe('cache/broadcast', () => {
     // leave `content` exactly as they found it.
     await m.files.recordLocalEdit(V, 'a.md', 'body')
     await m.files.markPushed(V, 'a.md', 'body', 'sha2')
-    await delivered()
+    await barrier(other.heard)
 
-    expect(other.heard).toEqual([])
+    expect(other.heard).toEqual([BARRIER])
     other.close()
   })
 
@@ -584,9 +596,10 @@ describe('cache/broadcast', () => {
       { path: 'fresh.md', content: 'remote', version: 'sha1' },
       { path: 'dirty.md', content: 'remote', version: 'sha1' }, // skipped: locally modified
     ])
-    await delivered()
 
-    expect(other.heard).toEqual([{ vaultId: V, paths: ['fresh.md'] }])
+    await vi.waitFor(() => {
+      expect(other.heard).toEqual([{ vaultId: V, paths: ['fresh.md'] }])
+    }, { timeout: 2000, interval: 5 })
     other.close()
   })
 
@@ -596,12 +609,13 @@ describe('cache/broadcast', () => {
 
     await m.files.recordLocalDelete(V, 'a.md')
     await m.files.confirmDeleted(V, 'a.md')
-    await delivered()
 
-    expect(other.heard).toEqual([
-      { vaultId: V, paths: ['a.md'] },
-      { vaultId: V, paths: ['a.md'] },
-    ])
+    await vi.waitFor(() => {
+      expect(other.heard).toEqual([
+        { vaultId: V, paths: ['a.md'] },
+        { vaultId: V, paths: ['a.md'] },
+      ])
+    }, { timeout: 2000, interval: 5 })
     other.close()
   })
 
@@ -615,9 +629,9 @@ describe('cache/broadcast', () => {
     await m.files.markMerged(V, 'a.md', 'stale', 'merged', 'sha2')
     // Adopted: the record still holds what went into the merge.
     await m.files.markMerged(V, 'a.md', 'local', 'merged', 'sha3')
-    await delivered()
+    await barrier(other.heard)
 
-    expect(other.heard).toEqual([{ vaultId: V, paths: ['a.md'] }])
+    expect(other.heard).toEqual([{ vaultId: V, paths: ['a.md'] }, BARRIER])
     other.close()
   })
 
@@ -632,14 +646,15 @@ describe('cache/broadcast', () => {
     other.channel.postMessage({ vaultId: 42, paths: ['a.md'] })
     other.channel.postMessage({ vaultId: V, paths: [] })
     other.channel.postMessage({ vaultId: V, paths: ['a.md', 7, 'b.md'] })
-    await delivered()
+    await barrier(seen)
 
-    expect(seen).toEqual([{ vaultId: V, paths: ['a.md', 'b.md'] }])
+    expect(seen).toEqual([{ vaultId: V, paths: ['a.md', 'b.md'] }, BARRIER])
 
     off()
+    const before = seen.length
     other.channel.postMessage({ vaultId: V, paths: ['c.md'] })
-    await delivered()
-    expect(seen).toHaveLength(1)
+    await barrier(other.heard)
+    expect(seen).toHaveLength(before)
 
     other.close()
   })
@@ -648,9 +663,9 @@ describe('cache/broadcast', () => {
     const other = otherTab()
 
     m.bc.publishCacheChange(V, [])
-    await delivered()
+    await barrier(other.heard)
 
-    expect(other.heard).toEqual([])
+    expect(other.heard).toEqual([BARRIER])
     other.close()
   })
 })
