@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test as base, expect, type Page } from '@playwright/test'
 import { BASE_URL } from '../playwright.config'
+import { waitForStableLayout } from './settle'
 
 /**
  * Layout smoke checks — the one class of bug nothing else here can see.
@@ -64,9 +65,9 @@ const APP_ROUTES = [
   { path: '/', ready: '[data-testid="entry-card"]' },
   { path: '/unscheduled', ready: '[data-testid="entry-card"]' },
   { path: '/notes', ready: '[data-testid="entry-card"]' },
-  { path: '/day/2026-09-04', ready: '[data-topbar]' },
-  { path: '/week/2026-09-04', ready: '[data-topbar]' },
-  { path: '/calendar/2026-09-01', ready: '[data-topbar]' },
+  { path: '/day/2026-09-04', ready: '[data-occ-key]' },
+  { path: '/week/2026-09-04', ready: '[data-occ-key]' },
+  { path: '/calendar/2026-09-01', ready: '[data-occ-key]' },
 ]
 
 /**
@@ -311,7 +312,7 @@ for (const vp of VIEWPORTS) {
       test(`${route} — app shell`, async ({ page }) => {
         await page.goto(`${BASE_URL}${route}`, { waitUntil: 'load' })
         await page.waitForSelector(ready, { timeout: 30_000 })
-        await page.waitForTimeout(1500) // let the virtualizer measure and settle
+        await waitForStableLayout(page)
 
         const m = await page.evaluate(readAppShell)
         // The shell clips itself at one screen, so nothing below it can extend
@@ -355,8 +356,8 @@ for (const vp of VIEWPORTS) {
           // chunk changes `rows`' identity, which is exactly what that hook glides
           // on, so the anchor row itself can still be mid-animation at 300ms — the
           // wait this replaced, timed only against the former and not the latter.
-          // 2x the glide duration, matching the panel-transition wait below.
-          await page.waitForTimeout(700)
+          // Wait until the rows have stopped moving (waitForStableLayout).
+          await waitForStableLayout(page)
           const after = await page.evaluate(readTopRow)
           expect(before, '"Load earlier": no row was on screen before the click').not.toBeNull()
           expect(after, '"Load earlier": no row was on screen after the click').not.toBeNull()
@@ -373,7 +374,8 @@ for (const vp of VIEWPORTS) {
         // plus the panel's own focus contract (focus moves in on open, Escape
         // returns it to the toggle button).
         await page.click('[aria-controls="quickNavPanel"]')
-        await page.waitForTimeout(400) // past the 200ms open transition
+        await expect(page.locator('#quickNavPanel')).toBeVisible()
+        await waitForStableLayout(page) // the topbar has finished growing
         const withPanel = await page.evaluate(readAppShell)
         expect(withPanel.docScrollH, 'document must not scroll vertically with the quick-nav panel open').toBeLessThanOrEqual(withPanel.docClientH)
         expect(withPanel.docScrollW, 'document must not scroll horizontally with the quick-nav panel open').toBeLessThanOrEqual(withPanel.docClientW)
@@ -390,11 +392,10 @@ for (const vp of VIEWPORTS) {
         // — and only unmounting runs its FocusScope's restore-focus-to-trigger
         // effect. The mobile inline panel has no such gate (a plain CSS height
         // transition, focus restored by _app.tsx's own Escape handler
-        // synchronously), so this wait is a no-op there.
-        await page.waitForTimeout(400) // past the 200ms close transition
-        const focusedBackOnToggle = await page.evaluate(() =>
-          document.activeElement === document.querySelector('[aria-controls="quickNavPanel"]'))
-        expect(focusedBackOnToggle, 'Escape returns focus to the quick-nav toggle button').toBe(true)
+        // synchronously), so polling is immediate there.
+        await expect.poll(() => page.evaluate(() =>
+          document.activeElement === document.querySelector('[aria-controls="quickNavPanel"]')),
+          { message: 'Escape returns focus to the quick-nav toggle button' }).toBe(true)
       })
     }
 
@@ -403,7 +404,7 @@ for (const vp of VIEWPORTS) {
       test(`${route} — flow shell`, async ({ page }) => {
         await page.goto(`${BASE_URL}${route}`, { waitUntil: 'load' })
         await page.waitForSelector('[data-flow-screen]', { timeout: 30_000 })
-        await page.waitForTimeout(1500)
+        await waitForStableLayout(page)
 
         const f = await page.evaluate(probeFlow)
         expect(f.missing, 'no [data-flow-screen] element found').not.toBe(true)

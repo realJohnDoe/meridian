@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { PNG } from 'pngjs'
 import { test, expect } from '@playwright/test'
 import { BASE_URL } from '../playwright.config'
+import { waitForStableLayout } from './settle'
 import { APCAcontrast, sRGBtoY } from 'apca-w3'
 
 /**
@@ -141,9 +142,9 @@ const ROUTES = [
   { path: '/', ready: '[data-testid="entry-card"]' },
   { path: '/unscheduled', ready: '[data-testid="entry-card"]' },
   { path: '/notes', ready: '[data-testid="entry-card"]' },
-  { path: '/day/2026-09-04', ready: '[data-topbar]' },
-  { path: '/week/2026-09-04', ready: '[data-topbar]' },
-  { path: '/calendar/2026-09-01', ready: '[data-topbar]' },
+  { path: '/day/2026-09-04', ready: '[data-occ-key]' },
+  { path: '/week/2026-09-04', ready: '[data-occ-key]' },
+  { path: '/calendar/2026-09-01', ready: '[data-occ-key]' },
   { path: '/entry/example/01-start-here', ready: '[data-flow-screen]' },
   { path: '/entry/new', ready: '[data-flow-screen]' },
   { path: '/settings', ready: '[data-flow-screen]' },
@@ -395,14 +396,14 @@ for (const themeId of themeIds) {
         // that already pin a literal date in their path. Without this, the
         // day-cell count on those three routes drifts with the calendar and
         // a fixed FLOOR can silently go from passing to failing with no code
-        // change (#1026). Date-only (not setTimeout/rAF), so waitForTimeout
-        // below still advances in real time.
+        // change (#1026). Date-only (not setTimeout/rAF), so the rAF-based
+        // waitForStableLayout below still advances in real time.
         await page.clock.setFixedTime(new Date(2026, 8, 4, 12, 0, 0))
         await page.context().addInitScript(id => { localStorage.setItem('meridian_theme', id) }, themeId)
         await page.goto(`${BASE_URL}${route}`, { waitUntil: 'load' })
         await page.waitForSelector(ready, { timeout: 30_000 })
         await page.evaluate(() => document.fonts.ready)
-        await page.waitForTimeout(1500) // let transitions/virtualizer settle, matching layout-smoke.spec.ts
+        await waitForStableLayout(page)
 
         const elements = await page.evaluate(collectTextElementsInPage)
 
