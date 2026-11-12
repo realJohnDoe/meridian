@@ -184,8 +184,11 @@ async function writeConflictCopy(
  * looks stale. Not calibrated against a measured propagation window — chosen
  * as a short, one-time wait for a read that, by hypothesis, is only briefly
  * behind a write GitHub has already accepted.
+ *
+ * Zero under test, like the throttle in githubApi.ts: the stubbed backend has
+ * no replica lag, and the re-read still follows a macrotask yield.
  */
-const POST_CONFLICT_READ_RETRY_MS = 500
+const POST_CONFLICT_READ_RETRY_MS = import.meta.env.VITEST ? 0 : 500
 
 async function resolveCollision(
   backend: StorageBackend,
