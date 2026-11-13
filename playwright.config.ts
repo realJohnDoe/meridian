@@ -31,6 +31,8 @@ export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
+  // A test that only passed on retry fails the job instead of passing quietly.
+  failOnFlakyTests: !!process.env.CI,
   // Playwright defaults to half the cores on CI — 2 on GitHub's 4-vCPU runner.
   workers: process.env.CI ? 4 : undefined,
   reporter: process.env.CI ? 'github' : 'list',
