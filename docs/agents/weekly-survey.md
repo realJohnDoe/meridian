@@ -4,8 +4,10 @@ Run twice a week by the scheduled task "Start top-ranked survey"; the task's
 prompt only says to follow this file. Goal: survey cadence without anyone
 remembering, and no new findings while earlier ones are still open.
 
-0. `node scripts/workshop-pause.mjs`: if `state` is not `normal`, **stop. Post
-   nothing, open nothing.** (Resume is the dispatcher's job; this task waits.)
+No workshop pause check: step 1's gate limits a pause to at most one run,
+since paused findings don't get worked. Disable the task by hand to stop even
+that.
+
 1. **Count the open survey findings** (issues labelled `survey-finding`; other
    issues don't count):
 
@@ -16,13 +18,22 @@ remembering, and no new findings while earlier ones are still open.
    ```
 
    **3 or more → stop. Post nothing, open nothing.**
-2. `node scripts/survey-next.mjs` (un-shallows itself; needs `gh`). Rows marked
+2. **Close finished parents.** Every open issue labelled `survey` with
+   sub-issues and none of them open gets a comment linking its findings (`#n` each), then
+   is closed as completed:
+
+   ```bash
+   gh api --paginate "repos/realJohnDoe/meridian/issues?labels=survey&state=open&per_page=100" \
+     --jq '.[] | select(.pull_request|not) | select(.sub_issues_summary.total>0 and .sub_issues_summary.total==.sub_issues_summary.completed) | .number'
+   ```
+
+   Then `node scripts/survey-next.mjs` (un-shallows itself; needs `gh`). Rows marked
    `-` are unranked, skip them.
 3. Walk the ranked rows in order. **Skip** a row if its score is `0` (fresh) or
    its survey already has an open parent issue with open findings that the
    workshop can still work. Findings that are `decision-required` or `deferred`
    don't count, so one parked decision doesn't block the survey for good (the
-   digest lists such parents under **Not picked up**). For each open
+   dispatcher lists them under **Decide**). For each open
    parent:
 
    ```bash
