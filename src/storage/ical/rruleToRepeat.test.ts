@@ -127,8 +127,7 @@ describe('rruleToRepeat — representable rules', () => {
   })
 
   it('keeps the clock time from a datetime UNTIL', () => {
-    // The test environment runs in UTC, so the Z timestamp needs no conversion.
-    expect(repeatOf('FREQ=DAILY;UNTIL=20260601T120000Z', monday).end)
+    expect(repeatOf('FREQ=DAILY;UNTIL=' + new Date(2026, 5, 1, 12, 0).toISOString().replace(/[-:]|\.\d{3}/g, ''), monday).end)
       .toEqual({ type: 'until', date: '2026-06-01', time: '12:00' })
   })
 

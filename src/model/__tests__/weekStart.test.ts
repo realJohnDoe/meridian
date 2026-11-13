@@ -34,8 +34,8 @@ function series(overrides: Partial<StoreSeries> = {}): StoreSeries {
 }
 
 const roots: Roots = new Map()
-const FROM = new Date('2026-04-01')
-const TO   = new Date('2026-05-31')
+const FROM = new Date(2026, 3, 1)
+const TO   = new Date(2026, 4, 31)
 
 const datesOf = (s: StoreSeries) => expandRange([s], roots, FROM, TO).map(o => o.date)
 const datesIn = (s: StoreSeries, from: Date, to: Date) => expandRange([s], roots, from, to).map(o => o.date)

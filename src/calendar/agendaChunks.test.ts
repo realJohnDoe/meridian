@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { addDays, startOfDay } from 'date-fns'
+import { addDays, differenceInCalendarDays, startOfDay } from 'date-fns'
 import { fmtISO, expandWithMultiday } from '@/model'
 import type { Roots } from '@/types'
 import { makeOcc, makeSeries, makeRoots, testKey, TEST_VAULT } from '@/test-utils'
@@ -27,7 +27,7 @@ describe('chunkRange', () => {
       // i+1's first (start-of-day) — compare at day granularity.
       expect(startOfDay(addDays(a.to, 1)).getTime()).toBe(b.from.getTime())
       // Each chunk spans exactly CHUNK_DAYS calendar days.
-      expect((b.from.getTime() - a.from.getTime()) / 86_400_000).toBe(CHUNK_DAYS)
+      expect(differenceInCalendarDays(b.from, a.from)).toBe(CHUNK_DAYS)
     }
   })
 })
