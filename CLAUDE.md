@@ -45,20 +45,7 @@ Using `npm install` will create a `package-lock.json` that must not be committed
 
 Once the first changeset of a session/task has been applied and verified (`pnpm run check` passing, re-run after the last edit), commit and push it to a feature branch right away — don't wait for an explicit "commit and push" ask each time. Keep committing and pushing subsequent changesets the same way as the task progresses.
 
-After changing any files, check whether an open PR already covers the current branch; if the changes aren't included in any open PR yet, open a new one.
-
-Use the `tracemap-pr` skill from [realJohnDoe/tracemap](https://github.com/realJohnDoe/tracemap) (`skills/tracemap-pr/SKILL.md`) on every PR to add trace map images to its description; it decides itself when none would help.
-
-Label every issue an agent creates with exactly one model-tier label —
-`haiku`, `sonnet` (well-scoped, mechanical), `opus` (needs design or
-cross-module reasoning) or `opus-plan` (a plan spanning several PRs) — plus
-any workshop label that applies, e.g. `decision-required` when a human must decide
-before work starts. Every workshop label, what it does and how it's cleared:
-`docs/agents/triage-labels.md`.
-Order between issues is a native **blocked-by** edge, not prose: the workshop
-(`docs/agents/daily-dispatch.md`) dispatches every tier-labelled issue without
-an open native blocker, so a `Blocked by` line alone holds nothing back. How
-to add one: **Blocking** in `docs/agents/issue-tracker.md`.
+Before creating, labelling or ordering an issue, or opening a PR, follow the workshop plugin's `conventions` skill. Meridian's own labels are in `docs/agents/triage-labels.md`.
 
 ## Dev server base path
 
