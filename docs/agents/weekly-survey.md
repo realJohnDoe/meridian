@@ -31,16 +31,16 @@ that.
    `-` are unranked, skip them.
 3. Walk the ranked rows in order. **Skip** a row if its score is `0` (fresh) or
    its survey already has an open parent issue with open findings that the
-   workshop can still work. Findings that are `decision-required` or `deferred`
-   don't count, so one parked decision doesn't block the survey for good (the
-   dispatcher lists them under **Decide**). For each open
+   workshop can still work. Findings that are `deferred` or have an open `## Decision needed` section
+   (no `**Decided:**` line yet) don't count, so one parked decision doesn't
+   block the survey for good. For each open
    parent:
 
    ```bash
    gh api "repos/realJohnDoe/meridian/issues?labels=<label>&state=open&per_page=100" \
      --jq '.[] | select(.pull_request|not) | select(.sub_issues_summary.total>.sub_issues_summary.completed) | .number'
    gh api "repos/realJohnDoe/meridian/issues/<parent>/sub_issues?per_page=100" \
-     --jq '[.[] | select(.state=="open") | select([.labels[].name] | any(. == "decision-required" or . == "deferred") | not)] | length'
+     --jq '[.[] | select(.state=="open") | select([.labels[].name] | any(. == "deferred") | not) | select((.body // "") | (contains("## Decision needed") and (contains("**Decided:**")|not)) | not)] | length'
    ```
 
    `<label>` is the survey's `label:` frontmatter key; skip the row if any

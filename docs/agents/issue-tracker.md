@@ -4,7 +4,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 ## Conventions
 
-Every issue an agent creates also gets one model-tier label (`haiku`/`sonnet`/`opus`/`opus-plan`), plus `decision-required` when needed, per `CLAUDE.md`.
+Labels, blocked-by edges and sub-issues follow the workshop plugin's `conventions` skill (see `CLAUDE.md`).
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
 - **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
@@ -29,11 +29,7 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue. After publishing tickets with blockers, confirm each blocked ticket is seen as blocked and only the intended frontier is dispatchable, and fix any mismatch before ending the turn:
-
-- Preferred: the dispatcher's dry run, `node scripts/workshop-dispatch.mjs` (writes nothing). Compare its `sessions` and **Not picked up** reasons against the intended order.
-- If `gh` is limited to search: `gh api -X GET search/issues -f q='repo:realJohnDoe/meridian is:issue is:open blocked-by:<n>'` lists the issues natively blocked by `#n`.
-- If native edges can't be created from the session, tell the user rather than relying on the `Blocked by:` body fallback silently.
+Create a GitHub issue, labelled per `conventions`. After publishing tickets with blockers, run the `dispatcher` skill's dry run (`node <dispatcher skill>/scripts/dispatch.mjs --digest realJohnDoe/agent-skills --repos realJohnDoe/meridian`, writes nothing) and compare its plan against the intended order.
 
 ## When a skill says "fetch the relevant ticket"
 
@@ -44,12 +40,12 @@ Run `gh issue view <number> --comments`.
 Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
 
 - **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `gh issue create --label wayfinder:map`.
-- **Child ticket**: an issue linked to the map as a GitHub sub-issue (`gh api` on the sub-issues endpoint). Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
-- **Blocking**: GitHub's **native issue dependencies**, the canonical, UI-visible representation. Add an edge with `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, _not_ the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
-- **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
+- **Child ticket**: a sub-issue of the map (see `conventions`). Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
+- **Blocking**: a native blocked-by edge (see `conventions`); a ticket is unblocked when every blocker is closed.
+- **Frontier query**: the map's open children with no open blocker and no assignee; first in map order wins.
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
 
 ## Daily dispatch
 
-A scheduled task starts sessions for open, unblocked, tier-labelled issues and follows up on their PRs: see `docs/agents/daily-dispatch.md`. Working an issue by hand? Assign yourself first, or the next daily run may dispatch it too.
+The workshop's shared Dispatcher routine (the `dispatcher` skill) dispatches open, approved, unblocked, tier-labelled issues and follows up on their PRs; Meridian declares nothing for it. Working an issue by hand? Assign yourself first, or the next daily run may dispatch it too.

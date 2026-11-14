@@ -203,9 +203,7 @@ scripted and suits the cheapest tier regardless of which tier the fix itself
 needed. Where findings touch the same code, add a one-line **sequencing
 note** saying which order avoids rebasing the same file twice.
 Also record each such note as a native **blocked-by** edge on the later finding's
-sub-issue, so order is queryable and not only prose; the API call is under
-**Blocking** in `docs/agents/issue-tracker.md`, which also has the
-publish-time check that the workshop sees them. Worked example: #1289's note
+sub-issue (`conventions`), so order is queryable and not only prose. Worked example: #1289's note
 "land #1294 before #1290" is the edge `#1290 blocked_by #1294`. Open findings
 that can start now (`<parent>` = the run's parent issue number):
 
@@ -296,10 +294,10 @@ files"); this section states only what a survey run does.
   - the survey's own `Category` tag(s) (the list each survey defines below,
     e.g. `dry`, `srp`, `testing`, `security`);
   - `survey-finding`, plus the same survey-type label as the parent issue;
-  - a model-tier label — exactly one of `haiku`, `sonnet`, `opus`,
-    `opus-plan` — matching the Recommended model field;
-  - `decision-required`, when the finding hinges on a product decision only
-    the maintainer can make.
+  - a model-tier label matching the Recommended model field, and a
+    `## Decision needed` body section when the finding hinges on a product
+    decision only the maintainer can make: both per the workshop plugin's
+    `conventions` skill.
 
   **Search open parent issues (and their sub-issues) for the survey-type label
   first** — a re-run mostly re-derives findings that are already open, and
@@ -314,8 +312,8 @@ files"); this section states only what a survey run does.
 - A finding closes when a PR saying `Fixes #N` merges. Do not edit a file to
   close one. Dropping one as invalid or won't-fix is a close with `not planned`
   plus a comment saying why; deferring one is an open issue with a `deferred`
-  label plus a comment. The daily dispatcher closes the parent issue
-  once every finding sub-issue is resolved (`docs/agents/daily-dispatch.md`).
+  label plus a comment. The shared dispatcher closes the parent issue
+  once every finding sub-issue is resolved.
 
 `data-integrity.md`'s "Known suspects" section, which appends a verdict to each
 suspect's hypothesis in-place, is unchanged: that survey keeps its suspects list
@@ -338,8 +336,7 @@ findings, which are issues. Still propose rather than silently commit past
 review: keep it on the branch the session is already working on — a remote
 session is *assigned* its branch name, so the `survey-run/<name>` branch this
 paragraph used to ask for was never available to follow and no such branch has
-ever existed here — label that PR `automerge` (the workshop merges it once green;
-the maintainer removes the label to hold it), and note in the run's parent
+ever existed here — label that PR `automerge` (see `conventions`), and note in the run's parent
 issue, in one line, that the survey file was updated and why, so the two stay
 linked.
 

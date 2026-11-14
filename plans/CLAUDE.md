@@ -44,17 +44,17 @@ labelled with:
   (`health-ui.md`), `performance`, `product` (`product-niche.md`),
   `data-integrity`, `ux` (`usability.md`);
 - a **model-tier label** — exactly one of `haiku`, `sonnet`, `opus`,
-  `opus-plan` — matching the Recommended model field;
-- `decision-required` when the finding hinges on a product decision only the
-  maintainer can make, in place of a separate issue.
+  `opus-plan` — matching the Recommended model field (per the workshop
+  plugin's `conventions` skill).
+
+A finding that hinges on a product decision only the maintainer can make gets
+a `## Decision needed` section (`conventions`), in place of a separate issue.
 
 There is no more `survey:<name>` label — the survey-type label plus the
 category tags replace it, so a run, a category, or a tier is each one label
 query. `plan:<name>` is unchanged for a plan and its steps (`plan:tooling`,
 `plan:ical-rrule`). An open product decision that isn't itself a survey
-finding is still its own issue, labelled `decision-required` (this used to be
-`product-question` — same shape, renamed for consistency with the finding
-label of the same name). Carry the survey's own finding fields into the body
+finding is still its own issue, given a `## Decision needed` section. Carry the survey's own finding fields into the body
 (`.claude/skills/_survey/conventions.md` defines the shared six) and state the recommended
 model tier in the first line, as the report files used to.
 `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton.
@@ -133,12 +133,12 @@ guess.
 ## Open product questions
 
 A change that turns out to hinge on a product decision becomes an issue
-labelled `decision-required`, not a comment beside the code. A comment is where
+with a `## Decision needed` section, not a comment beside the code. A comment is where
 such a question goes to be forgotten: the surveys that exist to surface these
 (`product-niche.md` section 6, `data-integrity.md`'s
 normalization-versus-corruption rule) read the tracker and the reports, not
 inline prose. A survey finding that hinges on the same kind of decision gets
-the same label alongside its category and survey-type labels, rather than a
+the same section alongside its category and survey-type labels, rather than a
 separate issue — see **Filing** above.
 
 Give it the evidence, why it matters, and the options as you see them — the

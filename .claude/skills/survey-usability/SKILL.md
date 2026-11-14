@@ -191,7 +191,7 @@ step right while a sibling flow diverges — the other edit scope, the other
 viewport, the drawer on mobile versus the dialog on desktop — or a relabel in
 one place that splits the product's vocabulary. Findings about the mental model
 itself (what "a vault" or "all future occurrences" should mean) are usually
-product decisions: tier them `opus-plan` and label `decision-required`. Example
+product decisions: tier them `opus-plan` and give them a `## Decision needed` section. Example
 hazard note: "Sonnet 5 if the three screens using this label are listed; else
 Opus 5."
 

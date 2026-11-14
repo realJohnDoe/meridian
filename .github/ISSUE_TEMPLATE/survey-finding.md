@@ -13,9 +13,9 @@ that label is retired. Label it instead with:
   - `survey-finding`, plus the survey-type label matching the parent issue
     (`health`, `ui`, `performance`, `product`, `data-integrity`, `security`,
     `ux`, `retro`)
-  - a model-tier label: exactly one of `haiku`, `sonnet`, `opus`, `opus-plan`
-  - `decision-required`, if the finding hinges on a product decision only the
-    maintainer can make
+  - a model-tier label, and a `## Decision needed` body section if the
+    finding hinges on a product decision only the maintainer can make: both
+    per the workshop plugin's `conventions` skill
 Plan step (not a survey finding)? Label it `plan:<name>` instead and skip the
 above.
 
