@@ -46,6 +46,15 @@ describe('vitest.config.ts coverage thresholds', () => {
  * is exactly what the exclusion is for.
  */
 describe('vitest.config.ts coverage exclusions', () => {
+  it('every literal (non-glob) exclusion names an existing file', () => {
+    const exclude = vitestConfig.test?.coverage?.exclude ?? []
+    const literal = exclude.filter(p => !/[*?{[]/.test(p))
+    expect(literal.length).toBeGreaterThan(0)
+
+    const missing = literal.filter(p => !fs.existsSync(path.join(ROOT, p)))
+    expect(missing, `coverage exclusions pointing at files that no longer exist:\n  ${missing.join('\n  ')}`).toEqual([])
+  })
+
   it('every excluded src/routes/ file is small enough to be registration', () => {
     const MAX_LINES = 100
     const exclude = vitestConfig.test?.coverage?.exclude ?? []

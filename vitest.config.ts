@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { coverageConfigDefaults, defineConfig } from 'vitest/config'
+import { defineConfig } from 'vitest/config'
 
 const SRC_DIR = path.resolve(import.meta.dirname, './src')
 const alias = { '@': SRC_DIR }
@@ -86,7 +86,10 @@ export default defineConfig({
       // otherwise whole untested modules silently vanish from the report.
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        ...coverageConfigDefaults.exclude,
+        // Test harness modules, not source. Listed explicitly: spreading
+        // coverageConfigDefaults.exclude contributed nothing in Vitest 5.1.0.
+        'src/**/__tests__/**',
+        'src/test-utils/**',
         // shadcn registry components are boilerplate, not application logic
         // worth a coverage floor. components/ui/ is kept as a faithful mirror
         // of the shadcn registry precisely so this exclusion stays true — our
@@ -109,7 +112,7 @@ export default defineConfig({
         'src/routes/_app.notes.tsx',
         'src/routes/_app.day.$date.tsx',
         'src/routes/_app.week.$date.tsx',
-        'src/routes/_app.calendar.$month.tsx',
+        'src/routes/_app.calendar.$date.tsx',
         // Entry routes: only the two that really are registration. Listed
         // individually for the same reason the `_app` routes above are — the
         // `_entry*.tsx` glob this replaces also swallowed
@@ -134,11 +137,8 @@ export default defineConfig({
       // toward it, so a floor left alone drifts into guarding nothing.
       // storeCommit.ts sat at 30/95/45/35 against a measured 100/100/100/100
       // until 2026-09-06 for exactly that reason. Re-measure the floors
-      // (`pnpm run test:coverage`) when running the health survey, per
-      // the survey-health skill's Budget — and src/coverageConfig.test.ts's
-      // third guard now fails CI on its own once any floor drifts more than
-      // ~10 points below measured, so a missed re-measure doesn't go
-      // unnoticed until the next survey (#1039).
+      // (`pnpm run test:coverage`); src/coverageConfig.test.ts's third guard
+      // fails CI once any floor drifts more than ~10 points below measured.
       thresholds: {
         // Global floor. Per-file thresholds only guard the files they name, so
         // a brand-new untested logic module used to slip through the gate
