@@ -53,11 +53,12 @@ Label every issue an agent creates with exactly one model-tier label —
 `haiku`, `sonnet` (well-scoped, mechanical), `opus` (needs design or
 cross-module reasoning) or `opus-plan` (a plan spanning several PRs) — plus
 any workshop label that applies, e.g. `decision-required` when a human must decide
-before work starts. Every workshop label, what it does and how it's cleared:
+before work starts. Never add `ready-for-agent`: it is the maintainer's go-ahead,
+and nothing is dispatched without it. Every workshop label, what it does and how it's cleared:
 `docs/agents/triage-labels.md`.
 Order between issues is a native **blocked-by** edge, not prose: the workshop
-(`docs/agents/daily-dispatch.md`) dispatches every tier-labelled issue without
-an open native blocker, so a `Blocked by` line alone holds nothing back. How
+(`docs/agents/daily-dispatch.md`) dispatches every tier-labelled, `ready-for-agent` issue
+without an open native blocker, so a `Blocked by` line alone holds nothing back. How
 to add one: **Blocking** in `docs/agents/issue-tracker.md`.
 
 ## Dev server base path

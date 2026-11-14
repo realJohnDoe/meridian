@@ -35,10 +35,12 @@ digest issue, which also says why anything isn't moving.
 
 ## What the script decides
 
-- **Dispatch**: open issues that have a `haiku`/`sonnet`/`opus` label, no
+- **Dispatch**: open issues that have a `haiku`/`sonnet`/`opus` label and
+  `ready-for-agent`, no
   `opus-plan`, `decision-required` or `deferred`, no assignee, no open blocker (native, or named in the body by a `Blocked by: #n` line or `## Blocked by` section), no
   sub-issues, and no open PR that closes them. Oldest first. Every other open
-  issue is either somewhere else in the digest (its PR, Decide, Unstick) or
+  issue is either somewhere else in the digest (its PR, Decide, Unstick, or
+  Triage when only `ready-for-agent` is missing) or
   under **Not picked up** with its reason (no tier label, `opus-plan`, `deferred`, blocked
   by `#N`, assigned by hand), so nothing is skipped silently.
 - **Follow-up**: every open, non-draft PR (Dependabot's as `opus`, one with no

@@ -4,7 +4,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 ## Conventions
 
-Every issue an agent creates also gets one model-tier label (`haiku`/`sonnet`/`opus`/`opus-plan`), plus `decision-required` when needed, per `CLAUDE.md`.
+Every issue an agent creates also gets one model-tier label (`haiku`/`sonnet`/`opus`/`opus-plan`), plus `decision-required` when needed, per `CLAUDE.md`. Never `ready-for-agent`: that is the maintainer's go-ahead.
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
 - **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
