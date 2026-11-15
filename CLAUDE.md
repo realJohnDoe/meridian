@@ -230,23 +230,11 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 5. **View-ephemeral state lives with its view.** `store.ts` holds durable vault/sync/prefs state only. `calendar/viewState.ts` owns calendar view ephemera (agenda scroll position, carousel swipe previews, scroll-to-today) in its own Zustand store, reached through the `@/calendar` barrel like any other feature-internal state — not through `store.ts`/`storeBridge`. `zustand` is otherwise restricted to `store.ts`; `calendar/viewState.ts` is the one named exception in `eslint.config.js`.
 
-## Manual browser verification
+## Acceptance checks
 
-Don't proactively start the dev server and drive it with `preview_*` tools to verify a change. Only do this when the user explicitly asks for it — they generally test UI changes themselves.
-
-**This does not apply to survey runs.** the `survey-performance`,
-`survey-product-niche`, `survey-health-ui` and `survey-usability` skills each specify a measurement or screenshot
-pass as a required phase — dev server, browser, real numbers — and those
-surveys are the explicit ask. Skipping that phase because of the paragraph
-above is a silent failure: it lands as "partially assessed", which the survey
-conventions permit, so nothing surfaces that the run never looked. Base path and
-preview/launch gotchas: `docs/agents/dev-server.md`.
-
-**Nor does it apply to a finding's acceptance check.** When the issue gives a
-measurement or repro recipe, running it is the explicit ask: re-run it
-(headless Chromium works in cloud sessions) and put before → after in the PR's
+When the issue gives a measurement or repro recipe, re-run it (headless
+Chromium works in cloud sessions) and put before → after in the PR's
 "Acceptance check" section. If it truly can't run, say why there.
-
 
 ## Agent skills
 
