@@ -3,7 +3,7 @@ name: Dependabot auto-merge
 on: pull_request
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
 
 jobs:
@@ -13,25 +13,26 @@ jobs:
     steps:
       - id: meta
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
-      # Majors are left open for a human. Auto-merge waits for the required checks.
+      # Majors are left open for a human. The workshop dispatcher merges the rest
+      # once green (realJohnDoe/agent-skills, skills/dispatcher). GitHub's native
+      # auto-merge would merge with this workflow's token, and a push made with it
+      # starts no workflows, so nothing would deploy.
       - if: steps.meta.outputs.update-type != 'version-update:semver-major'
-        run: gh pr merge --auto --squash "$PR_URL"
+        run: gh pr edit --add-label automerge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # A push by anyone but Dependabot (a workshop follow-up, a merge of main) is
-  # code nobody reviewed: drop auto-merge so the PR waits in the digest's
-  # Review list, like an opus PR.
+  # A push by anyone but Dependabot is code nobody reviewed: drop the label.
   hold-for-review:
     if: >-
       github.event.action == 'synchronize' &&
       github.event.pull_request.user.login == 'dependabot[bot]' &&
       github.actor != 'dependabot[bot]' &&
-      github.event.pull_request.auto_merge
+      contains(github.event.pull_request.labels.*.name, 'automerge')
     runs-on: ubuntu-latest
     steps:
-      - run: gh pr merge --disable-auto "$PR_URL"
+      - run: gh pr edit --remove-label automerge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
