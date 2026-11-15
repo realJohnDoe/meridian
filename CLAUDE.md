@@ -230,6 +230,11 @@ These rules are enforced by the import-boundary lint rules (`pnpm run lint`):
 
 5. **View-ephemeral state lives with its view.** `store.ts` holds durable vault/sync/prefs state only. `calendar/viewState.ts` owns calendar view ephemera (agenda scroll position, carousel swipe previews, scroll-to-today) in its own Zustand store, reached through the `@/calendar` barrel like any other feature-internal state — not through `store.ts`/`storeBridge`. `zustand` is otherwise restricted to `store.ts`; `calendar/viewState.ts` is the one named exception in `eslint.config.js`.
 
+## Acceptance checks
+
+When the issue gives a measurement or repro recipe, re-run it (headless
+Chromium works in cloud sessions) and put before → after in the PR's
+"Acceptance check" section. If it truly can't run, say why there.
 
 ## Agent skills
 
