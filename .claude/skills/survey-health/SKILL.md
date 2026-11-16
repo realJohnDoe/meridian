@@ -64,7 +64,7 @@ from training data. Two rules are specific to this survey:
   network or resource finding, isolate the suspect with a throwaway probe and
   say in the coverage statement whether the environment is implicated — a
   uniform per-unit cost across otherwise unrelated units is the tell.
-- **Grep the config comments for expiry conditions, and check whether they have been met.** A pin, cap, or disabled rule whose comment says "revisit once X", "until Y lands", or "remove when Z ships" is a decision with a stated trigger and no owner — nothing re-checks it. These are cheap to verify (one registry or issue-tracker query each) and high-yield, because the rationale is already written down for you and the only question is whether it still holds. A met condition is a finding; so is a comment whose stated rationale you can show is no longer true. Check the value against its own comment too — a comment asserting the opposite of the setting beneath it is its own finding.
+- **Grep the config comments for expiry conditions, and check whether they have been met.** A pin, cap, or disabled rule whose comment says "revisit once X", "until Y lands", or "remove when Z ships" is a decision with a stated trigger and no owner — nothing re-checks it. These are cheap to verify (one registry or issue-tracker query each) and high-yield, because the rationale is already written down for you and the only question is whether it still holds. A met condition is a finding; so is a comment whose stated rationale you can show is no longer true. Check the value against its own comment too — a comment asserting the opposite of the setting beneath it is its own finding. For a lint exemption (`ignores`, a disabled rule for one file), dry-run it: plant the forbidden import in each exempt file and in one control file — on 2026-11-16 that showed one shared `ignores` list exempting three files from two unrelated restrictions (#1461).
 
 ## Budget
 
@@ -109,7 +109,7 @@ from training data. Two rules are specific to this survey:
   `transform / setup / import / tests / environment` — is the other half: when
   `import` is several times `tests`, the suite is paying for isolation rather
   than for assertions, and the question is which files actually need it.
-- **Establish which workspace each gate actually covers, and record it as a matrix.** Give **coverage its own row, separate from `test`** — they are usually different scripts, and the common shape is a `test` script that fans out to every workspace beside a `test:coverage` script that does not, so the suite runs everywhere while coverage is measured and gated in one package only. Directories that aren't packages count as columns too: `scripts/` holds the dispatcher that merges PRs, and on 2026-11-12 it had no lint, no typecheck and one 18-line test (#1434). Do not assume a root-level `build`/`test` script reaches a sub-workspace — verify it (e.g. does the root test runner's `include` glob match the sub-package? does the root `tsc -b` reference its tsconfig?) and list the gates on one axis against the workspaces on the other. A package that CI checks in a separate job but the documented local command silently skips is a real finding, and it is invisible unless you build this matrix: every gate is green, and the gap only shows in what each one *ran on*. This is the single cheapest high-yield check in this section for any repo with more than one package.
+- **Establish which workspace each gate actually covers, and record it as a matrix.** Give **coverage its own row, separate from `test`** — they are usually different scripts, and the common shape is a `test` script that fans out to every workspace beside a `test:coverage` script that does not, so the suite runs everywhere while coverage is measured and gated in one package only. Directories that aren't packages count as columns too (`scripts/`, #1434). Do not assume a root-level `build`/`test` script reaches a sub-workspace — verify it (e.g. does the root test runner's `include` glob match the sub-package? does the root `tsc -b` reference its tsconfig?) and list the gates on one axis against the workspaces on the other. A package that CI checks in a separate job but the documented local command silently skips is a real finding, and it is invisible unless you build this matrix: every gate is green, and the gap only shows in what each one *ran on*. This is the single cheapest high-yield check in this section for any repo with more than one package.
 - **Build the app and look at what shipped, not just at what was written.** Run
   the production build and rank the emitted chunks by size, then grep the largest
   one for markers of the heavy dependencies (`cm-content` for CodeMirror, `rdp-`
@@ -245,13 +245,10 @@ Examples (not exhaustive):
   fortnight before 2026-09-13 (#1031, #1023, PRs #897/#887/#1050). The greps:
   `setTimeout`/`await new Promise` in a test body (Playwright: `waitForTimeout`),
   `new Date()`/`Date.now()` with no `vi.setSystemTime`, and a module-level `let`
-  in a shared helper that no `beforeEach` resets. **Then run the suite once
-  under a non-UTC zone** (`TZ=America/New_York pnpm exec vitest run`): every
-  session and CI runner is UTC, the one zone where local time equals UTC, so a
-  zone assumption is invisible to all of the greps. On 2026-11-12 it failed 11
-  tests (#1429); once that pins `TZ` in `vitest.config.ts`, check instead that
-  the pin is still a non-UTC zone. Rate flakes above their apparent size: they teach everyone to
-  re-run CI instead of reading it
+  in a shared helper that no `beforeEach` resets. Zone assumptions are invisible
+  to those greps on UTC runners; `vitest.config.ts` pins a non-UTC `TZ` for that
+  (#1429) — check the pin is still non-UTC. Rate flakes above their apparent
+  size: they teach everyone to re-run CI instead of reading it
 - Swallowed errors — empty or log-only `catch` blocks, unhandled promise rejections, errors caught without surfacing to the user or a recovery path
 - No consistent error strategy — each layer inventing its own mix of throw / return-null / silent-default
 
