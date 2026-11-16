@@ -490,29 +490,47 @@ export default [
   // src/calendar/viewState.ts is a second, deliberately separate
   // Zustand store scoped to calendar-view-local ephemeral state (scroll
   // position, carousel previews) — not the global store, so it's exempted
-  // here too, but it must still be reached through the @/calendar barrel like
-  // any other feature-internal state (enforced by no-restricted-paths above).
-  // Machine-enforces what was previously only a convention.
+  // from the zustand restriction too, but it must still be reached through the
+  // @/calendar barrel like any other feature-internal state (enforced by
+  // no-restricted-paths above).
   //
-  // ORDERING: this block must stay ABOVE the src/model/** block below. Flat
-  // config replaces a rule's options wholesale rather than merging them, so a
-  // later block naming this same rule id would silently drop model's own
-  // restriction list (react, @/store, @/storage, ...). model's list therefore
-  // repeats `zustand` and `dexie` itself.
+  // Each singleton has its own exemption list, so no exempt file is exempt
+  // from the other restriction. Zustand uses the core `no-restricted-imports`
+  // and dexie the `@typescript-eslint` one: flat config replaces a rule's
+  // options wholesale per rule id, so two ids is what lets the `ignores`
+  // differ.
+  //
+  // ORDERING: the dexie block must stay ABOVE the src/model/** block below,
+  // which names the same rule id and so repeats `dexie` in its own list.
   {
     files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/store.ts', 'src/storage/cache/db.ts', 'src/calendar/viewState.ts'],
+    ignores: ['src/store.ts', 'src/calendar/viewState.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'zustand', message: 'Only src/store.ts may import zustand. Use @/store or @/storeBridge.' },
+          ],
+          patterns: [
+            { group: ['zustand/*'], message: 'Only src/store.ts may import zustand. Use @/store or @/storeBridge.' },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/storage/cache/db.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
         {
           paths: [
-            { name: 'zustand', message: 'Only src/store.ts may import zustand. Use @/store or @/storeBridge.' },
-            { name: 'dexie',   message: 'Only src/storage/cache/db.ts may import dexie. Use the functions exported by @/storage/cache/{files,credentials,registry}.' },
+            { name: 'dexie', message: 'Only src/storage/cache/db.ts may import dexie. Use the functions exported by @/storage/cache/{files,credentials,registry}.' },
           ],
           patterns: [
-            { group: ['zustand/*'], message: 'Only src/store.ts may import zustand. Use @/store or @/storeBridge.' },
-            { group: ['dexie/*'],   message: 'Only src/storage/cache/db.ts may import dexie. Use the functions exported by @/storage/cache/{files,credentials,registry}.' },
+            { group: ['dexie/*'], message: 'Only src/storage/cache/db.ts may import dexie. Use the functions exported by @/storage/cache/{files,credentials,registry}.' },
           ],
         },
       ],
@@ -534,10 +552,6 @@ export default [
             {
               name: 'react',
               message: 'model/ is the pure domain core and must not depend on React.',
-            },
-            {
-              name: 'zustand',
-              message: 'model/ is the pure domain core and must not depend on the store.',
             },
             {
               name: 'dexie',
