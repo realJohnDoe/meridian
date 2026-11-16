@@ -11,7 +11,8 @@ import { VaultIcon } from '@/components/vaultIcon'
 import { cn } from '@/lib/cn'
 import { keyVaultId } from '@/fileIO'
 import type { StoreItem } from '@/types'
-import { sortVaults, type VaultRef } from '@/vaultActions'
+import { sortVaults } from '@/storage'
+import type { VaultRef } from '@/vaultRef'
 
 /** One vault's row in the tree: the vault, and the people who appear in it. */
 interface VaultGroup {

@@ -716,3 +716,12 @@ export async function removeVault(id: string): Promise<void> {
   }
 }
 
+
+/**
+ * The one ordering for a list of vaults, shared so Settings' vault list and
+ * the topbar view filter's calendar tree never drift apart the way they used
+ * to (alphabetical in one, registration order in the other).
+ */
+export function sortVaults(vaults: VaultRef[]): VaultRef[] {
+  return [...vaults].sort((a, b) => a.name.localeCompare(b.name))
+}

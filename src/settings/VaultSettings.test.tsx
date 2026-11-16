@@ -7,16 +7,16 @@ import { setupStore, installFakePersistence, seedStore, makeOcc, makeRoots, test
 import { entryKey } from '@/fileIO'
 import type { Roots } from '@/types'
 import type { VaultRef } from '@/vaultRef'
-import { setVaultColor, setVaultRetentionDays, removeVault } from '@/vaultActions'
-import type * as VaultActions from '@/vaultActions'
+import { setVaultColor, setVaultRetentionDays, removeVault } from '@/storage'
+import type * as Storage from '@/storage'
 import { VaultSettings } from './VaultSettings'
 
 // Only setVaultColor/setVaultRetentionDays are faked — everything else
 // (exportVaultIcs et al.) stays real, since the export test below exercises
 // it for real. Faking just these two sidesteps a real Dexie/IndexedDB write,
 // which jsdom has no backing store for.
-vi.mock('@/vaultActions', async (importOriginal) => ({
-  ...(await importOriginal<typeof VaultActions>()),
+vi.mock('@/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof Storage>()),
   setVaultColor: vi.fn(),
   setVaultRetentionDays: vi.fn(),
   // Faked for the move-in tests below, which assert the subscription is

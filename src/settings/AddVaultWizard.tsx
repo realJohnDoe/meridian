@@ -4,7 +4,7 @@ import { HardDrive, GitBranch, CalendarDays, BookOpen } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
 import { cn } from '@/lib/cn'
 import { useStore } from '@/store'
-import { addLocalVault, addExampleVault, isFolderPickerSupported } from '@/vaultActions'
+import { addLocalVault, addExampleVault, isFolderPickerSupported } from '@/storage'
 import IcalStep from './IcalStep'
 import GithubStep from './GithubStep'
 

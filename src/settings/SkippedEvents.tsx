@@ -1,4 +1,4 @@
-import type { SkippedEvent } from '@/vaultActions'
+import type { SkippedEvent } from '@/storage'
 
 /**
  * The events a calendar left out because their repeat rule has no form in

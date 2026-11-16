@@ -1,8 +1,8 @@
 // ── Vault references ─────────────────────────────────────────────────────────
-// A root leaf (not storage/) because @/vaultActions re-exports VaultRef for
-// components/, and the import-boundary rule forbids components/ from
-// importing @/storage at all — a root leaf keeps that chain intact without
-// storeBridge.ts/store.ts acquiring an upward dependency on @/storage.
+// A root leaf (not storage/) because components/ imports it directly and the
+// import-boundary rule forbids components/ from importing @/storage at all —
+// a root leaf also keeps storeBridge.ts/store.ts from acquiring an upward
+// dependency on @/storage.
 
 export type VaultKind = 'local' | 'example' | 'github' | 'ical'
 

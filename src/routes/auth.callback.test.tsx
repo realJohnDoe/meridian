@@ -33,7 +33,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
   }
 })
 
-vi.mock('@/vaultActions', () => ({
+vi.mock('@/storage', () => ({
   completeGitHubSignIn,
   fetchInstalledRepos,
   addGitHubVaultOAuth,

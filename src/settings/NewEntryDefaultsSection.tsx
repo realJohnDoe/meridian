@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '@/store'
 import { useAllParticipants } from '@/hooks'
 import { ParticipantsRow, ListedOnRow, defaultParticipants, saveDefaultParticipants, saveDefaultLists, storedDefaultLists } from '@/editor'
-import type { VaultRef } from '@/vaultActions'
+import type { VaultRef } from '@/vaultRef'
 import type { EntryKey } from '@/fileIO'
 import { SettingsSection, SettingsRow } from './SettingsSection'
 

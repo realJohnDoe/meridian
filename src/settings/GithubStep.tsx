@@ -5,7 +5,7 @@ import { useStore } from '@/store'
 import {
   addGitHubVaultOAuth, startGitHubSignIn, findReusableGitHubSession, fetchInstalledRepos,
   GITHUB_APP_INSTALL_URL, type ReusableGitHubSession, type InstalledRepo,
-} from '@/vaultActions'
+} from '@/storage'
 
 /**
  * The github step's own state machine, separate from `WizardStep` because it

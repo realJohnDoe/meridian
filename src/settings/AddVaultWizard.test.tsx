@@ -3,11 +3,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { useStore } from '@/store'
 import { setupStore } from '@/test-utils'
-import type * as VaultActions from '@/vaultActions'
+import type * as Storage from '@/storage'
 import {
   addLocalVault, addExampleVault, addIcalVault, addGitHubVaultOAuth, startGitHubSignIn,
   findReusableGitHubSession, fetchInstalledRepos, previewIcalFeed,
-} from '@/vaultActions'
+} from '@/storage'
 import AddVaultWizard from './AddVaultWizard'
 
 const navigate = vi.fn()
@@ -18,8 +18,8 @@ vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navigate }))
 // setFolderPickerSupported below), per its own doc comment: it's read fresh
 // during render specifically so a module-scope fake wouldn't exercise the
 // branch it thinks it does.
-vi.mock('@/vaultActions', async (importOriginal) => ({
-  ...(await importOriginal<typeof VaultActions>()),
+vi.mock('@/storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof Storage>()),
   addLocalVault: vi.fn(),
   addExampleVault: vi.fn(),
   addIcalVault: vi.fn(),

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Check, ChevronRight, ExternalLink } from 'lucide-react'
 import { SettingsSection } from './SettingsSection'
 import { useStore } from '@/store'
-import { GITHUB_APP_INSTALL_URL, type InstalledRepo } from '@/vaultActions'
+import { GITHUB_APP_INSTALL_URL, type InstalledRepo } from '@/storage'
 import { cn } from '@/lib/cn'
 
 // Prefills the name field on GitHub's own new-repository form — verified live

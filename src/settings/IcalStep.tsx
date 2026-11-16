@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/primitives/button'
 import { Input } from '@/components/ui/input'
-import { addIcalVault, previewIcalFeed, type SkippedEvent } from '@/vaultActions'
+import { addIcalVault, previewIcalFeed, type SkippedEvent } from '@/storage'
 import { SkippedEvents } from './SkippedEvents'
 
 /** What the validate step learned about a pasted feed URL. */

@@ -13,8 +13,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { ConfirmDialogContent } from '@/components/primitives/confirm-dialog-content'
-import { previewVaultIcsImport, importVaultIcs } from '@/vaultActions'
-import type { VaultRef, IcsImportSummary } from '@/vaultActions'
+import { previewVaultIcsImport, importVaultIcs } from './vaultIcs'
+import type { VaultRef } from '@/vaultRef'
+import type { IcsImportSummary } from './vaultIcs'
 import { SettingsRow } from './SettingsSection'
 import { SkippedEvents } from './SkippedEvents'
 
