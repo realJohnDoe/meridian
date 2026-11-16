@@ -10,12 +10,13 @@ import { Input } from '@/components/ui/input'
 import { useStore } from '@/store'
 import {
   syncToBackend, renameVault, setVaultColor, setVaultRetentionDays, startGitHubSignIn,
-  GITHUB_APP_INSTALL_URL, exportVaultIcs,
-} from '@/vaultActions'
+  GITHUB_APP_INSTALL_URL,
+} from '@/storage'
+import { exportVaultIcs } from './vaultIcs'
 import { archiveEntry } from '@/editor'
 import { keyRoute } from '@/entryRoute'
 import { deleteWholeFileWithUndo } from '@/occurrenceActions'
-import type { VaultRef } from '@/vaultActions'
+import type { VaultRef } from '@/vaultRef'
 import { VAULT_COLORS, isWritableVault } from '@/vaultRef'
 import { VAULT_COLOR_SWATCH } from '@/components/primitives/occurrence-variants'
 import { cn } from '@/lib/cn'

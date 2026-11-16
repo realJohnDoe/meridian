@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react'
 import { useStore, vaultLayer } from '@/store'
 import { VaultIcon } from '@/components'
-import { sortVaults } from '@/vaultActions'
+import { sortVaults } from '@/storage'
 import { SettingsSection, SettingsLinkRow } from './SettingsSection'
 import { vaultSummary, attentionLabel } from './vaultSummary'
 

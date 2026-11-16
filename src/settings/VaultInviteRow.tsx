@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Copy, Check, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/primitives/button'
-import { appUrl } from '@/vaultActions'
+import { appUrl } from '@/storage'
 import { SettingsRow } from './SettingsSection'
 
 /**

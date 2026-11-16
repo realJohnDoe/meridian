@@ -11,7 +11,7 @@ const { reconnectVault, startGitHubSignIn } = vi.hoisted(() => ({
   startGitHubSignIn: vi.fn(),
 }))
 
-vi.mock('@/vaultActions', () => ({
+vi.mock('@/storage', () => ({
   syncToBackend: vi.fn(),
   reconnectVault,
   startGitHubSignIn,

@@ -13,8 +13,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { ConfirmDialogContent } from '@/components/primitives/confirm-dialog-content'
-import { removeVault, cacheDirtyCount } from '@/vaultActions'
-import type { VaultRef } from '@/vaultActions'
+import { removeVault, cacheDirtyCount } from '@/storage'
+import type { VaultRef } from '@/vaultRef'
 import { SettingsRow } from './SettingsSection'
 
 /** The "Remove vault" row and its confirm dialog, which warns about unsynced changes. */

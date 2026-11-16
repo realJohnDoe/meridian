@@ -5,7 +5,7 @@ import {
   completeGitHubSignIn, fetchInstalledRepos, addGitHubVaultOAuth, reauthGitHubVault,
   OAuthCallbackError, GITHUB_APP_INSTALL_URL, takePendingGitHub,
   type InstalledRepo, type OAuthTokens,
-} from '@/vaultActions'
+} from '@/storage'
 import { Button } from '@/components/primitives/button'
 import { RepoPicker } from '@/settings'
 import { useStore } from '@/store'

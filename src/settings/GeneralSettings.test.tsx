@@ -12,7 +12,7 @@ vi.mock('@tanstack/react-router', async () => {
 })
 
 vi.mock('next-themes', () => ({ useTheme: () => ({ theme: 'dracula', setTheme: vi.fn(), systemTheme: 'dark' }) }))
-vi.mock('@/vaultActions', () => ({ setDefaultVault: vi.fn() }))
+vi.mock('@/storage', () => ({ setDefaultVault: vi.fn() }))
 
 setupStore()
 

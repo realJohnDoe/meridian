@@ -317,11 +317,10 @@ export default [
               message: `Import from @/${protected_} barrel (index.ts), not from its internals.`,
             })),
             // UI components must not import from @/storage at all (barrel or internals).
-            // Use vaultActions.ts for vault-management commands instead.
             {
               target: ['./src/components', './src/calendar', './src/editor', './src/search', './src/onboarding'],
               from: './src/storage',
-              message: 'UI components must not import from @/storage. Use @/vaultActions for vault commands.',
+              message: 'UI components must not import from @/storage.',
             },
           ],
         },
