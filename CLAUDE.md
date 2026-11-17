@@ -20,9 +20,8 @@ one with less code. A shorter diff that does the same job is worth more than
 a longer one that merely feels more thorough — don't pad a change with extra
 abstraction, options, or handling the task doesn't need just to make it look
 more complete. This applies to edits to this file and to the survey skills in
-`.claude/skills/survey-*/` as much as to source: see
-`.claude/skills/_survey/conventions.md` for
-the same principle applied to keeping survey files from growing unchecked.
+`.claude/skills/survey-*/` as much as to source; the workshop `surveys` skill
+applies the same principle to keeping survey files from growing unchecked.
 
 ## Package manager
 

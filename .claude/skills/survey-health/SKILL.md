@@ -6,7 +6,7 @@ scope: src ":!src/**/*.test.*" ":!src/test-utils"
 scope-alt: "src/**/*.test.*" src/test-utils e2e
 ---
 
-Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
+Read the workshop plugin's `surveys` skill before starting; its conventions apply to every run, and `docs/agents/survey.md` holds this repo's gates and environment limits.
 
 # Codebase Health Survey
 
@@ -14,7 +14,7 @@ Survey this codebase for code health issues across the categories below.
 
 Shared process, scoring, and reporting rules — model-tier ratings, the
 ranking formula, category-verdict conventions, and how to report results —
-live in [the shared survey conventions](../_survey/conventions.md). Read that first; this
+live in the shared survey conventions. Read that first; this
 file states only what's specific to this survey.
 
 ## Scope — `src/` or the test suite, and say which
@@ -33,7 +33,7 @@ said it was in scope. Alternate the corpus between runs.
 
 ## Process
 
-Per [Running a survey](../_survey/conventions.md#running-a-survey): scan plan first, evaluate
+Per Running a survey: scan plan first, evaluate
 on merits, verify capability claims by inspection. Version currency in
 particular comes from the registry query in the Budget section below, never
 from training data. Two rules are specific to this survey:
@@ -121,13 +121,13 @@ from training data. Two rules are specific to this survey:
   change it, rebuild, and diff the entry chunk's raw and gzip size. On the
   2026-09-06 run one import line in `routes/__root.tsx` was worth 53% of the
   entry chunk (465,525 → 218,894 bytes gzip).
-- **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition. **Un-shallow the clone first** ([recipe](../_survey/conventions.md#running-a-survey)) — a session's checkout is shallow, so `git log` answers from a truncated graph and every commit older than the boundary collapses into it, making per-directory tallies show where the truncation landed rather than where development is concentrated. This paragraph blamed a squashed history for that until 2026-09-13; the history is not squashed (3,225 commits back to 2026-05-22, `git blame` intact) and the clone was shallow. Record the history's true span next to the tallies, and if the span you can see is still shorter than your sampling window, say so and stop treating the numbers as comparative.
+- **Sample git history for co-change patterns** (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition. **Un-shallow the clone first** — a session's checkout is shallow, so `git log` answers from a truncated graph and every commit older than the boundary collapses into it, making per-directory tallies show where the truncation landed rather than where development is concentrated. This paragraph blamed a squashed history for that until 2026-09-13; the history is not squashed (3,225 commits back to 2026-05-22, `git blame` intact) and the clone was shallow. Record the history's true span next to the tallies, and if the span you can see is still shorter than your sampling window, say so and stop treating the numbers as comparative.
 - **Identify where development is currently concentrated** — sample recent history over a meaningful window (e.g. `git log --since="60 days ago" --name-only`, or recent merged PRs if available) and tally which directories see the most commits/PRs. This is the evidence base for the activity weighting in the Scoring guidance: findings in "hot" directories are worth more to fix than equivalently-scored findings in dormant corners of the codebase, because more code keeps landing on top of the problem in the meantime.
 - Sample the rest. Do not skip a directory entirely without recording it in the coverage statement.
 
 ## Output structure
 
-**Reporting:** per the [shared reporting conventions](../_survey/conventions.md#reporting),
+**Reporting:** per the shared reporting conventions,
 including suggested improvements to this survey file itself.
 
 ### 1. Health verdict (~5 sentences)
@@ -144,17 +144,17 @@ A plain-language summary of the repo's overall health. Name the **worst one or t
 ### 3. Category verdicts
 
 One line per category (1–10). Verdicts follow the
-[shared convention](../_survey/conventions.md#category-verdicts): **clean** /
+shared convention: **clean** /
 **findings: #N, #M** / **partially assessed**.
 
 ### 4. Findings
 
 `Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
-the [shared finding fields](../_survey/conventions.md#finding-fields). This survey adds:
+the shared finding fields. This survey adds:
 
 - **Category** — one or more tags from: `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`. As of 2026-10-30, `architecture`, `overengineering`, `srp` and `types` have no repo label, and an agent cannot create one; applying a missing label fails the whole issue create. Name those tags in the body instead.
 - **Impact** — 1–10 (10 = catastrophic/systemic; 5 = e.g. a DRY violation duplicated across ~4 files, or a missing error state on a primary user flow; 1 = trivial/cosmetic)
-- **Task context** — the block described in [writing findings down to Sonnet 5](../_survey/conventions.md#write-findings-down-to-sonnet-5-where-you-honestly-can): exact locations, the enumerated work, measured numbers, the trap with a file and line, any in-repo precedent, and — for an extraction — the seam verified in both directions.
+- **Task context** — the block described in writing findings down to Sonnet 5: exact locations, the enumerated work, measured numbers, the trap with a file and line, any in-repo precedent, and — for an extraction — the seam verified in both directions.
 
 **Fails silently here** (what sets the tier): a re-hidden bug class, a lint rule
 that passes but no longer catches what it should, a "dead" export that's
@@ -164,20 +164,20 @@ decision (e.g. "narrow the type" vs "restructure the module boundary"). Example
 hazard note: "Sonnet 5 if the import boundary to preserve is specified in the
 task; else Opus 5."
 
-Rank and report findings per the [shared convention](../_survey/conventions.md#ranking-findings). Here, "confirming" a fix means re-running the build, lint, or the test suite — naming the workspace it must be run in, since a root-level command may not cover the package the fix touched.
+Rank and report findings per the shared convention. Here, "confirming" a fix means re-running the build, lint, or the test suite — naming the workspace it must be run in, since a root-level command may not cover the package the fix touched.
 
 When the ranking formula puts a low-impact finding above a high-impact one (a wide, cheap toolchain fix outranking a narrow correctness bug, say), **say so in one line under the summary table** and name which finding a reader sorting by raw impact should look at first. The same note covers the other way the formula distorts: when a real finding falls out of the top N purely on effort — the usual case being an architecture finding, which is both the highest-weight category and the most expensive to fix — name it in one line below the findings rather than dropping it silently, so "category 1: clean" never appears when the truth is "category 1's finding didn't survive the divisor". The formula is a default order, not a claim about what matters most, and silently shipping an inverted order makes the table read as the latter.
 
 List the **top 7 findings**, numbered (the category verdicts above reference
-these numbers), per [Don't pad the findings
-list](../_survey/conventions.md#dont-pad-the-findings-list) and [prefer systemic
-findings](../_survey/conventions.md#finding-fields).
+these numbers), per Don't pad the findings
+list and prefer systemic
+findings.
 
 ---
 
 ## Categories to scan — ranked by priority
 
-Ranking and bullets: see [Running a survey](../_survey/conventions.md#running-a-survey). Each
+Ranking and bullets: see Running a survey. Each
 category is defined by its heading and scope line. A finding that matches a
 scope but no bullet may be *more* valuable, not less: it's what the checklist
 didn't anticipate.

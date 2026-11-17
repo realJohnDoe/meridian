@@ -5,7 +5,7 @@ label: product
 scope: src/onboarding src/storage/devFixtures docs README.md
 ---
 
-Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
+Read the workshop plugin's `surveys` skill before starting; its conventions apply to every run, and `docs/agents/survey.md` holds this repo's gates and environment limits.
 
 # Product Niche Fit & Positioning Survey
 
@@ -18,7 +18,7 @@ Produce the **top 5 findings** across both, each anchored to a verbatim quote fr
 
 Shared process, scoring, and reporting rules — model-tier ratings, the
 ranking formula, category-verdict conventions, and how to report results —
-live in [the shared survey conventions](../_survey/conventions.md). Read that first; this
+live in the shared survey conventions. Read that first; this
 file states only what's specific to this survey.
 
 **Scope.** This is a survey of our own product and its positioning — not vendor research, and not a shopping exercise for components to integrate. Competing and adjacent products enter only as _the context that defines the niche_, and primarily through the set the README already names (Obsidian + TaskNotes, Google Calendar, GitHub Issues/Projects, Todoist, Google Keep). **One bounded exception:** the README makes factual claims about those products in its comparison table, and a stale claim about a competitor costs more trust than a missing feature does — so verifying those specific claims is in scope. Anything beyond that is a separate market-research exercise; record it as out of scope rather than drifting into it.
@@ -57,7 +57,7 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
 
 - **Derive, then judge, then write.** Phase 0 first and in writing, then the walk, then the findings. Do not decide the niche you _expect_ and collect quotes for it — derive the revealed niche from product evidence before re-reading the copy, so the copy can't anchor you.
 - **Read the README cold, once, before anything else,** and record your honest first-pass answers to: what is this, who is it for, what would I use it instead of, and would I keep reading? That first read is unrepeatable — capture it before the code teaches you what the product means. It is the closest thing available to a real visitor's experience.
-- **Every finding needs a verbatim quote** from a real surface — README, in-app string, tutorial entry, blog, or code — per the [shared Evidence rule](../_survey/conventions.md#finding-fields). The blog is hard-wrapped at ~90 characters, so give a line range there rather than a quote that silently spans a break. Fit findings additionally need the product evidence: the feature, constraint, or code that creates the gap.
+- **Every finding needs a verbatim quote** from a real surface — README, in-app string, tutorial entry, blog, or code — per the shared Evidence rule. The blog is hard-wrapped at ~90 characters, so give a line range there rather than a quote that silently spans a break. Fit findings additionally need the product evidence: the feature, constraint, or code that creates the gap.
 - **Verify this plan's own quotes before relying on them.** The plan quotes copy that the product keeps changing, and a stale example here is exactly the kind of error the survey exists to catch. Where a quotation in this document no longer matches the live surface, use the live surface and note the drift in the coverage statement.
 - **Time-box the recognition test.** Judge the surfaces by what a visitor learns in the first ~30 seconds — headline, first screen, first paragraph, the app's first view — and say explicitly at which line or screen the niche becomes unambiguous, or that it never does.
 - **Make positioning measurable rather than a matter of taste:**
@@ -69,13 +69,13 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
   - **Adjacency test.** Put the product's look mentally beside the alternatives the README names. Does it read as belonging to that set, as belonging to a _different_ set, or as generic? Any of the three can be right — a deliberate outlier is a positioning choice — but it should be deliberate, and the report should say which it is.
 - **Distinguish "doesn't fit the niche" from "isn't finished."** An immature feature that clearly serves the target job is execution debt, not a positioning problem. Call something a fit finding only when the product's _direction_ and the target's _needs_ diverge.
 - **Say when the status quo is right.** A deliberately narrow niche, a feature deliberately not built, an audience deliberately turned away — these are strategy, and the report should confirm them as such when the evidence supports it, rather than reflexively recommending expansion. `Meridian supports notes, but it doesn't try to be a better note-taking app than Obsidian` is exactly this kind of decision: test whether the product honours it, don't second-guess it.
-- Treat every copy claim as a hypothesis to verify against the code and the product, per [Running a survey](../_survey/conventions.md#running-a-survey).
+- Treat every copy claim as a hypothesis to verify against the code and the product, per Running a survey.
 
 ## Budget
 
 - **Read completely** (they are the positioning): `README.md` end to end; the prose in `blog/` — currently the three numbered post directories, of which `1-…/meridian-why-i-built-a-markdown-first-calendar.md` is the positioning post, `1-…/interview.md` and `3-…/interview.md` are prose, and `2-how-meridian-was-built/` is a generated explorer (`explorer.html`, `iterations.json`) that should be skimmed for framing only, not read; the coach tour (`src/onboarding/CoachTour.tsx`); and the tutorial entries themselves, which live in `src/storage/devFixtures/tutorialVault.ts` (`exampleBackend.ts` is only the ~66-line backend shim that serves them) — the Tutorial vault is the product's argument for itself, made in content.
 - **Derive the revealed niche from the product, not the docs:** the feature surface (which capabilities are deep — recurrence, wikilinks, participants, search — and which are thin; line counts per `src/` directory are a fast first cut), the storage options and what each demands of a user (`src/storage/`, plus the trade-offs already recorded in [storage-backend.md](../../../plans/reports/storage-backend.md)), platform and browser constraints, the entry-format surface area in `src/model/fieldRegistry.ts` (`INLINE_FIELDS`, `STRUCTURAL_KEYS`) and the rest of `src/model/`, and what the default first-run path optimises for.
-- **Walk the first-run experience** on the example vault via the preview tools (follow the preview gotchas in `docs/agents/dev-server.md`: worktree-specific launch config, unique port, base path `/`). Judge it as a visitor deciding whether this product is for them. The real setup path can only be assessed from code and copy — see [what this environment can and cannot do](../_survey/conventions.md#what-this-environment-can-and-cannot-do) — so state that up front.
+- **Walk the first-run experience** on the example vault via the preview tools (follow the preview gotchas in `docs/agents/dev-server.md`: worktree-specific launch config, unique port, base path `/`). Judge it as a visitor deciding whether this product is for them. The real setup path can only be assessed from code and copy — see `## Environment limits` in `docs/agents/survey.md` — so state that up front.
 - **If no preview tooling is available in the session at all** — check before planning around it — the fallback is not the first resort. The repo already carries `@playwright/test` as a devDependency, so a session with Bash and a Chromium binary can still take real screenshots. Launch with `executablePath: '/opt/pw-browsers/chromium'`, because the repo's pinned Playwright expects a browser build the container doesn't have: start the server yourself (`pnpm exec vite --port <unique> --strictPort`), then drive it from a scratch script — importing `@playwright/test` by absolute path if the script lives outside the repo — at 390×844 and 1440×900, setting `localStorage['meridian_theme']` in an init script to reach each palette. That path was taken on the 2026-09-14 and 2026-11-01 runs, and category 3 came back fully assessed both times. Only if that is also unavailable: do not silently skip the visual work or quietly substitute a guess for it. Say so in the coverage statement, fall back to assessing visual identity from `src/index.css` tokens, the dependency set, and layout source, mark category 3 **partially assessed**, and flag any finding that rests on the un-taken screenshots as needing confirmation before it is acted on. An impression invented from tokens is worse than an admitted gap.
 - **Check the app's own front door**: `index.html`, the PWA manifest, the app name, and the icons (`public/icon*.png`). The install prompt and the home-screen icon are positioning surfaces too, and often the only ones a returning user sees.
 - **Read the visual identity as evidence, not decoration:** the theme tokens and their comments in `src/index.css` (colour, radius, density), the typography, the icon set (`lucide-react` — one family, consistently used?), the interaction vocabulary the dependencies imply (`vaul` drawers signal a mobile-native product; heavy dialog use would signal a desktop one), and the app icons. Capture screenshots at mobile and desktop width in every theme the app ships — the blind visual read above depends on them, so take them before analysing anything else.
@@ -84,7 +84,7 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
 
 ## Output structure
 
-**Reporting:** per the [shared reporting conventions](../_survey/conventions.md#reporting),
+**Reporting:** per the shared reporting conventions,
 including suggested improvements to this survey file itself.
 
 ### 1. Niche verdict (~6 sentences)
@@ -101,7 +101,7 @@ State the three niches from Phase 0 in one line each, then answer the two headli
 ### 3. Category verdicts
 
 One line per category (1–7). Verdicts follow the
-[shared convention](../_survey/conventions.md#category-verdicts): **clean** /
+shared convention: **clean** /
 **findings: #N, #M** / **partially assessed** (here, "the plan" means the
 walk). Clean is only available to categories actually walked.
 
@@ -112,7 +112,7 @@ This section is also where the status quo gets confirmed. If a category's walk f
 ### 4. Findings — top 5
 
 `Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are the
-[shared finding fields](../_survey/conventions.md#finding-fields), with three notes: `Breadth`
+shared finding fields, with three notes: `Breadth`
 counts **surfaces** rather than files; `Problem` is what the target user
 misunderstands, misses or walks away from; and `Fix` must present options rather
 than assert one for anything touching the niche itself. `Evidence` additionally
@@ -136,7 +136,7 @@ decisions: the plan lays out options and consequences, it does not pick. Example
 hazard note: "Haiku 4.5 if the approved headline text is given in the task; else
 Opus 5 in plan mode."
 
-Rank and report findings per the [shared convention](../_survey/conventions.md#ranking-findings) — here the summary table adds `gap` and `question` columns (finding → gap → question → recommended model).
+Rank and report findings per the shared convention — here the summary table adds `gap` and `question` columns (finding → gap → question → recommended model).
 
 **This formula routinely inverts the impact ordering, and that is intended, not a bug to correct.** A cheap mechanical fix touching five surfaces will outrank a strategy finding twice its impact, because the formula ranks return on effort, not importance. It therefore appears to contradict the scoring guidance at the foot of this document ("a gap that makes the right user bounce outranks any amount of imprecise wording"). Resolve it this way, explicitly, every time: **the niche verdict leads on impact** — it names the widest gap and the single change that would close the most of it, regardless of cost — while **the findings list ranks on the formula**. When the two orderings disagree, say so in one line above the findings table, so the reader is not left thinking the report buried its own headline.
 
@@ -156,7 +156,7 @@ Close with a short, explicit list of the **strategy questions this survey surfac
 
 ## Categories to walk — ranked by priority
 
-Ranking and bullets: see [Running a survey](../_survey/conventions.md#running-a-survey).
+Ranking and bullets: see Running a survey.
 
 ### 1. Niche fit — does the product serve the job it targets? _(highest weight)_
 
