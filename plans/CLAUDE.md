@@ -55,7 +55,7 @@ category tags replace it, so a run, a category, or a tier is each one label
 query. `plan:<name>` is unchanged for a plan and its steps (`plan:tooling`,
 `plan:ical-rrule`). An open product decision that isn't itself a survey
 finding is still its own issue, given a `## Decision needed` section. Carry the survey's own finding fields into the body
-(`.claude/skills/_survey/conventions.md` defines the shared six) and state the recommended
+(the workshop `surveys` skill defines the shared six) and state the recommended
 model tier in the first line, as the report files used to.
 `.github/ISSUE_TEMPLATE/survey-finding.md` is the skeleton.
 

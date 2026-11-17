@@ -5,7 +5,7 @@ label: security
 scope: worker src/storage src/editor src/routes/auth.callback.tsx src/settings .github/workflows package.json pnpm-lock.yaml vite.config.ts
 ---
 
-Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
+Read the workshop plugin's `surveys` skill before starting; its conventions apply to every run, and `docs/agents/survey.md` holds this repo's gates and environment limits.
 
 # Security Survey
 
@@ -59,7 +59,7 @@ Findings must be anchored to one or more of these.
 
 ## Process
 
-Three phases, in order, per [Running a survey](../_survey/conventions.md#running-a-survey):
+Three phases, in order, per Running a survey:
 
 1. **Threat plan.** For each invariant, name the code that upholds it (file and
    function) and the input that would break it.
@@ -103,7 +103,7 @@ not a description to cite.
 
 ## Output structure
 
-File the run per the [shared reporting conventions](../_survey/conventions.md#reporting),
+File the run per the shared reporting conventions,
 with `security` as the survey-type label.
 
 1. **Security verdict** (~5 sentences): can an attacker get the user's token or
@@ -111,8 +111,8 @@ with `security` as the survey-type label.
 2. **Coverage statement:** which invariants were probed versus reasoned about,
    gate status, and anything unverified with what would settle it.
 3. **Category verdicts:** one line per category below, per the
-   [shared convention](../_survey/conventions.md#category-verdicts).
-4. **Findings — top 6.** The [shared finding fields](../_survey/conventions.md#finding-fields),
+   shared convention.
+4. **Findings — top 6.** The shared finding fields,
    plus:
    - **Invariant violated** — which numbered invariant, under what conditions.
    - **Category** — one of the category tags below. These are not repo labels;

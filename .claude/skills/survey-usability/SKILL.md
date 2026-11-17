@@ -5,7 +5,7 @@ label: ux
 scope: src
 ---
 
-Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
+Read the workshop plugin's `surveys` skill before starting; its conventions apply to every run, and `docs/agents/survey.md` holds this repo's gates and environment limits.
 
 # Usability Survey
 
@@ -14,8 +14,8 @@ code.** The question is whether a person can do the jobs this product exists
 for — quickly, confidently, without surprises — not whether the code behind
 the screen is well made.
 
-Shared process, scoring, and reporting rules live in [the shared survey
-conventions](../_survey/conventions.md). Read that first; this file states only what's
+Shared process, scoring, and reporting rules live in the shared survey
+conventions. Read that first; this file states only what's
 specific to this survey, including the two shared fields it redefines
 (Evidence and Breadth).
 
@@ -41,7 +41,7 @@ belongs to one of them, hand it over in one line rather than reporting it here:
 - `data-integrity.md` — anything actually lost or corrupted.
 
 A defect two surveys both find is one issue: search open issues first, per
-[Reporting](../_survey/conventions.md#reporting), and comment rather than duplicate.
+Reporting, and comment rather than duplicate.
 
 ## Process
 
@@ -76,8 +76,7 @@ A defect two surveys both find is one issue: search open issues first, per
   screen's `Archived` list (2026-10-31) until the PR history named them. Use the default theme plus one dark theme — contrast
   across all themes is `health-ui.md`'s. Screenshot every step into the
   scratchpad; findings cite steps, not screenshots, since those cannot be
-  attached to an issue. Environment limits are in [what this environment can and
-  cannot do](../_survey/conventions.md#what-this-environment-can-and-cannot-do): only the
+  attached to an issue. Environment limits are in `docs/agents/survey.md`: only the
   Tutorial vault is reachable, so the add-vault flow is walked up to the
   browser-permission or OAuth hand-off, or the calendar's `Check calendar`
   (its server-side fetch fails here), and no further. Load the large vault
@@ -140,7 +139,7 @@ sweep once per distinct screen.
 
 ## Output structure
 
-**Reporting:** per the [shared reporting conventions](../_survey/conventions.md#reporting),
+**Reporting:** per the shared reporting conventions,
 with survey-type label `ux`, including suggested improvements to this survey
 file itself.
 
@@ -162,13 +161,13 @@ One row per task × viewport: **completed** / **completed with friction** /
 
 ### 4. Category verdicts
 
-One line per category (1–8), per the [shared
-convention](../_survey/conventions.md#category-verdicts).
+One line per category (1–8), per the shared
+convention.
 
 ### 5. Findings — top 7
 
-`Title`, `Recommended model`, `Problem` and `Fix` are the [shared finding
-fields](../_survey/conventions.md#finding-fields). This survey redefines two and adds four:
+`Title`, `Recommended model`, `Problem` and `Fix` are the shared finding
+fields. This survey redefines two and adds four:
 
 - **Evidence** — replaces the file-and-quote rule: the reproduction steps from
   a named starting URL and viewport, plus the **verbatim on-screen text**
@@ -183,7 +182,7 @@ fields](../_survey/conventions.md#finding-fields). This survey redefines two and
 - **Impact** — 1–10 (10 = a core task cannot be completed, or the user loses
   work without noticing; 5 = a core task completes, but only after a detour or
   error most first-time users would hit; 1 = cosmetic).
-- **Task context** — per [the shared rule](../_survey/conventions.md#write-findings-down-to-sonnet-5-where-you-honestly-can),
+- **Task context** — per the shared rule,
   filled in the locate step.
 
 **Fails silently here** (what sets the tier): a fix that makes the reported

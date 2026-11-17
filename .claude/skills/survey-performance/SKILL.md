@@ -5,7 +5,7 @@ label: performance
 scope: src
 ---
 
-Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
+Read the workshop plugin's `surveys` skill before starting; its conventions apply to every run, and `docs/agents/survey.md` holds this repo's gates and environment limits.
 
 # PWA Snappiness Survey
 
@@ -13,7 +13,7 @@ Survey this codebase for UI performance issues. The goal: the app should feel **
 
 Shared process, scoring, and reporting rules — model-tier ratings, the
 ranking formula, and how to report results — live in
-[the shared survey conventions](../_survey/conventions.md). Read that first; this file
+the shared survey conventions. Read that first; this file
 states only what's specific to this survey.
 
 ## Target user flows (the hot paths)
@@ -76,14 +76,14 @@ Findings must be anchored to one or more of these flows — an issue that no com
   more with `--sourcemap --outDir <scratch>` to attribute a chunk to packages.
 - **React Compiler is enabled** (`vite.config.ts` applies `reactCompilerPreset`; components and hooks are auto-memoized at build time). Static "missing `memo`" / "unstable props defeat memoization" reasoning does not transfer to this codebase — memoization findings must be backed by runtime render counts, never by code inspection alone.
 - **Dev-mode numbers are relative, not absolute.** The dev server runs unminified dev-mode React, which overstates ms costs. Treat dev-server measurements as baselines for before/after comparison, not as absolute latency claims. Measure flow 6 (cold start, first paint, service-worker behavior) and all bundle findings against the production build (`pnpm run build` + `vite preview`) — and since the big-vault generator is dev-only, accept the small example vault for prod-build measurements and state that limitation in the coverage statement.
-- **Only the example (Tutorial) backend is measurable** — see [what this environment can and cannot do](../_survey/conventions.md#what-this-environment-can-and-cannot-do). Record the other two as "traced, not measured".
+- **Only the example (Tutorial) backend is measurable** — see `## Environment limits` in `docs/agents/survey.md`. Record the other two as "traced, not measured".
 - **Measure amplification, not vibes.** "Missing `memo`" is not a finding by itself. A finding must show _amplification with a number attached_: this click re-renders N components (counted), this handler runs X ms of synchronous work before paint (measured), this module adds Y kB to the entry chunk (from build output). Count subscribers via grep where relevant, but the headline evidence is runtime measurement.
 - **Perceived performance counts as performance.** A toggle that persists in 300 ms but paints the checkmark optimistically in 16 ms is _fast_; one that paints after persistence is _slow_ even if total work is identical. Measure when pixels change (Event Timing `duration`, above), not just how much work runs.
-- Evaluate the code on its merits, per [Running a survey](../_survey/conventions.md#running-a-survey) — here "this is debounced" and "this is cached" are the claims to verify, against the measurements as well as the code.
+- Evaluate the code on its merits, per Running a survey — here "this is debounced" and "this is cached" are the claims to verify, against the measurements as well as the code.
 
 ## Budget
 
-- **Use the existing big-vault generator — do not write a new one** ([recipe](../_survey/conventions.md#what-this-environment-can-and-cannot-do)). The example vault is too small to expose scaling problems; run all measurements against the generated one and note its size in the coverage statement.
+- **Use the existing big-vault generator — do not write a new one** (recipe in `docs/agents/survey.md`, `## Environment limits`). The example vault is too small to expose scaling problems; run all measurements against the generated one and note its size in the coverage statement.
 - **Use the existing stress harness too — do not hand-roll instrumentation it
   already has.** `scripts/perf/` measures cold start, toggling and agenda scroll
   plus the pipeline stage by stage; read its README (phases, caveats) first, and
@@ -101,7 +101,7 @@ Findings must be anchored to one or more of these flows — an issue that no com
 
 ## Output structure
 
-**Reporting:** per the [shared reporting conventions](../_survey/conventions.md#reporting),
+**Reporting:** per the shared reporting conventions,
 including suggested improvements to this survey file itself.
 
 ### 1. Snappiness verdict (~5 sentences)
@@ -117,7 +117,7 @@ Plain-language summary: overall, where does the app do unnecessary or badly-time
 ### 3. Findings — top 5
 
 `Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are the
-[shared finding fields](../_survey/conventions.md#finding-fields), with two notes: `Breadth`
+shared finding fields, with two notes: `Breadth`
 may be counted in components-per-screen where the multiplication is the point,
 and `Fix` must state the **expected effect on the baseline number** (e.g.
 "render count per toggle should drop from ~180 to ~2"). This survey adds:
@@ -134,12 +134,12 @@ Reserve plan mode + multi-PR for an architecture change **or** a product
 decision (e.g. "cap the list" vs "restructure the virtualizer"). Example hazard
 note: "Sonnet 5 if the cache key is specified in the task; else Opus 5."
 
-A `Fix` that adds a cache, memo or incremental path must name the recompute-equivalence test ([conventions](../_survey/conventions.md#reporting)).
+A `Fix` that adds a cache, memo or incremental path must name the recompute-equivalence test (conventions).
 
-Rank and report findings per the [shared convention](../_survey/conventions.md#ranking-findings). Here, "confirming" a fix means re-running the measurement recipe.
+Rank and report findings per the shared convention. Here, "confirming" a fix means re-running the measurement recipe.
 
-Per [Don't pad the findings list](../_survey/conventions.md#dont-pad-the-findings-list) and
-[prefer systemic findings](../_survey/conventions.md#finding-fields): "every occurrence row
+Per Don't pad the findings list and
+prefer systemic findings: "every occurrence row
 subscribes to the whole store" beats "this one component lacks `useCallback`",
 and real numbers beat generic React-performance boilerplate.
 
@@ -147,7 +147,7 @@ and real numbers beat generic React-performance boilerplate.
 
 ## Categories to scan — ranked by priority
 
-Ranking and bullets: see [Running a survey](../_survey/conventions.md#running-a-survey).
+Ranking and bullets: see Running a survey.
 
 ### 1. Render amplification _(highest weight)_
 

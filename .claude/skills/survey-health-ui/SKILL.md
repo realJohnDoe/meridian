@@ -5,7 +5,7 @@ label: ui
 scope: src/components src/hooks src/calendar src/editor src/routes src/settings src/search src/onboarding
 ---
 
-Read [the shared survey conventions](../_survey/conventions.md) before starting; they apply to every run.
+Read the workshop plugin's `surveys` skill before starting; its conventions apply to every run, and `docs/agents/survey.md` holds this repo's gates and environment limits.
 
 # UI-Layer Health Survey
 
@@ -13,7 +13,7 @@ Survey the **UI layer** of this codebase for code health issues across the categ
 
 Shared process, scoring, and reporting rules — model-tier ratings, the
 ranking formula, category-verdict conventions, and how to report results —
-live in [the shared survey conventions](../_survey/conventions.md). Read that first; this
+live in the shared survey conventions. Read that first; this
 file states only what's specific to this survey.
 
 ## Scope
@@ -26,7 +26,7 @@ Start by identifying which directories constitute the UI layer and state that li
 
 ## Process
 
-Per [Running a survey](../_survey/conventions.md#running-a-survey): scan plan first, evaluate
+Per Running a survey: scan plan first, evaluate
 on merits, verify capability claims by inspection. That last one extends to
 component libraries here — check what the installed shadcn/radix components
 actually ship before claiming a custom implementation duplicates one. Two rules
@@ -56,7 +56,7 @@ are specific to this survey:
 - Skim the full directory tree once so nothing is invisible, then confine close reading to the UI layer.
 - Read closely: the app shell / root layout, the most-imported components and hooks (measure this — don't guess), the 15 largest component files, every file in the shared-components directory, and at least 2–3 representative components from every feature directory that renders UI.
 - **Read the UI toolchain, not just the source:** Tailwind config, global CSS / theme tokens, the shadcn component inventory (`components/ui/` or equivalent) and its divergence from upstream, lint config for React/JSX/a11y/Tailwind rules, and the component-test setup (or its absence). From `package.json`, inventory the **UI-related** dependencies (React ecosystem, radix/shadcn, styling, icons, animation, forms, a11y) and know where each is used — this feeds the Library Fit category.
-- **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. Install and generate the gitignored types first, per [what this environment can and cannot do](../_survey/conventions.md#what-this-environment-can-and-cannot-do).
+- **Run the existing quality gates once** — build, lint, and test — and report each gate's pass/fail status in the coverage statement. Install and generate the gitignored types first, per `## Environment limits` in `docs/agents/survey.md` (`## Environment limits` in `docs/agents/survey.md`).
 - **Look at the running app at phone width, in every theme — this survey cannot
   be done from jsdom.** Categories 3 and 2 are largely unreachable without it:
   touch-target size, safe-area insets, hover-only affordances, focus after
@@ -94,7 +94,7 @@ are specific to this survey:
 
 ## Output structure
 
-**Reporting:** per the [shared reporting conventions](../_survey/conventions.md#reporting),
+**Reporting:** per the shared reporting conventions,
 including suggested improvements to this survey file itself.
 
 ### 1. Health verdict (~5 sentences)
@@ -110,7 +110,7 @@ A plain-language summary of the UI layer's overall health. Name the **worst one 
 ### 3. Category verdicts
 
 One line per category (1–8). Verdicts follow the
-[shared convention](../_survey/conventions.md#category-verdicts): **clean** /
+shared convention: **clean** /
 **findings: #N, #M** / **partially assessed**.
 
 Category 8's **keep-custom verdicts** ("this custom UI is right, and here's
@@ -120,7 +120,7 @@ defects, and must not consume a slot in the top-N findings list below.
 ### 4. Findings
 
 `Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
-the [shared finding fields](../_survey/conventions.md#finding-fields). This survey adds:
+the shared finding fields. This survey adds:
 
 - **Category** — one or more tags from: `component-architecture` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `a11y` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
   (only `ux`, `performance`, `toolchain`, `dry`, `testing`, `security`, `dead-code` and `dependencies` exist as repo labels, and issue creation rejects a missing one — label with the nearest existing one and keep the exact tag in the body)
@@ -135,20 +135,20 @@ a structural change across the UI layer **or** a product decision (e.g.
 Example hazard note: "Sonnet 5 if the token names to use are listed in the
 task; else Opus 5."
 
-Rank and report findings per the [shared convention](../_survey/conventions.md#ranking-findings). Here, "confirming" a fix means re-running the build, lint, or the test suite.
+Rank and report findings per the shared convention. Here, "confirming" a fix means re-running the build, lint, or the test suite.
 
 **Breadth-in-files under-ranks concentrated findings — say so rather than inflating it.** A god component is, by construction, one file: the whole defect is that N repetitions of one concern live in the same place. So `(impact × breadth) ÷ effort` scores it below a one-line lint tweak whose guard happens to span 100 files, and the ranking then contradicts this survey's own instruction to prefer systemic and structural issues. Do not fix this by padding the breadth count. Report the honest file count, and where the rank and the impact disagree, add one line under the summary table saying which findings the formula demotes and why. The reader can then re-sort on impact, which is what the separate-fields rule is for.
 
 List the **top 7 findings**, numbered (the category verdicts above reference
-these numbers), per [Don't pad the findings
-list](../_survey/conventions.md#dont-pad-the-findings-list) and [prefer systemic
-findings](../_survey/conventions.md#finding-fields).
+these numbers), per Don't pad the findings
+list and prefer systemic
+findings.
 
 ---
 
 ## Categories to scan — ranked by priority
 
-Ranking and bullets: see [Running a survey](../_survey/conventions.md#running-a-survey).
+Ranking and bullets: see Running a survey.
 
 ### 1. Component Architecture & Boundaries _(highest weight)_
 
