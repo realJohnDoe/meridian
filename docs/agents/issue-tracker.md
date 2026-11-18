@@ -4,7 +4,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 ## Conventions
 
-Labels, blocked-by edges and sub-issues follow the workshop plugin's `conventions` skill (see `CLAUDE.md`).
+Labels, blocked-by edges and sub-issues follow the workshop plugin's `workshop-conventions` skill (see `CLAUDE.md`).
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
 - **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
@@ -29,7 +29,7 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue, labelled per `conventions`. After publishing tickets with blockers, run the `dispatcher` skill's dry run (`node <dispatcher skill>/scripts/dispatch.mjs --digest realJohnDoe/agent-skills --repos realJohnDoe/meridian`, writes nothing) and compare its plan against the intended order.
+Create a GitHub issue, labelled per `workshop-conventions`. After publishing tickets with blockers, run the `dispatcher` skill's dry run (`node <dispatcher skill>/scripts/dispatch.mjs --digest realJohnDoe/agent-skills --repos realJohnDoe/meridian`, writes nothing) and compare its plan against the intended order.
 
 ## When a skill says "fetch the relevant ticket"
 
@@ -40,8 +40,8 @@ Run `gh issue view <number> --comments`.
 Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
 
 - **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `gh issue create --label wayfinder:map`.
-- **Child ticket**: a sub-issue of the map (see `conventions`). Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
-- **Blocking**: a native blocked-by edge (see `conventions`); a ticket is unblocked when every blocker is closed.
+- **Child ticket**: a sub-issue of the map (see `workshop-conventions`). Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
+- **Blocking**: a native blocked-by edge (see `workshop-conventions`); a ticket is unblocked when every blocker is closed.
 - **Frontier query**: the map's open children with no open blocker and no assignee; first in map order wins.
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.

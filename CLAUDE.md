@@ -44,7 +44,7 @@ Using `npm install` will create a `package-lock.json` that must not be committed
 
 Once the first changeset of a session/task has been applied and verified (`pnpm run check` passing, re-run after the last edit), commit and push it to a feature branch right away — don't wait for an explicit "commit and push" ask each time. Keep committing and pushing subsequent changesets the same way as the task progresses.
 
-Before creating, labelling or ordering an issue, or opening a PR, follow the workshop plugin's `conventions` skill. Meridian's own labels are in `docs/agents/triage-labels.md`.
+Before creating, labelling or ordering an issue, or opening a PR, follow the workshop plugin's `workshop-conventions` skill. Meridian's own labels are in `docs/agents/triage-labels.md`.
 
 ## Dev server base path
 

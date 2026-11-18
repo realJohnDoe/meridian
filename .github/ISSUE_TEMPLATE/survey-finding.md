@@ -15,7 +15,7 @@ that label is retired. Label it instead with:
     `ux`, `retro`)
   - a model-tier label, and a `## Decision needed` body section if the
     finding hinges on a product decision only the maintainer can make: both
-    per the workshop plugin's `conventions` skill
+    per the workshop plugin's `workshop-conventions` skill
 Plan step (not a survey finding)? Label it `plan:<name>` instead and skip the
 above.
 

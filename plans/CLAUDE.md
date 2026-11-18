@@ -45,10 +45,10 @@ labelled with:
   `data-integrity`, `ux` (`usability.md`);
 - a **model-tier label** — exactly one of `haiku`, `sonnet`, `opus`,
   `opus-plan` — matching the Recommended model field (per the workshop
-  plugin's `conventions` skill).
+  plugin's `workshop-conventions` skill).
 
 A finding that hinges on a product decision only the maintainer can make gets
-a `## Decision needed` section (`conventions`), in place of a separate issue.
+a `## Decision needed` section (`workshop-conventions`), in place of a separate issue.
 
 There is no more `survey:<name>` label — the survey-type label plus the
 category tags replace it, so a run, a category, or a tier is each one label

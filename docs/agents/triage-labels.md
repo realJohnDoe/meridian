@@ -1,7 +1,7 @@
 # Triage Labels
 
 Tier, `ready-for-agent`, `deferred`, `automerge` and the `## Decision needed`
-section come from the workshop plugin's `conventions` skill; follow it. Only the
+section come from the workshop plugin's `workshop-conventions` skill; follow it. Only the
 labels below are Meridian's own. Category labels such as `security` or `ux` are
 for filtering and change nothing.
 
