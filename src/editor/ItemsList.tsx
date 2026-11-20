@@ -1,4 +1,4 @@
-import { useState, startTransition } from 'react'
+import { useState, useDeferredValue, type ReactNode } from 'react'
 import { X, ChevronDown } from 'lucide-react'
 import type { Occurrence, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
@@ -77,8 +77,6 @@ export function rowSortKey({ entry, occ }: Row, now: Date): SortKey {
 }
 
 export default function ItemsList({ items, onChange, roots, currentKey, vaultId, onPromote, onOpenWikilink, onToggleDone }: Props) {
-  // Opened inside a transition so the trigger paints at once while the done rows mount.
-  const [doneOpen,    setDoneOpen]    = useState(false)
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
   const [editText,    setEditText]    = useState('')
 
@@ -326,17 +324,28 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
         />
 
         {doneList.rows.length > 0 && (
-          <Collapsible open={doneOpen} onOpenChange={open => startTransition(() => setDoneOpen(open))}>
-            <CollapsibleTrigger className="flex items-center gap-1 mt-1 text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-180">
-              <ChevronDown size={12} className="transition-transform duration-200" />
-              Done · {doneRows.length}
-            </CollapsibleTrigger>
-            <CollapsibleBody className="pt-1.5">
-              {renderSection(doneList)}
-            </CollapsibleBody>
-          </Collapsible>
+          <DoneSection count={doneRows.length}>{renderSection(doneList)}</DoneSection>
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * The collapsible "Done · n" section. Its own component so a click re-renders
+ * only the trigger: the chevron follows `open` at once, and the rows mount from
+ * the deferred copy in an interruptible render after the chevron has painted.
+ */
+function DoneSection({ count, children }: { count: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const rowsOpen = useDeferredValue(open)
+  return (
+    <Collapsible open={rowsOpen} onOpenChange={() => setOpen(o => !o)}>
+      <CollapsibleTrigger data-open={open} className="flex items-center gap-1 mt-1 text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase hover:text-foreground transition-colors [&[data-open=true]>svg]:rotate-180">
+        <ChevronDown size={12} className="transition-transform duration-200" />
+        Done · {count}
+      </CollapsibleTrigger>
+      <CollapsibleBody className="pt-1.5">{children}</CollapsibleBody>
+    </Collapsible>
   )
 }
