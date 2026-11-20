@@ -152,7 +152,7 @@ export default function MonthStrip({ activeMonth, onNavigateMonth }: Props) {
               aria-current={m.key === activeKey ? 'date' : undefined}
               aria-label={m.ariaLabel}
               className={cn(
-                'shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors',
+                'shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors active:opacity-70',
                 // The current real month always reads as primary, even when
                 // it isn't the one being viewed; a viewed month that isn't
                 // today's gets a primary tint ringed in primary instead, so

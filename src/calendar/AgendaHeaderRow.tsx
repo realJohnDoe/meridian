@@ -13,7 +13,7 @@ interface Props {
 // HEADER_H in agendaSections.ts seeds the virtualizer's initial offset from
 // this box's height, so keep them in sync if the padding changes.
 const baseCls = cn(
-  'w-full px-3.5 pt-3.5 pb-1.5 text-xs',
+  'w-full px-3.5 pt-3.5 pb-1.5 text-xs active:opacity-70',
   'flex items-center gap-2 bg-background text-left',
   'after:content-[""] after:flex-1 after:h-px after:bg-border',
 )

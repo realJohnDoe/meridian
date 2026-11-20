@@ -125,7 +125,7 @@ function AllDayStripView({ allDay, dvDate, dvMidnight, isToday, onOpen, allDayEx
           <button
             type="button"
             onClick={() => setAllDayExpanded(true)}
-            className="h-5 flex items-center text-xs text-muted-foreground hover:text-secondary-foreground"
+            className="h-5 flex items-center text-xs text-muted-foreground hover:text-secondary-foreground active:opacity-70"
           >
             +{hiddenCount}
           </button>
