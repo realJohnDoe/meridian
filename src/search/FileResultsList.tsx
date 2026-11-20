@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { useEffect, useMemo, type RefObject } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { Occurrence } from '@/types'
 import { fileEntries } from '@/fileOccurrence'
@@ -30,17 +30,6 @@ interface Props {
 // Update if the card padding/gap changes.
 const ROW_H = 68
 
-// Delays re-filtering/re-rendering results until typing pauses, so a fast
-// typist doesn't re-mount hundreds of cards on every keystroke.
-function useDebouncedValue<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delayMs)
-    return () => clearTimeout(id)
-  }, [value, delayMs])
-  return debounced
-}
-
 /**
  * Deduped, file-granular search results for the bottom-bar filter overlay.
  *
@@ -62,13 +51,11 @@ export default function FileResultsList(props: Props) {
   const occBySlug = useFileOccurrenceMap()
   const backlinks = useStore(s => s.backlinks)
 
-  const debouncedQuery = useDebouncedValue(query, 150)
-
   const results = useMemo(() => {
-    if (!debouncedQuery) return []
+    if (!query) return []
     const entries = fileEntries(roots)
     const ranked = rankByQuery(
-      debouncedQuery,
+      query,
       entries,
       e => [e.title, ...e.tags, ...e.items].join(' '),
       e => e.title,
@@ -88,7 +75,7 @@ export default function FileResultsList(props: Props) {
         listedOn: (backlinks.get(entry.entryKey) ?? []).map(key => roots.get(key)?.title ?? key),
       }]
     })
-  }, [roots, backlinks, occBySlug, debouncedQuery])
+  }, [roots, backlinks, occBySlug, query])
 
   useEffect(() => { onResultsChange?.(results) }, [results, onResultsChange])
 

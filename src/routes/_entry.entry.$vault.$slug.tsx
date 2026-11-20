@@ -2,7 +2,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
-import { useFileOccurrenceMap, useEntryAccess } from '@/hooks'
+import { useFileOccurrenceMap, useEntryAccess, useReadyAfterMount } from '@/hooks'
 import { useEntryEditor } from '@/editor'
 import { expandRange, firstOccurrenceFrom } from '@/model'
 import { isEditScope, isSeries } from '@/types'
@@ -36,6 +36,10 @@ function EditableEntry({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
 
   const isFavorited = favorites.includes(occ.entryKey)
   const hooks = useEntryEditor(occ, scope ?? 'single')
+  // The topbar paints with the tap, the editor in the next render — see
+  // useReadyAfterMount. Safe here because an existing entry's editor never
+  // takes focus on mount (only a blank new draft does, on its own route).
+  const ready = useReadyAfterMount()
 
   return (
     <>
@@ -46,7 +50,7 @@ function EditableEntry({ occ, scope }: { occ: Occurrence; scope?: EditScope }) {
         onBack={hooks.handleClose}
       />
       <Suspense fallback={<EntrySkeleton />}>
-        <EntryEditor hooks={hooks} items={items} roots={roots} />
+        {ready ? <EntryEditor hooks={hooks} items={items} roots={roots} /> : <EntrySkeleton />}
       </Suspense>
     </>
   )
