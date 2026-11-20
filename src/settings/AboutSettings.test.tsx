@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import AboutSettings from './AboutSettings'
 
 describe('AboutSettings', () => {
@@ -42,5 +42,17 @@ describe('AboutSettings', () => {
       expect(link).toHaveAttribute('target', '_blank')
       expect(link).toHaveAttribute('rel', 'noreferrer')
     }
+  })
+
+  it('copies the performance log', () => {
+    const writeText = vi.fn(() => Promise.resolve())
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    render(<AboutSettings />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('meridian perf journal'))
+    expect(screen.getByRole('button', { name: 'Copied' })).toBeInTheDocument()
   })
 })

@@ -26,6 +26,7 @@ export { startCrossTabSync } from './crossTabSync'
 export { resetSyncBackoff } from './syncState'
 
 export { cacheDirtyCount } from './cache/files'
+export { copyDetails } from './notifications'
 
 export {
   startGitHubSignIn, completeGitHubSignIn, fetchInstalledRepos, findReusableGitHubSession,
