@@ -1,5 +1,8 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Code2, Scale, Bug, ExternalLink } from 'lucide-react'
+import { Button } from '@/components/primitives/button'
+import { perfJournalCount, perfJournalDump } from '@/lib/perfJournal'
+import { copyDetails } from '@/storage'
 import { SettingsSection, SettingsRow } from './SettingsSection'
 
 const REPO_URL    = 'https://github.com/realJohnDoe/meridian'
@@ -32,6 +35,23 @@ function AboutLinkRow({ icon, label, value, href }: {
   )
 }
 
+/** Copies `lib/perfJournal.ts`'s record of slow taps and frames, for pasting into an issue. */
+function PerfLogRow() {
+  const [copied, setCopied] = useState(false)
+  const count = perfJournalCount()
+  return (
+    <SettingsRow
+      label="Performance log"
+      description={`${count} slow ${count === 1 ? 'moment' : 'moments'} recorded this session. Copy it into an issue when the app felt sluggish.`}
+      control={
+        <Button variant="outline" size="sm" onClick={() => { copyDetails(perfJournalDump()); setCopied(true) }}>
+          {copied ? 'Copied' : 'Copy'}
+        </Button>
+      }
+    />
+  )
+}
+
 /**
  * The project's only route back to itself: what an installed, chrome-less PWA
  * is, where its source lives, and where to send feedback. No telemetry, no
@@ -57,6 +77,7 @@ export default function AboutSettings() {
         label="Report an issue"
         href={ISSUES_URL}
       />
+      <PerfLogRow />
     </SettingsSection>
   )
 }

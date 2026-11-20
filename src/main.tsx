@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import { routeTree } from './routeTree.gen'
 import { AppErrorFallback } from '@/components'
+import { startPerfJournal } from '@/lib/perfJournal'
+
+startPerfJournal()
 
 // After a PWA update the old chunk hashes are gone from the cache. Reload so
 // the new SW serves the updated bundles instead of crashing on a stale import;
