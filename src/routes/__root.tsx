@@ -7,6 +7,7 @@ import { useVisibleViewportCssVars } from '@/hooks'
 import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync } from '@/storage'
 import { requestScrollToToday, getCurrentDate, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
 import { flushActiveAutoSave } from '@/autoSaveFlushPort'
+import { onIdle } from '@/lib/idle'
 import { Toaster } from '@/components/ui/sonner'
 import { MovedNotice } from './-movedNotice'
 import { ReconnectVaults } from './-reconnectVaults'
@@ -206,6 +207,14 @@ function Root() {
   // ordinary tab switch and move the calendar to the new today accordingly.
   const lastActiveDayRef = useRef(startOfToday().getTime())
   const router = useRouter()
+
+  // Warm the entry route's chunk once the app is idle. Entries are opened by
+  // imperative navigate() calls, not <Link>, so defaultPreload never fires for
+  // them; without this the first tap on an entry also parses CodeMirror.
+  // Code only: no route has a loader, so this has no data side effects.
+  useEffect(() => onIdle(() => {
+    router.loadRouteChunk(router.routesById['/_entry/entry/$vault/$slug'])?.catch(() => {})
+  }, 5_000), [router])
 
   useEffect(() => {
     void restoreVaults()

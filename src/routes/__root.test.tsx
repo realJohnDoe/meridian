@@ -36,7 +36,12 @@ const {
     // Mutable so tests can flip between "inside the app shell" and "outside
     // it" (e.g. /_entry, /settings) without re-mocking per test.
     routeIds: { current: ['/_app'] as string[] },
-    router: { state: { location: { pathname: '/' } }, navigate: vi.fn() },
+    router: {
+      state: { location: { pathname: '/' } },
+      navigate: vi.fn(),
+      routesById: { '/_entry/entry/$vault/$slug': { id: '/_entry/entry/$vault/$slug' } },
+      loadRouteChunk: vi.fn(),
+    },
   }
 })
 
@@ -91,6 +96,20 @@ describe('__root — startup', () => {
   it('restores saved vaults on mount', () => {
     render(<Root />)
     expect(restoreVaults).toHaveBeenCalledTimes(1)
+  })
+
+  it('warms the entry route chunk once idle, not during the first paint', () => {
+    render(<Root />)
+    expect(router.loadRouteChunk).not.toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(5_000) })
+    expect(router.loadRouteChunk).toHaveBeenCalledWith({ id: '/_entry/entry/$vault/$slug' })
+  })
+
+  it('swallows a failed entry chunk warm-up (a stale chunk is handled by vite:preloadError)', () => {
+    router.loadRouteChunk.mockReturnValueOnce(Promise.reject(new Error('stale chunk')))
+    render(<Root />)
+    act(() => { vi.advanceTimersByTime(5_000) })
+    expect(router.loadRouteChunk).toHaveBeenCalledTimes(1)
   })
 
   it('renders the routed content', () => {
