@@ -74,7 +74,7 @@ function ParticipantAvatars({ participants, onOpen }: { participants: string[]; 
   return (
     <div
       aria-hidden
-      className="flex items-center self-center shrink-0 pl-1 pointer-events-auto cursor-pointer"
+      className="flex items-center self-center shrink-0 pl-1 pointer-events-auto cursor-pointer active:opacity-70"
       onClick={onOpen}
     >
       {shown.map((name, i) => (

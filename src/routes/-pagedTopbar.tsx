@@ -67,7 +67,7 @@ export function PagedTopbar({
       aria-expanded={expanded}
       aria-controls="quickNavPanel"
       className={cn(
-        'flex items-center gap-1 min-w-0 text-left',
+        'flex items-center gap-1 min-w-0 text-left active:opacity-70',
         // With paging chevrons rendered, the button must shrink to fit its
         // own content (label + chevron) rather than claim flex-1 — mr-auto
         // then pushes the chevrons to the row's right edge in its place;

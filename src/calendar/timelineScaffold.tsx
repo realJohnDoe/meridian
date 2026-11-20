@@ -112,7 +112,7 @@ export function TimelineScroller({
 // pane was paying 7 columns × HOURS times, per mounted pane.
 const HOUR_CELL_CLASS = cn(
   occRadius,
-  'absolute inset-x-0 bg-muted-subtle cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'absolute inset-x-0 bg-muted-subtle active:bg-accent cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
 )
 
 interface HourCellsProps {

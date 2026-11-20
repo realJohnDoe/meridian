@@ -263,7 +263,7 @@ function LiveWeekAllDayStrip({ weekStart, days, clockValue, onOpen, allDayExpand
                 type="button"
                 onClick={() => setAllDayExpanded(true)}
                 style={{ gridColumn: col + 1, gridRow: label.row + 1 }}
-                className="text-3xs sm:text-2xs text-muted-foreground hover:text-secondary-foreground text-left px-0.5 sm:px-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="text-3xs sm:text-2xs text-muted-foreground hover:text-secondary-foreground active:opacity-70 text-left px-0.5 sm:px-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               >
                 +{label.hidden}
               </button>
@@ -465,7 +465,7 @@ export default function WeekPane(props: Props) {
                 key={fmtISO(d)}
                 type="button"
                 onClick={() => onDayClick(d)}
-                className="flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1.5 hover:bg-muted-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                className="flex-1 min-w-0 flex flex-col items-center gap-0.5 py-1.5 hover:bg-muted-subtle active:bg-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                 aria-label={fmtShort(d)}
               >
                 <span className="text-2xs font-semibold tracking-[.06em] uppercase text-muted-foreground">

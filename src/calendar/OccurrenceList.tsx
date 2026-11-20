@@ -170,7 +170,7 @@ function DoneHeaderRow({ count, open, onToggle }: DoneHeaderProps) {
       type="button"
       aria-expanded={open}
       onClick={onToggle}
-      className="flex items-center gap-1 mx-3.5 mt-2 mb-1 text-xs font-bold text-secondary-foreground tracking-[.08em] uppercase hover:text-foreground transition-colors"
+      className="flex items-center gap-1 mx-3.5 mt-2 mb-1 text-xs font-bold text-secondary-foreground tracking-[.08em] uppercase hover:text-foreground active:opacity-70 transition-colors"
     >
       <ChevronDown size={12} className={cn('transition-transform duration-200', open && 'rotate-180')} />
       Done · {count}
