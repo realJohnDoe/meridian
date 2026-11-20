@@ -82,7 +82,7 @@ export function SettingsLinkRow({ icon, label, description, value, badge, ...lin
   return (
     <Link
       {...link}
-      className="flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+      className="flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent active:bg-accent focus-visible:bg-accent focus-visible:outline-none"
     >
       {icon}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">

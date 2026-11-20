@@ -7,6 +7,10 @@ import { startPerfJournal } from '@/lib/perfJournal'
 
 startPerfJournal()
 
+// iOS Safari only applies :active (the pressed styles) once some touch listener
+// exists on the document; this no-op is the standard way to opt in.
+document.addEventListener('touchstart', () => {}, { passive: true })
+
 // After a PWA update the old chunk hashes are gone from the cache. Reload so
 // the new SW serves the updated bundles instead of crashing on a stale import;
 // routes' lazyChunk() keeps its Suspense fallback up meanwhile, rather than

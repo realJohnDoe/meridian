@@ -46,13 +46,13 @@ function IconButton(props: IconButtonProps) {
       aria-label={label}
       className={cn(
         'relative inline-flex shrink-0 items-center justify-center touch-manipulation',
-        'rounded-sm transition-colors disabled:cursor-not-allowed',
+        'rounded-sm transition-colors active:opacity-60 disabled:cursor-not-allowed',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
         hit === 'expand'
           // Centered 44px hit zone, size-independent of the icon it wraps.
           ? "before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
           : 'p-1.5',
-        variant === 'ghost' && 'h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground',
+        variant === 'ghost' && 'h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground active:bg-accent',
         className,
       )}
       {...rest}

@@ -76,7 +76,7 @@ function AgendaOverdueGroupRow({ occ, count, oldest, onOpen, onToggleDone, onSwi
                 layout, so wrapping it doesn't shift the centered Badge. */}
             <button
               type="button"
-              className="contents"
+              className="contents [&:active>*]:opacity-70"
               title={`${count} overdue, oldest ${fmtShort(oldest)}`}
               onClick={() => toast(`Missed ${count} times — oldest ${fmtShort(oldest)}`)}
             >
