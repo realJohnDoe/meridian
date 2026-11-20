@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { Plus, X, Tag, ChevronDown, CircleCheck } from 'lucide-react'
+import { useState, startTransition } from 'react'
+import { X, ChevronDown } from 'lucide-react'
 import type { Occurrence, Roots } from '@/types'
 import type { EntryKey } from '@/fileIO'
 import { parseItemEntry, itemKeys, serializeTaskEntry } from './items'
-import { fileEntries, fileOccurrenceMap } from '@/fileOccurrence'
+import { fileOccurrenceMap } from '@/fileOccurrence'
 import { useStore } from '@/store'
 import { resolveWikilink } from '@/wikilinks'
 import { OccurrenceCard, TagChip, FlipList } from '@/components'
@@ -14,11 +14,9 @@ import { occKind } from '@/occView'
 import { IconButton } from '@/components/primitives/icon-button'
 import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { CollapsibleBody } from '@/components/primitives/collapsible-body'
-import { Command, CommandInput, CommandList, CommandGroup, CommandItem, CommandEmpty } from '@/components/ui/command'
-import { FloatingComboboxList } from './FloatingComboboxList'
+import { ItemsPicker } from './ItemsPicker'
 import { reopenOcc } from '@/occurrenceActions'
-import { rankByQuery } from '@/lib/matching'
-import { useFloatingCombobox, useFileOccurrenceMap, useLeavingRows } from '@/hooks'
+import { useFileOccurrenceMap, useLeavingRows } from '@/hooks'
 import { CollapseRow } from '@/components/primitives/collapse-row'
 
 interface Props {
@@ -79,11 +77,10 @@ export function rowSortKey({ entry, occ }: Row, now: Date): SortKey {
 }
 
 export default function ItemsList({ items, onChange, roots, currentKey, vaultId, onPromote, onOpenWikilink, onToggleDone }: Props) {
-  const [pickerOpen,  setPickerOpen]  = useState(false)
-  const [pickerQuery, setPickerQuery] = useState('')
+  // Opened inside a transition so the trigger paints at once while the done rows mount.
+  const [doneOpen,    setDoneOpen]    = useState(false)
   const [editingIdx,  setEditingIdx]  = useState<number | null>(null)
   const [editText,    setEditText]    = useState('')
-  const { anchorRef, listRef, placement } = useFloatingCombobox(pickerOpen, setPickerOpen)
 
   const occBySlug = useFileOccurrenceMap()
   const backlinks = useStore(s => s.backlinks)
@@ -96,8 +93,6 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   // file" again — a wikilink's stored ref is always the bare fileSlug (see
   // addLink), so it compares directly against FilePickerEntry.fileSlug.
   const linkedSlugs = new Set(entries.filter(e => e.kind === 'link').map(e => e.ref))
-  const allFiles  = fileEntries(roots, vaultId ?? undefined).filter(e => !linkedSlugs.has(e.fileSlug))
-  const filtered  = pickerQuery ? rankByQuery(pickerQuery, allFiles, e => e.title) : allFiles
 
   const sortedRows: Row[] = (() => {
     const rows: Row[] = entries.map(entry => {
@@ -123,8 +118,6 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
     const t = text.trim()
     if (!t) return
     onChange([...items, serializeTaskEntry(t, false)])
-    setPickerQuery('')
-    setPickerOpen(false)
   }
 
   // A file stores the BARE slug, never the key — the vault is implied by which
@@ -140,8 +133,6 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
       const occ = target ? occBySlug.get(target) : undefined
       if (occ && isDimmed(occ)) reopenOcc(occ)
     }
-    setPickerQuery('')
-    setPickerOpen(false)
   }
 
   // Animate out, exactly as ticking a row done does — a removal is the same
@@ -190,15 +181,6 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
   const doneList   = useLeavingRows(doneRows,   row => row.entry.key)
   const leave = (row: Row) => (isDoneRow(row) ? doneList : activeList).beginLeave(row)
 
-  const donePickerRows = (() => {
-    const q = pickerQuery.toLowerCase()
-    return doneRows.filter(({ entry, occ }) => {
-      if (!q) return true
-      if (entry.kind === 'task') return entry.text.toLowerCase().includes(q)
-      return occ ? occ.metadata.title.toLowerCase().includes(q) : entry.ref.toLowerCase().includes(q)
-    })
-  })()
-
   const redoItem = (row: Row) => {
     const { entry, occ } = row
     if (entry.kind === 'task') {
@@ -206,8 +188,6 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
     } else if (occ) {
       reopenOcc(occ)
     }
-    setPickerQuery('')
-    setPickerOpen(false)
   }
 
   function renderRowContent(row: Row) {
@@ -332,96 +312,21 @@ export default function ItemsList({ items, onChange, roots, currentKey, vaultId,
             running so the two never animate the same rows at once. */}
         {renderSection(activeList)}
 
-        {/* Add item — half-card affordance, same dimensions as item cards.
-            The input never moves once opened (see useFloatingCombobox); only
-            the suggestion list floats above or below it. */}
-        <div className="flex items-start gap-1">
-          <div ref={anchorRef} className="flex-1">
-            <Command shouldFilter={false} className="contents">
-              {pickerOpen ? (
-                <div className="rounded-lg border border-input bg-background">
-                  <CommandInput
-                    wrapperClassName="border-b-0"
-                    placeholder="Add an item or link an entry…"
-                    value={pickerQuery}
-                    onValueChange={setPickerQuery}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && pickerQuery.trim() && filtered.length === 0) {
-                        addTask(pickerQuery)
-                      }
-                    }}
-                  />
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 rounded-lg bg-state-subtle pl-2 pr-2.5 py-2 text-left text-primary-text shadow-none transition-colors hover-layer"
-                  onClick={() => setPickerOpen(true)}
-                >
-                  <Plus size={13} className="shrink-0" />
-                  <span className="text-sm">Add item…</span>
-                </button>
-              )}
-              <FloatingComboboxList placement={placement} listRef={listRef} className="w-64">
-                <CommandList>
-                  {pickerQuery.trim() && (
-                    <CommandItem
-                      value={`__task__${pickerQuery}`}
-                      onSelect={() => addTask(pickerQuery)}
-                    >
-                      <Tag size={13} className="shrink-0 opacity-60" />
-                      <span>Add <strong>"{pickerQuery.trim()}"</strong></span>
-                    </CommandItem>
-                  )}
-                  {donePickerRows.length > 0 && (
-                    <CommandGroup heading="Done items">
-                      {donePickerRows.slice(0, 8).map(row => {
-                        const { entry, occ } = row
-                        const label = entry.kind === 'task'
-                          ? entry.text
-                          : (occ?.metadata.title ?? entry.ref)
-                        return (
-                          <CommandItem
-                            key={entry.idx}
-                            value={`__redo__${entry.idx}`}
-                            onSelect={() => redoItem(row)}
-                          >
-                            <CircleCheck size={13} className="shrink-0 opacity-60" />
-                            <span className="truncate">{label}</span>
-                          </CommandItem>
-                        )
-                      })}
-                    </CommandGroup>
-                  )}
-                  {filtered.length > 0 && (
-                    <CommandGroup heading="Link an entry">
-                      {filtered.slice(0, 8).map(e => (
-                        <CommandItem
-                          key={e.fileSlug}
-                          value={e.fileSlug}
-                          onSelect={() => addLink(e.fileSlug)}
-                        >
-                          <span className="truncate">{e.title}</span>
-                          {e.tags[0] && (
-                            <span className="ml-auto text-2xs text-muted-foreground shrink-0">{e.tags[0]}</span>
-                          )}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  )}
-                  {!pickerQuery && filtered.length === 0 && donePickerRows.length === 0 && (
-                    <CommandEmpty>No files found</CommandEmpty>
-                  )}
-                </CommandList>
-              </FloatingComboboxList>
-            </Command>
-          </div>
-          {/* Spacer matching the X button so the card aligns with cards above */}
-          <span className="w-5 shrink-0" aria-hidden="true" />
-        </div>
+        <ItemsPicker
+          roots={roots}
+          vaultId={vaultId}
+          linkedSlugs={linkedSlugs}
+          doneItems={doneRows.map(({ entry, occ }) => ({
+            key: entry.key,
+            label: entry.kind === 'task' ? entry.text : (occ?.metadata.title ?? entry.ref),
+          }))}
+          onAddTask={addTask}
+          onAddLink={addLink}
+          onRedo={key => { const row = doneRows.find(r => r.entry.key === key); if (row) redoItem(row) }}
+        />
 
         {doneList.rows.length > 0 && (
-          <Collapsible defaultOpen={false}>
+          <Collapsible open={doneOpen} onOpenChange={open => startTransition(() => setDoneOpen(open))}>
             <CollapsibleTrigger className="flex items-center gap-1 mt-1 text-2xs font-semibold text-muted-foreground tracking-[.05em] uppercase hover:text-foreground transition-colors [&[data-state=open]>svg]:rotate-180">
               <ChevronDown size={12} className="transition-transform duration-200" />
               Done · {doneRows.length}
