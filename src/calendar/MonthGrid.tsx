@@ -15,13 +15,12 @@ import { monthGridCells } from './monthGridCells'
 const EMPTY: Occurrence[] = []
 import { useExpandWithMultiday } from './useExpandWithMultiday'
 import { useNow } from './useNow'
-import { useToday, useOccPainter, useMediaQuery, useOpenEntry } from '@/hooks'
+import { useToday, useOccPainter, useMediaQuery, useOpenEntry, useReadyAfterMount } from '@/hooks'
 import { useCalendarFilter } from './useCalendarFilter'
 import { SurfaceButton } from '@/components/primitives/surface-button'
 import { cn } from '@/lib/cn'
 import { OccurrencePill } from './OccurrencePill'
 import { EMPTY_EXPANSION_WINDOW } from './deferredExpansionWindow'
-import { useReadyAfterMount } from './useReadyAfterMount'
 
 
 // ── CalCell ───────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { AgendaView } from '@/calendar'
-import { useOpenEntry } from '@/hooks'
+import { useOpenEntry, useReadyAfterMount } from '@/hooks'
 import { useStore } from '@/store'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -31,6 +31,11 @@ function AgendaSkeleton() {
 function AgendaPage() {
   const vaultLoading = useStore(s => s.vaultLoading)
   const onOpen = useOpenEntry()
+  // Skeleton for the first commit after a navigation back here too, so the
+  // tap paints before the agenda mounts — see useReadyAfterMount. AgendaView
+  // then mounts exactly as it does after a cold start: its scroll restore and
+  // any pending requestScrollToDate wait in viewState until it reads them.
+  const ready = useReadyAfterMount()
 
   // Skeleton until the cache-first paint is *complete*, not until the first
   // vault's rows show up.
@@ -48,7 +53,7 @@ function AgendaPage() {
   // navigation. Phase 1 is indexed Dexie reads with no network, and the
   // background sync still refines the agenda in place afterwards — so the
   // cost is a few milliseconds against a first frame that is actually right.
-  if (vaultLoading) {
+  if (vaultLoading || !ready) {
     return (
       <div className="flex-1 overflow-y-auto [-webkit-overflow-scrolling:touch]">
         <AgendaSkeleton />

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import FileResultsList, { type FileSearchResult } from './FileResultsList'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey, makeRootMeta, TEST_VAULT } from '@/test-utils'
 import type { Roots } from '@/types'
@@ -20,7 +20,6 @@ let clientHeightDescriptor: PropertyDescriptor | undefined
 let clientWidthDescriptor: PropertyDescriptor | undefined
 
 beforeEach(() => {
-  vi.useFakeTimers()
   offsetHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
   offsetWidthDescriptor  = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 600 })
@@ -33,7 +32,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  vi.useRealTimers()
   if (offsetHeightDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeightDescriptor)
   if (offsetWidthDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor)
   if (clientHeightDescriptor) Object.defineProperty(HTMLElement.prototype, 'clientHeight', clientHeightDescriptor)
@@ -71,28 +69,21 @@ function renderList(highlightedEntryKey: string | null = null) {
   return { onOpen, onResultsChange, container, type }
 }
 
-function flushDebounce() {
-  act(() => { vi.advanceTimersByTime(150) })
-}
-
 describe('FileResultsList', () => {
   it('renders nothing for an empty query', () => {
     const occ = makeOcc({ entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
     const { container } = renderList()
-    flushDebounce()
     expect(container.firstChild).toBeEmptyDOMElement()
   })
 
-  it('shows a matching file after the debounce settles', () => {
+  it('shows a matching file', () => {
     const occ = makeOcc({ entryKey: testKey('note.md') })
     seedStore([occ], makeRoots('note.md', { title: 'Standup' }))
     const { type } = renderList()
 
     type('stand')
-    expect(screen.queryByText('Standup')).not.toBeInTheDocument() // not yet — debounce hasn't settled
 
-    flushDebounce()
 
     expect(screen.getByText('Standup')).toBeInTheDocument()
   })
@@ -103,7 +94,6 @@ describe('FileResultsList', () => {
     const { type } = renderList()
 
     type('zzz')
-    flushDebounce()
 
     expect(screen.queryByText('Standup')).not.toBeInTheDocument()
   })
@@ -119,7 +109,6 @@ describe('FileResultsList', () => {
     const { type } = renderList()
 
     type('urgent')
-    flushDebounce()
 
     expect(screen.getByText('Groceries')).toBeInTheDocument()
   })
@@ -133,7 +122,6 @@ describe('FileResultsList', () => {
     const { type, container } = renderList()
 
     type('pra')
-    flushDebounce()
 
     const titles = [...container.querySelectorAll('.text-sm.font-medium')].map(el => el.textContent)
     expect(titles).toEqual(['Practice notes', 'Xylophone practice'])
@@ -146,7 +134,6 @@ describe('FileResultsList', () => {
     const { type, container } = renderList()
 
     type('stand')
-    flushDebounce()
 
     expect(container.querySelectorAll('[data-testid="entry-card"]')).toHaveLength(1)
   })
@@ -157,7 +144,6 @@ describe('FileResultsList', () => {
     const { type, onOpen } = renderList()
 
     type('stand')
-    flushDebounce()
     fireEvent.click(screen.getByRole('button', { name: 'Standup' }))
 
     expect(onOpen).toHaveBeenCalledTimes(1)
@@ -183,7 +169,6 @@ describe('FileResultsList', () => {
     const { type, container } = renderList()
 
     type('handy')
-    flushDebounce()
 
     expect(container.querySelectorAll('[data-testid="entry-card"]')).toHaveLength(1)
     expect(screen.getByText('handy')).toBeInTheDocument()
@@ -201,7 +186,6 @@ describe('FileResultsList', () => {
     const { type } = renderList()
 
     type('stand')
-    flushDebounce()
 
     expect(screen.getByText('Linked From')).toBeInTheDocument()
   })
@@ -212,7 +196,6 @@ describe('FileResultsList', () => {
     const { type, onResultsChange } = renderList()
 
     type('stand')
-    flushDebounce()
 
     const [results] = onResultsChange.mock.calls.at(-1)!
     expect(results).toHaveLength(1)
@@ -225,7 +208,6 @@ describe('FileResultsList', () => {
     const { type } = renderList(testKey('note.md'))
 
     type('stand')
-    flushDebounce()
 
     expect(document.getElementById(`search-option-${testKey('note.md')}`)?.className).toMatch(/ring-2/)
   })

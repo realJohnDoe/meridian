@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createRef } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import SearchResults, { type SearchRow } from './SearchResults'
 import { setupStore, seedStore, makeOcc, makeRoots, testKey } from '@/test-utils'
 
@@ -17,7 +17,6 @@ let clientHeightDescriptor: PropertyDescriptor | undefined
 let clientWidthDescriptor: PropertyDescriptor | undefined
 
 beforeEach(() => {
-  vi.useFakeTimers()
   offsetHeightDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
   offsetWidthDescriptor  = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 600 })
@@ -30,7 +29,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  vi.useRealTimers()
   if (offsetHeightDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeightDescriptor)
   if (offsetWidthDescriptor) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidthDescriptor)
   if (clientHeightDescriptor) Object.defineProperty(HTMLElement.prototype, 'clientHeight', clientHeightDescriptor)
@@ -57,10 +55,6 @@ function renderResults(highlightedIndex = -1) {
   return { onOpen, onCreate, onRowsChange, type }
 }
 
-function flushDebounce() {
-  act(() => { vi.advanceTimersByTime(150) })
-}
-
 describe('SearchResults', () => {
   it('hides the Create row when the query is empty', () => {
     renderResults()
@@ -82,7 +76,6 @@ describe('SearchResults', () => {
     const { type } = renderResults()
 
     type('stand')
-    flushDebounce()
 
     expect(screen.getByText('Standup')).toBeInTheDocument()
   })
@@ -93,7 +86,6 @@ describe('SearchResults', () => {
     const { type, onOpen } = renderResults()
 
     type('stand')
-    flushDebounce()
     fireEvent.click(screen.getByRole('button', { name: 'Standup' }))
 
     expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ entryKey: testKey('note.md') }))
@@ -109,7 +101,6 @@ describe('SearchResults', () => {
     const { type, onRowsChange } = renderResults()
 
     type('Morning Run')
-    flushDebounce()
 
     const [rows, defaultIndex] = onRowsChange.mock.calls.at(-1)!
     expect(defaultIndex).toBe(1)
@@ -124,7 +115,6 @@ describe('SearchResults', () => {
     const { type, onRowsChange } = renderResults()
 
     type('Morning') // matches "Morning Run" but isn't exactly it
-    flushDebounce()
 
     const [, defaultIndex] = onRowsChange.mock.calls.at(-1)!
     expect(defaultIndex).toBe(0)
@@ -136,7 +126,6 @@ describe('SearchResults', () => {
     const { type, onOpen, onCreate, onRowsChange } = renderResults()
 
     type('Morning Run')
-    flushDebounce()
 
     const [rows] = onRowsChange.mock.calls.at(-1)!
     rows[1]!.activate()

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type RefObject } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState, type RefObject } from 'react'
 import { Plus } from 'lucide-react'
 import type { Occurrence } from '@/types'
 import FileResultsList, { type FileSearchResult } from './FileResultsList'
@@ -36,6 +36,12 @@ export default function SearchResults(props: Props) {
   const { query, onOpen, onCreate, scrollRef, onRowsChange } = props
   const highlightedIndex = props.highlightedIndex ?? -1
   const [results, setResults] = useState<FileSearchResult[]>([])
+  // The input and the Create row follow `query` with each keystroke; the
+  // ranked list gets a deferred copy, so it re-renders in an interruptible
+  // background pass that the next keystroke abandons rather than waits for.
+  // '' on mount: the overlay mounts on the first keystroke, and that one
+  // shouldn't wait for the list either.
+  const deferredQuery = useDeferredValue(query, '')
 
   const rows = useMemo<SearchRow[]>(() => {
     const list: SearchRow[] = []
@@ -84,7 +90,7 @@ export default function SearchResults(props: Props) {
       )}
 
       <FileResultsList
-        query={query}
+        query={deferredQuery}
         onOpen={onOpen}
         scrollRef={scrollRef}
         onResultsChange={setResults}

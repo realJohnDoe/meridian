@@ -2,6 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo } from 'react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { fmtISO, parseMonth } from '@/model'
 import { setCurrentDate, monthDayKeptDate } from '@/calendar'
+import { useReadyAfterMount } from '@/hooks'
 import { PageSkeleton } from '@/components/primitives/page-skeleton'
 import { lazyChunk } from './-lazyChunk'
 
@@ -18,6 +19,9 @@ function CalendarPage() {
   const navigate = useNavigate()
 
   const month = useMemo(() => parseMonth(date), [date])
+  // Paging months keeps this page mounted; only switching in from another
+  // view shows the skeleton first — see useReadyAfterMount.
+  const ready = useReadyAfterMount()
 
   // `date` is the selected day, not the month — MonthView derives the month
   // from it. The URL owns it; this only mirrors it for the sidebar.
@@ -38,11 +42,11 @@ function CalendarPage() {
 
   return (
     <Suspense fallback={<PageSkeleton />}>
-      <MonthView
+      {ready ? <MonthView
         month={month}
         onNavigateMonth={onNavigateMonth}
         onDayClick={onDayClick}
-      />
+      /> : <PageSkeleton />}
     </Suspense>
   )
 }
