@@ -20,7 +20,7 @@ const badgeVariants = cva(
         // (see PRIORITY_CLASS/TYPE_CHIP_ACTIVE_CLS). Same tint + chip-tint-foreground
         // pattern as the `link` variant above.
         chip: [
-          'h-control px-2.5 text-xs rounded-full border border-border bg-secondary text-secondary-foreground cursor-pointer',
+          'h-control px-2.5 text-xs rounded-full border border-border bg-secondary text-secondary-foreground cursor-pointer active:opacity-70',
           'aria-[pressed=true]:bg-primary-tint aria-[pressed=true]:text-chip-tint-foreground aria-[pressed=true]:border-primary',
           'data-[state=on]:bg-primary-tint data-[state=on]:text-chip-tint-foreground data-[state=on]:border-primary',
         ],

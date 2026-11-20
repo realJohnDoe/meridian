@@ -24,6 +24,8 @@ function SurfaceButton({ className, ...props }: SurfaceButtonProps) {
         'h-auto p-0 font-normal justify-start text-left whitespace-normal',
         // caller owns hover styling
         'hover:bg-transparent',
+        // pure-CSS press feedback: paints on the next frame whatever JS is doing
+        'active:bg-accent',
         className,
       )}
       {...props}
