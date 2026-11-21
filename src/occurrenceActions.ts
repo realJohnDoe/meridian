@@ -13,7 +13,13 @@ import { commitNext, commitMove, persistEntries } from './storeCommit'
 
 let _toastId:       string | number | null = null
 let _pendingCommit: (() => void) | null    = null
-const TOAST_MS = 4000
+let _stopWatching:  (() => void) | null    = null
+let _navArmed = false
+// WCAG 2.2.1: long enough to notice a mistaken delete and reach `Undo`.
+const TOAST_MS = 10_000
+// A delete's own navigation (the editor calls `navigateBack()` right after)
+// must not count as the user's next action; see `onNavigationResolved`.
+const OWN_NAV_GRACE_MS = 1500
 
 // Restores each of `keys`' items/root from `snapshot` into the *current*
 // store, rather than reverting the whole store — an edit made to another
@@ -55,39 +61,82 @@ const scoped = (o: Occurrence, fmt: (date: string) => string): string | undefine
 const onDate   = (o: Occurrence) => scoped(o, d => `Deleted ${o.metadata.title} on ${d}`)
 const fromDate = (o: Occurrence) => scoped(o, d => `Deleted ${o.metadata.title} from ${d} on`)
 
+// Runs and clears the pending commit and forgets the toast's watchers.
+function settleDelete(): void {
+  _stopWatching?.(); _stopWatching = null
+  _toastId = null
+  const commit = _pendingCommit
+  _pendingCommit = null
+  commit?.()
+}
+
+/**
+ * Persists a pending delete now and closes its toast without committing twice.
+ * For page teardown (`pagehide`), where the toast's own timer never gets to run.
+ */
+export function flushPendingDelete(): void {
+  const id = _toastId
+  settleDelete()
+  if (id !== null) toast.dismiss(id)
+}
+
+/**
+ * Call once per resolved route navigation. The first one after a delete is
+ * ignored when it is the delete's own (the editor's `navigateBack()`); any
+ * later one is the user's next action and commits the delete.
+ */
+export function onNavigationResolved(): void {
+  if (_toastId === null) return
+  if (!_navArmed) { _navArmed = true; return }
+  flushPendingDelete()
+}
+
 function showDeleteToast(
   title: string,
   commitFn: () => void,
   undoFn: () => void,
   opts?: { endsSeries?: boolean; label?: string },
 ): void {
-  if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-  if (_toastId !== null) { toast.dismiss(_toastId); _toastId = null }
+  flushPendingDelete()
 
   _pendingCommit = commitFn
+  _navArmed = false
+  const graceTimer = setTimeout(() => { _navArmed = true }, OWN_NAV_GRACE_MS)
   const message = opts?.endsSeries
     ? `Deleted: ${title} — this series only repeats after completion, so it ends here.`
     : opts?.label ?? `Deleted: ${title}`
   const toastFn = opts?.endsSeries ? toast.warning : toast
-  _toastId = toastFn(message, {
-    duration: TOAST_MS,
+  const show = (duration: number) => toastFn(message, {
+    id: _toastId ?? undefined,
+    duration,
     action: {
       label: 'Undo',
       onClick: () => {
         _pendingCommit = null
-        _toastId = null
+        settleDelete()
         undoFn()
       },
     },
-    onDismiss: () => {
-      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-      _toastId = null
-    },
-    onAutoClose: () => {
-      if (_pendingCommit) { _pendingCommit(); _pendingCommit = null }
-      _toastId = null
-    },
+    // Only the current toast settles: a replaced one's late callback must not
+    // commit (or unwatch) its successor.
+    onDismiss: () => { if (_pendingCommit === commitFn) settleDelete() },
+    onAutoClose: () => { if (_pendingCommit === commitFn) settleDelete() },
   })
+  _toastId = show(TOAST_MS)
+
+  // Sonner pauses on hover and a hidden page but not on keyboard focus, so a
+  // screen-reader user who reached the toast (alt+T) would still lose it.
+  const inToast = (e: FocusEvent) => e.target instanceof Element && !!e.target.closest('[data-sonner-toaster]')
+  const onFocusIn = (e: FocusEvent) => { if (inToast(e)) show(Infinity) }
+  const onFocusOut = (e: FocusEvent) => { if (inToast(e)) show(TOAST_MS) }
+  const doc = typeof document === 'undefined' ? null : document
+  doc?.addEventListener('focusin', onFocusIn)
+  doc?.addEventListener('focusout', onFocusOut)
+  _stopWatching = () => {
+    clearTimeout(graceTimer)
+    doc?.removeEventListener('focusin', onFocusIn)
+    doc?.removeEventListener('focusout', onFocusOut)
+  }
 }
 
 export function toggleOccDone(o: Occurrence): void {
