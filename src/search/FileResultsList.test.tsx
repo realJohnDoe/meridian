@@ -113,18 +113,54 @@ describe('FileResultsList', () => {
     expect(screen.getByText('Groceries')).toBeInTheDocument()
   })
 
-  it('ranks a prefix match above a scattered subsequence match', () => {
-    const a = makeOcc({ id: 'a', entryKey: testKey('a.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'a.md', title: 'Xylophone practice' } })
-    const b = makeOcc({ id: 'b', entryKey: testKey('b.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'b.md', title: 'Practice notes' } })
-    const roots: Roots = makeRoots('a.md', { title: 'Xylophone practice' }) // 'p...r...a...c' scattered match for "pra"
-    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'Practice notes', tags: [], items: [] }))     // starts with "pra" -> scoreQuery prefix bonus
-    seedStore([a, b], roots)
+  it('ranks title hits above tag hits above body hits', () => {
+    const mk = (id: string, title: string) =>
+      makeOcc({ id, entryKey: testKey(`${id}.md`), metadata: { vaultId: TEST_VAULT, fileSlug: `${id}.md`, title } })
+    const occs = [mk('a', 'Alpha'), mk('b', 'Beta'), mk('c', 'Planning')]
+    const roots: Roots = makeRoots('a.md', { title: 'Alpha', body: 'ship the plan' })
+    roots.set(testKey('b.md'), makeRootMeta('b.md', { title: 'Beta', tags: ['plan'], items: [] }))
+    roots.set(testKey('c.md'), makeRootMeta('c.md', { title: 'Planning', tags: [], items: [] }))
+    seedStore(occs, roots)
     const { type, container } = renderList()
 
-    type('pra')
+    type('plan')
 
     const titles = [...container.querySelectorAll('.text-sm.font-medium')].map(el => el.textContent)
-    expect(titles).toEqual(['Practice notes', 'Xylophone practice'])
+    expect(titles).toEqual(['Planning', 'Beta', 'Alpha'])
+  })
+
+  it('finds a phrase from the body and shows the matching line, highlighted', () => {
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Welcome' } })
+    seedStore([occ], makeRoots('note.md', { title: 'Welcome', body: 'Intro\nkeeps tasks as plain Markdown files' }))
+    const { type, container } = renderList()
+
+    type('markdown')
+
+    expect(screen.getByText('Welcome')).toBeInTheDocument()
+    expect(container.querySelector('mark')?.textContent).toBe('Markdown')
+    expect(container.textContent).toContain('keeps tasks as plain')
+  })
+
+  it('does not match scattered letters', () => {
+    const occ = makeOcc({ entryKey: testKey('note.md') })
+    seedStore([occ], makeRoots('note.md', { title: 'Book a dentist appointment' }))
+    const { type } = renderList()
+
+    type('sam')
+
+    expect(screen.queryByText('Book a dentist appointment')).not.toBeInTheDocument()
+  })
+
+  it('requires every query word and ignores case and accents', () => {
+    const occ = makeOcc({ entryKey: testKey('note.md'), metadata: { vaultId: TEST_VAULT, fileSlug: 'note.md', title: 'Café Visit' } })
+    seedStore([occ], makeRoots('note.md', { title: 'Café Visit', body: 'with Zoë' }))
+    const { type } = renderList()
+
+    type('CAFE zoe')
+    expect(screen.getByText('Café Visit')).toBeInTheDocument()
+
+    type('cafe nobody')
+    expect(screen.queryByText('Café Visit')).not.toBeInTheDocument()
   })
 
   it('shows one card per file even when a file has multiple occurrences', () => {

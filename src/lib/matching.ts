@@ -1,6 +1,6 @@
-// Shared fuzzy subsequence matcher used by every free-text file/item picker
-// (search overlay, item picker, "listed on" picker) so results stay consistent
-// across surfaces.
+// Fuzzy subsequence matcher shared by the free-text file/item pickers (item
+// picker, "listed on" picker). The search bar has its own word matcher,
+// search/searchMatch.ts: this one is for short known names, not content.
 
 function matchesQuery(query: string, text: string): boolean {
   if (!query) return true
