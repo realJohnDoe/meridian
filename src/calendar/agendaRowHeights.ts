@@ -19,7 +19,7 @@ import type { AgendaRow } from './agendaSections'
 // ROW_H_PLAIN: the same card with no meta row, so it sits on its min-h-11 (44)
 //              floor + mb-1.5 (6) = 50px — the figure OccurrenceList.ts already
 //              uses for exactly this shape.
-// EMPTY_H:     a day-empty row (badge + "No events" text), no card at all —
+// EMPTY_H:     a day-empty row (badge + "Nothing scheduled" text), no card at all —
 //              min-h-11 (44) + its own mt-3 (12) + mb-1.5 (6), always a fresh
 //              day.
 // DAY_GAP_H:   AgendaRow's mt-3 (12), carried by a day's *first* occurrence row

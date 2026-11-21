@@ -21,7 +21,9 @@ function AgendaEmptyDayRow({ date, isToday }: Props) {
       <div className="w-9 shrink-0 flex justify-center">
         <DayBadge date={date} isToday={isToday} />
       </div>
-      <span className="text-sm text-muted-foreground">No events</span>
+      {/* pl-5: OccurrenceCard's pl-2 + w-1 bar + gap-2, so the text starts
+          where a card's content does. */}
+      <span className="pl-5 text-sm text-muted-foreground">Nothing scheduled</span>
     </div>
   )
 }
