@@ -143,30 +143,20 @@ sweep once per distinct screen.
 with survey-type label `ux`, including suggested improvements to this survey
 file itself.
 
-### 1. Usability verdict (~5 sentences)
+The four parts of the workshop `surveys` skill's **Report structure**, with a task-results table between the coverage statement and the category verdicts:
 
-Name the **one or two tasks that go worst** and the **single biggest theme**
-running through the findings.
+- **Usability verdict:** name the one or two tasks that go worst and the
+  single biggest theme running through the findings.
+- **Coverage statement:** which tasks were walked at which viewport, which were
+  cut short and where, and one line restating that this is heuristic
+  evaluation, not user testing.
+- **Task results:** one row per task × viewport: **completed** / **completed
+  with friction** / **failed**, the step count, and the finding numbers that
+  explain it.
 
-### 2. Coverage statement
+### Findings — top 7
 
-Which tasks were walked at which viewport, which were cut short and where, the
-environment limits hit, and one line restating that this is heuristic
-evaluation, not user testing.
-
-### 3. Task results
-
-One row per task × viewport: **completed** / **completed with friction** /
-**failed**, the step count, and the finding numbers that explain it.
-
-### 4. Category verdicts
-
-One line per category (1–8), per the shared
-convention.
-
-### 5. Findings — top 7
-
-`Title`, `Recommended model`, `Problem` and `Fix` are the shared finding
+`Title`, `Tier`, `Problem` and `Fix` are the shared finding
 fields. This survey redefines two and adds four:
 
 - **Evidence** — replaces the file-and-quote rule: the reproduction steps from
@@ -190,9 +180,9 @@ step right while a sibling flow diverges — the other edit scope, the other
 viewport, the drawer on mobile versus the dialog on desktop — or a relabel in
 one place that splits the product's vocabulary. Findings about the mental model
 itself (what "a vault" or "all future occurrences" should mean) are usually
-product decisions: tier them `opus-plan` and give them a `## Decision needed` section. Example
-hazard note: "Sonnet 5 if the three screens using this label are listed; else
-Opus 5."
+product decisions: tier them `opus` with `plan` and give them a `## Decision needed` section. Example
+hazard note: "`sonnet` if the three screens using this label are listed; else
+`opus`."
 
 ## Categories to walk — ranked by priority
 
