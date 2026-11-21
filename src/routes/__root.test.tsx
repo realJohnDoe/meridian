@@ -9,7 +9,7 @@ import { THEMES } from '@/settings'
 const {
   restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, requestScrollToToday, setCurrentDate,
   getCurrentDate, resetCalendarOnVaultChange, onVaultChanged, triggerVaultChanged, startCrossTabSync, stopCrossTabSync,
-  flushActiveAutoSave, callOrder, navigateMock, routeIds, router,
+  flushActiveAutoSave, flushPendingDelete, callOrder, navigateMock, routeIds, router,
 } = vi.hoisted(() => {
   const listeners = new Set<(change: { contentReplaced: boolean }) => void>()
   const stopCrossTabSync = vi.fn()
@@ -20,6 +20,7 @@ const {
     resetSyncBackoff: vi.fn(),
     flushPendingPush: vi.fn(() => { callOrder.push('flushPendingPush') }),
     flushActiveAutoSave: vi.fn(() => { callOrder.push('flushActiveAutoSave') }),
+    flushPendingDelete: vi.fn(() => { callOrder.push('flushPendingDelete') }),
     callOrder,
     requestScrollToToday: vi.fn(),
     setCurrentDate: vi.fn(),
@@ -41,9 +42,12 @@ const {
       navigate: vi.fn(),
       routesById: { '/_entry/entry/$vault/$slug': { id: '/_entry/entry/$vault/$slug' } },
       loadRouteChunk: vi.fn(),
+      subscribe: vi.fn(() => () => {}),
     },
   }
 })
+
+vi.mock('@/occurrenceActions', () => ({ flushPendingDelete, onNavigationResolved: vi.fn() }))
 
 // createFileRoute is mocked to hand back the component directly — the real
 // root route is bound to the generated tree. Outlet needs router context it
@@ -213,7 +217,7 @@ describe('__root — going away', () => {
     setVisibility('hidden')
 
     expect(flushActiveAutoSave).toHaveBeenCalledTimes(1)
-    expect(callOrder).toEqual(['flushActiveAutoSave', 'flushPendingPush'])
+    expect(callOrder).toEqual(['flushActiveAutoSave', 'flushPendingDelete', 'flushPendingPush'])
   })
 
   it('flushes a pending editor autosave before pushing, on pagehide', () => {
@@ -222,7 +226,7 @@ describe('__root — going away', () => {
     act(() => { window.dispatchEvent(new Event('pagehide')) })
 
     expect(flushActiveAutoSave).toHaveBeenCalledTimes(1)
-    expect(callOrder).toEqual(['flushActiveAutoSave', 'flushPendingPush'])
+    expect(callOrder).toEqual(['flushActiveAutoSave', 'flushPendingDelete', 'flushPendingPush'])
   })
 
   it('stops flushing the editor autosave after unmount', () => {

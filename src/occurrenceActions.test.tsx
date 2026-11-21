@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import {
   beginSwipeDelete, toggleOccDone, reopenOcc, moveEntryToVault,
-  deleteOccurrenceWithUndo, deleteFutureWithUndo, deleteSeriesWithUndo, deleteWholeFileWithUndo,
+  deleteOccurrenceWithUndo, deleteFutureWithUndo, deleteSeriesWithUndo, deleteWholeFileWithUndo, flushPendingDelete, onNavigationResolved,
 } from './occurrenceActions'
 import { entryKey as makeEntryKey } from '@/fileIO'
 import { Toaster } from '@/components/ui/sonner'
@@ -22,7 +22,7 @@ afterEach(() => {
   // Safety net: settle any toast a failed assertion left pending, so its
   // deferred commit can't fire during the *next* test (occurrenceActions'
   // _pendingCommit/_toastId are module-level singletons shared across tests).
-  act(() => { vi.advanceTimersByTime(10_000) })
+  act(() => { vi.advanceTimersByTime(11_000) })
   vi.useRealTimers()
 })
 
@@ -55,7 +55,7 @@ describe('beginSwipeDelete', () => {
     expect(persistence.deletes).toEqual([])
     expect(screen.getByText('Deleted: Standup')).toBeInTheDocument()
 
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.deletes).toEqual([testKey('note.md')])
   })
@@ -68,7 +68,7 @@ describe('beginSwipeDelete', () => {
 
     act(() => beginSwipeDelete(a)())
     flushToastMount()
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(items().find(i => i.id === 'occ-a')).toBeUndefined()
     expect(items().find(i => i.id === 'occ-b')).toBeDefined()
@@ -88,7 +88,7 @@ describe('beginSwipeDelete', () => {
 
     expect(items().find(i => i.id === 'occ-1')).toBeDefined()
 
-    act(() => { vi.advanceTimersByTime(5000) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.deletes).toEqual([])
     expect(persistence.writes).toEqual([testKey('note.md')])
@@ -107,7 +107,7 @@ describe('beginSwipeDelete', () => {
     expect(findOverrideFor('series-1')?.excluded).toBe(true)
     expect(persistence.writes).toEqual([])
 
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.writes).toEqual([testKey('note.md')])
     expect(persistence.deletes).toEqual([])
@@ -126,7 +126,7 @@ describe('beginSwipeDelete', () => {
 
     expect(items()).toEqual([series])
 
-    act(() => { vi.advanceTimersByTime(5000) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.writes).toEqual([testKey('note.md')])
     expect(persistence.deletes).toEqual([])
@@ -176,7 +176,7 @@ describe('beginSwipeDelete', () => {
     expect(useStore.getState().roots.get(testKey('b.md'))?.items).toEqual([])
     expect(persistence.writes).toEqual([])
 
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.deletes).toEqual([testKey('a.md')])
     expect(persistence.writes).toEqual([testKey('b.md')])
@@ -200,7 +200,7 @@ describe('beginSwipeDelete', () => {
     expect(items().find(i => i.id === 'occ-a')).toBeDefined()
     expect(useStore.getState().roots.get(testKey('b.md'))?.items).toEqual(['[[a.md]]'])
 
-    act(() => { vi.advanceTimersByTime(5000) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     // The restore is persisted too — both slugs, since both were reverted.
     expect(persistence.writes.sort()).toEqual([testKey('a.md'), testKey('b.md')])
@@ -224,7 +224,7 @@ describe('beginSwipeDelete', () => {
     expect(persistence.deletes).toEqual([testKey('a.md')])
 
     act(() => applyB())
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.deletes).toEqual([testKey('a.md'), testKey('b.md')])
   })
@@ -249,6 +249,58 @@ describe('beginSwipeDelete', () => {
 // animation: the store update lands immediately (no `apply()` step), and
 // only the persist/backend write (and Undo) waits on the toast.
 
+describe('delete undo window', () => {
+  function swipe(id = 'occ-1') {
+    const occ = makeOcc({ id, entryKey: testKey('note.md') })
+    seedStore([occ], makeRoots('note.md'))
+    render(<Toaster />)
+    act(() => beginSwipeDelete(occ)())
+    flushToastMount()
+    return occ
+  }
+
+  it('keeps Undo available past 6 s and undo restores the entry', () => {
+    swipe()
+    act(() => { vi.advanceTimersByTime(6000) })
+    fireEvent.click(screen.getByText('Undo'))
+    expect(items().find(i => i.id === 'occ-1')).toBeDefined()
+    expect(persistence.deletes).toEqual([])
+  })
+
+  it('commits and closes on a navigation after the toast', () => {
+    swipe()
+    act(() => { vi.advanceTimersByTime(2000) })
+    act(() => onNavigationResolved())
+    expect(persistence.deletes).toEqual([testKey('note.md')])
+  })
+
+  it("survives the delete's own navigation (editor navigateBack), then commits on the next", () => {
+    swipe()
+    act(() => onNavigationResolved())
+    expect(persistence.deletes).toEqual([])
+    expect(screen.getByText('Undo')).toBeInTheDocument()
+    act(() => onNavigationResolved())
+    expect(persistence.deletes).toEqual([testKey('note.md')])
+  })
+
+  it('flushPendingDelete persists once and leaves nothing pending', () => {
+    swipe()
+    act(() => flushPendingDelete())
+    expect(persistence.deletes).toEqual([testKey('note.md')])
+    act(() => { vi.advanceTimersByTime(11_000) })
+    expect(persistence.deletes).toEqual([testKey('note.md')])
+  })
+
+  it('does not time out while focus is inside the toast', () => {
+    swipe()
+    const undo = screen.getByText('Undo')
+    act(() => { undo.focus() })
+    act(() => { vi.advanceTimersByTime(30_000) })
+    expect(persistence.deletes).toEqual([])
+    expect(screen.getByText('Undo')).toBeInTheDocument()
+  })
+})
+
 describe('deleteOccurrenceWithUndo', () => {
   it('excludes a recurring occurrence immediately and defers persistence to auto-close', () => {
     const series = makeSeries({ id: 'series-1', entryKey: testKey('note.md'), repeat: { type: 'schedule', freq: 'daily' } })
@@ -263,7 +315,7 @@ describe('deleteOccurrenceWithUndo', () => {
     expect(persistence.writes).toEqual([])
     expect(screen.getByText(/^Deleted Standup on /)).toBeInTheDocument()
 
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.writes).toEqual([testKey('note.md')])
   })
@@ -280,7 +332,7 @@ describe('deleteOccurrenceWithUndo', () => {
 
     expect(items()).toEqual([series])
 
-    act(() => { vi.advanceTimersByTime(5000) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.writes).toEqual([testKey('note.md')])
     expect(persistence.deletes).toEqual([])
@@ -301,7 +353,7 @@ describe('deleteFutureWithUndo', () => {
     expect(stored.repeat.end).toEqual({ type: 'until', date: '2026-06-19' })
     expect(persistence.writes).toEqual([])
 
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.writes).toEqual([testKey('note.md')])
   })
@@ -334,7 +386,7 @@ describe('deleteSeriesWithUndo', () => {
     expect(items().map(i => i.id)).toEqual(['series-2'])
     expect(persistence.writes).toEqual([])
 
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.writes).toEqual([testKey('note.md')])
     expect(persistence.deletes).toEqual([])
@@ -372,7 +424,7 @@ describe('deleteWholeFileWithUndo', () => {
     expect(persistence.deletes).toEqual([])
     expect(screen.getByText('Deleted: A')).toBeInTheDocument()
 
-    act(() => { vi.advanceTimersByTime(4100) })
+    act(() => { vi.advanceTimersByTime(10_100) })
 
     expect(persistence.deletes).toEqual([testKey('a.md')])
     expect(persistence.writes).toEqual([testKey('b.md')])

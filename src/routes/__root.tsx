@@ -7,6 +7,7 @@ import { useVisibleViewportCssVars } from '@/hooks'
 import { restoreVaults, autoSyncTick, resetSyncBackoff, flushPendingPush, onVaultChanged, startCrossTabSync } from '@/storage'
 import { requestScrollToToday, getCurrentDate, setCurrentDate, resetCalendarOnVaultChange } from '@/calendar'
 import { flushActiveAutoSave } from '@/autoSaveFlushPort'
+import { flushPendingDelete, onNavigationResolved } from '@/occurrenceActions'
 import { onIdle } from '@/lib/idle'
 import { Toaster } from '@/components/ui/sonner'
 import { MovedNotice } from './-movedNotice'
@@ -231,7 +232,9 @@ function Root() {
     // is still one edit behind. Both calls happen in this one handler rather
     // than as two separately registered listeners so the ordering does not
     // depend on addEventListener's registration order.
-    const flushAll = () => { flushActiveAutoSave(); flushPendingPush() }
+    // The pending delete is persisted before the push, for the same reason.
+    const flushAll = () => { flushActiveAutoSave(); flushPendingDelete(); flushPendingPush() }
+    const stopNavWatch = router.subscribe('onResolved', onNavigationResolved)
     const onVisible = () => {
       if (document.visibilityState !== 'visible') {
         // Best-effort: push anything dirty before the tab is backgrounded (or
@@ -270,6 +273,7 @@ function Root() {
     return () => {
       clearInterval(intervalId)
       stopCrossTabSync()
+      stopNavWatch()
       window.removeEventListener('online', onOnline)
       document.removeEventListener('visibilitychange', onVisible)
       window.removeEventListener('pagehide', flushAll)
