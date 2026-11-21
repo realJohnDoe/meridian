@@ -15,13 +15,8 @@ minimumReleaseAge: 1440
 # ── Security overrides ────────────────────────────────────────────────────────
 # glob 9–14.0.1 (GHSA-3g3m-2fjr-6pw4, AbortSignal bypass), via
 # vite-plugin-pwa>workbox-build.
-# GHSA-g3hv-75wg-m249 (moderate): minimatch <11.0.1 glob-pattern DoS. Lint-time
-# only, fed patterns we author. Range-scoped so only the vulnerable range moves
-# to 11.x; eslint-plugin-jsx-a11y (3.x, outside the range) keeps its own. Drop
-# once no minimatch in the vulnerable range remains.
 overrides:
   glob: ^14.0.3
-  'minimatch@>=7 <11.0.1': ^11.0.5
 
 # ── Accepted audit advisories ─────────────────────────────────────────────────
 # GHSA-gcqx-w48m-w2h4 (low): deepmerge <=4.3.1 prototype poisoning. Build-time
