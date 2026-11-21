@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useCallback, memo } from 'react'
 import { cn } from '@/lib/cn'
+import { useStore } from '@/store'
 
 // The column geometry is load-bearing and must stay consistent: the viewport is
 // exactly three rows tall (h-30 = 120px), rows are one row (h-10), and the
@@ -271,6 +272,12 @@ function ScrollColumn({ items, value, fmt, onChange, label }: ScrollColumnProps)
 
 const MINUTE_STEP = 5
 const HOURS   = Array.from({ length: 24 }, (_, i) => i)
+// 12-hour display: the hour column holds 0-11 shown as 12, 1 … 11; the AM/PM
+// column holds 0 (AM) or 1 (PM). The emitted value stays 24-hour HH:MM.
+const HOURS12 = Array.from({ length: 12 }, (_, i) => i)
+const MERIDIEM = [0, 1]
+const fmt12   = (n: number) => String(n === 0 ? 12 : n)
+const fmtAmPm = (n: number) => (n === 0 ? 'AM' : 'PM')
 const MINUTES = Array.from({ length: 60 / MINUTE_STEP }, (_, i) => i * MINUTE_STEP)
 const pad2    = (n: number) => String(n).padStart(2, '0')
 
@@ -280,6 +287,7 @@ interface Props {
 }
 
 export default function TimeWheels({ value, onChange }: Props) {
+  const hour12 = useStore(s => s.localePrefs.hour12)
   const parts = value.match(/^(\d{1,2}):(\d{2})/)
   const h = parts ? parseInt(parts[1]!, 10) : 9
   const rawM = parts ? parseInt(parts[2]!, 10) : 0
@@ -304,6 +312,29 @@ export default function TimeWheels({ value, onChange }: Props) {
     (nm: number, carry: number) => emit(mod(latestRef.current.h + carry, 24), nm),
     [emit],
   )
+
+  // 12-hour: the hour wheel keeps the current half of the day, the AM/PM wheel
+  // keeps the hour; a minute carry still moves the 24-hour hour, so it flips
+  // AM/PM by itself when it crosses 11 -> 12.
+  const onHour12 = useCallback(
+    (n: number) => emit(n + (latestRef.current.h >= 12 ? 12 : 0), latestRef.current.m),
+    [emit],
+  )
+  const onMeridiem = useCallback(
+    (p: number) => emit((latestRef.current.h % 12) + p * 12, latestRef.current.m),
+    [emit],
+  )
+
+  if (hour12) {
+    return (
+      <div className="flex items-center gap-1">
+        <ScrollColumn items={HOURS12} value={h % 12} fmt={fmt12} onChange={onHour12} label="Hour" />
+        <span className="text-muted-foreground font-mono text-lg leading-none">:</span>
+        <ScrollColumn items={MINUTES} value={m} fmt={pad2} onChange={onMinute} label="Minute" />
+        <ScrollColumn items={MERIDIEM} value={h >= 12 ? 1 : 0} fmt={fmtAmPm} onChange={onMeridiem} label="AM or PM" />
+      </div>
+    )
+  }
 
   return (
     <div className="flex items-center gap-1">
