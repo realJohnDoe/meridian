@@ -1,4 +1,4 @@
-# pnpm 11+ project settings
+# pnpm project settings
 
 packages:
   - '.'
@@ -7,7 +7,7 @@ packages:
 # ── Supply-chain protection ───────────────────────────────────────────────────
 #
 # minimumReleaseAge (minutes): pnpm refuses to install any package version
-# published less than N minutes ago. The pnpm 11 default is 1440 (24 h).
+# published less than N minutes ago. 1440 is the default pnpm sets (24 h).
 # 1440 min = 24 h — gives the ecosystem time to flag hijacked releases while
 # still allowing the esbuild security patch (GHSA-gv7w-rqvm-qjhr) to install.
 minimumReleaseAge: 1440
