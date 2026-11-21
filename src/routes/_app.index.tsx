@@ -3,6 +3,7 @@ import { AgendaView } from '@/calendar'
 import { useOpenEntry, useReadyAfterMount } from '@/hooks'
 import { useStore } from '@/store'
 import { Skeleton } from '@/components/ui/skeleton'
+import { SKELETON_REVEAL } from '@/components/primitives/page-skeleton'
 
 export const Route = createFileRoute('/_app/')({
   component: AgendaPage,
@@ -13,7 +14,7 @@ function AgendaSkeleton() {
     // px-3.5 matches both AgendaRow's mx-3.5 and AgendaHeaderRow's own
     // px-3.5, so the real agenda lands on the same edge the skeleton drew —
     // no sideways jump when it swaps in.
-    <div className="flex flex-col gap-0 px-3.5 pt-3 pb-8 lg:max-w-3xl lg:mx-auto">
+    <div className={`flex flex-col gap-0 px-3.5 pt-3 pb-8 lg:max-w-3xl lg:mx-auto ${SKELETON_REVEAL}`}>
       {[0, 1, 2].map(i => (
         <div key={i} className="mb-5">
           <Skeleton className="h-4 w-28 mb-3" />
