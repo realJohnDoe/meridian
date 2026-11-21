@@ -938,13 +938,21 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
     ? (entry.items.find(i => isSeries(i) && i.id === occ.ownerId) as RepeatPattern<OccurrenceMetadata> | undefined)
     : undefined
   if (!series) return applyAll(data, occ, fields, touched)
-  if (series.date === occ.date) return applyAll(data, occ, fields, touched)
+  // The form shows the occurrence's own time, which differs from the series'
+  // when it was re-timed on its own earlier. Unless this save changes it, that
+  // one-off move stays one-off: the following occurrences keep the series'
+  // time (#1496). An unknown `touched` treats the time as changed, as before.
+  const editedTime = scheduled?.time || null
+  const legTime = touched && editedTime === (occ.time || null) ? series.time : editedTime
+  if (series.date === occ.date) {
+    return applyAll(data, occ, scheduled ? { ...fields, scheduled: { ...scheduled, time: legTime ?? '' } } : fields, touched)
+  }
 
   const occDate = occ.date
   const newSeriesId = crypto.randomUUID()
   const newDate = scheduled?.date ?? occDate
   const newRepeat = !repeat || deepEqual(repeat, series.repeat) ? followDate(series.repeat, occDate, newDate) : repeat
-  const leg: SeriesShape = { date: ruleStartDate(newDate, scheduled?.time || null, newRepeat), time: scheduled?.time || null, repeat: newRepeat }
+  const leg: SeriesShape = { date: ruleStartDate(newDate, legTime, newRepeat), time: legTime, repeat: newRepeat }
   const newMeta = seriesMeta(series.metadata, fields, touched)
   const removing = repeatRemoved(fields, touched)
 
@@ -961,7 +969,7 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
   const newLeg: StoreItem = removing
     ? {
         date:     scheduled?.date ?? occDate,
-        time:     scheduled?.time || null,
+        time:     editedTime,
         source:   'explicit',
         entryKey: series.entryKey,
         id:       newSeriesId,
@@ -986,13 +994,17 @@ function applyFuture(data: StoreData, occ: Occurrence, fields: EditFields, touch
     // so they go with it — which is what the editor asks about before letting
     // this run.
     if (!isSeries(i) && i.ownerId === series.id && i.date >= occDate) {
-      // The edited occurrence is an override too, but unlike the others it was
-      // just told to join the leg, so it takes the leg's slot rather than
-      // keeping its own — and the stub that hid its pre-override slot goes
-      // with it (#1230). Kept rather than dropped so the editor bound to its
-      // id follows it onto the new slot.
-      if (!removing && i.date === occDate && (i.id === occ.id || (i.excluded && editedIsStored))) {
-        return i.excluded ? [] : [{ ...i, ownerId: newSeriesId, date: newDate, time: leg.time, metadata: inheritChanges(i.metadata, series.metadata, newMeta) }]
+      // The edited occurrence is an override too, but unlike the others it
+      // was just told to join the leg, so it takes the form's slot. Kept
+      // rather than dropped so the editor bound to its id follows it. The stub
+      // that hid its pre-override slot goes when that is the leg's slot
+      // (#1230); otherwise it moves with it, onto the leg's own slot that day,
+      // which the edited occurrence still replaces (#1496).
+      if (!removing && i.date === occDate && i.id === occ.id) {
+        return [{ ...i, ownerId: newSeriesId, date: newDate, time: editedTime, metadata: inheritChanges(i.metadata, series.metadata, newMeta) }]
+      }
+      if (!removing && i.date === occDate && i.excluded && editedIsStored) {
+        return editedTime === leg.time ? [] : [{ ...i, ownerId: newSeriesId, date: newDate, time: leg.time }]
       }
       return removing || dropsDay(series, leg, i.date)
         ? []
