@@ -97,14 +97,26 @@ describe('AddVaultWizard — source step', () => {
     expect(screen.getByText('Subscribe to a calendar')).toBeInTheDocument()
   })
 
-  it('adds the local vault and navigates away immediately when Local is chosen', async () => {
+  it('adds the local vault and navigates away once it is added', async () => {
     setFolderPickerSupported(true)
+    vi.mocked(addLocalVault).mockResolvedValue(true)
     render(<AddVaultWizard />)
     fireEvent.click(screen.getByRole('button', { name: /Local folder/ }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Choose folder' })); await Promise.resolve() })
 
-    expect(navigate).toHaveBeenCalledWith({ to: '/settings' })
+    expect(navigate).toHaveBeenCalledWith({ to: '/settings', replace: true })
     expect(addLocalVault).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays on the wizard when the folder picker is cancelled', async () => {
+    setFolderPickerSupported(true)
+    vi.mocked(addLocalVault).mockResolvedValue(false)
+    render(<AddVaultWizard />)
+    fireEvent.click(screen.getByRole('button', { name: /Local folder/ }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Choose folder' })); await Promise.resolve() })
+
+    expect(addLocalVault).toHaveBeenCalledTimes(1)
+    expect(navigate).not.toHaveBeenCalled()
   })
 
   it('adds the example vault and navigates away immediately when Tutorial is chosen', async () => {
@@ -112,7 +124,7 @@ describe('AddVaultWizard — source step', () => {
     fireEvent.click(screen.getByRole('button', { name: /Tutorial vault/ }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add' })); await Promise.resolve() })
 
-    expect(navigate).toHaveBeenCalledWith({ to: '/settings' })
+    expect(navigate).toHaveBeenCalledWith({ to: '/settings', replace: true })
     expect(addExampleVault).toHaveBeenCalledTimes(1)
   })
 })
@@ -176,7 +188,7 @@ describe('AddVaultWizard — iCal step', () => {
     fireEvent.change(screen.getByDisplayValue('Calendar'), { target: { value: 'Family' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Add calendar' })); await Promise.resolve() })
 
-    expect(navigate).toHaveBeenCalledWith({ to: '/settings' })
+    expect(navigate).toHaveBeenCalledWith({ to: '/settings', replace: true })
     expect(addIcalVault).toHaveBeenCalledWith('https://example.com/feed.ics', 'Family')
   })
 
@@ -288,7 +300,7 @@ describe('AddVaultWizard — GitHub step — reusing an existing sign-in', () =>
       await Promise.resolve()
     })
 
-    expect(navigate).toHaveBeenCalledWith({ to: '/settings' })
+    expect(navigate).toHaveBeenCalledWith({ to: '/settings', replace: true })
     expect(addGitHubVaultOAuth).toHaveBeenCalledWith({
       owner: 'acme', repo: 'journal', branch: 'main',
       accessToken: 'at', refreshToken: 'rt', expiresAt: session.expiresAt,
