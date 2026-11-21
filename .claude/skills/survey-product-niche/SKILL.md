@@ -76,10 +76,8 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
 - **Read completely** (they are the positioning): `README.md` end to end; the prose in `blog/` — currently the three numbered post directories, of which `1-…/meridian-why-i-built-a-markdown-first-calendar.md` is the positioning post, `1-…/interview.md` and `3-…/interview.md` are prose, and `2-how-meridian-was-built/` is a generated explorer (`explorer.html`, `iterations.json`) that should be skimmed for framing only, not read; the coach tour (`src/onboarding/CoachTour.tsx`); and the tutorial entries themselves, which live in `src/storage/devFixtures/tutorialVault.ts` (`exampleBackend.ts` is only the ~66-line backend shim that serves them) — the Tutorial vault is the product's argument for itself, made in content.
 - **Derive the revealed niche from the product, not the docs:** the feature surface (which capabilities are deep — recurrence, wikilinks, participants, search — and which are thin; line counts per `src/` directory are a fast first cut), the storage options and what each demands of a user (`src/storage/`, plus the trade-offs already recorded in [storage-backend.md](../../../plans/reports/storage-backend.md)), platform and browser constraints, the entry-format surface area in `src/model/fieldRegistry.ts` (`INLINE_FIELDS`, `STRUCTURAL_KEYS`) and the rest of `src/model/`, and what the default first-run path optimises for.
 - **Walk the first-run experience** on the example vault via the preview tools (follow the preview gotchas in `docs/agents/dev-server.md`: worktree-specific launch config, unique port, base path `/`). Judge it as a visitor deciding whether this product is for them. The real setup path can only be assessed from code and copy — see `## Environment limits` in `docs/agents/survey.md` — so state that up front.
-- **If no preview tooling is available in the session at all** — check before planning around it — the fallback is not the first resort. The repo already carries `@playwright/test` as a devDependency, so a session with Bash and a Chromium binary can still take real screenshots. Launch with `executablePath: '/opt/pw-browsers/chromium'`, because the repo's pinned Playwright expects a browser build the container doesn't have: start the server yourself (`pnpm exec vite --port <unique> --strictPort`), then drive it from a scratch script — importing `@playwright/test` by absolute path if the script lives outside the repo — at 390×844 and 1440×900, setting `localStorage['meridian_theme']` in an init script to reach each palette. That path was taken on the 2026-09-14 and 2026-11-01 runs, and category 3 came back fully assessed both times. Only if that is also unavailable: do not silently skip the visual work or quietly substitute a guess for it. Say so in the coverage statement, fall back to assessing visual identity from `src/index.css` tokens, the dependency set, and layout source, mark category 3 **partially assessed**, and flag any finding that rests on the un-taken screenshots as needing confirmation before it is acted on. An impression invented from tokens is worse than an admitted gap.
-- **Check the app's own front door**: `index.html`, the PWA manifest, the app name, and the icons (`public/icon*.png`). The install prompt and the home-screen icon are positioning surfaces too, and often the only ones a returning user sees.
-- **Read the visual identity as evidence, not decoration:** the theme tokens and their comments in `src/index.css` (colour, radius, density), the typography, the icon set (`lucide-react` — one family, consistently used?), the interaction vocabulary the dependencies imply (`vaul` drawers signal a mobile-native product; heavy dialog use would signal a desktop one), and the app icons. Capture screenshots at mobile and desktop width in every theme the app ships — the blind visual read above depends on them, so take them before analysing anything else.
-- **Bounded competitor verification only**, per the scope note: confirm the comparison table's specific factual claims, nothing further. **Expect the vendors' own docs to be unreachable** — on 2026-09-14 both `tasknotes.dev` and `support.google.com` returned `EGRESS_BLOCKED` from this environment's proxy, which is the first thing a run hits and the easiest place to give up and mark a claim unverified. `WebSearch` and the vendors' secondary hosts are not blocked, and were enough: `github.com/callumalpass/tasknotes` settled TaskNotes' licence and its per-instance recurrence handling, and `developers.google.com/calendar` settled Google Calendar's. A claim you could not reach a source for goes in the coverage statement's verification table as **could not verify** with the blocked host named — never as "verified" from memory, and never silently dropped.
+- **If no preview tooling is available in the session at all**, drive Chromium per the workshop `surveys` skill (this repo's setup: `## Environment limits` in `docs/agents/survey.md`); the 2026-09-14 and 2026-11-01 runs did, and category 3 came back fully assessed both times. Only if that fails too, assess visual identity from `src/index.css` tokens, the dependency set and layout source, and flag any finding resting on the un-taken screenshots as needing confirmation before it is acted on.
+- **Bounded competitor verification only**, per the scope note: confirm the comparison table's specific factual claims, nothing further. Expect the vendors' own docs to be blocked (see the workshop `surveys` skill): on 2026-09-14 `tasknotes.dev` and `support.google.com` were, and `github.com/callumalpass/tasknotes` and `developers.google.com/calendar` settled the claims instead.
 - Skim the rest so nothing is invisible. Record anything skipped in the coverage statement.
 
 ## Output structure
@@ -87,31 +85,15 @@ Then state the gaps plainly. **Declared vs. revealed** is a strategy question �
 **Reporting:** per the shared reporting conventions,
 including suggested improvements to this survey file itself.
 
-### 1. Niche verdict (~6 sentences)
+The four parts of the workshop `surveys` skill's **Report structure**, then sections 5 and 6 below, with:
 
-State the three niches from Phase 0 in one line each, then answer the two headline questions directly: how well does the product fit its niche, and how well does it communicate it? Name the **widest of the three gaps** and the **single change that would close the most of it**. This is the answer; the findings are the evidence.
-
-### 2. Coverage statement
-
-- Your cold-read first impressions, recorded before analysis (what you thought this was, who for, instead of what).
-- Which surfaces you read completely, which you sampled, and what you assessed from code and copy only because it couldn't be walked.
-- Which comparison-table claims you verified and which you couldn't.
-- Anything you suspect but couldn't verify — flag it "unverified," and say what would settle it.
-
-### 3. Category verdicts
-
-One line per category (1–7). Verdicts follow the
-shared convention: **clean** /
-**findings: #N, #M** / **partially assessed** (here, "the plan" means the
-walk). Clean is only available to categories actually walked.
-
-A category can also be walked, turn up something real, and still lose its slot to the top-5 cap. Don't round that to "clean" — it isn't — and don't pad the findings list to accommodate it. Mark the category **findings: below the cut**, and record the item in a single short paragraph after the findings, with its quote and an impact score, clearly marked as sub-threshold. One or two of these is a sign the cap is working; five means the cap is wrong for this run and you should say that instead.
-
-This section is also where the status quo gets confirmed. If a category's walk found a deliberate narrowness, a non-goal the product honours, or an audience correctly turned away, say so here with the evidence — the plan asks for that judgment in the Process section, and it needs somewhere to land that isn't the findings list.
+- **Niche verdict** (~6 sentences): state the three niches from Phase 0 in one line each, then answer the two headline questions directly: how well does the product fit its niche, and how well does it communicate it? Name the **widest of the three gaps** and the **single change that would close the most of it**.
+- **Coverage statement:** your cold-read first impressions, recorded before analysis (what you thought this was, who for, instead of what); what you assessed from code and copy only because it couldn't be walked; which comparison-table claims you verified and which you couldn't.
+- **Category verdicts:** "the plan" means the walk. A walked category whose finding lost its slot to the top-5 cap is **below the cut**; record the item with its quote. This is also where the status quo gets confirmed: if a category's walk found a deliberate narrowness, a non-goal the product honours, or an audience correctly turned away, say so here with the evidence, since it needs somewhere to land that isn't the findings list.
 
 ### 4. Findings — top 5
 
-`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are the
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem` and `Fix` are the
 shared finding fields, with three notes: `Breadth`
 counts **surfaces** rather than files; `Problem` is what the target user
 misunderstands, misses or walks away from; and `Fix` must present options rather
@@ -133,10 +115,10 @@ without checking the competitor. Reserve plan mode + multi-PR for anything that
 changes **what the product is or who it's for** — the niche, the headline, the
 lead differentiator, whether to chase an emerging audience. Those are the user's
 decisions: the plan lays out options and consequences, it does not pick. Example
-hazard note: "Haiku 4.5 if the approved headline text is given in the task; else
-Opus 5 in plan mode."
+hazard note: "`haiku` if the approved headline text is given in the task; else
+`opus` with `plan`."
 
-Rank and report findings per the shared convention — here the summary table adds `gap` and `question` columns (finding → gap → question → recommended model).
+Rank and report findings per the shared convention — here the summary table adds `gap` and `question` columns (finding → gap → question → tier).
 
 **This formula routinely inverts the impact ordering, and that is intended, not a bug to correct.** A cheap mechanical fix touching five surfaces will outrank a strategy finding twice its impact, because the formula ranks return on effort, not importance. It therefore appears to contradict the scoring guidance at the foot of this document ("a gap that makes the right user bounce outranks any amount of imprecise wording"). Resolve it this way, explicitly, every time: **the niche verdict leads on impact** — it names the widest gap and the single change that would close the most of it, regardless of cost — while **the findings list ranks on the formula**. When the two orderings disagree, say so in one line above the findings table, so the reader is not left thinking the report buried its own headline.
 

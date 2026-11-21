@@ -106,14 +106,12 @@ not a description to cite.
 File the run per the shared reporting conventions,
 with `security` as the survey-type label.
 
-1. **Security verdict** (~5 sentences): can an attacker get the user's token or
-   vault, and how? Name the worst invariant and the headline probe.
-2. **Coverage statement:** which invariants were probed versus reasoned about,
-   gate status, and anything unverified with what would settle it.
-3. **Category verdicts:** one line per category below, per the
-   shared convention.
-4. **Findings — top 6.** The shared finding fields,
-   plus:
+The four parts of the workshop `surveys` skill's **Report structure**, with:
+
+- **Security verdict:** can an attacker get the user's token or vault, and how?
+  Name the worst invariant and the headline probe.
+- **Coverage statement:** which invariants were probed versus reasoned about.
+- **Findings — top 6:** the shared finding fields, plus:
    - **Invariant violated** — which numbered invariant, under what conditions.
    - **Category** — one of the category tags below. These are not repo labels;
      state the tag in the body and label only `security` + `survey-finding` + the tier.
@@ -127,8 +125,8 @@ with `security` as the survey-type label.
 **Fails silently here** is the default: a security fix that is wrong still
 passes every test that doesn't attack it. A denylist that misses one encoding, a
 CORS check that only a browser honours, a sanitizer applied at one of three
-render sites. Example hazard note: "Sonnet 5 if every render site is listed in
-the task; else Opus 5." Reserve plan mode for a change of trust model (e.g.
+render sites. Example hazard note: "`sonnet` if every render site is listed in
+the task; else `opus`." Reserve plan mode for a change of trust model (e.g.
 moving token storage out of IndexedDB).
 
 ## Categories — ranked by priority

@@ -143,28 +143,15 @@ at per-run numbers whose report no longer exists. So: date every verdict you
 re-issue above, and do **not** renumber the old code comments — per
 `plans/CLAUDE.md`, an old number is correct for the run it names.
 
-### 1. Integrity verdict (~5 sentences)
+The four parts of the workshop `surveys` skill's **Report structure**, with:
 
-Plain-language summary: can this app lose the user's writing, and if so, how? Name the **worst one or two invariants** (with the headline repro) and the **single biggest structural theme** (e.g. "the cache is treated as authoritative in three places where the backend version token is the only real source of truth"). This is the headline; the findings are the evidence.
+- **Integrity verdict:** can this app lose the user's writing, and if so, how? Name the worst one or two invariants, with the headline repro (a theme such as "the cache is treated as authoritative in three places where the backend version token is the only real source of truth").
+- **Coverage statement:** which invariants you probed with real reproductions and which you only reasoned about; which backends you exercised and which you only traced, and the vault(s) used (size, how generated). For each unverified suspicion, say what would settle it.
+- **Category verdicts:** "the plan" means the threat plan, and "scanning" means probing.
 
-### 2. Coverage statement
+### Findings — top 8
 
-- Which invariants you probed with real reproductions, which you only reasoned about statically, and which you skipped — with the reason.
-- Which backends you exercised versus traced only, and the vault(s) used (size, how generated).
-- The pass/fail status of each quality gate from the single run required in the Budget section.
-- Roughly what fraction of the integrity-critical surface this report is based on.
-- Anything you suspect but could not reproduce — flag it as "unverified." Say what would be needed to settle it.
-
-### 3. Category verdicts
-
-One line per category (1–7). Verdicts follow the
-shared convention: **clean** /
-**findings: #N, #M** / **partially assessed** (here, "the plan" means the
-threat plan, and "scanning" means probing).
-
-### 4. Findings — top 8
-
-`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem` and `Fix` are
 the shared finding fields — note that `Breadth`
 here is very often a *condition* rather than a file set ("every entry, whenever
 two tabs are open"; "every series whose time falls in the DST gap"), which the
@@ -183,15 +170,12 @@ conflict resolved by always preferring local, a cache invalidation that works on
 one device and rots on the second, a repeat-rule fix correct in the author's
 timezone only. Reserve plan mode + multi-PR for a structural change **or** a
 product decision (e.g. "preserve comments" vs "declare the file format
-normalized on save"). Example hazard note: "Sonnet 5 if the CAS precondition to
-preserve is spelled out in the task; else Opus 5."
+normalized on save"). Example hazard note: "`sonnet` if the CAS precondition to
+preserve is spelled out in the task; else `opus`."
 
-Rank and report findings per the shared convention — here the summary table adds `invariant` and `failure mode` columns (finding → invariant → failure mode → recommended model). "Confirming" a fix means re-running a repro or the test suite.
+Rank and report findings per the shared convention — here the summary table adds `invariant` and `failure mode` columns (finding → invariant → failure mode → tier). "Confirming" a fix means re-running a repro or the test suite.
 
-Per Don't pad the findings list and
-prefer systemic findings: "every save path drops
-unknown frontmatter keys" beats "this one date helper is off by one", and a
-short report backed by real reproductions beats a long one built on suspicion.
+Prefer systemic findings: "every save path drops unknown frontmatter keys" beats "this one date helper is off by one".
 
 ---
 

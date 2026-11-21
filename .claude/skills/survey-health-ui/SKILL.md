@@ -75,19 +75,11 @@ are specific to this survey:
   `e2e/contrast-sweep.spec.ts` is no bar — it samples 11 routes in their default
   state (no dialog, drawer, search result or selected row) and tolerates 1–3
   violations per theme and route; `e2e/layout-smoke.spec.ts` pins shell geometry
-  plus route coverage. Open dialogs, drawers and selected states yourself. If the
-  session has no `preview_*` tooling (base path and routes: `docs/agents/dev-server.md`), drive Chromium yourself rather than
-  skipping: `@playwright/test` is a devDependency and `e2e/` is the worked
-  example — `pnpm exec vite --port <unique> --strictPort`, then
-  `import { chromium } from '@playwright/test'` launched with
-  `executablePath: '/opt/pw-browsers/chromium'` (the pinned version's own browser
-  is not installed), at 390×844 and 1440×900, setting `meridian_theme` (and
-  `meridian.tourDone`, or the tour's controls pollute every measurement) in an
-  init script. A touch-target probe must count an absolute `::before`/`::after`
-  toward the hit area — `IconButton` and `Checkbox` extend theirs that way and
-  otherwise read as false positives. If even that is unavailable, say so in
-  the coverage statement and mark the affected categories **partially assessed**;
-  an admitted gap beats an impression inferred from tokens.
+  plus route coverage. Open dialogs, drawers and selected states yourself. Without `preview_*`
+  tooling, drive Chromium per the workshop `surveys` skill (this repo's setup:
+  `## Environment limits` in `docs/agents/survey.md`). A touch-target probe must
+  count an absolute `::before`/`::after` toward the hit area — `IconButton` and
+  `Checkbox` extend theirs that way and otherwise read as false positives.
 - **Audit the gates' own config, not just their exit codes.** A green gate says nothing about whether it is still aimed at the right files. Check every path in the lint, coverage and smoke-test configs against the filesystem: per-file coverage thresholds naming a moved file, exclusion globs whose stated rationale has been outgrown by a file that has since tripled in size, and route lists that a new route does not automatically join. These fail *open* — Vitest, for one, accepts a threshold for a nonexistent path and exits 0 with no warning — so nothing surfaces them but this check.
 - **Sample git history for co-change patterns** among components, hooks, and style files (e.g. `git log --name-only` over recent commits) — this is the evidence base for co-location findings; don't assert "these files change together" from intuition.
 - Sample the rest of the UI. Do not skip a UI directory entirely without recording it in the coverage statement. Non-UI directories may be skipped wholesale — record them as "out of scope" rather than "skipped."
@@ -97,29 +89,18 @@ are specific to this survey:
 **Reporting:** per the shared reporting conventions,
 including suggested improvements to this survey file itself.
 
-### 1. Health verdict (~5 sentences)
+The four parts of the workshop `surveys` skill's **Report structure**, with:
 
-A plain-language summary of the UI layer's overall health. Name the **worst one or two areas** (by directory or subsystem — not individual findings) and the **single biggest structural theme** running through the findings. This is the headline answer; the list below is the supporting evidence.
-
-### 2. Coverage statement
-
-- Which UI directories/files you examined closely, which you only sampled, and which you excluded as out of scope — with the reason.
-- Roughly what fraction of the UI layer this report is based on.
-- Any area you suspect has issues but did not have budget to investigate — flag it as "unverified."
-
-### 3. Category verdicts
-
-One line per category (1–8). Verdicts follow the
-shared convention: **clean** /
-**findings: #N, #M** / **partially assessed**.
+- **Health verdict:** about the UI layer.
+- **Coverage statement:** UI directories you left out are "out of scope", not "skipped".
 
 Category 8's **keep-custom verdicts** ("this custom UI is right, and here's
 why") belong here, under that category's line — they are conclusions, not
 defects, and must not consume a slot in the top-N findings list below.
 
-### 4. Findings
+### Findings
 
-`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem` and `Fix` are
 the shared finding fields. This survey adds:
 
 - **Category** — one or more tags from: `component-architecture` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `a11y` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`
@@ -132,17 +113,14 @@ token swap that looks right in light mode and wrong in dark, a memoization
 change that quietly stales the rendered state. Reserve plan mode + multi-PR for
 a structural change across the UI layer **or** a product decision (e.g.
 "extract a shared dialog" vs "restructure the feature's component boundary").
-Example hazard note: "Sonnet 5 if the token names to use are listed in the
-task; else Opus 5."
+Example hazard note: "`sonnet` if the token names to use are listed in the
+task; else `opus`."
 
 Rank and report findings per the shared convention. Here, "confirming" a fix means re-running the build, lint, or the test suite.
 
 **Breadth-in-files under-ranks concentrated findings — say so rather than inflating it.** A god component is, by construction, one file: the whole defect is that N repetitions of one concern live in the same place. So `(impact × breadth) ÷ effort` scores it below a one-line lint tweak whose guard happens to span 100 files, and the ranking then contradicts this survey's own instruction to prefer systemic and structural issues. Do not fix this by padding the breadth count. Report the honest file count, and where the rank and the impact disagree, add one line under the summary table saying which findings the formula demotes and why. The reader can then re-sort on impact, which is what the separate-fields rule is for.
 
-List the **top 7 findings**, numbered (the category verdicts above reference
-these numbers), per Don't pad the findings
-list and prefer systemic
-findings.
+List the **top 7 findings**, numbered (the category verdicts reference these numbers).
 
 ---
 

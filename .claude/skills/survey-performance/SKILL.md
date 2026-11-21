@@ -104,19 +104,14 @@ Findings must be anchored to one or more of these flows — an issue that no com
 **Reporting:** per the shared reporting conventions,
 including suggested improvements to this survey file itself.
 
-### 1. Snappiness verdict (~5 sentences)
+The four parts of the workshop `surveys` skill's **Report structure**, with:
 
-Plain-language summary: overall, where does the app do unnecessary or badly-timed work? Name the **worst one or two flows** from the list above (with their headline numbers) and the **single biggest structural theme** (e.g. "every mutation re-renders the whole visible agenda because subscriptions are file-granular, not occurrence-granular"). This is the headline; the findings are the evidence.
+- **Snappiness verdict:** where does the app do unnecessary or badly-timed work? Name the worst one or two flows from the list above, with their headline numbers (a theme such as "every mutation re-renders the whole visible agenda because subscriptions are file-granular, not occurrence-granular").
+- **Coverage statement:** which flows you traced and measured end to end and which you only traced statically, and the test vault used (size, how generated).
 
-### 2. Coverage statement
+### Findings — top 5
 
-- Which flows you traced AND measured end to end, which you only traced statically, and which you skipped — with the reason.
-- The test vault used (size, how generated, where the generator lives).
-- Any flow or layer you suspect has issues but lacked budget to measure — flag as "unverified."
-
-### 3. Findings — top 5
-
-`Title`, `Breadth`, `Recommended model`, `Evidence`, `Problem` and `Fix` are the
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem` and `Fix` are the
 shared finding fields, with two notes: `Breadth`
 may be counted in components-per-screen where the multiplication is the point,
 and `Fix` must state the **expected effect on the baseline number** (e.g.
@@ -132,16 +127,13 @@ and `Fix` must state the **expected effect on the baseline number** (e.g.
 misplaced pixels, or a bundle change that doesn't actually move the number.
 Reserve plan mode + multi-PR for an architecture change **or** a product
 decision (e.g. "cap the list" vs "restructure the virtualizer"). Example hazard
-note: "Sonnet 5 if the cache key is specified in the task; else Opus 5."
+note: "`sonnet` if the cache key is specified in the task; else `opus`."
 
 A `Fix` that adds a cache, memo or incremental path must name the recompute-equivalence test (conventions).
 
 Rank and report findings per the shared convention. Here, "confirming" a fix means re-running the measurement recipe.
 
-Per Don't pad the findings list and
-prefer systemic findings: "every occurrence row
-subscribes to the whole store" beats "this one component lacks `useCallback`",
-and real numbers beat generic React-performance boilerplate.
+Prefer systemic findings: "every occurrence row subscribes to the whole store" beats "this one component lacks `useCallback`".
 
 ---
 
