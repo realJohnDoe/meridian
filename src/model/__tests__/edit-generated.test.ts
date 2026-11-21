@@ -345,3 +345,45 @@ describe('applyEdit — single re-time then future re-time (issue #1230)', () =>
     )
   })
 })
+
+describe('applyEdit — single re-time then future edit of another field (issue #1496)', () => {
+  it('spreads only the edited field: the following occurrences keep the series time', () => {
+    fc.assert(
+      fc.property(shapeArb, fc.nat(40), priorityArb, titleArb, (raw, pick, change, second) => {
+        const shape = { ...raw, time: '09:00', overrides: raw.overrides.filter(o => o.kind !== 'excluded') }
+        fc.pre(shape.repeat.kind !== 'afterCompletion')
+        const data = build(shape)
+        const inner = expand(data).filter(o => o.date > shape.date && o.date >= '2026-03-05' && o.date <= '2026-05-20')
+        fc.pre(inner.length > 0)
+        const occ = inner[pick % inner.length]!
+
+        const form1 = formFor(occ, data, 'single')
+        const fields1 = { ...form1, scheduled: { date: occ.date, time: '10:00' } }
+        const moved = applyEdit(data, occ, 'single', fields1, NEW_TARGET, changedEditFields(form1, fields1))
+        const before = expand(moved)
+        const pinned = follow(moved, occ)
+
+        const form2 = formFor(pinned, moved, 'future')
+        const fields2 = withChange(form2, change)
+        const after = applyEdit(moved, pinned, 'future', fields2, NEW_TARGET, changedEditFields(form2, fields2))
+        const occsAfter = expand(after)
+
+        // Every slot stays where it was; only the priority of the following,
+        // inheriting occurrences changes (an override's own priority wins, #1191).
+        const prio = change.kind === 'priority' ? change.value : null
+        const inherits = (o: Occurrence) => o.metadata.priority === (shape.priority ?? undefined)
+        const expected = before.map(o => o.date < occ.date || !inherits(o) ? view(o) : view({ ...o, metadata: { ...o.metadata, priority: prio ?? undefined } }))
+        expect(views(occsAfter)).toEqual(expected.sort())
+        expect(follow(after, pinned).time).toBe('10:00')
+        expect(titled(expand(parse(serializeOnly(after))))).toEqual(titled(occsAfter))
+
+        // A second save in the same session lands where saving its fields once would.
+        const fields3 = withChange(fields2, second)
+        const t3 = changedEditFields(form2, fields3)
+        const twice = applyEdit(after, follow(after, pinned), 'future', fields3, NEW_TARGET, t3)
+        expect(serializeOnly(twice)).toBe(serializeOnly(applyEdit(moved, pinned, 'future', fields3, NEW_TARGET, t3)))
+      }),
+      { seed: 20261121, numRuns: 100 },
+    )
+  })
+})
