@@ -64,12 +64,11 @@ export default function AddVaultWizard() {
   const available = isFolderPickerSupported() ? SOURCE_CARDS : SOURCE_CARDS.filter(c => c.id !== 'local')
   const sourceCards = offerTutorial ? [...available, TUTORIAL_CARD] : available
 
-  const done = () => void navigate({ to: '/settings' })
+  const done = () => void navigate({ to: '/settings', replace: true })
 
   async function handleNext() {
     if (source === 'local') {
-      done()
-      await addLocalVault()
+      if (await addLocalVault()) done()
     } else if (source === 'example') {
       done()
       await addExampleVault()

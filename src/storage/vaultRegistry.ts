@@ -535,7 +535,8 @@ export async function setVaultRetentionDays(id: string, days: number | null): Pr
   await updateVaultRefs(current => current.map(r => (r.id === id ? { ...r, retentionDays: days ?? undefined } : r)))
 }
 
-export async function addLocalVault(): Promise<void> {
+/** Resolves `true` once the vault is added, `false` if the picker was cancelled or the add failed. */
+export async function addLocalVault(): Promise<boolean> {
   try {
     await cacheInit()
     const handle = await diskPickDirectory()
@@ -546,10 +547,13 @@ export async function addLocalVault(): Promise<void> {
     const ref: VaultRef = { id, name: handle.name, kind: 'local' }
     const backend = new LocalBackend(id, handle.name, handle)
     await registerAndMount(ref, backend)
+    return true
   } catch (e) {
-    if ((e as Error).name === 'AbortError') return
-    console.error('[vault] addLocalVault failed:', e)
-    notifyError('Could not connect vault', e)
+    if ((e as Error).name !== 'AbortError') {
+      console.error('[vault] addLocalVault failed:', e)
+      notifyError('Could not connect vault', e)
+    }
+    return false
   }
 }
 
