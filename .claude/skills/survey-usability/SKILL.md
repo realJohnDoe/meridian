@@ -107,8 +107,6 @@ the walkthroughs. Per core flow — tasks 1, 2, 3, 6, 7, 8 and 9 below — at
    `await page.locator('body').ariaSnapshot()`, then
    `await page.addScriptTag({ path: '<scratch>/node_modules/axe-core/axe.min.js' })`
    and `page.evaluate(() => axe.run(document, { resultTypes: ['violations'] }))`.
-   (Verified 2026-11-03 on the agenda: `aria-required-attr`, `button-name`
-   and `region` fire.)
 3. Read the snapshot as a screen-reader user would: can they reach each
    control by role and name, is the result of an action announced (a toast, a
    moved focus, a changed heading), does the flow finish without sight?
@@ -126,11 +124,11 @@ core, and say which you added:
 2. Capture a task for tomorrow at 9:00.
 3. Complete a task, then find it again.
 4. Reschedule an event.
-5. Change one occurrence of a recurring event; then change all future ones.
+5. Change one occurrence of a recurring event; then change all future ones, once on an occurrence you already edited alone. After each save, check the occurrences you didn't touch.
 6. Write a note that links to another entry; follow the backlink.
 7. Find an entry by searching.
 8. Move between agenda, day, week, month, unscheduled tasks and notes, and back to today.
-9. Delete one occurrence of a recurring event from its editor, then undo it (the Tutorial vault's `team-standup` or `morning-run`); delete a one-off entry from its editor; swipe-delete from the agenda. Walk each route separately: swipe-delete never reaches the editor's dialogs.
+9. Delete one occurrence of a recurring event from its editor, then undo it (the Tutorial vault's `team-standup` or `morning-run`); delete a one-off entry from its editor; swipe-delete from the agenda. Walk each route separately: swipe-delete never reaches the editor's dialogs. Time how long `Undo` stays on screen.
 10. Change the theme and one other preference.
 11. Start adding a vault (up to the environment's limit).
 
