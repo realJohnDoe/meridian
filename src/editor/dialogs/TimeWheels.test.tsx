@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { useState } from 'react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, act } from '@testing-library/react'
+import { useStore } from '@/store'
 import TimeWheels, { ITEM_H, SETTLE_MS, geometry } from './TimeWheels'
 
 const H = geometry(24)   // hours:   home 72
@@ -43,6 +44,10 @@ function setScrollTop(el: HTMLElement, px: number) {
   Object.defineProperty(el, 'scrollTop', { value: px, writable: true, configurable: true })
 }
 
+const setHour12 = (hour12: boolean) =>
+  useStore.setState(st => ({ localePrefs: { ...st.localePrefs, hour12 } }))
+
+beforeEach(() => { setHour12(false) })
 afterEach(() => { vi.useRealTimers() })
 
 describe('TimeWheels — value parsing', () => {
@@ -544,5 +549,37 @@ describe('TimeWheels — holding through settle', () => {
     vi.advanceTimersByTime(SETTLE_MS * 2)
 
     expect(hour.scrollTop).toBe((H.home + 6) * ITEM_H + 10)   // finger still down
+  })
+})
+
+describe('TimeWheels — 12-hour display', () => {
+  beforeEach(() => { setHour12(true) })
+  const texts = (col: HTMLElement) => within(col).getAllByRole('option').map(o => o.textContent)
+
+  it('lists 12, 1 … 11 and an AM/PM column', () => {
+    renderWheels('13:30')
+    const hour = screen.getByRole('listbox', { name: 'Hour' })
+    expect(texts(hour)).toEqual(['12', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'])
+    expect(selected(hour)).toBe('1')
+    expect(selected(screen.getByRole('listbox', { name: 'AM or PM' }))).toBe('PM')
+  })
+
+  it('shows midnight as 12 AM', () => {
+    renderWheels('00:00')
+    expect(selected(screen.getByRole('listbox', { name: 'Hour' }))).toBe('12')
+    expect(selected(screen.getByRole('listbox', { name: 'AM or PM' }))).toBe('AM')
+  })
+
+  it('emits 24-hour HH:MM when picking 1 and PM', () => {
+    const { emitted, hour } = renderLive('09:00')
+    fireEvent.click(within(hour).getAllByRole('option').find(o => o.textContent === '1')!)
+    fireEvent.click(within(screen.getByRole('listbox', { name: 'AM or PM' })).getByRole('option', { name: 'PM' }))
+    expect(emitted).toHaveBeenLastCalledWith('13:00')
+  })
+
+  it('flips AM/PM when the minutes carry across 11 -> 12', () => {
+    const { emitted, minute } = renderLive('11:55')
+    fireEvent.keyDown(minute, { key: 'ArrowDown' })
+    expect(emitted).toHaveBeenLastCalledWith('12:00')
   })
 })
