@@ -1,3 +1,5 @@
+import { Profiler } from 'react'
+import { recordRender } from '@/lib/perfJournal'
 import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import AppSidebar from './-appSidebar'
@@ -33,7 +35,7 @@ function EntryLayout() {
           claim — see the sidebar's own "sidebar-gap" placeholder in
           components/ui/sidebar.tsx. */}
       <div data-flow-screen className="mx-auto w-full min-w-0 flex-1 bg-background">
-        <Outlet />
+        <Profiler id="entry-page" onRender={recordRender}><Outlet /></Profiler>
       </div>
     </SidebarProvider>
   )
