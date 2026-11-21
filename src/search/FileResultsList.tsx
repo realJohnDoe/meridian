@@ -6,13 +6,15 @@ import { OccurrenceCard } from '@/components'
 import { VirtualRows } from '@/components/primitives/virtual-rows'
 import { useStore } from '@/store'
 import { useFileOccurrenceMap } from '@/hooks'
-import { rankByQuery } from '@/lib/matching'
+import { searchEntries, highlightParts } from './searchMatch'
 import { cn } from '@/lib/cn'
 
 export interface FileSearchResult {
   entry:    { entryKey: string; title: string }
   occ:      Occurrence
   listedOn: string[]
+  /** Matching body line, when the match needed the body. */
+  snippet?: string
 }
 
 interface Props {
@@ -36,7 +38,7 @@ const ROW_H = 68
  * Shows one agenda OccurrenceCard per matching file (one representative
  * occurrence per file from fileOccurrenceMap), so no duplicates when a file
  * has multiple occurrences in the range.
- * Tags and topics are matched the same way — no divergence between fields.
+ * Matching is `searchEntries` (title, tags, body); body hits show a snippet.
  */
 export default function FileResultsList(props: Props) {
   'use no memo' // TanStack Virtual's useVirtualizer() returns imperative
@@ -54,24 +56,20 @@ export default function FileResultsList(props: Props) {
   const results = useMemo(() => {
     if (!query) return []
     const entries = fileEntries(roots)
-    const ranked = rankByQuery(
-      query,
-      entries,
-      e => [e.title, ...e.tags, ...e.items].join(' '),
-      e => e.title,
-    )
+    const ranked = searchEntries(query, entries.map(e => ({ ...e, body: roots.get(e.entryKey)?.body })))
     // The occurrence is resolved here, not in the render body: a row that
     // cannot resolve one must never reach the virtualizer, or `count` promises
     // a row that nothing draws — the virtualizer still reserves its height and
     // the result is an invisible gap between real results. `fileOccurrenceMap`
     // is total over `roots`, so this drops nothing today; it is what keeps the
     // count and what is drawn incapable of disagreeing if that ever changes.
-    return ranked.flatMap(entry => {
+    return ranked.flatMap(({ entry, snippet }) => {
       const occ = occBySlug.get(entry.entryKey)
       if (!occ) return []
       return [{
         entry,
         occ,
+        snippet,
         listedOn: (backlinks.get(entry.entryKey) ?? []).map(key => roots.get(key)?.title ?? key),
       }]
     })
@@ -102,7 +100,7 @@ export default function FileResultsList(props: Props) {
       virtualizer={virtualizer}
       rows={results}
       rowStyle={(_, vi) => ({ '--stagger': `${vi.index * 0.025}s`, paddingBottom: 6 }) as React.CSSProperties}
-      renderRow={({ entry, occ, listedOn }) => {
+      renderRow={({ entry, occ, listedOn, snippet }) => {
         const highlighted = highlightedEntryKey === entry.entryKey
         return (
           // Not role="option" itself — OccurrenceCard's own SurfaceButton
@@ -122,6 +120,13 @@ export default function FileResultsList(props: Props) {
               onOpen={() => onOpen(occ)}
               onToggleDone={() => {}}
             />
+            {snippet && (
+              <p className="truncate px-3 pt-0.5 text-xs text-muted-foreground">
+                {highlightParts(query, snippet).map((part, i) =>
+                  // eslint-disable-next-line @eslint-react/no-array-index-key -- static text runs, position is identity
+                  i % 2 ? <mark key={i} className="rounded-sm bg-primary-tint text-foreground">{part}</mark> : part)}
+              </p>
+            )}
           </div>
         )
       }}
