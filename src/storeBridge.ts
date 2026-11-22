@@ -5,6 +5,7 @@ import type { VaultRef } from './vaultRef'
 import { useStore, vaultLayer } from './store'
 import type { VaultLayer, VaultSyncStatus } from './store'
 import { fileOccurrenceMap } from './fileOccurrence'
+import { measure } from '@/lib/perfJournal'
 
 // ── STORE ACCESSORS ────────────────────────────────────────────
 export const getItems         = (): StoreItem[]    => useStore.getState().items
@@ -73,7 +74,7 @@ export const getSlugSnapshot = (): StoreData => {
  */
 export const getVaultLayer   = (vaultId: string): VaultLayer => vaultLayer(useStore.getState().entries, vaultId)
 export const setVaultLayer   = (vaultId: string, data: VaultLayer): void =>
-  useStore.getState().setVaultLayer(vaultId, data)
+  measure('setVaultLayer', () => { useStore.getState().setVaultLayer(vaultId, data) })
 export const removeVaultLayer = (vaultId: string): void =>
   useStore.getState().removeVaultLayer(vaultId)
 
