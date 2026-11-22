@@ -24,6 +24,7 @@ import { notify, warn, warnWithDetails, notifyError } from './notifications'
 import { getBackend } from './backends'
 import { journal, hashContent, syncJournalDump } from './syncJournal'
 import { parseFiles, reportParseFailures } from './parseReport'
+import { measure } from '@/lib/perfJournal'
 import { syncStateFor, noteSyncSuccess, noteSyncFailure } from './syncState'
 import { sweepRetention } from './retentionSweep'
 import { updateSyncUI } from './syncUI'
@@ -432,6 +433,10 @@ export function mergeChangedIntoStore(
   records: Array<{ path: string; content: string }>,
   alsoAffected: Iterable<EntryKey> = [],
 ): void {
+  measure('mergeChangedIntoStore', () => { mergeChanged(vaultId, records, alsoAffected) })
+}
+
+function mergeChanged(vaultId: string, records: Array<{ path: string; content: string }>, alsoAffected: Iterable<EntryKey>): void {
   const affected = new Set(alsoAffected)
   for (const r of records) affected.add(pathToKey(vaultId, r.path))
 

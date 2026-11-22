@@ -6,7 +6,7 @@ type Callback = (list: { getEntries: () => unknown[] }) => void
 const observers = new Map<string, Callback>()
 
 class FakeObserver {
-  static supportedEntryTypes = ['event', 'long-animation-frame']
+  static supportedEntryTypes = ['event', 'long-animation-frame', 'measure']
   constructor(private cb: Callback) {}
   observe({ type }: { type: string }) { observers.set(type, this.cb) }
 }
@@ -80,9 +80,9 @@ describe('perfJournal', () => {
       recordRender('app-page', 'update', 9, 500)
       recordRender('entry-page', 'update', 71, 60)
       recordRender('root', 'update', 84, 61)
-      emit('event', event({ name: 'click', startTime: 50, duration: 120 }))
+      emit('event', event({ name: 'click', startTime: 50, duration: 120, processingStart: 60, processingEnd: 100 }))
       const dump = perfJournalDump()
-      expect(dump).toContain('← entry-page update 71ms, root update 84ms · other 36ms')
+      expect(dump).toContain('← entry-page update 71ms, root update 84ms · other 26ms (commit/effects/layout)')
       expect(dump).not.toContain('app-page')
     })
 
@@ -90,13 +90,13 @@ describe('perfJournal', () => {
       recordRender('entry-page', 'update', 70, 60)
       recordRender('root', 'update', 80, 61)
       recordRender('app-page', 'update', 30, 62)
-      emit('event', event({ startTime: 50, duration: 200 }))
-      expect(perfJournalDump()).toContain('other 120ms')
+      emit('event', event({ startTime: 50, duration: 200, processingStart: 60 }))
+      expect(perfJournalDump()).toContain('other 110ms')
     })
 
-    it('says so when nothing rendered, and never reports a negative remainder', () => {
+    it('says so when nothing rendered, leaves input delay out, and never reports a negative remainder', () => {
       emit('event', event({ interactionId: 1, startTime: 0, duration: 120 }))
-      expect(perfJournalDump()).toContain('← no render · other 120ms')
+      expect(perfJournalDump()).toContain('← no render · other 90ms')
       recordRender('root', 'update', 500, 10)
       emit('event', event({ interactionId: 2, startTime: 0, duration: 120 }))
       expect(perfJournalDump()).toContain('other 0ms')
@@ -106,7 +106,24 @@ describe('perfJournal', () => {
       emit('event', event({ name: 'pointerdown', startTime: 0, duration: 120 }))
       recordRender('root', 'update', 80, 200)
       emit('event', event({ name: 'click', startTime: 100, duration: 150 }))
-      expect(perfJournalDump()).toContain('root update 80ms · other 170ms')
+      expect(perfJournalDump()).toContain('root update 80ms · other 140ms')
+    })
+  })
+
+  describe('User Timing attribution', () => {
+    const m = (name: string, startTime: number, duration: number) => ({ name, startTime, duration })
+
+    it('names the measures that overlapped the input delay, not the ones after it', () => {
+      emit('measure', m('mergeChangedIntoStore', -300, 320), m('setVaultLayer', 40, 50))
+      emit('event', event({ startTime: 0, duration: 200, processingStart: 30 }))
+      const dump = perfJournalDump()
+      expect(dump).toContain('other 170ms (commit/effects/layout) · input delayed by mergeChangedIntoStore 320ms')
+      expect(dump).not.toContain('setVaultLayer')
+    })
+
+    it('gives a long measure a line of its own', () => {
+      emit('measure', m('setVaultLayer', 0, 150))
+      expect(perfJournalDump()).toContain('task         150ms  setVaultLayer')
     })
   })
 })
