@@ -1,6 +1,7 @@
 name: Deploy
 
-# One merge deploys all three: the GitHub Pages site, the `meridian` Worker
+# One merge deploys all three: the GitHub Pages site (now only the teardown
+# page that retires the old origin, src/teardown/), the `meridian` Worker
 # (the app on its own origin plus its endpoints) and the `legacy` Worker
 # (endpoints only, for the Pages site). See worker/wrangler.toml.
 

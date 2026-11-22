@@ -127,6 +127,10 @@ export default defineConfig({
         'src/routes/_entry.entry.$slug.tsx',
         'src/routeTree.gen.ts',
         'src/main.tsx',
+        // The teardown page's entry wiring; its logic is in teardown.ts and
+        // retireWorker.ts, both counted.
+        'src/teardown/main.ts',
+        'src/teardown/sw.ts',
       ],
       // Per-file floors for modules already well-covered, so they can't
       // silently regress. Set a few points below measured coverage to leave
