@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { Profiler, useEffect, useRef } from 'react'
+import { recordRender } from '@/lib/perfJournal'
 import { createFileRoute, Outlet, useNavigate, useRouter, useRouterState } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { useStore } from '@/store'
@@ -117,7 +118,7 @@ function SettingsLayout() {
           data-flow-screen
           className="mx-auto flex w-full max-w-2xl flex-col px-4 pt-5 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6"
         >
-          <Outlet />
+          <Profiler id="settings-page" onRender={recordRender}><Outlet /></Profiler>
         </div>
       </div>
     </SidebarProvider>

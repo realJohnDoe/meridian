@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { Profiler, useCallback, useEffect, useRef } from 'react'
+import { recordRender } from '@/lib/perfJournal'
 import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
 import { CalendarCheck2 } from 'lucide-react'
 import { useMediaQuery } from '@/hooks'
@@ -298,7 +299,7 @@ function AppMain() {
             view, not route content, and a shell-wide query would flag the
             search bar's own input on every route. */}
         <section data-app-content className="flex flex-1 flex-col overflow-hidden min-h-0">
-          <Outlet />
+          <Profiler id="app-page" onRender={recordRender}><Outlet /></Profiler>
         </section>
 
         <SearchBar />

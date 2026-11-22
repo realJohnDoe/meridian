@@ -1,9 +1,10 @@
 import { createRouter, RouterProvider } from '@tanstack/react-router'
+import { Profiler } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import { routeTree } from './routeTree.gen'
 import { AppErrorFallback } from '@/components'
-import { startPerfJournal } from '@/lib/perfJournal'
+import { startPerfJournal, recordRender } from '@/lib/perfJournal'
 
 startPerfJournal()
 
@@ -33,5 +34,7 @@ declare module '@tanstack/react-router' {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <RouterProvider router={router} />
+  <Profiler id="root" onRender={recordRender}>
+    <RouterProvider router={router} />
+  </Profiler>
 )

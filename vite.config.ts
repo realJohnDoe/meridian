@@ -258,9 +258,13 @@ export default defineConfig({
     spaFallbackPlugin(),
   ],
   resolve: {
-    alias: {
-      '@': path.resolve(import.meta.dirname, './src'),
-    },
+    alias: [
+      { find: '@', replacement: path.resolve(import.meta.dirname, './src') },
+      // React's profiling build, so <Profiler onRender> reports in production —
+      // the perf journal (src/lib/perfJournal.ts) attributes slow taps to it.
+      // Anchored: a string key 'react-dom' would rewrite every react-dom import.
+      { find: /^react-dom\/client$/, replacement: 'react-dom/profiling' },
+    ],
   },
   // Align dep pre-bundling target with the build target. Without this, Vite's
   // optimizeDeps uses its own default (es2020/chrome87/…) and fails on packages

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { startPerfJournal, perfJournalCount, perfJournalDump, clearPerfJournal } from './perfJournal'
+import { startPerfJournal, perfJournalCount, perfJournalDump, clearPerfJournal, recordRender as record } from './perfJournal'
 
 type Callback = (list: { getEntries: () => unknown[] }) => void
 const observers = new Map<string, Callback>()
@@ -26,6 +26,10 @@ beforeEach(() => {
   vi.stubGlobal('PerformanceObserver', FakeObserver)
   startPerfJournal()
 })
+
+/** React's onRender passes baseDuration and startTime between the duration and the commit time. */
+const recordRender = (id: string, phase: string, duration: number, commitTime: number) =>
+  record(id, phase, duration, 0, 0, commitTime)
 
 describe('perfJournal', () => {
   it('records a slow interaction split into input, handler and paint time', () => {
@@ -69,5 +73,40 @@ describe('perfJournal', () => {
   it('caps the ring', () => {
     for (let i = 1; i <= 150; i++) emit('event', event({ interactionId: i }))
     expect(perfJournalCount()).toBe(100)
+  })
+
+  describe('React render attribution', () => {
+    it('lists the renders committed inside the interaction, not outside it', () => {
+      recordRender('app-page', 'update', 9, 500)
+      recordRender('entry-page', 'update', 71, 60)
+      recordRender('root', 'update', 84, 61)
+      emit('event', event({ name: 'click', startTime: 50, duration: 120 }))
+      const dump = perfJournalDump()
+      expect(dump).toContain('← entry-page update 71ms, root update 84ms · other 36ms')
+      expect(dump).not.toContain('app-page')
+    })
+
+    it('subtracts only root renders, so nested ids are not counted twice', () => {
+      recordRender('entry-page', 'update', 70, 60)
+      recordRender('root', 'update', 80, 61)
+      recordRender('app-page', 'update', 30, 62)
+      emit('event', event({ startTime: 50, duration: 200 }))
+      expect(perfJournalDump()).toContain('other 120ms')
+    })
+
+    it('says so when nothing rendered, and never reports a negative remainder', () => {
+      emit('event', event({ interactionId: 1, startTime: 0, duration: 120 }))
+      expect(perfJournalDump()).toContain('← no render · other 120ms')
+      recordRender('root', 'update', 500, 10)
+      emit('event', event({ interactionId: 2, startTime: 0, duration: 120 }))
+      expect(perfJournalDump()).toContain('other 0ms')
+    })
+
+    it('recomputes the attribution when a later entry widens the interaction', () => {
+      emit('event', event({ name: 'pointerdown', startTime: 0, duration: 120 }))
+      recordRender('root', 'update', 80, 200)
+      emit('event', event({ name: 'click', startTime: 100, duration: 150 }))
+      expect(perfJournalDump()).toContain('root update 80ms · other 170ms')
+    })
   })
 })

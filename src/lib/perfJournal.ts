@@ -12,6 +12,11 @@
  * - **Long Animation Frames** (`long-animation-frame`): each slow frame, with
  *   the scripts that ran in it — the attribution for the above.
  *
+ * Plus **React render time** (`recordRender`, the `<Profiler onRender>` callback
+ * of a few static-id subtrees), appended to each slow interaction so the line
+ * says how much of it was rendering and how much (`other`: commit, unmount,
+ * layout) was not. Needs the profiling build, aliased in vite.config.ts.
+ *
  * No content: entries carry the route path, event type and target element
  * tag/role, never text.
  */
@@ -33,6 +38,21 @@ function push(t: number, text: string, interaction?: Interaction): void {
   if (_lines.length > CAPACITY) _lines.splice(0, _lines.length - CAPACITY)
 }
 
+/** Renders are kept this long: well past the interaction they belong to, which is described right after it. */
+const RENDER_KEEP_MS = 10_000
+const _renders: { id: string; phase: string; duration: number; commitTime: number }[] = []
+
+/**
+ * `<Profiler onRender>` callback (its full signature, so it can be passed as is).
+ * Fires during commit, before Event Timing delivers the interaction.
+ */
+export function recordRender(
+  id: string, phase: string, actualDuration: number, _baseDuration: number, _startTime: number, commitTime: number,
+): void {
+  _renders.push({ id, phase, duration: actualDuration, commitTime })
+  while (_renders[0] && _renders[0].commitTime < commitTime - RENDER_KEEP_MS) _renders.shift()
+}
+
 const ms = (n: number) => `${Math.round(n)}ms`
 
 function describeTarget(node: Node | null): string {
@@ -44,9 +64,15 @@ function describeTarget(node: Node | null): string {
 
 /** Input delay until the first handler ran, handlers until the last one finished, then rendering until the next paint. */
 function describeInteraction(i: Interaction): string {
+  const renders = _renders.filter(r => r.commitTime >= i.start && r.commitTime <= i.end)
+  // Nested Profilers' time is already inside `root`'s, so only `root` is subtracted.
+  const rootMs = renders.filter(r => r.id === 'root').reduce((sum, r) => sum + r.duration, 0)
+  const other = Math.max(0, i.end - i.start - rootMs)
+  const seen = renders.map(r => `${r.id} ${r.phase} ${ms(r.duration)}`).join(', ') || 'no render'
   return `${i.names.join('+')} ${ms(i.end - i.start)} = input ${ms(i.processingStart - i.start)}`
     + ` + handlers ${ms(i.processingEnd - i.processingStart)} + paint ${ms(i.end - i.processingEnd)}`
     + `  on ${i.target} at ${i.path}`
+    + `\n               ← ${seen} · other ${ms(other)} (commit/unmount/layout)`
 }
 
 function onEvent(e: PerformanceEventTiming): void {
@@ -118,4 +144,5 @@ export function perfJournalDump(): string {
 /** Tests only. */
 export function clearPerfJournal(): void {
   _lines.length = 0
+  _renders.length = 0
 }
