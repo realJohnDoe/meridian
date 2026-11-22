@@ -29,7 +29,7 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue, labelled per `conventions`. After publishing tickets with blockers, run the `dispatcher` skill's dry run (`node <dispatcher skill>/scripts/dispatch.mjs --digest realJohnDoe/agent-skills --repos realJohnDoe/meridian`, writes nothing) and compare its plan against the intended order.
+Create a GitHub issue, labelled per `conventions`. After publishing tickets with blockers, run the `dispatcher` skill's dry run (`node <dispatcher skill>/scripts/dispatch.ts plan --home realJohnDoe/joes-workshop --repos realJohnDoe/meridian`, writes nothing) and compare its plan against the intended order.
 
 ## When a skill says "fetch the relevant ticket"
 
