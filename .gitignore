@@ -10,3 +10,4 @@ worker/worker-configuration.d.ts
 scripts/perf/results/
 test-results/
 playwright-report/
+dist-teardown
