@@ -17,7 +17,9 @@ interface Props {
 
 /**
  * Shared footer for the delete dialogs. Archive is outlined, like Cancel: a
- * real alternative to deleting, but not the primary action.
+ * real alternative to deleting, but not the primary action. `AlertDialogAction`
+ * bakes in the `default` variant, and `outline` sets no text color to replace
+ * its `text-primary-foreground`, hence the explicit `text-foreground`.
  */
 export default function DeleteDialogFooter(props: Props) {
   const { onClose, onDelete, onArchive } = props
@@ -26,7 +28,7 @@ export default function DeleteDialogFooter(props: Props) {
       <AlertDialogCancel onClick={onClose} className="mt-0">Cancel</AlertDialogCancel>
       {onArchive && (
         <AlertDialogAction
-          className={buttonVariants({ variant: 'outline', className: 'gap-1.5' })}
+          className={buttonVariants({ variant: 'outline', className: 'gap-1.5 text-foreground' })}
           onClick={onArchive}
         >
           <Archive size={13} />

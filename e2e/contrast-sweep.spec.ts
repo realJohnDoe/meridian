@@ -150,6 +150,13 @@ const ROUTES = [
   { path: '/settings', ready: '[data-flow-screen]' },
   { path: '/settings/appearance', ready: '[data-flow-screen]' },
   { path: '/settings/vault/example', ready: '[data-flow-screen]' },
+  // Dialogs: none of the routes above renders one, and a dialog button's
+  // colors come from composing variants, which src/themeContrast.test.ts's
+  // token pairs can't see — "Archive instead" shipped as `outline`'s
+  // background with `default`'s leftover `text-primary-foreground`. `open`
+  // names the button to click; only text inside the dialog is checked, since
+  // everything behind it sits under the dimming overlay.
+  { path: '/entry/example/01-start-here', ready: '[data-flow-screen]', open: 'Delete', name: 'delete dialog' },
 ]
 
 /**
@@ -163,7 +170,7 @@ const ROUTES = [
 const FLOOR: Record<string, Record<string, number>> = {
   meridian: {
     '/': 12, '/unscheduled': 12, '/notes': 12, '/day/2026-09-04': 12, '/week/2026-09-04': 12, '/calendar/2026-09-01': 12,
-    '/entry/example/01-start-here': 7, '/entry/new': 5, '/settings': 9, '/settings/appearance': 1, '/settings/vault/example': 7,
+    '/entry/example/01-start-here': 7, '/entry/new': 5, '/settings': 9, '/settings/appearance': 1, '/settings/vault/example': 7, 'delete dialog': 1,
   },
   'meridian-light': {
     '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
@@ -171,7 +178,7 @@ const FLOOR: Record<string, Record<string, number>> = {
   },
   'tokyo-night': {
     '/': 13, '/unscheduled': 13, '/notes': 13, '/day/2026-09-04': 13, '/week/2026-09-04': 13, '/calendar/2026-09-01': 13,
-    '/entry/example/01-start-here': 8, '/entry/new': 6, '/settings': 10, '/settings/appearance': 2, '/settings/vault/example': 8,
+    '/entry/example/01-start-here': 8, '/entry/new': 6, '/settings': 10, '/settings/appearance': 2, '/settings/vault/example': 8, 'delete dialog': 1,
   },
   'catppuccin-latte': {
     '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
@@ -195,7 +202,7 @@ const FLOOR: Record<string, Record<string, number>> = {
   },
   dracula: {
     '/': 0, '/unscheduled': 0, '/notes': 0, '/day/2026-09-04': 0, '/week/2026-09-04': 0, '/calendar/2026-09-01': 0,
-    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 1,
+    '/entry/example/01-start-here': 0, '/entry/new': 0, '/settings': 0, '/settings/appearance': 0, '/settings/vault/example': 1, 'delete dialog': 1,
   },
 }
 
@@ -234,7 +241,7 @@ interface CollectedElement {
  * friends — real in this codebase, see `sidebar.tsx`, `select.tsx`) makes
  * text color here not always fully opaque.
  */
-function collectTextElementsInPage(): CollectedElement[] {
+function collectTextElementsInPage(scope: string): CollectedElement[] {
   function toRGBA(cssColor: string): { rgb: number[]; alpha: number } {
     function overBackdrop(hex: string): Uint8ClampedArray {
       const c = document.createElement('canvas')
@@ -297,7 +304,7 @@ function collectTextElementsInPage(): CollectedElement[] {
   }
 
   const out: CollectedElement[] = []
-  for (const el of document.body.querySelectorAll('*')) {
+  for (const el of document.querySelectorAll(`${scope} *`)) {
     let hasDirectText = false
     for (const n of el.childNodes) {
       if (n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim().length > 0) { hasDirectText = true; break }
@@ -388,7 +395,8 @@ const themeIds = extractThemeIds()
 
 for (const themeId of themeIds) {
   test.describe(themeId, () => {
-    for (const { path: route, ready } of ROUTES) {
+    for (const { path, ready, open, name } of ROUTES) {
+      const route = name ?? path
       test(route, async ({ page }) => {
         // Freeze "today" so routes that render relative to the current date
         // (`/`, `/unscheduled`, `/notes`) produce the same DOM — and the same
@@ -400,12 +408,16 @@ for (const themeId of themeIds) {
         // waitForStableLayout below still advances in real time.
         await page.clock.setFixedTime(new Date(2026, 8, 4, 12, 0, 0))
         await page.context().addInitScript(id => { localStorage.setItem('meridian_theme', id) }, themeId)
-        await page.goto(`${BASE_URL}${route}`, { waitUntil: 'load' })
+        await page.goto(`${BASE_URL}${path}`, { waitUntil: 'load' })
         await page.waitForSelector(ready, { timeout: 30_000 })
+        if (open) {
+          await page.getByRole('button', { name: open, exact: true }).click()
+          await page.getByRole('alertdialog').waitFor()
+        }
         await page.evaluate(() => document.fonts.ready)
         await waitForStableLayout(page)
 
-        const elements = await page.evaluate(collectTextElementsInPage)
+        const elements = await page.evaluate(collectTextElementsInPage, open ? '[role="alertdialog"]' : 'body')
 
         // Screenshot 2: same layout, ink blanked — background-only, since color
         // (unlike display/visibility) never triggers reflow.
